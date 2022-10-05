@@ -6,9 +6,12 @@ include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 find_package(Poco REQUIRED Foundation)
 
-add_executable( pathCam source/test.cpp 
+add_executable( pathCam source/test.cpp
+                source/common.h
 								source/Image.cpp 
-								source/Image.h)
+								source/Image.h
+								source/FeatureDetector.h
+								source/FeatureDetector.cpp)
 
 
 

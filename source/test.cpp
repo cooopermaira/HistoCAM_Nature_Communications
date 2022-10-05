@@ -14,29 +14,33 @@ int main( int argc, char* argv[] )
   string file1 = "/Users/bsumma/Source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
   string file2 = "/Users/bsumma/Source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1197.Raw";
   
-  Image *image_1 = new Image();
+  pathCam::Image *image_1 = new pathCam::Image();
   image_1->set_disk_file(file1);
   
   image_1->load_raw_from_disk();
   image_1->create_reg_image(factor);
   
-  Image *image_2 = new Image();
+  pathCam::Image *image_2 = new pathCam::Image();
   image_2->set_disk_file(file2);
   
   image_2->load_raw_from_disk();
   image_2->create_reg_image(factor);
   
-
+  
   auto begin = std::chrono::high_resolution_clock::now();
   
-    //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
-    int minHessian = 5000;
-    Ptr<SURF> detector = SURF::create( minHessian );
-    //Mat descriptors_object, descriptors_scene;
-    detector->detectAndCompute( image_1->get_reg_image(), noArray(), image_1->keypoints, image_1->descriptors );
-    std::cout << image_1->keypoints.size() << "\n";
-    detector->detectAndCompute( image_2->get_reg_image(), noArray(), image_2->keypoints, image_2->descriptors );
-    std::cout << image_2->keypoints.size() << "\n";
+  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(pathCam::_SURF);
+  detector->set_SURF_params(5000);
+  detector->detect_and_compute(image_1, image_2);
+  
+//    //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
+//    int minHessian = 5000;
+//    Ptr<SURF> detector = SURF::create( minHessian );
+//    //Mat descriptors_object, descriptors_scene;
+//  detector->detectAndCompute( image_1->get_reg_image(), noArray(), image_1->keypoints, image_1->descriptors );
+//    std::cout << image_1->keypoints.size() << "\n";
+//  detector->detectAndCompute( image_2->get_reg_image(), noArray(), image_2->keypoints, image_2->descriptors );
+//    std::cout << image_2->keypoints.size() << "\n";
     //-- Step 2: Matching descriptor vectors with a FLANN based matcher
     // Since SURF is a floating-point descriptor NORM_L2 is used
     Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create(DescriptorMatcher::FLANNBASED);
@@ -63,8 +67,10 @@ int main( int argc, char* argv[] )
     }
   
   //0, RANSAC, LMEDS, RHO
-  Mat H = findHomography( image_1_pts, image_2_pts, RHO );
-  
+  Mat H = findHomography( image_1_pts, image_2_pts, RANSAC );
+  double t_x = H.at<double>(0,0)*H.at<double>(0,2)*factor;
+  double t_y = H.at<double>(1,1)*H.at<double>(1,2)*factor;
+  std::cout << t_x << "\t" << t_y << "\n";
 
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);

@@ -3,14 +3,14 @@
 
 #include "common.h"
 
-
+namespace pathCam{
 class Image{
 public:
   
   std::vector<cv::KeyPoint> keypoints;
   cv::Mat descriptors;
-
-    
+  
+  
   Image(char *raw_buffer=0);
   ~Image();
   
@@ -28,7 +28,7 @@ public:
     }
   }
   
-  void create_reg_image(float reg_scale);
+  void create_reg_image(float reg_scale, bool convert=true);
   
   //I'm not sure if this makes a copy
   inline cv::Mat get_reg_image(){ return reg_image; }
@@ -41,18 +41,18 @@ private:
   
   void allocate_memory_RAW();
   void free_memory_RAW();
-
+  
   
   unsigned int width, height;
   char *raw_buffer;
   
   cv::Mat reg_image;
   float reg_scale;
-
-
+  
+  
   
 };
-
+}
 
 
 #endif // IMAGE

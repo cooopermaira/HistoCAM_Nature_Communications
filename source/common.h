@@ -24,6 +24,7 @@
 #include <string>
 
 #include "Image.h"
+#include "FeatureDetector.h"
 
 
 #endif /* common_h */
