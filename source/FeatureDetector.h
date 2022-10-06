@@ -30,6 +30,9 @@ class FeatureDetector{
       case _SURF:
         detector = SURF::create();
         break;
+      case _SIFT:
+        detector = SIFT::create();
+        break;
       default:
         break;
     }
@@ -42,6 +45,9 @@ public:
     create_default_detector();
   };
   
+  ~FeatureDetector(){ detector.release(); };
+
+  
   //SURF
   struct{
     int minHessian;
@@ -50,17 +56,45 @@ public:
   
   inline void set_SURF_params(int minHessian){
     SURF_params.minHessian = minHessian;
+    feature_type=_SURF;
     if(detector != nullptr){ detector.release(); }
     detector = SURF::create(SURF_params.minHessian);
   }
   
-  inline void detect_and_compute(Image *image_1, Image *image_2){
-    detector->detectAndCompute(image_1->get_reg_image(),
-                               noArray(), image_1->keypoints,
-                               image_1->descriptors );
-    detector->detectAndCompute(image_2->get_reg_image(),
-                               noArray(), image_2->keypoints,
-                               image_2->descriptors );
+  struct{
+    int nfeatures;
+    int nOctaveLayers;
+    double contrastThreshold;
+    double edgeThreshold;
+    double sigma;
+  } SIFT_params;
+  
+  inline void set_SIFT_params(int   nfeatures,
+                              int   nOctaveLayers,
+                              double   contrastThreshold,
+                              double   edgeThreshold,
+                              double   sigma){
+    SIFT_params.nfeatures = nfeatures;
+    SIFT_params.nOctaveLayers = nOctaveLayers;
+    SIFT_params.contrastThreshold = contrastThreshold;
+    SIFT_params.edgeThreshold = edgeThreshold;
+    SIFT_params.sigma = sigma;
+    
+    feature_type=_SIFT;
+
+    if(detector != nullptr){ detector.release(); }
+    detector = SIFT::create(SIFT_params.nfeatures,
+                            SIFT_params.nOctaveLayers,
+                            SIFT_params.contrastThreshold,
+                            SIFT_params.edgeThreshold,
+                            SIFT_params.sigma);
+  }
+  
+  
+  inline void detect_and_compute(Image *image){
+    detector->detectAndCompute(image->get_reg_image(),
+                               noArray(), image->keypoints,
+                               image->descriptors );
   }
   
   

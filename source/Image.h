@@ -28,7 +28,7 @@ public:
     }
   }
   
-  void create_reg_image(float reg_scale, bool convert=true);
+  void create_reg_image(float reg_scale, bool convert=true, int interpolation=cv::INTER_LINEAR);
   
   //I'm not sure if this makes a copy
   inline cv::Mat get_reg_image(){ return reg_image; }

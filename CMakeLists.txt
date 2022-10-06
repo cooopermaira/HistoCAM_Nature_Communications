@@ -10,6 +10,10 @@ add_executable( pathCam source/test.cpp
                 source/common.h
 								source/Image.cpp 
 								source/Image.h
+                source/Match.cpp
+                source/Match.h
+								source/DescriptorMatcher.h
+								source/DescriptorMatcher.cpp
 								source/FeatureDetector.h
 								source/FeatureDetector.cpp)
 

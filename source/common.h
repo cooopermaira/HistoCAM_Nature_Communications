@@ -25,6 +25,8 @@
 
 #include "Image.h"
 #include "FeatureDetector.h"
+#include "Match.h"
+#include "DescriptorMatcher.h"
 
 
 #endif /* common_h */
