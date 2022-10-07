@@ -36,6 +36,9 @@ class FeatureDetector{
       case _AKAZE:
         detector = AKAZE::create();
         break;
+      case _BRISK:
+        detector = BRISK::create();
+        break;
       default:
         break;
     }
@@ -163,6 +166,33 @@ public:
   }
 
   
+  
+  class BRISKParameters{
+  public:
+                             
+    int thresh;
+    int octaves=3;
+    float patternScale;
+    
+    BRISKParameters(int thresh=30, int octaves=3, float patternScale=1.0f):
+    thresh(thresh),
+    octaves(octaves),
+    patternScale(patternScale)
+    {};
+  };
+  
+  BRISKParameters BRISK_params;
+  
+  inline void set_BRISK_params(BRISKParameters _BRISK_params){
+    BRISK_params = _BRISK_params;
+    feature_type=_BRISK;
+
+    if(detector != nullptr){ detector.release(); }
+    detector = BRISK::create(BRISK_params.thresh,
+                             BRISK_params.octaves,
+                             BRISK_params.patternScale);
+  }
+
   
   
   inline void detect_and_compute(Image *image){

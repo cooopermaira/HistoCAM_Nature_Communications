@@ -22,7 +22,7 @@ int main( int argc, char* argv[] )
   //INTER_LINEAR_EXACT, INTER_NEAREST_EXACT
   
   //Note that setting parameters will override this setting
-  int features = pathCam::_AKAZE;
+  int features = pathCam::_BRISK;
   //pathCam::_AKAZE, pathCam::_BRISK, pathCam::_GFFT, pathCam::_KAZE,
   //pathCam::_MSER, pathCam::_ORB, pathCam::_SIFT, pathCam::_BOOST,
   //pathCam::_DAISY, pathCam::_FREAK, pathCam::_LATCH, pathCam::_LUCID,
@@ -31,6 +31,7 @@ int main( int argc, char* argv[] )
   pathCam::FeatureDetector::SIFTParameters SIFT_params;
   pathCam::FeatureDetector::SURFParameters SURF_params;
   pathCam::FeatureDetector::AKAZEParameters AKAZE_params;
+  pathCam::FeatureDetector::BRISKParameters BRISK_params;
 
   
   cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
@@ -75,6 +76,9 @@ int main( int argc, char* argv[] )
       break;
     case pathCam::_AKAZE:
       detector->set_AKAZE_params(AKAZE_params);
+      break;
+    case pathCam::_BRISK:
+      detector->set_BRISK_params(BRISK_params);
       break;
   }
 
