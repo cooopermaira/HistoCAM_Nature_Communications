@@ -7,8 +7,12 @@ using namespace std;
 int main( int argc, char* argv[] )
 {
   
-  int factor = 4;
-  //1,2,4,8,16
+  //Crop
+  double crop_factor = 1.0;
+  //1.0, 0.5, 0.25
+  
+  double scale_factor = 1.0;
+  //1.0, 0.5, 0.25, 0.125, 0.0625
   
   bool debayer = true;
   //true, false
@@ -17,11 +21,16 @@ int main( int argc, char* argv[] )
   //INTER_NEAREST, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4, INTER_LINEAR_EXACT,
   //INTER_LINEAR_EXACT, INTER_NEAREST_EXACT
   
+  //Note that setting parameters will override this setting
   int features = pathCam::_SIFT;
   //pathCam::_AKAZE, pathCam::_BRISK, pathCam::_GFFT, pathCam::_KAZE,
   //pathCam::_MSER, pathCam::_ORB, pathCam::_SIFT, pathCam::_BOOST,
   //pathCam::_DAISY, pathCam::_FREAK, pathCam::_LATCH, pathCam::_LUCID,
   //pathCam::_MSD, pathCam::_SURF, pathCam::_VGG
+  
+  pathCam::FeatureDetector::SIFTParameters SIFT_params;
+  pathCam::FeatureDetector::SURFParameters SURF_params;
+  
   
   cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE;
   //cv::DescriptorMatcher::FLANNBASED
@@ -44,17 +53,27 @@ int main( int argc, char* argv[] )
   image_1->set_disk_file(file1);
   
   image_1->load_raw_from_disk();
-  image_1->create_reg_image(factor,debayer,interpolation);
+  image_1->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
   
   pathCam::Image *image_2 = new pathCam::Image();
   image_2->set_disk_file(file2);
   
   image_2->load_raw_from_disk();
-  image_2->create_reg_image(factor,debayer,interpolation);
+  image_2->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
   
   auto begin = std::chrono::high_resolution_clock::now();
   
-  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(pathCam::_SIFT);
+  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features);
+  
+  switch(features){
+    case pathCam::_SURF:
+      detector->set_SURF_params(SURF_params);
+      break;
+    case pathCam::_SIFT:
+      detector->set_SIFT_params(SIFT_params);
+      break;
+  }
+
   detector->detect_and_compute(image_1);
   detector->detect_and_compute(image_2);
   
@@ -73,18 +92,19 @@ int main( int argc, char* argv[] )
     }
   
   Mat H = findHomography( image_1_pts, image_2_pts, estimator );
-  double t_x = H.at<double>(0,0)*H.at<double>(0,2)*factor;
-  double t_y = H.at<double>(1,1)*H.at<double>(1,2)*factor;
+  double t_x = H.at<double>(0,0)*H.at<double>(0,2)*scale_factor;
+  double t_y = H.at<double>(1,1)*H.at<double>(1,2)*scale_factor;
 
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
   
-  std::cout << factor << "\t";
+  std::cout << scale_factor << "\t";
+  std::cout << crop_factor << "\t";
+  std::cout << debayer << "\t";
+  std::cout << (image_1->keypoints.size()+image_2->keypoints.size())/2 << "\t";
   std::cout << sqrt((dx-t_x)*(dx-t_x) + (dy-t_y)*(dy-t_y)) << "\t";
   printf("%.3fs\n", elapsed.count() * 1e-9);
 
-  std::cout << image_1->keypoints.size() << "\n";
-  std::cout << image_2->keypoints.size() << "\n";
   
 //  //-- Draw matches
 //  Mat img_matches;

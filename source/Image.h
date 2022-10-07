@@ -28,7 +28,7 @@ public:
     }
   }
   
-  void create_reg_image(float reg_scale, bool convert=true, int interpolation=cv::INTER_LINEAR);
+  void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR);
   
   //I'm not sure if this makes a copy
   inline cv::Mat get_reg_image(){ return reg_image; }
@@ -47,7 +47,8 @@ private:
   char *raw_buffer;
   
   cv::Mat reg_image;
-  float reg_scale;
+  double reg_scale;
+  double reg_crop;
   
   
   

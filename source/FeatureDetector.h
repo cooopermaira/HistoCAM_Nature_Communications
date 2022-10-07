@@ -49,37 +49,63 @@ public:
 
   
   //SURF
-  struct{
-    int minHessian;
-  } SURF_params;
+  class SURFParameters{
+  public:
+    double hessianThreshold;
+    int nOctaves;
+    int nOctaveLayers;
+    bool extended;
+    bool upright;
+    
+    SURFParameters(double hessianThreshold=100,
+                int nOctaves=4,
+                int nOctaveLayers=3,
+                bool extended=false,
+                bool upright=false):
+                    hessianThreshold(hessianThreshold),
+                    nOctaves(nOctaves),
+                    nOctaveLayers(nOctaveLayers),
+                    extended(extended),
+                    upright(upright) {};
+  };
   
+  SURFParameters SURF_params;
   
-  inline void set_SURF_params(int minHessian){
-    SURF_params.minHessian = minHessian;
+  inline void set_SURF_params(SURFParameters _SURF_params){
+    SURF_params = _SURF_params;
     feature_type=_SURF;
     if(detector != nullptr){ detector.release(); }
-    detector = SURF::create(SURF_params.minHessian);
+    detector = SURF::create(SURF_params.hessianThreshold,
+                            SURF_params.nOctaves,
+                            SURF_params.nOctaveLayers,
+                            SURF_params.extended,
+                            SURF_params.upright );
   }
   
-  struct{
+  class SIFTParameters{
+  public:
     int nfeatures;
     int nOctaveLayers;
     double contrastThreshold;
     double edgeThreshold;
     double sigma;
-  } SIFT_params;
-  
-  inline void set_SIFT_params(int   nfeatures,
-                              int   nOctaveLayers,
-                              double   contrastThreshold,
-                              double   edgeThreshold,
-                              double   sigma){
-    SIFT_params.nfeatures = nfeatures;
-    SIFT_params.nOctaveLayers = nOctaveLayers;
-    SIFT_params.contrastThreshold = contrastThreshold;
-    SIFT_params.edgeThreshold = edgeThreshold;
-    SIFT_params.sigma = sigma;
     
+    SIFTParameters(int   nfeatures=0,
+                   int   nOctaveLayers=3,
+                   double   contrastThreshold=0.04,
+                   double   edgeThreshold=10,
+                   double   sigma=1.6):
+                          nfeatures(nfeatures),
+                          nOctaveLayers(nOctaveLayers),
+                          contrastThreshold(contrastThreshold),
+                          edgeThreshold(edgeThreshold),
+                          sigma(sigma) {};
+  };
+  
+  SIFTParameters SIFT_params;
+  
+  inline void set_SIFT_params(SIFTParameters _SIFT_params){
+    SIFT_params = _SIFT_params;
     feature_type=_SIFT;
 
     if(detector != nullptr){ detector.release(); }
