@@ -33,6 +33,9 @@ class FeatureDetector{
       case _SIFT:
         detector = SIFT::create();
         break;
+      case _AKAZE:
+        detector = AKAZE::create();
+        break;
       default:
         break;
     }
@@ -115,6 +118,51 @@ public:
                             SIFT_params.edgeThreshold,
                             SIFT_params.sigma);
   }
+  
+    
+  class AKAZEParameters{
+  public:
+                             
+    AKAZE::DescriptorType descriptor_type;
+    int descriptor_size;
+    int descriptor_channels;
+    float threshold;
+    int nOctaves;
+    int nOctaveLayers;
+    KAZE::DiffusivityType diffusivity = KAZE::DIFF_PM_G2;
+    
+    
+    AKAZEParameters(AKAZE::DescriptorType descriptor_type = AKAZE::DESCRIPTOR_MLDB,
+                    int descriptor_size = 0, int descriptor_channels = 3,
+                    float threshold = 0.001f, int nOctaves = 4,
+                    int nOctaveLayers = 4, KAZE::DiffusivityType diffusivity = KAZE::DIFF_PM_G2):
+    descriptor_type(descriptor_type),
+    descriptor_size(descriptor_size),
+    descriptor_channels(descriptor_channels),
+    threshold(threshold),
+    nOctaves(nOctaves),
+    nOctaveLayers(nOctaveLayers),
+    diffusivity(diffusivity)
+    {};
+  };
+  
+  AKAZEParameters AKAZE_params;
+  
+  inline void set_AKAZE_params(AKAZEParameters _AKAZE_params){
+    AKAZE_params = _AKAZE_params;
+    feature_type=_AKAZE;
+
+    if(detector != nullptr){ detector.release(); }
+    detector = AKAZE::create(AKAZE_params.descriptor_type,
+                             AKAZE_params.descriptor_size,
+                             AKAZE_params.descriptor_channels,
+                             AKAZE_params.threshold,
+                             AKAZE_params.nOctaves,
+                             AKAZE_params.nOctaveLayers,
+                             AKAZE_params.diffusivity);
+  }
+
+  
   
   
   inline void detect_and_compute(Image *image){
