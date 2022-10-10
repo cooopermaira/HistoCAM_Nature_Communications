@@ -7,6 +7,8 @@ using namespace std;
 int main( int argc, char* argv[] )
 {
   
+  std::cout << getBuildInformation() << "\n";
+  
   //Crop
   double crop_factor = 0.5;
   //1.0, 0.5, 0.25
@@ -22,11 +24,16 @@ int main( int argc, char* argv[] )
   //INTER_LINEAR_EXACT, INTER_NEAREST_EXACT
   
   //Note that setting parameters will override this setting
-  int features = pathCam::_BRISK;
-  //pathCam::_AKAZE, pathCam::_BRISK, pathCam::_GFFT, pathCam::_KAZE,
+  int features = pathCam::_SURF;
+  //pathCam::_AKAZE, pathCam::_BRISK, athCam::_KAZE,
   //pathCam::_MSER, pathCam::_ORB, pathCam::_SIFT, pathCam::_BOOST,
   //pathCam::_DAISY, pathCam::_FREAK, pathCam::_LATCH, pathCam::_LUCID,
   //pathCam::_MSD, pathCam::_SURF, pathCam::_VGG
+
+  //Not working
+  bool use_FREAK = false;
+  
+  //not really working: pathCam::_GFFT
   
   pathCam::FeatureDetector::SIFTParameters SIFT_params;
   pathCam::FeatureDetector::SURFParameters SURF_params;
@@ -65,7 +72,7 @@ int main( int argc, char* argv[] )
   
   auto begin = std::chrono::high_resolution_clock::now();
   
-  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features);
+  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
   
   switch(features){
     case pathCam::_SURF:

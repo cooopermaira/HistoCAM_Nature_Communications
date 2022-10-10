@@ -16,12 +16,14 @@ using namespace cv::xfeatures2d;
 namespace pathCam{
 
 enum{_AKAZE, _BRISK, _GFFT, _KAZE, _MSER, _ORB, _SIFT, //features2d
-  _BOOST, _DAISY, _FREAK, _LATCH, _LUCID, _MSD, _SURF, _VGG}; //xfeatures2d
-
+  _BOOST, _DAISY, _LATCH, _LUCID, _MSD, _SURF, _VGG}; //xfeatures2d
 
 class FeatureDetector{
   
   int feature_type;
+  bool use_FREAK;
+  
+  FREAK extractor;
   
   Ptr<Feature2D> detector;
   
@@ -39,6 +41,9 @@ class FeatureDetector{
       case _BRISK:
         detector = BRISK::create();
         break;
+      case _GFFT:
+        detector = GFTTDetector::create();
+        break;
       default:
         break;
     }
@@ -47,12 +52,12 @@ class FeatureDetector{
   
 public:
   
-  FeatureDetector(int feature_type=_SURF): feature_type(feature_type) {
+  FeatureDetector(int feature_type=_SURF, bool use_FREAK=false):
+                            feature_type(feature_type), use_FREAK(use_FREAK) {
     create_default_detector();
   };
   
   ~FeatureDetector(){ detector.release(); };
-
   
   //SURF
   class SURFParameters{
@@ -196,9 +201,15 @@ public:
   
   
   inline void detect_and_compute(Image *image){
-    detector->detectAndCompute(image->get_reg_image(),
-                               noArray(), image->keypoints,
-                               image->descriptors );
+    if(use_FREAK){
+      detector->detect(image->get_reg_image(),image->keypoints);
+      extractor.compute( image->get_reg_image(), image->keypoints, image->descriptors  );
+      
+    }else{
+      detector->detectAndCompute(image->get_reg_image(),
+                                 noArray(), image->keypoints,
+                                 image->descriptors );
+    }
   }
   
   
