@@ -36,7 +36,7 @@ int main( int argc, char* argv[] )
   //not really working: pathCam::_GFFT
   
   pathCam::FeatureDetector::SIFTParameters SIFT_params;
-  pathCam::FeatureDetector::SURFParameters SURF_params;
+  pathCam::FeatureDetector::SURFParameters SURF_params = pathCam::FeatureDetector::SURFParameters(1000, 1, 3, false, false);
   pathCam::FeatureDetector::AKAZEParameters AKAZE_params;
   pathCam::FeatureDetector::BRISKParameters BRISK_params;
 
@@ -62,16 +62,17 @@ int main( int argc, char* argv[] )
   image_1->set_disk_file(file1);
   
   image_1->load_raw_from_disk();
-  image_1->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
   
   pathCam::Image *image_2 = new pathCam::Image();
   image_2->set_disk_file(file2);
   
   image_2->load_raw_from_disk();
-  image_2->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
   
   auto begin = std::chrono::high_resolution_clock::now();
-  
+
+  image_1->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
+  image_2->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
+
   pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
   
   switch(features){
