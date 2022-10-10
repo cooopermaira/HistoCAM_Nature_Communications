@@ -31,7 +31,7 @@ int main( int argc, char* argv[] )
   //pathCam::_MSD, pathCam::_SURF, pathCam::_VGG
 
   //Not working
-  bool use_FREAK = false;
+  bool use_FREAK = true;
   
   //not really working: pathCam::_GFFT
   
@@ -41,7 +41,7 @@ int main( int argc, char* argv[] )
   pathCam::FeatureDetector::BRISKParameters BRISK_params;
 
   
-  cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::FLANNBASED;
+  cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   //cv::DescriptorMatcher::FLANNBASED
   //cv::DescriptorMatcher::BRUTEFORCE
   //cv::DescriptorMatcher::BRUTEFORCE_L1

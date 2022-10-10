@@ -23,7 +23,7 @@ class FeatureDetector{
   int feature_type;
   bool use_FREAK;
   
-  FREAK extractor;
+  Ptr<FREAK> extractor;
   
   Ptr<Feature2D> detector;
   
@@ -55,6 +55,7 @@ public:
   FeatureDetector(int feature_type=_SURF, bool use_FREAK=false):
                             feature_type(feature_type), use_FREAK(use_FREAK) {
     create_default_detector();
+    if(use_FREAK){extractor = FREAK::create();}
   };
   
   ~FeatureDetector(){ detector.release(); };
@@ -203,8 +204,7 @@ public:
   inline void detect_and_compute(Image *image){
     if(use_FREAK){
       detector->detect(image->get_reg_image(),image->keypoints);
-      extractor.compute( image->get_reg_image(), image->keypoints, image->descriptors  );
-      
+      extractor->compute( image->get_reg_image(), image->keypoints, image->descriptors  );
     }else{
       detector->detectAndCompute(image->get_reg_image(),
                                  noArray(), image->keypoints,
