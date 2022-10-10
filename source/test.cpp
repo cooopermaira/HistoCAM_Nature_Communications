@@ -41,7 +41,7 @@ int main( int argc, char* argv[] )
   pathCam::FeatureDetector::BRISKParameters BRISK_params;
 
   
-  cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
+  cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::FLANNBASED;
   //cv::DescriptorMatcher::FLANNBASED
   //cv::DescriptorMatcher::BRUTEFORCE
   //cv::DescriptorMatcher::BRUTEFORCE_L1
@@ -53,8 +53,8 @@ int main( int argc, char* argv[] )
   //LMEDS,RANSAC, RHO, USAC_DEFAULT, USAC_PARALLEL, USAC_FM_8PTS,
   //USAC_FAST, USAC_ACCURATE, USAC_PROSAC, USAC_MAGSAC
   
-  string file1 = "/Users/bsumma/Source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
-  string file2 = "/Users/bsumma/Source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
+  string file1 = "/Users/bsumma/source/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
+  string file2 = "/Users/bsumma/source/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
   float dx = -4.57613;
   float dy = 0.324399;
   
