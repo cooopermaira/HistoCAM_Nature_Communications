@@ -123,11 +123,49 @@ int main( int argc, char* argv[] )
   std::cout << crop_factor << "\t";
   std::cout << debayer << "\t";
   std::cout << (image_1->keypoints.size()+image_2->keypoints.size())/2 << "\t";
-//  std::cout << "(" << dx << "," << dy <<  ")" << "\t";
-//  std::cout << "(" << t_x << "," << t_y <<  ")" << "\t";
   std::cout << sqrt((dx-t_x)*(dx-t_x) + (dy-t_y)*(dy-t_y)) << "\t";
   printf("%.3fs\n", elapsed.count() * 1e-9);
 
+  Mat T_M = Mat(2,3,CV_32F);
+  
+  T_M.at<float>(0,0) = 1.0;
+  T_M.at<float>(0,1) = 0.0;
+  T_M.at<float>(0,2) = -dx;
+  T_M.at<float>(1,0) = 0.0;
+  T_M.at<float>(1,1) = 1.0;
+  T_M.at<float>(1,2) = -dy;
+  
+  std::cout << T_M << "\n";
+  
+  image_1->load_raw_from_disk();
+  image_2->load_raw_from_disk();
+  
+
+  Mat image_1_Mat = cv::Mat(Size(6464,4852), CV_8UC1, image_1->get_Raw(), Mat::AUTO_STEP);
+  cvtColor(image_1_Mat,image_1_Mat,COLOR_BayerBG2BGR);
+
+  Mat image_2_Mat = cv::Mat(Size(6464,4852), CV_8UC1, image_2->get_Raw(), Mat::AUTO_STEP);
+  cvtColor(image_2_Mat,image_2_Mat,COLOR_BayerBG2BGR);
+
+  Mat ground_truth = image_2_Mat.clone();
+  warpAffine(ground_truth, ground_truth,  T_M, Size(6464,4852));
+  absdiff(ground_truth, image_1_Mat, ground_truth);
+  
+  imwrite("ground_truth.png", ground_truth);
+
+  
+  T_M.at<float>(0,2) = -t_x;
+  T_M.at<float>(1,2) = -t_y;
+
+  Mat test = image_2_Mat.clone();
+  warpAffine(test, test,  T_M, Size(6464,4852));
+  absdiff(test, image_1_Mat, test);
+  
+  imwrite("test.png", ground_truth);
+
+  
+  
+  //M = np.float32([[1, 0, t_x], [0, 1, t_y]])
   
 //  //-- Draw matches
 //  Mat img_matches;

@@ -18,6 +18,7 @@ void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, 
 
   if(raw_buffer == 0){ return; }
   reg_image.release();
+  //this will change raw_buffer, not a copy!
   reg_image = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
   if(convert){
     cvtColor(reg_image,reg_image,COLOR_BayerBG2GRAY);
