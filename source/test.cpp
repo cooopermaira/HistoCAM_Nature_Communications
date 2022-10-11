@@ -24,14 +24,14 @@ int main( int argc, char* argv[] )
   //INTER_LINEAR_EXACT, INTER_NEAREST_EXACT
   
   //Note that setting parameters will override this setting
-  int features = pathCam::_SURF;
+  int features = pathCam::_ORB;
   //pathCam::_AKAZE, *pathCam::_BRISK, pathCam::_KAZE,
   //pathCam::_MSER, pathCam::_ORB, *pathCam::_SIFT, pathCam::_BOOST,
   //pathCam::_DAISY, pathCam::_LATCH, pathCam::_LUCID,
   //pathCam::_MSD, *pathCam::_SURF, pathCam::_VGG
 
   //Not working
-  bool use_FREAK = true;
+  bool use_FREAK = false;
   
   //not really working: pathCam::_GFFT
   
@@ -39,7 +39,7 @@ int main( int argc, char* argv[] )
   pathCam::FeatureDetector::SURFParameters SURF_params = pathCam::FeatureDetector::SURFParameters(1000, 1, 3, false, false);
   pathCam::FeatureDetector::AKAZEParameters AKAZE_params;
   pathCam::FeatureDetector::BRISKParameters BRISK_params;
-
+  pathCam::FeatureDetector::ORBParameters ORB_params = pathCam::FeatureDetector::ORBParameters(500, 1.2, 1, 31, 0, 2, ORB::HARRIS_SCORE, 31, 20);
   
   cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   //cv::DescriptorMatcher::FLANNBASED
@@ -89,6 +89,9 @@ int main( int argc, char* argv[] )
       break;
     case pathCam::_BRISK:
       detector->set_BRISK_params(BRISK_params);
+      break;
+    case pathCam::_ORB:
+      detector->set_ORB_params(ORB_params);
       break;
   }
 

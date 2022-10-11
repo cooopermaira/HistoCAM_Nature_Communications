@@ -44,6 +44,8 @@ class FeatureDetector{
       case _GFFT:
         detector = GFTTDetector::create();
         break;
+      case _ORB:
+        detector = ORB::create();
       default:
         break;
     }
@@ -199,7 +201,53 @@ public:
                              BRISK_params.patternScale);
   }
 
+  class ORBParameters{
+  public:
+    int nfeatures;
+    float scaleFactor;
+    int nlevels;
+    int edgeThreshold;
+    int firstLevel;
+    int WTA_K;
+    ORB::ScoreType scoreType;
+    int patchSize;
+    int fastThreshold;
+    
+
+    ORBParameters(int nfeatures=500, float scaleFactor=1.2f, int nlevels=8,
+                 int edgeThreshold=31, int firstLevel=0, int WTA_K=2,
+                 ORB::ScoreType scoreType=ORB::HARRIS_SCORE,
+                 int patchSize=31, int fastThreshold=20):
+    nfeatures(nfeatures),
+    scaleFactor(scaleFactor),
+    nlevels(nlevels),
+    edgeThreshold(edgeThreshold),
+    firstLevel(firstLevel),
+    WTA_K(WTA_K),
+    scoreType(scoreType),
+    patchSize(patchSize),
+    fastThreshold(fastThreshold)
+    {};
+  };
   
+  ORBParameters ORB_params;
+  
+  inline void set_ORB_params(ORBParameters _ORB_params){
+    ORB_params = _ORB_params;
+    feature_type=_ORB;
+
+    if(detector != nullptr){ detector.release(); }
+    detector = ORB::create(ORB_params.nfeatures,
+                           ORB_params.scaleFactor,
+                           ORB_params.nlevels,
+                           ORB_params.edgeThreshold,
+                           ORB_params.firstLevel,
+                           ORB_params.WTA_K,
+                           ORB_params.scoreType,
+                           ORB_params.patchSize,
+                           ORB_params.fastThreshold);
+  }
+
   
   inline void detect_and_compute(Image *image){
     if(use_FREAK){
