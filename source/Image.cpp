@@ -10,19 +10,6 @@ Image::~Image(){
   free_memory_RAW();
 }
 
-void Image::allocate_memory_RAW(){
-  if(raw_buffer ==0){
-    raw_buffer = new char[31363328];
-  }
-}
-
-void Image::free_memory_RAW(){
-  delete[] raw_buffer;
-  raw_buffer = 0;
-}
-
-
-
 void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation){
   reg_scale = _reg_scale;
   reg_crop = _reg_crop;

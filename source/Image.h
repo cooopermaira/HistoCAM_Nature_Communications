@@ -33,15 +33,25 @@ public:
   //I'm not sure if this makes a copy
   inline cv::Mat get_reg_image(){ return reg_image; }
   
+  inline bool in_memory(){
+    return (raw_buffer != 0);
+  }
   
   
 private:
   
   std::string filename;
   
-  void allocate_memory_RAW();
-  void free_memory_RAW();
-  
+  inline void allocate_memory_RAW(){
+    if(raw_buffer ==0){
+      raw_buffer = new char[31363328];
+    }
+  }
+
+  inline void free_memory_RAW(){
+    delete[] raw_buffer;
+    raw_buffer = 0;
+  }
   
   unsigned int width, height;
   char *raw_buffer;

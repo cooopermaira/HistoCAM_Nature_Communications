@@ -25,10 +25,10 @@ int main( int argc, char* argv[] )
   
   //Note that setting parameters will override this setting
   int features = pathCam::_SURF;
-  //pathCam::_AKAZE, pathCam::_BRISK, athCam::_KAZE,
-  //pathCam::_MSER, pathCam::_ORB, pathCam::_SIFT, pathCam::_BOOST,
-  //pathCam::_DAISY, pathCam::_FREAK, pathCam::_LATCH, pathCam::_LUCID,
-  //pathCam::_MSD, pathCam::_SURF, pathCam::_VGG
+  //pathCam::_AKAZE, *pathCam::_BRISK, pathCam::_KAZE,
+  //pathCam::_MSER, pathCam::_ORB, *pathCam::_SIFT, pathCam::_BOOST,
+  //pathCam::_DAISY, pathCam::_LATCH, pathCam::_LUCID,
+  //pathCam::_MSD, *pathCam::_SURF, pathCam::_VGG
 
   //Not working
   bool use_FREAK = true;
@@ -53,8 +53,8 @@ int main( int argc, char* argv[] )
   //LMEDS,RANSAC, RHO, USAC_DEFAULT, USAC_PARALLEL, USAC_FM_8PTS,
   //USAC_FAST, USAC_ACCURATE, USAC_PROSAC, USAC_MAGSAC
   
-  string file1 = "/Users/bsumma/source/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
-  string file2 = "/Users/bsumma/source/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
+  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
+  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
   float dx = -4.57613;
   float dy = 0.324399;
   
@@ -67,6 +67,8 @@ int main( int argc, char* argv[] )
   image_2->set_disk_file(file2);
   
   image_2->load_raw_from_disk();
+  
+  if(!image_1->in_memory() || !image_2->in_memory()){ return -1; }
   
   auto begin = std::chrono::high_resolution_clock::now();
 
