@@ -18,7 +18,7 @@ public:
     filename = _filename;
   }
   
-  bool load_raw_from_disk(){
+  void load_raw_from_disk(){
     if(filename != ""){
       std::ifstream stream;
       stream.open(filename, std::ios::binary);

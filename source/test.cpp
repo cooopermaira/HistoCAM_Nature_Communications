@@ -29,7 +29,7 @@ int main( int argc, char* argv[] )
   //Note that setting parameters will override this setting
   int features = pathCam::_ORB;
   //pathCam::_AKAZE, *pathCam::_BRISK, pathCam::_KAZE,
-  //pathCam::_MSER, pathCam::_ORB, *pathCam::_SIFT, pathCam::_BOOST,
+  //pathCam::_MSER, *pathCam::_ORB, *pathCam::_SIFT, pathCam::_BOOST,
   //pathCam::_DAISY, pathCam::_LATCH, pathCam::_LUCID,
   //pathCam::_MSD, *pathCam::_SURF, pathCam::_VGG
 
@@ -42,7 +42,7 @@ int main( int argc, char* argv[] )
   pathCam::FeatureDetector::SURFParameters SURF_params = pathCam::FeatureDetector::SURFParameters(1000, 1, 1, false, false);
   pathCam::FeatureDetector::AKAZEParameters AKAZE_params;
   pathCam::FeatureDetector::BRISKParameters BRISK_params;
-  pathCam::FeatureDetector::ORBParameters ORB_params = pathCam::FeatureDetector::ORBParameters(500, 1.2, 1, 31, 0, 2, ORB::HARRIS_SCORE, 31, 20);
+  pathCam::FeatureDetector::ORBParameters ORB_params = pathCam::FeatureDetector::ORBParameters(500, 1.0, 1, 31, 0, 2, ORB::HARRIS_SCORE, 31, 20);
   
   cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   //cv::DescriptorMatcher::FLANNBASED
@@ -60,6 +60,11 @@ int main( int argc, char* argv[] )
   string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
   float dx = -4.57613;
   float dy = 0.324399;
+  
+//  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
+//  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1197.Raw";
+//  float dx = -3.92382;
+//  float dy = 0.041635;
   
   pathCam::Image *image_1 = new pathCam::Image();
   image_1->set_disk_file(file1);
