@@ -23,21 +23,21 @@ public:
       std::ifstream stream;
       stream.open(filename, std::ios::binary);
       if(raw_buffer == 0){ allocate_memory_RAW(); }
-      stream.read(raw_buffer,31363328);
+      stream.read(raw_buffer,width*height);
       stream.close();
     }
   }
   
   inline char * get_Raw(){ return raw_buffer;}
   
-  void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR);
+  void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR, bool real=false);
   
   //I'm not sure if this makes a copy
   inline cv::Mat get_reg_image(){ return reg_image; }
   
-  inline bool in_memory(){
-    return (raw_buffer != 0);
-  }
+  inline bool in_memory(){ return (raw_buffer != 0); }
+  
+  inline double get_reg_scale(){ return reg_scale; }
   
   
 private:
@@ -46,7 +46,7 @@ private:
   
   inline void allocate_memory_RAW(){
     if(raw_buffer ==0){
-      raw_buffer = new char[31363328];
+      raw_buffer = new char[width*height];
     }
   }
 

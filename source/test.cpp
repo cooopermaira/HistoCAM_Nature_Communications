@@ -19,9 +19,12 @@ int main( int argc, char* argv[] )
   bool debayer = true;
   //true, false
   
+  bool real = true;
+  //true, false  Phase coorelation needs real valued image
+  
   int interpolation = cv::INTER_NEAREST;
-  //INTER_NEAREST, INTER_CUBIC, INTER_AREA, INTER_LANCZOS4, INTER_LINEAR_EXACT,
-  //INTER_LINEAR_EXACT, INTER_NEAREST_EXACT
+  //cv::INTER_NEAREST, cv::INTER_CUBIC, cv::INTER_AREA, cv::INTER_LANCZOS4, cv::INTER_LINEAR_EXACT,
+  //cv::INTER_LINEAR_EXACT, cv::INTER_NEAREST_EXACT
   
   //Note that setting parameters will override this setting
   int features = pathCam::_ORB;
@@ -36,7 +39,7 @@ int main( int argc, char* argv[] )
   //not really working: pathCam::_GFFT
   
   pathCam::FeatureDetector::SIFTParameters SIFT_params;
-  pathCam::FeatureDetector::SURFParameters SURF_params = pathCam::FeatureDetector::SURFParameters(1000, 1, 3, false, false);
+  pathCam::FeatureDetector::SURFParameters SURF_params = pathCam::FeatureDetector::SURFParameters(1000, 1, 1, false, false);
   pathCam::FeatureDetector::AKAZEParameters AKAZE_params;
   pathCam::FeatureDetector::BRISKParameters BRISK_params;
   pathCam::FeatureDetector::ORBParameters ORB_params = pathCam::FeatureDetector::ORBParameters(500, 1.2, 1, 31, 0, 2, ORB::HARRIS_SCORE, 31, 20);
@@ -49,9 +52,9 @@ int main( int argc, char* argv[] )
   //cv::DescriptorMatcher::BRUTEFORCE_HAMMINGLUT
   //cv::DescriptorMatcher::BRUTEFORCE_SL2
   
-  int estimator = RANSAC;
-  //LMEDS,RANSAC, RHO, USAC_DEFAULT, USAC_PARALLEL, USAC_FM_8PTS,
-  //USAC_FAST, USAC_ACCURATE, USAC_PROSAC, USAC_MAGSAC
+  int estimator_type = cv::RANSAC;
+  //cv::LMEDS,RANSAC, cv::RHO, cv::USAC_DEFAULT, cv::USAC_PARALLEL, cv::USAC_FM_8PTS,
+  //cv::USAC_FAST, cv::USAC_ACCURATE, cv::USAC_PROSAC, cv::USAC_MAGSAC
   
   string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
   string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
@@ -72,11 +75,13 @@ int main( int argc, char* argv[] )
   
   auto begin = std::chrono::high_resolution_clock::now();
 
-  image_1->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
-  image_2->create_reg_image(scale_factor,crop_factor,debayer,interpolation);
+  image_1->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
+  image_2->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
 
-  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
+  pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
   
+  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
+
   switch(features){
     case pathCam::_SURF:
       detector->set_SURF_params(SURF_params);
@@ -97,25 +102,13 @@ int main( int argc, char* argv[] )
 
   detector->detect_and_compute(image_1);
   detector->detect_and_compute(image_2);
-  
+
   pathCam::Match *m = new pathCam::Match(image_1,image_2);
   pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
   matcher->match(m);
-  
-    //-- Localize the object
-    std::vector<Point2f> image_1_pts;
-    std::vector<Point2f> image_2_pts;
-    for( size_t i = 0; i < m->good_matches.size(); i++ )
-    {
-        //-- Get the keypoints from the good matches
-      image_1_pts.push_back( image_1->keypoints[ m->good_matches[i].queryIdx ].pt );
-      image_2_pts.push_back( image_2->keypoints[ m->good_matches[i].trainIdx ].pt );
-    }
-  
-  Mat H = findHomography( image_1_pts, image_2_pts, estimator );
-  double t_x = H.at<double>(0,0)*H.at<double>(0,2)*(1.0/scale_factor);
-  double t_y = H.at<double>(1,1)*H.at<double>(1,2)*(1.0/scale_factor);
 
+  mot->findHomography(m, estimator_type);
+  
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
   
@@ -123,80 +116,50 @@ int main( int argc, char* argv[] )
   std::cout << crop_factor << "\t";
   std::cout << debayer << "\t";
   std::cout << (image_1->keypoints.size()+image_2->keypoints.size())/2 << "\t";
-  std::cout << sqrt((dx-t_x)*(dx-t_x) + (dy-t_y)*(dy-t_y)) << "\t";
+  std::cout << sqrt((dx-mot->t_x)*(dx-mot->t_x) + (dy-mot->t_y)*(dy-mot->t_y)) << "\t";
   printf("%.3fs\n", elapsed.count() * 1e-9);
-
-  Mat T_M = Mat(2,3,CV_32F);
-  
-  T_M.at<float>(0,0) = 1.0;
-  T_M.at<float>(0,1) = 0.0;
-  T_M.at<float>(0,2) = -dx;
-  T_M.at<float>(1,0) = 0.0;
-  T_M.at<float>(1,1) = 1.0;
-  T_M.at<float>(1,2) = -dy;
-  
-  std::cout << T_M << "\n";
-  
-  image_1->load_raw_from_disk();
-  image_2->load_raw_from_disk();
   
 
-  Mat image_1_Mat = cv::Mat(Size(6464,4852), CV_8UC1, image_1->get_Raw(), Mat::AUTO_STEP);
-  cvtColor(image_1_Mat,image_1_Mat,COLOR_BayerBG2BGR);
-
-  Mat image_2_Mat = cv::Mat(Size(6464,4852), CV_8UC1, image_2->get_Raw(), Mat::AUTO_STEP);
-  cvtColor(image_2_Mat,image_2_Mat,COLOR_BayerBG2BGR);
-
-  Mat ground_truth = image_2_Mat.clone();
-  warpAffine(ground_truth, ground_truth,  T_M, Size(6464,4852));
-  absdiff(ground_truth, image_1_Mat, ground_truth);
-  
-  imwrite("ground_truth.png", ground_truth);
-
-  
-  T_M.at<float>(0,2) = -t_x;
-  T_M.at<float>(1,2) = -t_y;
-
-  Mat test = image_2_Mat.clone();
-  warpAffine(test, test,  T_M, Size(6464,4852));
-  absdiff(test, image_1_Mat, test);
-  
-  imwrite("test.png", ground_truth);
-
-  
-  
-  //M = np.float32([[1, 0, t_x], [0, 1, t_y]])
-  
-//  //-- Draw matches
-//  Mat img_matches;
-//  drawMatches( image_1->get_reg_image(), image_1->keypoints, image_2->get_reg_image(), image_2->keypoints, good_matches, img_matches, Scalar::all(-1),
-//               Scalar::all(-1), std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+//  Mat T_M = Mat(2,3,CV_32F);
 //
-//    //-- Get the corners from the image_1 ( the object to be "detected" )
-//    std::vector<Point2f> obj_corners(4);
-//    obj_corners[0] = Point2f(0, 0);
-//    obj_corners[1] = Point2f( (float)image_1->get_reg_image().cols, 0 );
-//    obj_corners[2] = Point2f( (float)image_1->get_reg_image().cols, (float)image_1->get_reg_image().rows );
-//    obj_corners[3] = Point2f( 0, (float)image_1->get_reg_image().rows );
-//    std::vector<Point2f> scene_corners(4);
-//    perspectiveTransform( obj_corners, scene_corners, H);
-//    //-- Draw lines between the corners (the mapped object in the scene - image_2 )
-//    line( img_matches, scene_corners[0] + Point2f((float)image_1->get_reg_image().cols, 0),
-//          scene_corners[1] + Point2f((float)image_1->get_reg_image().cols, 0), Scalar(0, 255, 0), 4 );
-//    line( img_matches, scene_corners[1] + Point2f((float)image_1->get_reg_image().cols, 0),
-//          scene_corners[2] + Point2f((float)image_1->get_reg_image().cols, 0), Scalar( 0, 255, 0), 4 );
-//    line( img_matches, scene_corners[2] + Point2f((float)image_1->get_reg_image().cols, 0),
-//          scene_corners[3] + Point2f((float)image_1->get_reg_image().cols, 0), Scalar( 0, 255, 0), 4 );
-//    line( img_matches, scene_corners[3] + Point2f((float)image_1->get_reg_image().cols, 0),
-//          scene_corners[0] + Point2f((float)image_1->get_reg_image().cols, 0), Scalar( 0, 255, 0), 4 );
-//    //-- Show detected matches
-//    imshow("Good Matches & Object detection", img_matches );
-//    waitKey();
+//  T_M.at<float>(0,0) = 1.0;
+//  T_M.at<float>(0,1) = 0.0;
+//  T_M.at<float>(0,2) = -dx;
+//  T_M.at<float>(1,0) = 0.0;
+//  T_M.at<float>(1,1) = 1.0;
+//  T_M.at<float>(1,2) = -dy;
+//
+//  image_1->load_raw_from_disk();
+//  image_2->load_raw_from_disk();
+//
+//
+//  Mat image_1_Mat = cv::Mat(Size(6464,4852), CV_8UC1, image_1->get_Raw(), Mat::AUTO_STEP);
+//  cvtColor(image_1_Mat,image_1_Mat,COLOR_BayerBG2BGR);
+//
+//  Mat image_2_Mat = cv::Mat(Size(6464,4852), CV_8UC1, image_2->get_Raw(), Mat::AUTO_STEP);
+//  cvtColor(image_2_Mat,image_2_Mat,COLOR_BayerBG2BGR);
+//
+//  Mat ground_truth = image_2_Mat.clone();
+//  warpAffine(ground_truth, ground_truth,  T_M, Size(6464,4852));
+//  absdiff(ground_truth, image_1_Mat, ground_truth);
+//
+//  imwrite("ground_truth.png", ground_truth);
+//
+//
+//  T_M.at<float>(0,2) = -mot->t_x;
+//  T_M.at<float>(1,2) = -mot->t_y;
+//
+//  Mat test = image_2_Mat.clone();
+//  warpAffine(test, test,  T_M, Size(6464,4852));
+//  absdiff(test, image_1_Mat, test);
+//
+//  imwrite("test.png", ground_truth);
   
   delete image_1;
   delete image_2;
-  delete detector;
-  delete m;
+//  delete detector;
+//  delete m;
+  delete mot;
   
   return 0;
 }

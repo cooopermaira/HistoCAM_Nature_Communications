@@ -27,6 +27,8 @@
 #include "FeatureDetector.h"
 #include "Match.h"
 #include "DescriptorMatcher.h"
+#include "MotionEstimator.h"
+
 
 
 #endif /* common_h */

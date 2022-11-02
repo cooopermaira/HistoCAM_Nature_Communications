@@ -10,6 +10,8 @@ add_executable( pathCam source/test.cpp
                 source/common.h
 								source/Image.cpp 
 								source/Image.h
+                source/MotionEstimator.cpp
+                source/MotionEstimator.h
                 source/Match.cpp
                 source/Match.h
 								source/DescriptorMatcher.h
