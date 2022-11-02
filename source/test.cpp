@@ -19,7 +19,7 @@ int main( int argc, char* argv[] )
   bool debayer = true;
   //true, false
   
-  bool real = true;
+  bool real = false;
   //true, false  Phase coorelation needs real valued image
   
   int interpolation = cv::INTER_NEAREST;

@@ -15,7 +15,6 @@ void DescriptorMatcher::match(Match *match){
   std::vector< std::vector<DMatch> > knn_matches;
   matcher->knnMatch( match->image_1->descriptors, match->image_2->descriptors, knn_matches, 2 );
   //-- Filter matches using the Lowe's ratio test
-  const float ratio_thresh = 0.75f;
   for (size_t i = 0; i < knn_matches.size(); i++)
   {
       if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)
