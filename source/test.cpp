@@ -53,8 +53,7 @@ int main( int argc, char* argv[] )
   //cv::DescriptorMatcher::BRUTEFORCE_SL2
   
   int estimator_type = cv::RANSAC;
-  //cv::LMEDS,RANSAC, cv::RHO, cv::USAC_DEFAULT, cv::USAC_PARALLEL, cv::USAC_FM_8PTS,
-  //cv::USAC_FAST, cv::USAC_ACCURATE, cv::USAC_PROSAC, cv::USAC_MAGSAC
+  //cv::LMEDS, cv::RANSAC, cv::RHO
   
   string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
   string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";

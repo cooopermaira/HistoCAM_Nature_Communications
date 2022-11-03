@@ -21,9 +21,7 @@ class DescriptorMatcher{
 
 public:
     
-  DescriptorMatcher(cv::DescriptorMatcher::MatcherType matcher_type, float ratio_thresh = 0.75f): matcher_type(matcher_type), ratio_thresh(ratio_thresh){
-    matcher = cv::DescriptorMatcher::create(matcher_type);
-  };
+  DescriptorMatcher(cv::DescriptorMatcher::MatcherType matcher_type, float ratio_thresh = 0.75f);
   
   ~DescriptorMatcher(){};
 

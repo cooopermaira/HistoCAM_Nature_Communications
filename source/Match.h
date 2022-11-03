@@ -17,12 +17,14 @@ public:
   Image * image_1;
   Image * image_2;
   
+  double quality;
+  
   std::vector<DMatch> good_matches;
 
   cv::Mat H;
   double t_x, t_y;
   
-  Match(Image * image_1, Image * image_2): image_1(image_1), image_2(image_2){};
+  Match(Image * image_1, Image * image_2): image_1(image_1), image_2(image_2), quality(0.0) {};
   ~Match(){};
   
   
