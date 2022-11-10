@@ -122,9 +122,7 @@ int main( int argc, char* argv[] )
 //  std::cout << (image_1->keypoints.size()+image_2->keypoints.size())/2 << "\t";
 //  std::cout << sqrt((dx-mot->t_x)*(dx-mot->t_x) + (dy-mot->t_y)*(dy-mot->t_y)) << "\t";
 //  printf("%.3fs\n", elapsed.count() * 1e-9);
-  
-  mot->matchTemplate(image_1, image_2);
-  
+    
 
 //  Mat T_M = Mat(2,3,CV_32F);
 //

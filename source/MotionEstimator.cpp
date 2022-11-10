@@ -40,37 +40,6 @@ void MotionEstimator::phaseCorrelate(Image *image_1, Image *image_2){
   
 }
 
-void MotionEstimator::matchTemplate(Image *image_1, Image *image_2){
-  
-  int match_method = cv::TM_CCORR ;
-  
-  int result_cols = image_1->get_reg_image().cols - image_2->get_reg_image().cols + 1;
-  int result_rows = image_1->get_reg_image().rows - image_2->get_reg_image().rows + 1;
-
-  
-  Mat result;
-  result.create( result_rows, result_cols, CV_32FC1 );
-  
-  cv::matchTemplate(image_1->get_reg_image(),image_2->get_reg_image(),result, match_method);
-  
-  double minVal; double maxVal; Point minLoc; Point maxLoc;
-  Point matchLoc;
-  cv::minMaxLoc( result, &minVal, &maxVal, &minLoc, &maxLoc, Mat() );
-  
-
-  
-  if( match_method  == cv::TM_SQDIFF || match_method == cv::TM_SQDIFF_NORMED )
-      { matchLoc = minLoc; }
-    else
-      { matchLoc = maxLoc; }
-  
-
-  std::cout << matchLoc << " " << minVal << " " << maxVal << " " << minLoc << " " << maxLoc << "\n";
-
-}
-
-
-
 
 
 };

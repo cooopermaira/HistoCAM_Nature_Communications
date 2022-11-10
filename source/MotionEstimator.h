@@ -26,8 +26,6 @@ namespace pathCam{
     
     void phaseCorrelate(Image *image_1, Image *image_2);
     
-    void matchTemplate(Image *image_1, Image *image_2);
-
     
   };
   

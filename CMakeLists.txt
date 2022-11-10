@@ -4,6 +4,8 @@ project( pathCam )
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
+message(STATUS ${OpenCV_INCLUDE_DIRS})
+
 find_package(Poco REQUIRED Foundation)
 
 add_executable( pathCam source/test.cpp
