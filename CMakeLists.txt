@@ -4,25 +4,26 @@ project( pathCam )
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
-message(STATUS ${OpenCV_INCLUDE_DIRS})
-
-find_package(Poco REQUIRED Foundation)
-
-add_executable( pathCam source/test.cpp
-                source/common.h
-								source/Image.cpp 
-								source/Image.h
+add_library(pathCamLib source/common.h
+                source/Image.cpp
+                source/Image.h
                 source/MotionEstimator.cpp
                 source/MotionEstimator.h
                 source/Match.cpp
                 source/Match.h
-								source/DescriptorMatcher.h
-								source/DescriptorMatcher.cpp
-								source/FeatureDetector.h
-								source/FeatureDetector.cpp)
+                source/ImageList.cpp
+                source/ImageList.h
+                source/DescriptorMatcher.h
+                source/DescriptorMatcher.cpp
+                source/FeatureDetector.h
+                source/FeatureDetector.cpp)
+
+add_executable( test source/test.cpp)
+add_executable( process_list_truth source/process_list_truth.cpp)
 
 
-
-target_link_libraries( pathCam ${OpenCV_LIBS} Poco::Foundation)
+target_link_libraries(pathCamLib ${OpenCV_LIBS})
+target_link_libraries( test ${OpenCV_LIBS} pathCamLib)
+target_link_libraries( process_list_truth ${OpenCV_LIBS} pathCamLib)
 
 

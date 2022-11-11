@@ -30,6 +30,8 @@ public:
   
   inline char * get_Raw(){ return raw_buffer;}
   
+  inline std::string get_File(){ return filename;}
+  
   void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR, bool real=false);
   
   //I'm not sure if this makes a copy

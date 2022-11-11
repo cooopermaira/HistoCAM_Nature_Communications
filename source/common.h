@@ -24,6 +24,7 @@
 #include <string>
 
 #include "Image.h"
+#include "ImageList.h"
 #include "FeatureDetector.h"
 #include "Match.h"
 #include "DescriptorMatcher.h"
