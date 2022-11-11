@@ -8,7 +8,7 @@
 #ifndef Match_h
 #define Match_h
 
-#include "common.h"
+#include "pathCam.h"
 
 namespace pathCam{
 

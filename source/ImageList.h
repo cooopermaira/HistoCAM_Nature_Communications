@@ -8,7 +8,7 @@
 #ifndef ImageList_h
 #define ImageList_h
 
-#include "common.h"
+#include "pathCam.h"
 
 
 namespace pathCam{

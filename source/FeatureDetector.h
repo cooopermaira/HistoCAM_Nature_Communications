@@ -8,7 +8,7 @@
 #ifndef FeatureDetector_h
 #define FeatureDetector_h
 
-#include "common.h"
+#include "pathCam.h"
 
 using namespace cv;
 using namespace cv::xfeatures2d;

@@ -1,7 +1,7 @@
 #ifndef IMAGE
 #define IMAGE
 
-#include "common.h"
+#include "pathCam.h"
 
 namespace pathCam{
 class Image{

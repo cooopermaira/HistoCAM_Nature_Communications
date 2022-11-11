@@ -1,12 +1,11 @@
 //
-//  common.h
-//  pathCam
+//  pathCam.h
 //
 //  Created by Brian Summa on 10/3/22.
 //
 
-#ifndef common_h
-#define common_h
+#ifndef pathCam_h
+#define pathCam_h
 
 #include <iostream>
 #include "opencv2/core.hpp"
@@ -32,4 +31,4 @@
 
 
 
-#endif /* common_h */
+#endif /* pathCam_h */

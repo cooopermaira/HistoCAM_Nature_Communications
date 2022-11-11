@@ -5,7 +5,7 @@
 //  Created by Brian Summa on 11/11/22.
 //
 
-#include "common.h"
+#include "pathCam.h"
 
 namespace pathCam{
 

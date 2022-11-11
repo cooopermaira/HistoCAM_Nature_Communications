@@ -8,7 +8,7 @@
 #ifndef MotionEstimator_h
 #define MotionEstimator_h
 
-#include "common.h"
+#include "pathCam.h"
 
 namespace pathCam{
     

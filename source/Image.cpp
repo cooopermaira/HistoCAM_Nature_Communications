@@ -1,4 +1,4 @@
-#include "common.h"
+#include "pathCam.h"
 
 using namespace cv;
 

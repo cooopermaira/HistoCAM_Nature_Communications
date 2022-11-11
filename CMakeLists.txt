@@ -4,7 +4,7 @@ project( pathCam )
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
-add_library(pathCamLib source/common.h
+add_library(pathCamLib source/pathCam.h
                 source/Image.cpp
                 source/Image.h
                 source/MotionEstimator.cpp
