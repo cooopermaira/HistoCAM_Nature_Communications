@@ -11,11 +11,12 @@ int main( int argc, char* argv[] )
 {
   
   //Should probably add fancier command line parsing
-  if(argc < 2){
+  if(argc < 3){
     std::cout << "Missing input. Use:\n";
-    std::cout << "process_list_truth <path to text file>\n";
+    std::cout << "process_list_truth <path to text file input> <path to text file output\n";
   }
   std::string file = argv[1];
+  std::string outfile_name = argv[2];
   
   double crop_factor = 1.0;
   double scale_factor = 1.0;
@@ -38,6 +39,9 @@ int main( int argc, char* argv[] )
   pathCam::ImageList *pathCam_session =  new pathCam::ImageList();
   
   pathCam_session->loadFileList(file);
+  
+  std::ofstream outfile;
+  outfile.open(outfile_name);
   
   for(unsigned int i=0; i < pathCam_session->images.size()-1; i++){
     
@@ -69,10 +73,12 @@ int main( int argc, char* argv[] )
 
     mot->findHomography(m, estimator_type);
    
-    std::cout << image_1->get_File() << "\t" << image_2->get_File() << "\t";
-    std::cout << mot->t_x << "\t" << mot->t_y << "\n";
+    outfile << image_1->get_File() << "\t" << image_2->get_File() << "\t";
+    outfile << mot->t_x << "\t" << mot->t_y << "\n";
   }
  
+  outfile.close();
+  
   delete pathCam_session;
   return 0;
   
