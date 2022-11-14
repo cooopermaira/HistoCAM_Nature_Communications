@@ -50,6 +50,9 @@ int main( int argc, char* argv[] )
 
     image_1->load_raw_from_disk();
     image_2->load_raw_from_disk();
+    
+    std::cout << image_1->get_File() << "\t" << image_2->get_File() << "\t";
+
 
     if(!image_1->in_memory() || !image_2->in_memory()){
       std::cout << "Issue loading image.\n";
@@ -72,9 +75,14 @@ int main( int argc, char* argv[] )
     matcher->match(m);
 
     mot->findHomography(m, estimator_type);
+    
+    std::cout << mot->t_x << "\t" << mot->t_y << "\n";
+
    
     outfile << image_1->get_File() << "\t" << image_2->get_File() << "\t";
     outfile << mot->t_x << "\t" << mot->t_y << "\n";
+    
+    image_1->free_memory_RAW();
   }
  
   outfile.close();

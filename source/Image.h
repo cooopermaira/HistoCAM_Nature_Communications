@@ -41,6 +41,13 @@ public:
   
   inline double get_reg_scale(){ return reg_scale; }
   
+  inline void free_memory_RAW(){
+    if(raw_buffer != 0){
+      delete[] raw_buffer;
+    }
+    raw_buffer = 0;
+  }
+  
   
 private:
   
@@ -50,11 +57,6 @@ private:
     if(raw_buffer ==0){
       raw_buffer = new char[width*height];
     }
-  }
-
-  inline void free_memory_RAW(){
-    delete[] raw_buffer;
-    raw_buffer = 0;
   }
   
   unsigned int width, height;
