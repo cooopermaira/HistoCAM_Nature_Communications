@@ -20,10 +20,11 @@ add_library(pathCamLib source/pathCam.h
 
 add_executable( test source/test.cpp)
 add_executable( process_list_truth source/process_list_truth.cpp)
+add_executable( process_list_orb source/process_list_orb.cpp)
 
 
 target_link_libraries(pathCamLib ${OpenCV_LIBS})
 target_link_libraries( test ${OpenCV_LIBS} pathCamLib)
 target_link_libraries( process_list_truth ${OpenCV_LIBS} pathCamLib)
-
+target_link_libraries( process_list_orb ${OpenCV_LIBS} pathCamLib)
 

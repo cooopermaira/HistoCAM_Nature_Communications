@@ -20,7 +20,7 @@ namespace pathCam{
     
     MotionEstimator(): t_x(0.0), t_y(0.0) {};
     
-    void findHomography(pathCam::Match *m, int estimator_type,
+    int findHomography(pathCam::Match *m, int estimator_type,
                         double ransacReprojThreshold = 3, int maxIters = 2000,
                         double confidence = 0.995);
     

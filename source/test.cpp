@@ -57,10 +57,17 @@ int main( int argc, char* argv[] )
   int estimator_type = cv::RANSAC;
   //cv::LMEDS, cv::RANSAC, cv::RHO
   
-  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
-  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
-  float dx = -4.57613;
-  float dy = 0.324399;
+//  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
+//  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1198.Raw";
+//  float dx = -4.57613;
+//  float dy = 0.324399;
+  
+  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114044-1117.Raw";
+  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114044-1118.Raw";
+  float dx = -0.236034;
+  float dy = 0.581168;
+  
+    
   
   //  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
   //  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1197.Raw";
@@ -110,23 +117,10 @@ int main( int argc, char* argv[] )
     detector->detect_and_compute(image_2);
 
   pathCam::Match *m = new pathCam::Match(image_1,image_2);
-
+        
+  pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
+  matcher->match(m);
   
-  for(unsigned i=0; i <= 16; i++){
-    cv::setNumThreads(i);
-    
-    auto begin = std::chrono::high_resolution_clock::now();
-    for(unsigned int i=0; i < 100; i++){
-    
-      pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
-      matcher->match(m);
-  
-    }
-    auto end = std::chrono::high_resolution_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
-    printf("%.3fs\n", elapsed.count() * 1e-9);
-  }
-  exit(1);
 
 
     mot->findHomography(m, estimator_type);
