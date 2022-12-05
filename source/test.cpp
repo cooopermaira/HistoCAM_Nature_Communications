@@ -4,6 +4,8 @@ using namespace cv;
 using namespace cv::xfeatures2d;
 using namespace std;
 
+#include <unistd.h>
+
 int main( int argc, char* argv[] )
 {
   
@@ -19,7 +21,7 @@ int main( int argc, char* argv[] )
   bool debayer = true;
   //true, false
   
-  bool real = true;
+  bool real = false;
   //true, false  Phase coorelation needs real valued image
   
   int interpolation = cv::INTER_NEAREST;
@@ -32,7 +34,7 @@ int main( int argc, char* argv[] )
   //pathCam::_MSER, *pathCam::_ORB, *pathCam::_SIFT, pathCam::_BOOST,
   //pathCam::_DAISY, pathCam::_LATCH, pathCam::_LUCID,
   //pathCam::_MSD, *pathCam::_SURF, pathCam::_VGG
-
+  
   //Not working
   bool use_FREAK = false;
   
@@ -60,10 +62,10 @@ int main( int argc, char* argv[] )
   float dx = -4.57613;
   float dy = 0.324399;
   
-//  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
-//  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1197.Raw";
-//  float dx = -3.92382;
-//  float dy = 0.041635;
+  //  string file1 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1196.Raw";
+  //  string file2 = "/Users/bsumma/source/tulane/pathcam/opencv-testing/feature_extraction_test/images/temp-07282022114108-1197.Raw";
+  //  float dx = -3.92382;
+  //  float dy = 0.041635;
   
   pathCam::Image *image_1 = new pathCam::Image();
   image_1->set_disk_file(file1);
@@ -77,52 +79,66 @@ int main( int argc, char* argv[] )
   
   if(!image_1->in_memory() || !image_2->in_memory()){ return -1; }
   
-  auto begin = std::chrono::high_resolution_clock::now();
-
   image_1->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
   image_2->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
+ 
 
-  pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
   
-//  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
-//
-//  switch(features){
-//    case pathCam::_SURF:
-//      detector->set_SURF_params(SURF_params);
-//      break;
-//    case pathCam::_SIFT:
-//      detector->set_SIFT_params(SIFT_params);
-//      break;
-//    case pathCam::_AKAZE:
-//      detector->set_AKAZE_params(AKAZE_params);
-//      break;
-//    case pathCam::_BRISK:
-//      detector->set_BRISK_params(BRISK_params);
-//      break;
-//    case pathCam::_ORB:
-//      detector->set_ORB_params(ORB_params);
-//      break;
-//  }
-//
-//  detector->detect_and_compute(image_1);
-//  detector->detect_and_compute(image_2);
-//
-//  pathCam::Match *m = new pathCam::Match(image_1,image_2);
-//  pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
-//  matcher->match(m);
-//
-//  mot->findHomography(m, estimator_type);
-//  
-//  auto end = std::chrono::high_resolution_clock::now();
-//  auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
-//  
-//  std::cout << scale_factor << "\t";
-//  std::cout << crop_factor << "\t";
-//  std::cout << debayer << "\t";
-//  std::cout << (image_1->keypoints.size()+image_2->keypoints.size())/2 << "\t";
-//  std::cout << sqrt((dx-mot->t_x)*(dx-mot->t_x) + (dy-mot->t_y)*(dy-mot->t_y)) << "\t";
-//  printf("%.3fs\n", elapsed.count() * 1e-9);
+    pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
     
+    pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
+    
+    switch(features){
+      case pathCam::_SURF:
+        detector->set_SURF_params(SURF_params);
+        break;
+      case pathCam::_SIFT:
+        detector->set_SIFT_params(SIFT_params);
+        break;
+      case pathCam::_AKAZE:
+        detector->set_AKAZE_params(AKAZE_params);
+        break;
+      case pathCam::_BRISK:
+        detector->set_BRISK_params(BRISK_params);
+        break;
+      case pathCam::_ORB:
+        detector->set_ORB_params(ORB_params);
+        break;
+    }
+    
+    detector->detect_and_compute(image_1);
+    detector->detect_and_compute(image_2);
+
+  pathCam::Match *m = new pathCam::Match(image_1,image_2);
+
+  
+  for(unsigned i=0; i <= 16; i++){
+    cv::setNumThreads(i);
+    
+    auto begin = std::chrono::high_resolution_clock::now();
+    for(unsigned int i=0; i < 100; i++){
+    
+      pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
+      matcher->match(m);
+  
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
+    printf("%.3fs\n", elapsed.count() * 1e-9);
+  }
+  exit(1);
+
+
+    mot->findHomography(m, estimator_type);
+
+    
+    std::cout << scale_factor << "\t";
+    std::cout << crop_factor << "\t";
+    std::cout << debayer << "\t";
+    std::cout << (image_1->keypoints.size()+image_2->keypoints.size())/2 << "\t";
+    std::cout << sqrt((dx-mot->t_x)*(dx-mot->t_x) + (dy-mot->t_y)*(dy-mot->t_y)) << "\t";
+    //printf("%.3fs\n", elapsed.count() * 1e-9);
+  
 
 //  Mat T_M = Mat(2,3,CV_32F);
 //
@@ -163,7 +179,7 @@ int main( int argc, char* argv[] )
   delete image_2;
 //  delete detector;
 //  delete m;
-  delete mot;
+  //delete mot;
   
   return 0;
 }
