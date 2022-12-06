@@ -18,8 +18,8 @@ int main( int argc, char* argv[] )
   std::string file = argv[1];
   std::string outfile_name = argv[2];
   
-  double crop_factor = 1.0;
-  double scale_factor = 1.0;
+  double crop_factor = 0.5;
+  double scale_factor = 0.25;
   bool debayer = true;
   bool real = false;
 
@@ -43,6 +43,9 @@ int main( int argc, char* argv[] )
   std::ofstream outfile;
   outfile.open(outfile_name);
   
+  pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
+  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
+  pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
 
   
   for(unsigned int i=0; i < pathCam_session->images.size()-1; i++){
@@ -50,10 +53,7 @@ int main( int argc, char* argv[] )
     pathCam::Image * image_1 = pathCam_session->images[i];
     pathCam::Image * image_2 = pathCam_session->images[i+1];
     
-    pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
-    pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
-    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
-
+ 
 
     image_1->load_raw_from_disk();
     image_2->load_raw_from_disk();
@@ -63,6 +63,9 @@ int main( int argc, char* argv[] )
       std::cout << "Issue loading image.\n";
       continue;
     }
+    
+    auto begin = std::chrono::high_resolution_clock::now();
+
     
     image_1->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
     image_2->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
@@ -87,8 +90,12 @@ int main( int argc, char* argv[] )
     
     int result = mot->findHomography(m, estimator_type);
     
+    auto end = std::chrono::high_resolution_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
+
     if(result == 1){
-      outfile << mot->t_x << "\t" << mot->t_y << "\n";
+      outfile << mot->t_x << "\t" << mot->t_y << "\t";
+      outfile << elapsed.count() * 1e-9 << "\n";
     }
     if(result == -1){
       outfile << "failed. Not enough matches\n";
@@ -100,13 +107,13 @@ int main( int argc, char* argv[] )
     
     image_1->free_memory_RAW();
     delete image_1;
-    image_2->free_memory_RAW();
-    delete m;
-    delete mot;
-    delete detector;
-    delete matcher;
 
+    delete m;
   }
+  
+  delete mot;
+  delete detector;
+  delete matcher;
  
   outfile.close();
   
