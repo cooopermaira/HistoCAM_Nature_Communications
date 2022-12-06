@@ -4,7 +4,6 @@ using namespace cv;
 using namespace cv::xfeatures2d;
 using namespace std;
 
-#include <unistd.h>
 
 int main( int argc, char* argv[] )
 {
