@@ -50,6 +50,8 @@ int main( int argc, char* argv[] )
     
     for(unsigned int i=0; i < pathCam_session->images.size()-1; i++){
         
+        std::cout << i << "\t" << i+1 << "\n";
+        
         pathCam::Image * image_1 = pathCam_session->images[i];
         pathCam::Image * image_2 = pathCam_session->images[i+1];
         
@@ -72,31 +74,37 @@ int main( int argc, char* argv[] )
         
         detector->set_SIFT_params(SIFT_params);
         
-        detector->detect_and_compute(image_1);
-        detector->detect_and_compute(image_2);
+        bool image_1_has_keys = detector->detect_and_compute(image_1);
+        bool image_2_has_keys = detector->detect_and_compute(image_2);
         
-        pathCam::Match *m = new pathCam::Match(image_1,image_2);
-        matcher->match(m);
+        if(image_1_has_keys && image_2_has_keys){
         
-        int result = mot->findHomography(m, estimator_type);
+            pathCam::Match *m = new pathCam::Match(image_1,image_2);
+            matcher->match(m);
         
-        auto end = std::chrono::high_resolution_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
+            int result = mot->findHomography(m, estimator_type, 1);
+        
+            auto end = std::chrono::high_resolution_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
 
-        if(result == 1){
-          outfile << mot->t_x << "\t" << mot->t_y << "\t";
-          outfile << elapsed.count() * 1e-9 << "\n";
-        }
-        if(result == -1){
-          outfile << "failed. Not enough matches\n";
-        }
-        if(result == -2){
-            outfile << "failed. Translation not found.\n";
+            if(result == 1){
+                outfile << mot->t_x << "\t" << mot->t_y << "\t";
+                outfile << elapsed.count() * 1e-9 << "\n";
+            }
+            if(result == -1){
+                outfile << "failed. Not enough matches\n";
+            }
+            if(result == -2){
+                outfile << "failed. Translation not found.\n";
+            }
+            delete m;
+
+        }else{
+            outfile << "image with no keypoints\n";
         }
 
         image_1->free_memory_RAW();
         delete image_1;
-        delete m;
     }
     
     delete mot;

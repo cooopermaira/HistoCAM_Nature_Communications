@@ -249,7 +249,7 @@ public:
   }
 
   
-  inline void detect_and_compute(Image *image){
+  inline bool detect_and_compute(Image *image){
     if(use_FREAK){
       detector->detect(image->get_reg_image(),image->keypoints);
       extractor->compute( image->get_reg_image(), image->keypoints, image->descriptors  );
@@ -258,6 +258,9 @@ public:
                                  noArray(), image->keypoints,
                                  image->descriptors );
     }
+      
+      return (image->keypoints.size() > 0);
+      
   }
   
   
