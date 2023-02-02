@@ -76,8 +76,16 @@ int main( int argc, char* argv[] )
         
         detector->detect_and_compute(image_1);
         detector->detect_and_compute(image_2);
+      
+        if(image_1->keypoints.size() < 200 || image_2->keypoints.size() < 200){
+          std::cout << "Too little features detected.  Going back to defaults\n";
+          delete detector;
+          detector = new pathCam::FeatureDetector(features, use_FREAK);
+          detector->detect_and_compute(image_1);
+          detector->detect_and_compute(image_2);
+        }
         
-        if(image_1->keypoints.size() < 4 || image_2->keypoints.size() < 4){
+        if(image_1->keypoints.size() < 100 || image_2->keypoints.size() < 100){
             outfile << "failed. Not enough keypoints\n";
             continue;
         }
