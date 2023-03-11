@@ -237,13 +237,13 @@ int main( int argc, char* argv[] )
     combined_box.min_y -= combined_box.min_y;
   }
   
-  std::cout << "combined bbox: ";
-  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
-  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
-  
-  std::cout << "width height: ";
-  std::cout << "[ " << combined_box.max_x-combined_box.min_x << ", ";
-  std::cout << combined_box.max_y-combined_box.min_y << "]\n";
+//  std::cout << "combined bbox: ";
+//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
+//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
+//  
+//  std::cout << "width height: ";
+//  std::cout << "[ " << combined_box.max_x-combined_box.min_x << ", ";
+//  std::cout << combined_box.max_y-combined_box.min_y << "]\n";
   
   
   Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
