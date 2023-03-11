@@ -83,7 +83,7 @@ int main( int argc, char* argv[] )
   pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
   pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
   
-  auto total_begin = std::chrono::high_resolution_clock::now();
+  auto reg_begin = std::chrono::high_resolution_clock::now();
 
   std::cout << "Performing Registration:\n";
   
@@ -175,12 +175,19 @@ int main( int argc, char* argv[] )
   }
     
   std::cout << "Done Registering Images\n";
+    
+  auto reg_end = std::chrono::high_resolution_clock::now();
+  auto reg_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(reg_end - reg_begin);
+  std::cout << reg_elapsed.count() * 1e-9 << " seconds including I/O\n";
+
   
   if(outimage_name == ""){
     delete pathCam_session;
     return 0;
   }
   
+  auto comp_begin = std::chrono::high_resolution_clock::now();
+
   std::cout << "Compositing Images:\n";
   
   Bbox combined_box = Bbox();
@@ -203,9 +210,9 @@ int main( int argc, char* argv[] )
   }
   
   
-  std::cout << "combined bbox: ";
-  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
-  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
+//  std::cout << "combined bbox: ";
+//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
+//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
   
   
   if(combined_box.min_x < 0.0){
@@ -258,10 +265,13 @@ int main( int argc, char* argv[] )
   
   imwrite(outimage_name, combined);
   std::cout << "Done Compositing Images\n";
+    
+  auto comp_end = std::chrono::high_resolution_clock::now();
+  auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
+  std::cout << comp_elapsed.count() * 1e-9 << " seconds including I/O\n";
 
-  auto total_end = std::chrono::high_resolution_clock::now();
-  auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(total_end - total_begin);
-  std::cout << total_elapsed.count() * 1e-9 << " seconds\n";
+  auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
+  std::cout << total_elapsed.count() * 1e-9 << " seconds total time including I/O\n";
 
     
   delete pathCam_session;
