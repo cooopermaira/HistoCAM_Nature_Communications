@@ -17,6 +17,7 @@ public:
   Image * image_1;
   Image * image_2;
   
+  //not used right now
   double quality;
   
   std::vector<DMatch> good_matches;
@@ -24,7 +25,10 @@ public:
   cv::Mat H;
   double t_x, t_y;
   
-  Match(Image * image_1, Image * image_2): image_1(image_1), image_2(image_2), quality(0.0) {};
+  Match(Image * image_1, Image * image_2): image_1(image_1),
+                                           image_2(image_2),
+                                           quality(0.0),
+                                           t_x(0.0), t_y(0.0) {};
   ~Match(){};
   
   

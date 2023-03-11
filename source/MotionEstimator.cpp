@@ -28,25 +28,25 @@ int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type,
     return -1;
   }
   
-  Mat H = cv::findHomography(image_1_pts, image_2_pts, estimator_type,
+  m->H = cv::findHomography(image_1_pts, image_2_pts, estimator_type,
                              ransacReprojThreshold, noArray(), maxIters,
                              confidence);
   
-  if(H.empty()){
+  if(m->H.empty()){
     return -2;
   }
   
-  t_x = H.at<double>(0,0)*H.at<double>(0,2)*(1.0/m->image_2->get_reg_scale());
-  t_y = H.at<double>(1,1)*H.at<double>(1,2)*(1.0/m->image_2->get_reg_scale());
+  m->t_x = m->H.at<double>(0,0)*m->H.at<double>(0,2)*(1.0/m->image_2->get_reg_scale());
+  m->t_y = m->H.at<double>(1,1)*m->H.at<double>(1,2)*(1.0/m->image_2->get_reg_scale());
   
   return 1;
 }
 
-void MotionEstimator::phaseCorrelate(Image *image_1, Image *image_2){
+void MotionEstimator::phaseCorrelate(pathCam::Match *m, Image *image_1, Image *image_2){
 
   Point2d p = cv::phaseCorrelate(image_1->get_reg_image(), image_2->get_reg_image());
-  t_x = p.x*(1.0/image_2->get_reg_scale());
-  t_y = p.y*(1.0/image_2->get_reg_scale());
+  m->t_x = p.x*(1.0/image_2->get_reg_scale());
+  m->t_y = p.y*(1.0/image_2->get_reg_scale());
   
 }
 

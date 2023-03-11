@@ -6,6 +6,8 @@
 namespace pathCam{
 class Image{
 public:
+  unsigned int width, height;
+
   
   std::vector<cv::KeyPoint> keypoints;
   cv::Mat descriptors;
@@ -59,7 +61,6 @@ private:
     }
   }
   
-  unsigned int width, height;
   char *raw_buffer;
   
   cv::Mat reg_image;
