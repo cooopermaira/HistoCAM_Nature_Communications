@@ -48,7 +48,8 @@ int main( int argc, char* argv[] )
   std::string outimage_name = "";
   
   if(argc == 4){
-    std::string outimage_name = argv[3];
+    outimage_name = argv[3];
+    std::cout << "Composited image will be written to " << outimage_name << "\n";
   }
   
   double crop_factor = 0.5;
@@ -91,15 +92,15 @@ int main( int argc, char* argv[] )
   for(unsigned int i=0; i < pathCam_session->images.size()-1; i++){
     
     if(i==0){
-      reg_results[i] = RegInfo(true, Vec2(0.0,0.0));
+        Bbox box = Bbox(0, 0, pathCam_session->images[0]->width, pathCam_session->images[0]->height);
+        reg_results[0] = RegInfo(true, Vec2(0, 0), box);
     }
-    
+      
     pathCam::Image * last_registered = pathCam_session->images[last_index];
     pathCam::Image * next_image = pathCam_session->images[i+1];
-    
+
     last_registered->load_raw_from_disk();
     next_image->load_raw_from_disk();
-    
     
     if(!last_registered->in_memory() || !next_image->in_memory()){
       std::cout << "Issue loading image.\n";
@@ -167,16 +168,14 @@ int main( int argc, char* argv[] )
     //initial program has no memory leaks
     
     last_registered->free_memory_RAW();
-    delete last_registered;
-    
     next_image->free_memory_RAW();
-    delete next_image;
-    
+      
     delete m;
   }
+    
+  std::cout << "Done Registering Images\n";
   
   if(outimage_name == ""){
-    std::cout << "Done Registration Images:\n";
     delete pathCam_session;
     return 0;
   }
@@ -196,7 +195,7 @@ int main( int argc, char* argv[] )
       if(reg_results[i].bbox.max_x >  combined_box.max_x){
         combined_box.max_x = reg_results[i].bbox.max_x;
       }
-      if(reg_results[i].bbox.max_y <  combined_box.max_y){
+      if(reg_results[i].bbox.max_y >  combined_box.max_y){
         combined_box.max_y = reg_results[i].bbox.max_y;
       }
     }
@@ -245,18 +244,20 @@ int main( int argc, char* argv[] )
   for(unsigned int i=0; i < pathCam_session->images.size(); i++){
     if(reg_results[i].successful){
       pathCam::Image * temp = pathCam_session->images[i];
+      temp->load_raw_from_disk();
       
-      Mat image_Mat = cv::Mat(Size(6464,4852), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
+      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
       
       image_Mat.copyTo(combined(Rect(reg_results[i].bbox.min_x, reg_results[i].bbox.min_y,                                                     image_Mat.cols, image_Mat.rows)));
       
-      delete temp;
+      temp->free_memory_RAW();
     }
   }
   
-  imwrite("registration.png", combined);
-  
+  imwrite(outimage_name, combined);
+  std::cout << "Done Compositing Images\n";
+
   
   delete pathCam_session;
   return 0;
