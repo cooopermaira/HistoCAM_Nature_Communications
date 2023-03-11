@@ -83,7 +83,8 @@ int main( int argc, char* argv[] )
   pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(features, use_FREAK);
   pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
   
-  
+  auto total_begin = std::chrono::high_resolution_clock::now();
+
   std::cout << "Performing Registration:\n";
   
   reg_results.resize(pathCam_session->images.size());
@@ -258,7 +259,11 @@ int main( int argc, char* argv[] )
   imwrite(outimage_name, combined);
   std::cout << "Done Compositing Images\n";
 
-  
+  auto total_end = std::chrono::high_resolution_clock::now();
+  auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(total_end - total_begin);
+  std::cout << total_elapsed.count() * 1e-9 << " seconds\n";
+
+    
   delete pathCam_session;
   return 0;
   
