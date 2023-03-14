@@ -1,4 +1,0 @@
-[submodule "poco"]
-	path = poco
-	url = https://github.com/bsumma/poco.git
-	branch = master
