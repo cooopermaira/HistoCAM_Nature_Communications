@@ -40,6 +40,7 @@ int main( int argc, char* argv[] )
   if(argc < 3){
     std::cout << "Missing input. Use:\n";
     std::cout << "process_list_truth <path to text file input> <path to text file output> OPTIONAL[<path to output image>]\n";
+    return 1;
   }
 
   std::string file = argv[1];

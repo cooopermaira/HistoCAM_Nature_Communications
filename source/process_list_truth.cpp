@@ -14,6 +14,7 @@ int main( int argc, char* argv[] )
     if(argc < 3){
         std::cout << "Missing input. Use:\n";
         std::cout << "process_list_truth <path to text file input> <path to text file output\n";
+        return 1;
     }
     std::string file = argv[1];
     std::string outfile_name = argv[2];
@@ -88,7 +89,7 @@ int main( int argc, char* argv[] )
             auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
 
             if(result == 1){
-                outfile << mot->t_x << "\t" << mot->t_y << "\t";
+                outfile << m->t_x << "\t" << m->t_y << "\t";
                 outfile << elapsed.count() * 1e-9 << "\n";
             }
             if(result == -1){
