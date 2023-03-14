@@ -46,7 +46,7 @@ OPTION(ENABLE_UTIL "" OFF)
 OPTION(ENABLE_ZIP "" OFF)
 OPTION(ENABLE_ENCODINGS "" OFF)
 
-#add_subdirectory(poco)
+add_subdirectory(poco)
 
 add_executable( test source/test.cpp)
 add_executable( process_list_truth source/process_list_truth.cpp)
@@ -55,7 +55,7 @@ add_executable( debayer source/debayer.cpp)
 add_executable( poco_test source/poco_test.cpp)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS})
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation)
 target_link_libraries( test pathCamLib)
 target_link_libraries( process_list_truth pathCamLib)
 target_link_libraries( process_list_orb pathCamLib)
