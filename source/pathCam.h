@@ -29,6 +29,11 @@
 #include "DescriptorMatcher.h"
 #include "MotionEstimator.h"
 
-
+#include "Poco/Runnable.h"
+#include "Poco/Thread.h"
+#include "Poco/MemoryPool.h"
+#include "Poco/MemoryPool.h"
+#include "Poco/File.h"
+#include "Poco/Path.h"
 
 #endif /* pathCam_h */
