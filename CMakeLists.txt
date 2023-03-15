@@ -23,9 +23,12 @@ endif()
 
 set(CMAKE_SKIP_INSTALL_RULES YES)
 
+
 IF(APPLE)
 	SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
-ENDIF(APPLE)
+ELSEIF(WINDOWS)
+    SET(OpenCV_DIR "C:\Users\CooperMaxS\Documents\opencv\opencv-4.6.0\opencv-4.6.0")
+ENDIF()
 
 
 find_package( OpenCV REQUIRED )
