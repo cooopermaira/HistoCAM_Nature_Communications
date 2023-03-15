@@ -6,8 +6,6 @@
 //
 
 #include "pathCam.h"
-#include "Poco/Runnable.h"
-#include "Poco/Thread.h"
 
 using namespace std;
 
