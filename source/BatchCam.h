@@ -19,7 +19,7 @@ class BatchCam{
 private:
   MemoryPool *imagePool;
   
-  Poco::Path image_list;
+  Poco::Path input_images;
   Poco::Path output_log;
   Poco::Path out_image;
   
@@ -48,7 +48,7 @@ public:
   }
 
 private:
-  void parseXML(Poco::Path xml_config);
+  bool parseXML(Poco::Path xml_config);
   
   
 };

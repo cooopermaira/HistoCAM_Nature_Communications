@@ -1,9 +1,9 @@
 <config>
   
   <io>
-    <image_list>value1</image_list>
-    <output_log>123</output_log>
-    <out_image>123</out_image>
+    <input_images>/Users/bsumma/images/image_list.txt</input_images>
+    <output_log>/Users/bsumma/images/log.txt</output_log>
+    <output_image>/Users/bsumma/images/result.png</output_image>
   </io>
   <registration>
     

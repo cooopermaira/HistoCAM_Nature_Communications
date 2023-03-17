@@ -49,9 +49,13 @@ add_library(pathCamLib source/pathCam.h
                 source/DescriptorMatcher.cpp
                 source/FeatureDetector.h
                 source/FeatureDetector.cpp 
-		source/BatchCam.h
-		source/BatchCam.cpp)
+                source/BatchCam.h
+                source/BatchCam.cpp)
     
+OPTION(ENABLE_UTIL "" ON)
+OPTION(ENABLE_XML "" ON)
+OPTION(ENABLE_FOUNDATION "" ON)
+
 OPTION(ENABLE_ACTIVERECORD "" OFF)
 OPTION(ENABLE_ACTIVERECORD_COMPILER "" OFF)
 OPTION(ENABLE_CRYPTO "" OFF)
@@ -70,9 +74,6 @@ OPTION(ENABLE_REDIS "" OFF)
 OPTION(ENABLE_ZIP "" OFF)
 OPTION(ENABLE_ENCODINGS "" OFF)
 
-OPTION(ENABLE_UTIL "" ON)
-OPTION(ENABLE_XML "" ON)
-OPTION(ENABLE_FOUNDATION "" ON)
 
 add_subdirectory(poco)
 
@@ -84,9 +85,9 @@ add_executable( poco_test source/poco_test.cpp)
 
 
 target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util)
-target_link_libraries( test pathCamLib)
-target_link_libraries( process_list_truth pathCamLib)
-target_link_libraries( process_list_orb pathCamLib)
-target_link_libraries( debayer pathCamLib)
-target_link_libraries( poco_test pathCamLib)
+target_link_libraries(test pathCamLib)
+target_link_libraries(process_list_truth pathCamLib)
+target_link_libraries(process_list_orb pathCamLib)
+target_link_libraries(debayer pathCamLib)
+target_link_libraries(poco_test pathCamLib)
 
