@@ -38,6 +38,9 @@ private:
   pathCam::MotionEstimator *mot;
   pathCam::FeatureDetector *detector;
   pathCam::DescriptorMatcher *matcher;
+  
+  std::vector < Image *> images;
+  std::vector < RegInfo > reg_results;
 
 
 public:
@@ -45,11 +48,21 @@ public:
   
   ~BatchCam(){
     delete imagePool;
+    
+    for(unsigned int i=0; i < images.size(); i++){
+      delete images[i];
+    }
+    images.clear();
   }
+  
+  bool run();
 
 private:
   bool parseXML(Poco::Path xml_config);
+  bool loadFileList();
   
+  bool registration();
+  bool compositing();
   
 };
 
