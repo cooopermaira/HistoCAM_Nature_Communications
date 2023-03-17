@@ -15,7 +15,7 @@ using namespace cv::xfeatures2d;
 
 namespace pathCam{
 
-enum{_AKAZE, _BRISK, _GFFT, _KAZE, _MSER, _ORB, _SIFT, //features2d
+enum{_AKAZE, _BRISK, _GFFT, _KAZE, _MSER, _FAST_ORB, _ORB, _SIFT, //features2d
   _BOOST, _DAISY, _LATCH, _LUCID, _MSD, _SURF, _VGG}; //xfeatures2d
 
 class FeatureDetector{
@@ -46,6 +46,9 @@ class FeatureDetector{
         break;
       case _ORB:
         detector = ORB::create();
+        break;
+      case _FAST_ORB:
+        detector = ORB::create(500, 1.0, 1, 31, 0, 2, ORB::HARRIS_SCORE, 31, 20);
       default:
         break;
     }

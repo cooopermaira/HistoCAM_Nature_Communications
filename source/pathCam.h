@@ -22,18 +22,25 @@
 #include <fstream>
 #include <string>
 
+#include "Poco/Runnable.h"
+#include "Poco/Thread.h"
+#include "Poco/MemoryPool.h"
+#include "Poco/File.h"
+#include "Poco/Path.h"
+#include "Poco/Util/XMLConfiguration.h"
+
+#include "util.h"
 #include "Image.h"
 #include "ImageList.h"
 #include "FeatureDetector.h"
 #include "Match.h"
 #include "DescriptorMatcher.h"
 #include "MotionEstimator.h"
+#include "BatchCam.h"
 
-#include "Poco/Runnable.h"
-#include "Poco/Thread.h"
-#include "Poco/MemoryPool.h"
-#include "Poco/MemoryPool.h"
-#include "Poco/File.h"
-#include "Poco/Path.h"
+
 
 #endif /* pathCam_h */
+
+
+

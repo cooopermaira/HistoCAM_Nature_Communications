@@ -7,31 +7,16 @@
 
 #include "pathCam.h"
 
-using namespace std;
-
-class Worker:public Poco::Runnable{
-    public:
-        Worker(int n):_id(n){}
-        virtual void run() {
-            cout << "i'm worker:" << _id << endl;
-        }
-    private:
-        int _id;
-};
+using namespace pathCam;
 
 int main(int argc, char **argv)
 {
-    Worker work1(1);
-    Worker work2(2);
+  std::string temp = "/Users/bsumma/source/pathcam/resources/config_example.xml";
+  Poco::Path temp_path = Path(temp);
+  
+  BatchCam *batch = new BatchCam(temp_path);
     
-    Poco::Thread thread1;
-    Poco::Thread thread2;
-    
-    thread1.start(work1);
-    thread2.start(work2);
-    
-    thread1.join();
-    thread2.join();
-    
-    return 0;
+  
+  delete batch;
+  return 0;
 }

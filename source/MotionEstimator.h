@@ -11,21 +11,30 @@
 #include "pathCam.h"
 
 namespace pathCam{
-    
-  class MotionEstimator{
-  public:
-    
-    MotionEstimator(){};
-    
-    int findHomography(pathCam::Match *m, int estimator_type,
-                        double ransacReprojThreshold = 3, int maxIters = 2000,
-                        double confidence = 0.995);
-    
-    void phaseCorrelate(pathCam::Match *m, Image *image_1, Image *image_2);
-    
-    
-  };
+
+class MotionEstimator{
+public:
   
+  MotionEstimator(){};
+  
+  int findHomography(pathCam::Match *m, int estimator_type,
+                     double ransacReprojThreshold = 3, int maxIters = 2000,
+                     double confidence = 0.995);
+  
+  void phaseCorrelate(pathCam::Match *m, Image *image_1, Image *image_2);
+  
+  
+};
+
+class RegInfo{
+public:
+  bool successful;
+  Bbox bbox;
+  Vec2 vec;
+  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0), Bbox bbox = Bbox()):
+  successful(successful), vec(vec), bbox(bbox) {};
+};
+
 }
 
 #endif /* MotionEstimator_h */

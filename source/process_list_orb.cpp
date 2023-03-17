@@ -7,31 +7,7 @@
 
 #include "pathCam.h"
 
-
-class Vec2{
-public:
-  double x, y;
-  Vec2(double x, double y): x(x), y(y){};
-};
-
-class Bbox{
-public:
-  double min_x, min_y, max_x, max_y;
-  Bbox(double min_x=std::numeric_limits<double>::infinity(),
-       double min_y=std::numeric_limits<double>::infinity(),
-       double max_x=-std::numeric_limits<double>::infinity(),
-       double max_y=-std::numeric_limits<double>::infinity()):
-  min_x(min_x), min_y(min_y), max_x(max_x), max_y(max_y) {};
-};
-
-class RegInfo{
-public:
-  bool successful;
-  Bbox bbox;
-  Vec2 vec;
-  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0), Bbox bbox = Bbox()):
-  successful(successful), vec(vec), bbox(bbox) {};
-};
+using namespace pathCam;
 
 int main( int argc, char* argv[] )
 {
@@ -59,9 +35,7 @@ int main( int argc, char* argv[] )
   bool real = false;
   
   int interpolation = cv::INTER_CUBIC;
-  
   int features = pathCam::_ORB;
-  
   bool use_FREAK = false;
   
   std::vector < RegInfo > reg_results;
