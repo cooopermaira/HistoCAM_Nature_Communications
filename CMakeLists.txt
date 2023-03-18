@@ -50,7 +50,8 @@ add_library(pathCamLib source/pathCam.h
                 source/FeatureDetector.h
                 source/FeatureDetector.cpp 
                 source/BatchCam.h
-                source/BatchCam.cpp)
+                source/BatchCam.cpp
+                source/util.h)
     
 OPTION(ENABLE_UTIL "" ON)
 OPTION(ENABLE_XML "" ON)

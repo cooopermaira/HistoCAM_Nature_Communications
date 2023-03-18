@@ -12,18 +12,44 @@ namespace pathCam{
 using Poco::AutoPtr;
 using Poco::Path;
 using Poco::Util::XMLConfiguration;
+using Poco::Environment;
 
 BatchCam::BatchCam(Poco::Path xml_config){
+  std::cout << "System OS: " << Environment::osDisplayName() << "\n";
+  std::cout << "System Arch: " << Environment::osArchitecture() << "\n";
+  std::cout << "Core count: " << Environment::processorCount() << "\n";
+
   std::cout << "Parsing " << xml_config.toString() << "\n";
   
-  parseXML(xml_config);
+  //Defaults
+  output_log = Path("./output_log.txt");
+  crop_factor = 1.0;
+  double scale_factor  = 1.0;
+  bool debayer = true;
+  bool real = false;
+  int interpolation = INTER_CUBIC;
+  int feature_type = _ORB;
+  bool use_FREAK = false;
+  pathCam::FeatureDetector::ORBParameters ORB_params;
+  cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
+  int estimator_type = RANSAC;
+  
+//  pathCam::MotionEstimator *mot =;
+//  pathCam::FeatureDetector *detector;
+//  pathCam::DescriptorMatcher *matcher;
+
+
+  
+  if(!parseXML(xml_config)){
+    std::cout << "Problem parsing XML.\n Exiting.\n";
+    exit(-1);
+  }
     
 }
 
 bool BatchCam::parseXML(Poco::Path xml_config){
   
   AutoPtr<XMLConfiguration> pConf(new XMLConfiguration(xml_config.toString()));
-  
   
   if(pConf->has("io")){
     
@@ -49,23 +75,28 @@ bool BatchCam::parseXML(Poco::Path xml_config){
     
     if(pConf->has("io.output_log")){
       std::string temp = pConf->getString("io.output_log");
-      output_log = Path(temp);
+      Path temp_log = Path(temp);
       
-      if(output_log.isDirectory()){
+      if(temp_log.isDirectory()){
         std::cout << "Output Log: Directories not supported.\n";
-        output_log = Path();
-        return false;
+        std::cout << "Using default.\n";
+        std::cout << output_log.toString() << "\n";
+        temp_log.clear();
       }
 
-      if(output_log.getExtension() != "txt"){
+      if(temp_log.getExtension() != "txt"){
         std::cout << "Output Log: Only text files supported.\n";
-        output_log = Path();
-        return false;
+        std::cout << "Using default.\n";
+        std::cout << output_log.toString() << "\n";
+        temp_log.clear();
       }
       
+      if(temp_log.toString() != ""){ output_log = temp_log; }
+      
     }else{
-      std::cout << "Output Log required.\n";
-      return false;
+      std::cout << "No output log supplied.\n";
+      std::cout << "Using default.\n";
+      std::cout << output_log.toString() << "\n";
     }
     
     if(pConf->has("io.output_image")){
@@ -73,9 +104,8 @@ bool BatchCam::parseXML(Poco::Path xml_config){
       out_image = Path(temp);
       
       if(out_image.getExtension() != "png" && out_image.getExtension() != "tif"){
-        std::cout << "Only PNG or TIF outputs supported.\n";
+        std::cout << "Only PNG or TIF outputs supported. No image output.\n";
         out_image = Path();
-        return false;
       }
     }
     
@@ -90,81 +120,132 @@ bool BatchCam::parseXML(Poco::Path xml_config){
     
     if(pConf->has("registration.detector")){
       
-      if(pConf->has("registration.detector.feature_type")){
+      if(pConf->has("registration.detector.features")){
         
-        if(pConf->has("registration.detector.feature_type.type")){
+        if(pConf->has("registration.detector.features.type")){
         
           
           
+        }else{
+          std::cout << "No feature type supplied.  Using defaults.\n";
         }
         
-        if(pConf->has("registration.detector.feature_type.params")){
+        if(pConf->has("registration.detector.features.params")){
         
           
           
+        }else{
+          std::cout << "No feature params supplied.  Using defaults.\n";
         }
         
         
+      }else{
+        std::cout << "No feature info supplied.  Using defaults.\n";
       }
       
       if(pConf->has("registration.detector.FREAK")){
         
         
+      }else{
+        std::cout << "No FREAK preference supplied.  Using defaults.\n";
       }
       
+    }else{
+      std::cout << "No detector info supplied.  Using defaults.\n";
     }
     
     if(pConf->has("registration.image")){
       
       if(pConf->has("registration.image.crop")){
-       
-       
-        
+        try {
+          crop_factor = pConf->getDouble("registration.image.crop");
+        }catch(std::string bad_input){
+          std::cout << "Bad input for crop: " << bad_input << "\n";
+        }
+        if(crop_factor < 0.0 || crop_factor > 1.0){
+          std::cout << "Bad crop factor given defaulting to 1.0\n";
+          crop_factor = 1.0;
+        }
       }
       
       if(pConf->has("registration.image.scale")){
-       
-      
-        
+        try {
+          scale_factor = pConf->getDouble("registration.image.scale");
+        }catch(std::string bad_input){
+          std::cout << "Bad input for scale: " << bad_input << "\n";
+        }
+        if(scale_factor < 0.0 || scale_factor > 1.0){
+          std::cout << "Bad scale factor given defaulting to 1.0\n";
+          crop_factor = 1.0;
+        }
+    
       }
       
       if(pConf->has("registration.image.interpolation")){
-       
-      
+        std::string temp = pConf->getString("registration.image.interpolation");
+        
+        if(temp == "NEAREST"){
+          interpolation = INTER_NEAREST;
+        }else if (temp == "LINEAR"){
+          interpolation = INTER_LINEAR;
+        }else if (temp == "CUBIC"){
+          interpolation = INTER_CUBIC;
+        }else if (temp == "AREA"){
+          interpolation = INTER_AREA;
+        }else if (temp == "LANCZOS4"){
+          interpolation = INTER_LANCZOS4;
+        }else if (temp == "LINEAR_EXACT"){
+          interpolation = INTER_LINEAR_EXACT;
+        }else if (temp == "NEAREST_EXACT"){
+          interpolation = INTER_NEAREST_EXACT;
+        }else if (temp == "MAX"){
+          interpolation = INTER_MAX;
+        }else{
+          std::cout << "Improper input for interpolation. Defaulting to CUBIC\n";
+          interpolation = INTER_CUBIC;
+        }
         
       }
       
       if(pConf->has("registration.image.real")){
-       
-      
-        
+        try {
+          real = pConf->getBool("registration.image.real");
+        }catch(std::string bad_input){
+          std::cout << "Bad input for real: " << bad_input << "\n";
+        }
       }
       
       if(pConf->has("registration.image.debayer")){
-       
-      
-        
+        try {
+          debayer = pConf->getBool("registration.image.debayer");
+        }catch(std::string bad_input){
+          std::cout << "Bad input for debayer: " << bad_input << "\n";
+        }
       }
       
+    }else{
+      std::cout << "No registation image info supplied.  Using defaults.\n";
     }
     
     if(pConf->has("registration.matcher")){
       
-      
-      
+    }else{
+      std::cout << "No matcher info supplied.  Using defaults.\n";
     }
     
     if(pConf->has("registration.estimator")){
       
-      
-      
+    }else{
+      std::cout << "No estimator info supplied.  Using defaults.\n";
     }
     
-    return true;
+  }else{
+    std::cout << "No registration info supplied.  Using defaults.\n";
   }
 
   
 
+  return true;
 
   
   

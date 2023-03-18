@@ -31,9 +31,15 @@ private:
   int interpolation;
   int feature_type;
   bool use_FREAK;
-  pathCam::FeatureDetector::ORBParameters ORB_params;
   cv::DescriptorMatcher::MatcherType matcher_type;
   int estimator_type;
+  
+  pathCam::FeatureDetector::SIFTParameters SIFT_params;
+  pathCam::FeatureDetector::SURFParameters SURF_params;
+  pathCam::FeatureDetector::AKAZEParameters AKAZE_params;
+  pathCam::FeatureDetector::BRISKParameters BRISK_params;
+  pathCam::FeatureDetector::ORBParameters ORB_params;
+
   
   pathCam::MotionEstimator *mot;
   pathCam::FeatureDetector *detector;
