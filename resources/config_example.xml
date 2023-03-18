@@ -20,8 +20,8 @@
       <crop>0.5</crop>
       <scale>0.25</scale>
       <interpolation>CUBIC</interpolation>
-      <real>False</real>
-      <debayer>True</debayer>
+      <real>false</real>
+      <debayer>true</debayer>
     </image>
     
     <matcher>BRUTEFORCE_HAMMING</matcher>
