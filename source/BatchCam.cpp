@@ -30,19 +30,35 @@ BatchCam::BatchCam(Poco::Path xml_config){
   int interpolation = INTER_CUBIC;
   int feature_type = _ORB;
   bool use_FREAK = false;
-  pathCam::FeatureDetector::ORBParameters ORB_params;
   cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   int estimator_type = RANSAC;
-  
-//  pathCam::MotionEstimator *mot =;
-//  pathCam::FeatureDetector *detector;
-//  pathCam::DescriptorMatcher *matcher;
-
 
   
   if(!parseXML(xml_config)){
     std::cout << "Problem parsing XML.\n Exiting.\n";
     exit(-1);
+  }
+  
+  pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
+  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(feature_type, use_FREAK);
+  pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
+
+  switch(feature_type){
+    case _SIFT:
+      detector->set_SIFT_params(SIFT_params);
+      break;
+    case _SURF:
+      detector->set_SURF_params(SURF_params);
+      break;
+    case _AKAZE:
+      detector->set_AKAZE_params(AKAZE_params);
+      break;
+    case _BRISK:
+      detector->set_BRISK_params(BRISK_params);
+      break;
+    case _ORB:
+      detector->set_ORB_params(ORB_params);
+      break;
   }
     
 }
@@ -123,28 +139,124 @@ bool BatchCam::parseXML(Poco::Path xml_config){
       if(pConf->has("registration.detector.features")){
         
         if(pConf->has("registration.detector.features.type")){
-        
-          
-          
+          std::string temp = pConf->getString("registration.detector.features.type");
+          if(temp == "SIFT"){
+            feature_type = _SIFT;
+          }else if (temp == "SURF"){
+            feature_type = _SURF;
+          }else if (temp == "AKAZE"){
+            feature_type = _AKAZE;
+          }else if (temp == "BRISK"){
+            feature_type = _BRISK;
+          }else if (temp == "ORB"){
+            feature_type = _ORB;
+          }else{
+            std::cout << "Unknown feature type. Using default.\n";
+          }
         }else{
-          std::cout << "No feature type supplied.  Using defaults.\n";
+          std::cout << "No feature type supplied.  Using default.\n";
         }
         
         if(pConf->has("registration.detector.features.params")){
         
+          switch(feature_type){
+            case _SIFT:
+              std::cout << "not yet implemented\n"; return false;
+              break;
+            case _SURF:
+              std::cout << "not yet implemented\n"; return false;
+              break;
+            case _AKAZE:
+              std::cout << "not yet implemented\n"; return false;
+              break;
+            case _BRISK:
+              std::cout << "not yet implemented\n"; return false;
+              break;
+            case _ORB:
+              int nfeatures;
+              try{
+                nfeatures = pConf->getInt("registration.detector.features.params[@nfeatures]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for nfeatures: " << bad_input << ". Using default.\n";
+                nfeatures = ORB_params.nfeatures;
+              }
+              float scaleFactor;
+              try{
+                scaleFactor = pConf->getDouble("registration.detector.features.params[@scaleFactor]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for scaleFactor: " << bad_input << ". Using default.\n";
+                scaleFactor = ORB_params.scaleFactor;
+              }
+              int nlevels;
+              try{
+                nlevels = pConf->getInt("registration.detector.features.params[@nlevels]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for nlevels: " << bad_input << ". Using default.\n";
+                nlevels = ORB_params.nlevels;
+              }
+              int edgeThreshold;
+              try{
+                edgeThreshold = pConf->getInt("registration.detector.features.params[@edgeThreshold]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for edgeThreshold: " << bad_input << ". Using default.\n";
+                edgeThreshold = ORB_params.edgeThreshold;
+              }
+              int firstLevel;
+              try{
+                firstLevel = pConf->getInt("registration.detector.features.params[@firstLevel]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
+                firstLevel = ORB_params.firstLevel;
+              }
+              int WTA_K;
+              try{
+                WTA_K = pConf->getInt("registration.detector.features.params[@WTA_K]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
+                WTA_K = ORB_params.WTA_K;
+              }
+              ORB::ScoreType scoreType;
+              std::string temp = pConf->getString("registration.detector.features.params[@scoreType]");
+              if(temp == "HARRIS_SCORE"){
+                scoreType = ORB::HARRIS_SCORE;
+              } else if (temp == "FAST_SCORE"){
+                scoreType = ORB::FAST_SCORE;
+              }else{
+                std::cout << "Unknown scoreType: " << temp << ". Using Defaults.\n";
+              }
+              int patchSize;
+              try{
+                patchSize = pConf->getInt("registration.detector.features.params[@patchSize]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for patchSize: " << bad_input << ". Using default.\n";
+                patchSize = ORB_params.patchSize;
+              }
+              int fastThreshold;
+              try{
+                fastThreshold = pConf->getInt("registration.detector.features.params[@fastThreshold]");
+              }catch(std::string bad_input){
+                std::cout << "Bad input for fastThreshold: " << bad_input << ". Using default.\n";
+                fastThreshold = ORB_params.fastThreshold;
+              }
+              break;
+          }
+          
           
           
         }else{
           std::cout << "No feature params supplied.  Using defaults.\n";
         }
         
-        
       }else{
         std::cout << "No feature info supplied.  Using defaults.\n";
       }
       
       if(pConf->has("registration.detector.FREAK")){
-        
+        try {
+          use_FREAK = pConf->getBool("registration.detector.FREAK");
+        }catch(std::string bad_input){
+          std::cout << "Bad input for FREAK: " << bad_input << ". Using default.\n";
+        }
         
       }else{
         std::cout << "No FREAK preference supplied.  Using defaults.\n";
@@ -288,7 +400,6 @@ bool BatchCam::loadFileList(){
   return true;
 }
 
-
 bool BatchCam::run(){
   bool good;
   
@@ -345,12 +456,10 @@ bool BatchCam::registration(){
     
     if(last_registered->keypoints.size() < 200 || next_image->keypoints.size() < 200){
       std::cout << "Too little features detected.  Going back to defaults\n";
-      delete detector;
-      detector = new pathCam::FeatureDetector(feature_type, use_FREAK);
+      detector->set_ORB_params();
       detector->detect_and_compute(last_registered);
       detector->detect_and_compute(next_image);
-      delete detector;
-      detector = new pathCam::FeatureDetector(feature_type, use_FREAK);
+      detector->set_ORB_params(ORB_params);
     }
     
     if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){

@@ -59,6 +59,11 @@ public:
       delete images[i];
     }
     images.clear();
+    
+    delete mot;
+    delete detector;
+    delete matcher;
+
   }
   
   bool run();

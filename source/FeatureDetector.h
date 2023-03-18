@@ -250,6 +250,22 @@ public:
                            ORB_params.patchSize,
                            ORB_params.fastThreshold);
   }
+  
+  inline void set_ORB_params(){
+    ORB_params = ORBParameters();
+    feature_type=_ORB;
+
+    if(detector != nullptr){ detector.release(); }
+    detector = ORB::create(ORB_params.nfeatures,
+                           ORB_params.scaleFactor,
+                           ORB_params.nlevels,
+                           ORB_params.edgeThreshold,
+                           ORB_params.firstLevel,
+                           ORB_params.WTA_K,
+                           ORB_params.scoreType,
+                           ORB_params.patchSize,
+                           ORB_params.fastThreshold);
+  }
 
   
   inline bool detect_and_compute(Image *image){
