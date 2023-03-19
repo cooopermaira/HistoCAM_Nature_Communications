@@ -50,7 +50,7 @@ private:
 
 
 public:
-  BatchCam(Poco::Path xml_config);
+  BatchCam(Poco::Util::LayeredConfiguration::Ptr config);
   
   ~BatchCam(){
     delete imagePool;
@@ -69,7 +69,7 @@ public:
   bool run();
 
 private:
-  bool parseXML(Poco::Path xml_config);
+  bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
   
   bool registration();

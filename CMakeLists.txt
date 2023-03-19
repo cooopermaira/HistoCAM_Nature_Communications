@@ -81,6 +81,7 @@ add_subdirectory(poco)
 add_executable( test source/test.cpp)
 add_executable( process_list_truth source/process_list_truth.cpp)
 add_executable( process_list_orb source/process_list_orb.cpp)
+add_executable( process_list_xml source/process_list_xml.cpp)
 add_executable( debayer source/debayer.cpp)
 add_executable( poco_test source/poco_test.cpp)
 
@@ -89,6 +90,7 @@ target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco:
 target_link_libraries(test pathCamLib)
 target_link_libraries(process_list_truth pathCamLib)
 target_link_libraries(process_list_orb pathCamLib)
+target_link_libraries(process_list_xml pathCamLib)
 target_link_libraries(debayer pathCamLib)
 target_link_libraries(poco_test pathCamLib)
 

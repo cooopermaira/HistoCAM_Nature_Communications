@@ -27,8 +27,10 @@
 #include "Poco/MemoryPool.h"
 #include "Poco/File.h"
 #include "Poco/Path.h"
-#include "Poco/Util/XMLConfiguration.h"
 #include "Poco/Environment.h"
+#include "Poco/Util/XMLConfiguration.h"
+#include "Poco/Util/Application.h"
+#include "Poco/Util/HelpFormatter.h"
 
 #include "util.h"
 #include "Image.h"

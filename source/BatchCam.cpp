@@ -12,15 +12,14 @@ namespace pathCam{
 using Poco::AutoPtr;
 using Poco::Path;
 using Poco::Util::XMLConfiguration;
+using Poco::Util::LayeredConfiguration;
 using Poco::Environment;
 
-BatchCam::BatchCam(Poco::Path xml_config){
+BatchCam::BatchCam(LayeredConfiguration::Ptr config){
   std::cout << "System OS: " << Environment::osDisplayName() << "\n";
   std::cout << "System Arch: " << Environment::osArchitecture() << "\n";
   std::cout << "Core count: " << Environment::processorCount() << "\n";
 
-  std::cout << "Parsing " << xml_config.toString() << "\n";
-  
   //Defaults
   output_log = Path("./output_log.txt");
   crop_factor = 1.0;
@@ -33,12 +32,11 @@ BatchCam::BatchCam(Poco::Path xml_config){
   cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   int estimator_type = RANSAC;
 
-  
-  if(!parseXML(xml_config)){
+  if(!parseConfig(config)){
     std::cout << "Problem parsing XML.\n Exiting.\n";
     exit(-1);
   }
-  
+
   pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
   pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(feature_type, use_FREAK);
   pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
@@ -60,13 +58,12 @@ BatchCam::BatchCam(Poco::Path xml_config){
       detector->set_ORB_params(ORB_params);
       break;
   }
-    
+
+
 }
 
-bool BatchCam::parseXML(Poco::Path xml_config){
-  
-  AutoPtr<XMLConfiguration> pConf(new XMLConfiguration(xml_config.toString()));
-  
+bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
+    
   if(pConf->has("io")){
     
     if(pConf->has("io.input_images")){
@@ -406,7 +403,12 @@ bool BatchCam::run(){
   good = registration();
   if(!good){ std::cout << "Registration Failed.\n"; return false; }
   
+  if(out_image.toString() != ""){
+    good = compositing();
+    if(!good){ std::cout << "Compositing Failed.\n"; return false; }
+  }
   
+  return true;
 }
 
 bool BatchCam::registration(){
@@ -513,6 +515,94 @@ bool BatchCam::registration(){
   std::cout << "Done Registering Images\n";
   std::cout << reg_elapsed.count() * 1e-9 << " seconds including I/O\n";
 
+
+}
+
+bool BatchCam::compositing(){
+  std::cout << "Compositing Images:\n";
+  
+  auto comp_begin = std::chrono::high_resolution_clock::now();
+  
+  Bbox combined_box = Bbox();
+  
+  for(unsigned int i=0; i < reg_results.size(); i++){
+    if(reg_results[i].successful){
+      if(reg_results[i].bbox.min_x <  combined_box.min_x){
+        combined_box.min_x = reg_results[i].bbox.min_x;
+      }
+      if(reg_results[i].bbox.min_y <  combined_box.min_y){
+        combined_box.min_y = reg_results[i].bbox.min_y;
+      }
+      if(reg_results[i].bbox.max_x >  combined_box.max_x){
+        combined_box.max_x = reg_results[i].bbox.max_x;
+      }
+      if(reg_results[i].bbox.max_y >  combined_box.max_y){
+        combined_box.max_y = reg_results[i].bbox.max_y;
+      }
+    }
+  }
+  
+  
+//  std::cout << "combined bbox: ";
+//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
+//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
+  
+  
+  if(combined_box.min_x < 0.0){
+    for(unsigned int i=0; i < reg_results.size(); i++){
+      if(reg_results[i].successful){
+        reg_results[i].bbox.min_x -= combined_box.min_x;
+        reg_results[i].bbox.max_x -= combined_box.max_x;
+      }
+    }
+    combined_box.max_x -= combined_box.min_x;
+    combined_box.min_x -= combined_box.min_x;
+  }
+  
+  if(combined_box.min_y < 0.0){
+    for(unsigned int i=0; i < reg_results.size(); i++){
+      if(reg_results[i].successful){
+        reg_results[i].bbox.min_y -= combined_box.min_y;
+        reg_results[i].bbox.max_y -= combined_box.max_y;
+      }
+    }
+    combined_box.max_y -= combined_box.min_y;
+    combined_box.min_y -= combined_box.min_y;
+  }
+  
+//  std::cout << "combined bbox: ";
+//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
+//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
+//
+//  std::cout << "width height: ";
+//  std::cout << "[ " << combined_box.max_x-combined_box.min_x << ", ";
+//  std::cout << combined_box.max_y-combined_box.min_y << "]\n";
+  
+  
+  Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
+  std::cout << combined.size()  << "\n";
+  
+  for(unsigned int i=0; i < images.size(); i++){
+    if(reg_results[i].successful){
+      pathCam::Image * temp = images[i];
+      temp->load_raw_from_disk();
+      
+      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
+      
+      image_Mat.copyTo(combined(Rect(reg_results[i].bbox.min_x, reg_results[i].bbox.min_y,                                                     image_Mat.cols, image_Mat.rows)));
+      
+      temp->free_memory_RAW();
+    }
+  }
+  
+  imwrite(out_image.toString(), combined);
+  auto comp_end = std::chrono::high_resolution_clock::now();
+
+  std::cout << "Done Compositing Images\n";
+    
+  auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
+  std::cout << comp_elapsed.count() * 1e-9 << " seconds including I/O\n";
 
 }
 
