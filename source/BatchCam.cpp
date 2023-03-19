@@ -23,23 +23,23 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config){
   //Defaults
   output_log = Path("./output_log.txt");
   crop_factor = 1.0;
-  double scale_factor  = 1.0;
-  bool debayer = true;
-  bool real = false;
-  int interpolation = INTER_CUBIC;
-  int feature_type = _ORB;
-  bool use_FREAK = false;
+  scale_factor  = 1.0;
+  debayer = true;
+  real = false;
+  interpolation = INTER_CUBIC;
+  feature_type = _ORB;
+  use_FREAK = false;
   cv::DescriptorMatcher::MatcherType matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
-  int estimator_type = RANSAC;
+  estimator_type = RANSAC;
 
   if(!parseConfig(config)){
     std::cout << "Problem parsing XML.\n Exiting.\n";
     exit(-1);
   }
 
-  pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
-  pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(feature_type, use_FREAK);
-  pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(matcher_type);
+  mot = new pathCam::MotionEstimator();
+  detector = new pathCam::FeatureDetector(feature_type, use_FREAK);
+  matcher = new pathCam::DescriptorMatcher(matcher_type);
 
   switch(feature_type){
     case _SIFT:
@@ -177,6 +177,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for nfeatures: " << bad_input << ". Using default.\n";
                 nfeatures = ORB_params.nfeatures;
               }
+              ORB_params.nfeatures = nfeatures;
               float scaleFactor;
               try{
                 scaleFactor = pConf->getDouble("registration.detector.features.params[@scaleFactor]");
@@ -184,6 +185,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for scaleFactor: " << bad_input << ". Using default.\n";
                 scaleFactor = ORB_params.scaleFactor;
               }
+              ORB_params.scaleFactor = scaleFactor;
               int nlevels;
               try{
                 nlevels = pConf->getInt("registration.detector.features.params[@nlevels]");
@@ -191,6 +193,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for nlevels: " << bad_input << ". Using default.\n";
                 nlevels = ORB_params.nlevels;
               }
+              ORB_params.nlevels = nlevels;
               int edgeThreshold;
               try{
                 edgeThreshold = pConf->getInt("registration.detector.features.params[@edgeThreshold]");
@@ -198,6 +201,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for edgeThreshold: " << bad_input << ". Using default.\n";
                 edgeThreshold = ORB_params.edgeThreshold;
               }
+              ORB_params.edgeThreshold = edgeThreshold;
               int firstLevel;
               try{
                 firstLevel = pConf->getInt("registration.detector.features.params[@firstLevel]");
@@ -205,6 +209,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
                 firstLevel = ORB_params.firstLevel;
               }
+              ORB_params.firstLevel = firstLevel;
               int WTA_K;
               try{
                 WTA_K = pConf->getInt("registration.detector.features.params[@WTA_K]");
@@ -212,6 +217,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
                 WTA_K = ORB_params.WTA_K;
               }
+              ORB_params.WTA_K = WTA_K;
               ORB::ScoreType scoreType;
               std::string temp = pConf->getString("registration.detector.features.params[@scoreType]");
               if(temp == "HARRIS_SCORE"){
@@ -220,7 +226,9 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 scoreType = ORB::FAST_SCORE;
               }else{
                 std::cout << "Unknown scoreType: " << temp << ". Using Defaults.\n";
+                scoreType = ORB_params.scoreType;
               }
+              ORB_params.scoreType = scoreType;
               int patchSize;
               try{
                 patchSize = pConf->getInt("registration.detector.features.params[@patchSize]");
@@ -228,6 +236,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for patchSize: " << bad_input << ". Using default.\n";
                 patchSize = ORB_params.patchSize;
               }
+              ORB_params.patchSize = patchSize;
               int fastThreshold;
               try{
                 fastThreshold = pConf->getInt("registration.detector.features.params[@fastThreshold]");
@@ -235,6 +244,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
                 std::cout << "Bad input for fastThreshold: " << bad_input << ". Using default.\n";
                 fastThreshold = ORB_params.fastThreshold;
               }
+              ORB_params.fastThreshold = fastThreshold;
               break;
           }
           
@@ -249,10 +259,12 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       }
       
       if(pConf->has("registration.detector.FREAK")){
+        bool temp = use_FREAK;
         try {
           use_FREAK = pConf->getBool("registration.detector.FREAK");
         }catch(std::string bad_input){
           std::cout << "Bad input for FREAK: " << bad_input << ". Using default.\n";
+          use_FREAK = temp;
         }
         
       }else{
@@ -266,10 +278,12 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
     if(pConf->has("registration.image")){
       
       if(pConf->has("registration.image.crop")){
+        double temp = crop_factor;
         try {
           crop_factor = pConf->getDouble("registration.image.crop");
         }catch(std::string bad_input){
           std::cout << "Bad input for crop: " << bad_input << "\n";
+          crop_factor = temp;
         }
         if(crop_factor < 0.0 || crop_factor > 1.0){
           std::cout << "Bad crop factor given defaulting to 1.0\n";
@@ -278,14 +292,16 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       }
       
       if(pConf->has("registration.image.scale")){
+        double temp = scale_factor;
         try {
           scale_factor = pConf->getDouble("registration.image.scale");
         }catch(std::string bad_input){
           std::cout << "Bad input for scale: " << bad_input << "\n";
+          scale_factor = temp;
         }
         if(scale_factor < 0.0 || scale_factor > 1.0){
           std::cout << "Bad scale factor given defaulting to 1.0\n";
-          crop_factor = 1.0;
+          scale_factor = 1.0;
         }
     
       }
@@ -317,18 +333,22 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       }
       
       if(pConf->has("registration.image.real")){
+        bool temp = real;
         try {
           real = pConf->getBool("registration.image.real");
         }catch(std::string bad_input){
-          std::cout << "Bad input for real: " << bad_input << "\n";
+          std::cout << "Bad input for real: " << bad_input << ". Using default.\n";
+          real = temp;
         }
       }
       
       if(pConf->has("registration.image.debayer")){
+        bool temp = debayer;
         try {
           debayer = pConf->getBool("registration.image.debayer");
         }catch(std::string bad_input){
-          std::cout << "Bad input for debayer: " << bad_input << "\n";
+          std::cout << "Bad input for debayer: " << bad_input << ". Using default\n";
+          debayer = temp;
         }
       }
       
@@ -451,7 +471,6 @@ bool BatchCam::registration(){
     last_registered->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
     next_image->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
     
-    detector->set_ORB_params(ORB_params);
     
     detector->detect_and_compute(last_registered);
     detector->detect_and_compute(next_image);
@@ -515,7 +534,7 @@ bool BatchCam::registration(){
   std::cout << "Done Registering Images\n";
   std::cout << reg_elapsed.count() * 1e-9 << " seconds including I/O\n";
 
-
+  return true;
 }
 
 bool BatchCam::compositing(){
@@ -603,6 +622,8 @@ bool BatchCam::compositing(){
     
   auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
   std::cout << comp_elapsed.count() * 1e-9 << " seconds including I/O\n";
+  
+  return true;
 
 }
 
