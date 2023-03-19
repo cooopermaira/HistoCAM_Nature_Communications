@@ -29,11 +29,11 @@ protected:
 
   void initialize(Application& self){
     Application::initialize(self);
-    bcam = new BatchCam(configPtr());
+    if(!_helpRequested){ bcam = new BatchCam(configPtr()); }
   }
   
   void uninitialize(){
-    delete bcam;
+    if(!_helpRequested){ delete bcam; }
     Application::uninitialize();
   }
   
