@@ -13,15 +13,16 @@ using Poco::AutoPtr;
 using Poco::Path;
 using Poco::Util::XMLConfiguration;
 using Poco::Util::LayeredConfiguration;
+using Poco::Logger;
 using Poco::Environment;
 
-BatchCam::BatchCam(LayeredConfiguration::Ptr config){
-  std::cout << "System OS: " << Environment::osDisplayName() << "\n";
-  std::cout << "System Arch: " << Environment::osArchitecture() << "\n";
-  std::cout << "Core count: " << Environment::processorCount() << "\n";
+BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
+  logger = &Applogger;
+  logger->information(Poco::format("System OS: %s", Environment::osDisplayName()));
+  logger->information(Poco::format("System Arch: %s", Environment::osArchitecture()));
+  logger->information(Poco::format("System OS: %u\n", Environment::processorCount()));
 
   //Defaults
-  output_log = Path("./output_log.txt");
   crop_factor = 1.0;
   scale_factor  = 1.0;
   debayer = true;
@@ -33,7 +34,7 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config){
   estimator_type = RANSAC;
 
   if(!parseConfig(config)){
-    std::cout << "Problem parsing XML.\n Exiting.\n";
+    logger->fatal("Problem parsing XML. Exiting...");
     exit(-1);
   }
 
@@ -91,25 +92,19 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       Path temp_log = Path(temp);
       
       if(temp_log.isDirectory()){
-        std::cout << "Output Log: Directories not supported.\n";
-        std::cout << "Using default.\n";
-        std::cout << output_log.toString() << "\n";
+        std::cout << "Output Log: Directories not supported. No registration output.\n";
         temp_log.clear();
       }
 
       if(temp_log.getExtension() != "txt"){
-        std::cout << "Output Log: Only text files supported.\n";
-        std::cout << "Using default.\n";
-        std::cout << output_log.toString() << "\n";
+        std::cout << "Output Log:  No registration output.\n";
         temp_log.clear();
       }
       
       if(temp_log.toString() != ""){ output_log = temp_log; }
       
     }else{
-      std::cout << "No output log supplied.\n";
-      std::cout << "Using default.\n";
-      std::cout << output_log.toString() << "\n";
+      std::cout << "No output log supplied. No registration output.\n";
     }
     
     if(pConf->has("io.output_image")){
@@ -123,7 +118,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
     }
     
   }else{
-    std::cout << "No IO info supplied.\n";
+    logger->fatal("No IO info supplied.");
     return false;
   }
   
@@ -378,14 +373,6 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
 
   
   
-//  std::string prop1 = pConf->getString("prop1");
-//  std::cout << prop1 << "\n";
-//  int prop2 = pConf->getInt("prop2");
-//  std::cout << prop2 << "\n";
-//  std::string prop3 = pConf->getString("prop3"); // ""
-//  std::string prop4 = pConf->getString("prop3.prop4"); // ""
-//  prop4 = pConf->getString("prop3.prop4[@attr]"); // "value3"
-//  prop4 = pConf->getString("prop3.prop4[1][@attr]"); // "value4"
 }
 
 bool BatchCam::loadFileList(){
@@ -393,7 +380,7 @@ bool BatchCam::loadFileList(){
   std::ifstream infile(input_images.toString().c_str());
   
   if(!infile.good()){
-    std::cout << "Unable to open file\n";
+    logger->fatal("Unable to open file.");
     return false;
   }
   
@@ -407,11 +394,11 @@ bool BatchCam::loadFileList(){
   }
   
   if(images.size() == 0){
-    std::cout << "No images loaded.\n";
+    logger->fatal("No images loaded.");
     return false;
   }
   
-  std::cout << images.size() << " images loaded.\n";
+  logger->information("%u images loaded.", images.size());
   infile.close();
   
   return true;
@@ -421,11 +408,11 @@ bool BatchCam::run(){
   bool good;
   
   good = registration();
-  if(!good){ std::cout << "Registration Failed.\n"; return false; }
+  if(!good){ logger->error("Registration failed."); return false; }
   
   if(out_image.toString() != ""){
     good = compositing();
-    if(!good){ std::cout << "Compositing Failed.\n"; return false; }
+    if(!good){ logger->error("Compositing failed.");  return false; }
   }
   
   return true;
@@ -433,12 +420,12 @@ bool BatchCam::run(){
 
 bool BatchCam::registration(){
   bool good = loadFileList();
-  if(!good){ std::cout << "Exiting run.\n"; return false; }
+  if(!good){ logger->fatal("Exiting run."); return false; }
   
   std::ofstream outfile;
-  outfile.open(output_log.toString());
+  if(output_log.toString() != ""){ outfile.open(output_log.toString()); }
   
-  std::cout << "Performing Registration:\n";
+  logger->information("Performing Registration:\n");
 
   auto reg_begin = std::chrono::high_resolution_clock::now();
     
@@ -459,12 +446,14 @@ bool BatchCam::registration(){
     next_image->load_raw_from_disk();
     
     if(!last_registered->in_memory() || !next_image->in_memory()){
-      std::cout << "Issue loading image.\n";
+      logger->error("Issue loading image.");
       continue;
     }
     
-    outfile << last_registered->get_File() << "\t";
-    outfile << next_image->get_File() << "\t";
+    if(output_log.toString() != ""){
+      outfile << last_registered->get_File() << "\t";
+      outfile << next_image->get_File() << "\t";
+    }
     
     auto begin = std::chrono::high_resolution_clock::now();
     
@@ -476,7 +465,8 @@ bool BatchCam::registration(){
     detector->detect_and_compute(next_image);
     
     if(last_registered->keypoints.size() < 200 || next_image->keypoints.size() < 200){
-      std::cout << "Too little features detected.  Going back to defaults\n";
+      logger->warning("Too little features detected.  Going back to defaults.");
+
       detector->set_ORB_params();
       detector->detect_and_compute(last_registered);
       detector->detect_and_compute(next_image);
@@ -484,7 +474,8 @@ bool BatchCam::registration(){
     }
     
     if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
-      outfile << "failed. Not enough keypoints\n";
+      logger->warning("Image pair failed. Not enough keypoints.");
+      if(output_log.toString() != ""){ outfile << "failed. Not enough keypoints\n"; }
       reg_results[i+1] = RegInfo(false, reg_results[i].vec);
       continue;
     }
@@ -497,13 +488,17 @@ bool BatchCam::registration(){
     auto end = std::chrono::high_resolution_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
     
-    outfile << last_registered->keypoints.size() << "\t";
-    outfile << next_image->keypoints.size() << "\t";
+    if(output_log.toString() != ""){
+      outfile << last_registered->keypoints.size() << "\t";
+      outfile << next_image->keypoints.size() << "\t";
+    }
     
     
     if(result == 1){
-      outfile << m->t_x << "\t" << m->t_y << "\t";
-      outfile << elapsed.count() * 1e-9 << "\n";
+      if(output_log.toString() != ""){
+        outfile << m->t_x << "\t" << m->t_y << "\t";
+        outfile << elapsed.count() * 1e-9 << "\n";
+      }
       double t_x = reg_results[last_index].vec.x-m->t_x;
       double t_y = reg_results[last_index].vec.y-m->t_y;
       Bbox box = Bbox(t_x, t_y, next_image->width+t_x, next_image->height+t_y);
@@ -511,11 +506,17 @@ bool BatchCam::registration(){
       last_index = i+1;
     }
     if(result == -1){
-      outfile << "failed. Not enough matches\n";
+      logger->warning("Image pair failed. Not enough matches.");
+      if(output_log.toString() != ""){
+        outfile << "failed. Not enough matches\n";
+      }
       reg_results[i+1] = RegInfo(false, reg_results[i].vec);
     }
     if(result == -2){
-      outfile << "failed. Translation not found.\n";
+      logger->warning("Image pair failed. Not enough keypoints.");
+      if(output_log.toString() != ""){
+        outfile << "failed.  Not enough keypoints.\n";
+      }
       reg_results[i+1] = RegInfo(false, reg_results[i].vec);
     }
     
@@ -531,14 +532,19 @@ bool BatchCam::registration(){
     
   auto reg_end = std::chrono::high_resolution_clock::now();
   auto reg_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(reg_end - reg_begin);
-  std::cout << "Done Registering Images\n";
-  std::cout << reg_elapsed.count() * 1e-9 << " seconds including I/O\n";
+  logger->information("Done Registering Images.");
+  logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
+  
+  if(output_log.toString() != ""){
+    outfile.close();
+  }
 
   return true;
 }
 
 bool BatchCam::compositing(){
-  std::cout << "Compositing Images:\n";
+    
+  logger->information("Compositing Images.");
   
   auto comp_begin = std::chrono::high_resolution_clock::now();
   
@@ -599,7 +605,6 @@ bool BatchCam::compositing(){
   
   
   Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
-  std::cout << combined.size()  << "\n";
   
   for(unsigned int i=0; i < images.size(); i++){
     if(reg_results[i].successful){
@@ -618,11 +623,11 @@ bool BatchCam::compositing(){
   imwrite(out_image.toString(), combined);
   auto comp_end = std::chrono::high_resolution_clock::now();
 
-  std::cout << "Done Compositing Images\n";
+  logger->information("Done Compositing Images.");
     
   auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
-  std::cout << comp_elapsed.count() * 1e-9 << " seconds including I/O\n";
-  
+  logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
+
   return true;
 
 }

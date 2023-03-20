@@ -18,6 +18,7 @@ namespace pathCam{
 class BatchCam{
 private:
   MemoryPool *imagePool;
+  Poco::Logger *logger;
   
   Poco::Path input_images;
   Poco::Path output_log;
@@ -50,7 +51,7 @@ private:
 
 
 public:
-  BatchCam(Poco::Util::LayeredConfiguration::Ptr config);
+  BatchCam(Poco::Util::LayeredConfiguration::Ptr config, Poco::Logger &Applogger);
   
   ~BatchCam(){
     delete imagePool;
