@@ -21,7 +21,9 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
   logger->information(Poco::format("System OS: %s", Environment::osDisplayName()));
   logger->information(Poco::format("System Arch: %s", Environment::osArchitecture()));
   logger->information(Poco::format("System OS: %u\n", Environment::processorCount()));
-
+  
+  mempool = new MemoryPool(6464*4852);
+  
   //Defaults
   crop_factor = 1.0;
   scale_factor  = 1.0;
@@ -37,7 +39,7 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
     logger->fatal("Problem parsing XML. Exiting...");
     exit(-1);
   }
-
+  
   mot = new pathCam::MotionEstimator();
   detector = new pathCam::FeatureDetector(feature_type, use_FREAK);
   matcher = new pathCam::DescriptorMatcher(matcher_type);
@@ -407,6 +409,9 @@ bool BatchCam::loadFileList(){
 bool BatchCam::run(){
   bool good;
   
+  good = loadFileList();
+  if(!good){ logger->fatal("Exiting run."); return false; }
+
   good = registration();
   if(!good){ logger->error("Registration failed."); return false; }
   
@@ -419,9 +424,6 @@ bool BatchCam::run(){
 }
 
 bool BatchCam::registration(){
-  bool good = loadFileList();
-  if(!good){ logger->fatal("Exiting run."); return false; }
-  
   std::ofstream outfile;
   if(output_log.toString() != ""){ outfile.open(output_log.toString()); }
   

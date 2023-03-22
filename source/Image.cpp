@@ -4,7 +4,7 @@ using namespace cv;
 
 namespace pathCam{
 
-Image::Image(char *raw_buffer): width(6464), height(4852), raw_buffer(raw_buffer), filename(""){ };
+Image::Image(MemoryPool *mempool): width(6464), height(4852), mempool(mempool), raw_buffer(0), filename(""){};
 
 Image::~Image(){
   free_memory_RAW();

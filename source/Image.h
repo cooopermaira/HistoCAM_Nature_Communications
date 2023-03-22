@@ -4,6 +4,9 @@
 #include "pathCam.h"
 
 namespace pathCam{
+
+using Poco::MemoryPool;
+
 class Image{
 public:
   unsigned int width, height;
@@ -13,7 +16,7 @@ public:
   cv::Mat descriptors;
   
   
-  Image(char *raw_buffer=0);
+  Image(MemoryPool *mempool=0);
   ~Image();
   
   void set_disk_file(std::string _filename){
@@ -45,7 +48,7 @@ public:
   
   inline void free_memory_RAW(){
     if(raw_buffer != 0){
-      delete[] raw_buffer;
+      if(mempool){mempool->release(raw_buffer);}else{ delete[] raw_buffer; }
     }
     raw_buffer = 0;
   }
@@ -54,10 +57,12 @@ public:
 private:
   
   std::string filename;
+  MemoryPool *mempool;
   
   inline void allocate_memory_RAW(){
     if(raw_buffer ==0){
-      raw_buffer = new char[width*height];
+      if(mempool){raw_buffer = reinterpret_cast<char*>(mempool->get());
+      }else{ raw_buffer = new char[width*height]; }
     }
   }
   
