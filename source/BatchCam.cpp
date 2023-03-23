@@ -390,7 +390,7 @@ bool BatchCam::loadFileList(){
   
   while (infile >>imageFile){
     if(imageFile.size() == 0){ continue;}
-    pathCam::Image *image = new pathCam::Image();
+    pathCam::Image *image = new pathCam::Image(mempool);
     image->set_disk_file(imageFile);
     images.push_back(image);
   }
@@ -400,7 +400,7 @@ bool BatchCam::loadFileList(){
     return false;
   }
   
-  logger->information("%u images loaded.", images.size());
+  logger->information("%u images loaded.", (unsigned int)images.size());
   infile.close();
   
   return true;
@@ -411,13 +411,36 @@ bool BatchCam::run(){
   
   good = loadFileList();
   if(!good){ logger->fatal("Exiting run."); return false; }
+  
+  logger->information("Performing Registration:\n");
+  auto reg_begin = std::chrono::high_resolution_clock::now();
 
   good = registration();
   if(!good){ logger->error("Registration failed."); return false; }
   
+  auto reg_end = std::chrono::high_resolution_clock::now();
+  auto reg_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(reg_end - reg_begin);
+  logger->information("Done Registering Images.");
+  logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
+
+  
+  
   if(out_image.toString() != ""){
+    logger->information("Compositing Images.");
+    
+    auto comp_begin = std::chrono::high_resolution_clock::now();
+
     good = compositing();
     if(!good){ logger->error("Compositing failed.");  return false; }
+    
+    auto comp_end = std::chrono::high_resolution_clock::now();
+
+    logger->information("Done Compositing Images.");
+      
+    auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
+    logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
+    auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
+    logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
   }
   
   return true;
@@ -427,9 +450,6 @@ bool BatchCam::registration(){
   std::ofstream outfile;
   if(output_log.toString() != ""){ outfile.open(output_log.toString()); }
   
-  logger->information("Performing Registration:\n");
-
-  auto reg_begin = std::chrono::high_resolution_clock::now();
     
   reg_results.resize(images.size());
   unsigned int last_index = 0;
@@ -531,12 +551,6 @@ bool BatchCam::registration(){
     delete m;
   }
 
-    
-  auto reg_end = std::chrono::high_resolution_clock::now();
-  auto reg_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(reg_end - reg_begin);
-  logger->information("Done Registering Images.");
-  logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
-  
   if(output_log.toString() != ""){
     outfile.close();
   }
@@ -545,10 +559,6 @@ bool BatchCam::registration(){
 }
 
 bool BatchCam::compositing(){
-    
-  logger->information("Compositing Images.");
-  
-  auto comp_begin = std::chrono::high_resolution_clock::now();
   
   Bbox combined_box = Bbox();
   
@@ -623,13 +633,7 @@ bool BatchCam::compositing(){
   }
   
   imwrite(out_image.toString(), combined);
-  auto comp_end = std::chrono::high_resolution_clock::now();
-
-  logger->information("Done Compositing Images.");
-    
-  auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
-  logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
-
+ 
   return true;
 
 }
