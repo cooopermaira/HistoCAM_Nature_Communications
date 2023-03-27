@@ -446,6 +446,124 @@ bool BatchCam::run(){
   return true;
 }
 
+class RegRunnable: public Poco::Runnable{
+private:
+  BatchCam *parent;
+  int i, j;
+
+public:
+  
+  RegRunnable(BatchCam *parent, int i, int j): parent(parent), i(i), j(j){};
+
+  virtual void run(){
+    if(i==0){
+        Bbox box = Bbox(0, 0, parent->images[0]->width, parent->images[0]->height);
+        parent->reg_results[0] = RegInfo(true, Vec2(0, 0), box);
+    }
+    
+    pathCam::Image * this_image = parent->images[i];
+    pathCam::Image * next_image = parent->images[j];
+    
+    //
+    this_image->load_raw_from_disk();
+    next_image->load_raw_from_disk();
+    
+    if(!this_image->in_memory() || !next_image->in_memory()){
+      //logger->error("Issue loading image.");
+      return;
+    }
+
+    //
+    this_image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
+    next_image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
+
+
+    
+  }
+    
+};
+
+
+bool BatchCam::parallel_registration(){
+//  
+//  reg_results.resize(images.size());
+//  
+//  for(unsigned int i=0; i < images.size()-1; i++){
+//    
+//    if(i==0){
+//        Bbox box = Bbox(0, 0, images[0]->width, images[0]->height);
+//        reg_results[0] = RegInfo(true, Vec2(0, 0), box);
+//    }
+//      
+//    pathCam::Image * last_registered = images[last_index];
+//    pathCam::Image * next_image = images[i+1];
+//
+//    last_registered->load_raw_from_disk();
+//    next_image->load_raw_from_disk();
+//    
+//    if(!last_registered->in_memory() || !next_image->in_memory()){
+//      logger->error("Issue loading image.");
+//      continue;
+//    }
+//        
+//    last_registered->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
+//    next_image->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
+//    
+//    
+//    detector->detect_and_compute(last_registered);
+//    detector->detect_and_compute(next_image);
+//    
+//    if(last_registered->keypoints.size() < 200 || next_image->keypoints.size() < 200){
+//      logger->warning("Too little features detected.  Going back to defaults.");
+//
+//      detector->set_ORB_params();
+//      detector->detect_and_compute(last_registered);
+//      detector->detect_and_compute(next_image);
+//      detector->set_ORB_params(ORB_params);
+//    }
+//    
+//    if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
+//      logger->warning("Image pair failed. Not enough keypoints.");
+//      reg_results[i+1] = RegInfo(false, reg_results[i].vec);
+//      continue;
+//    }
+//    
+//    pathCam::Match *m = new pathCam::Match(last_registered,next_image);
+//    matcher->match(m);
+//    
+//    int result = mot->findHomography(m, estimator_type);
+//        
+//    
+//    if(result == 1){
+//      double t_x = reg_results[last_index].vec.x-m->t_x;
+//      double t_y = reg_results[last_index].vec.y-m->t_y;
+//      Bbox box = Bbox(t_x, t_y, next_image->width+t_x, next_image->height+t_y);
+//      reg_results[i+1] = RegInfo(true, Vec2(t_x, t_y), box);
+//      last_index = i+1;
+//    }
+//    if(result == -1){
+//      logger->warning("Image pair failed. Not enough matches.");
+//      reg_results[i+1] = RegInfo(false, reg_results[i].vec);
+//    }
+//    if(result == -2){
+//      logger->warning("Image pair failed. Not enough keypoints.");
+//      reg_results[i+1] = RegInfo(false, reg_results[i].vec);
+//    }
+//    
+//    //Need to only unload if not using again, but doing this to make sure
+//    //initial program has no memory leaks
+//    
+//    last_registered->free_memory_RAW();
+//    next_image->free_memory_RAW();
+//      
+//    delete m;
+//  }
+
+
+  return true;
+}
+
+
 bool BatchCam::registration(){
   std::ofstream outfile;
   if(output_log.toString() != ""){ outfile.open(output_log.toString()); }

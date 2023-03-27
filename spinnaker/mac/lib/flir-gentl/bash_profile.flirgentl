@@ -1,0 +1,5 @@
+# Setting FLIR_GENTL64_CTI and GENICAM_GENTL64_PATH for FLIR GenTL producer
+# The original version is saved in /usr/local/lib/flir-gentl/bash_profile.flirgentl
+export FLIR_GENTL64_CTI="/usr/local/lib/flir-gentl/FLIR_GenTL.cti"
+if [ -z $GENICAM_GENTL64_PATH ]; then export GENICAM_GENTL64_PATH="/usr/local/lib/flir-gentl"
+else export GENICAM_GENTL64_PATH="/usr/local/lib/flir-gentl:$GENICAM_GENTL64_PATH"; fi

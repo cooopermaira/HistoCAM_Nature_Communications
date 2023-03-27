@@ -8,6 +8,12 @@
 #define pathCam_h
 
 #include <iostream>
+#include <chrono>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <queue>
+
 #include "opencv2/core.hpp"
 
 #ifdef HAVE_OPENCV_XFEATURES2D
@@ -17,10 +23,6 @@
 #include "opencv2/features2d.hpp"
 #include "opencv2/xfeatures2d.hpp"
 #endif
-
-#include <chrono>
-#include <fstream>
-#include <string>
 
 #include "Poco/Runnable.h"
 #include "Poco/Thread.h"

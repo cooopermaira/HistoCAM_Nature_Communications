@@ -26,6 +26,36 @@ public:
   min_x(min_x), min_y(min_y), max_x(max_x), max_y(max_y) {};
 };
 
+class ThreadQueue{
+private:
+  Poco::ThreadPool *pool;
+  std::queue < Poco::Runnable * > jobQueue;
+
+public:
+  ThreadQueue(int min_threads, int max_threads){
+    pool = new Poco::ThreadPool(min_threads,max_threads,60,POCO_THREAD_STACK_SIZE);
+  }
+  
+  bool run_jobs(std::vector < Poco::Runnable * > jobs){
+    for(unsigned int i=0; i < jobs.size(); i++){
+      jobQueue.push(jobs[i]);
+    }
+      
+    while(!jobQueue.empty()){
+      if(pool->available() > 0){
+        pool->start(*jobQueue.front());
+        jobQueue.pop();
+      }else{
+        Poco::Thread::sleep(100);
+      }
+    }
+    
+    pool->joinAll();
+  }
+
+  
+};
+
 }
 
 #endif /* util_h */

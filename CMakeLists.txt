@@ -34,24 +34,12 @@ ENDIF()
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
+IF(APPLE)
+	add_subdirectory(spinnaker/mac)
+ENDIF()
 
+include_directories( ${SPINNAKER_INCLUDE} )
 
-add_library(pathCamLib source/pathCam.h
-                source/Image.cpp
-                source/Image.h
-                source/MotionEstimator.cpp
-                source/MotionEstimator.h
-                source/Match.cpp
-                source/Match.h
-                source/ImageList.cpp
-                source/ImageList.h
-                source/DescriptorMatcher.h
-                source/DescriptorMatcher.cpp
-                source/FeatureDetector.h
-                source/FeatureDetector.cpp 
-                source/BatchCam.h
-                source/BatchCam.cpp
-                source/util.h)
     
 OPTION(ENABLE_UTIL "" ON)
 OPTION(ENABLE_XML "" ON)
@@ -75,8 +63,25 @@ OPTION(ENABLE_REDIS "" OFF)
 OPTION(ENABLE_ZIP "" OFF)
 OPTION(ENABLE_ENCODINGS "" OFF)
 
-
 add_subdirectory(poco)
+
+
+add_library(pathCamLib source/pathCam.h
+                source/Image.cpp
+                source/Image.h
+                source/MotionEstimator.cpp
+                source/MotionEstimator.h
+                source/Match.cpp
+                source/Match.h
+                source/ImageList.cpp
+                source/ImageList.h
+                source/DescriptorMatcher.h
+                source/DescriptorMatcher.cpp
+                source/FeatureDetector.h
+                source/FeatureDetector.cpp 
+                source/BatchCam.h
+                source/BatchCam.cpp
+                source/util.h)
 
 add_executable( test source/test.cpp)
 add_executable( process_list_truth source/process_list_truth.cpp)
@@ -84,6 +89,7 @@ add_executable( process_list_orb source/process_list_orb.cpp)
 add_executable( process_list_xml source/process_list_xml.cpp)
 add_executable( debayer source/debayer.cpp)
 add_executable( poco_test source/poco_test.cpp)
+add_executable( spinnaker_acquisition source/spinnaker_acquisition.cpp)
 
 
 target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util)
@@ -93,4 +99,5 @@ target_link_libraries(process_list_orb pathCamLib)
 target_link_libraries(process_list_xml pathCamLib)
 target_link_libraries(debayer pathCamLib)
 target_link_libraries(poco_test pathCamLib)
+target_link_libraries(spinnaker_acquisition pathCamLib ${SPINNAKER_LIBRARIES})
 

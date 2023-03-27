@@ -16,6 +16,9 @@ using Poco::Path;
 namespace pathCam{
 
 class BatchCam{
+  
+  friend class RegRunnable;
+  
 private:
   MemoryPool *mempool;
   Poco::Logger *logger;
@@ -74,6 +77,7 @@ private:
   bool loadFileList();
   
   bool registration();
+  bool parallel_registration();
   bool compositing();
   
 };
