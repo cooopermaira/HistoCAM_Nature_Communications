@@ -11,7 +11,6 @@
 #include "Poco/Runnable.h"
 #include <iostream>
 
-
 class ThreadQueue{
 private:
   Poco::ThreadPool *pool;
