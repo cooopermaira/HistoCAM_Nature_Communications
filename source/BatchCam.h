@@ -20,8 +20,9 @@ class BatchCam{
   friend class RegRunnable;
   
 private:
-  MemoryPool *mempool;
+  std::vector <MemoryPool *> mempool;
   Poco::Logger *logger;
+  unsigned int threads;
   
   Poco::Path input_images;
   Poco::Path output_log;
@@ -44,11 +45,7 @@ private:
   pathCam::FeatureDetector::BRISKParameters BRISK_params;
   pathCam::FeatureDetector::ORBParameters ORB_params;
 
-  
-  pathCam::MotionEstimator *mot;
-  pathCam::FeatureDetector *detector;
-  pathCam::DescriptorMatcher *matcher;
-  
+    
   std::vector < Image *> images;
   std::vector < RegInfo > reg_results;
 
@@ -57,16 +54,17 @@ public:
   BatchCam(Poco::Util::LayeredConfiguration::Ptr config, Poco::Logger &Applogger);
   
   ~BatchCam(){
-    delete mempool;
     
+    for(unsigned int i=0; i < threads; i++){
+      delete mempool[i];
+    }
+    mempool.clear();
+   
     for(unsigned int i=0; i < images.size(); i++){
       delete images[i];
     }
     images.clear();
     
-    delete mot;
-    delete detector;
-    delete matcher;
 
   }
   
@@ -76,8 +74,7 @@ private:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
   
-  bool registration();
-  bool parallel_registration();
+  bool registration(unsigned int thread_id=0);
   bool compositing();
   
 };

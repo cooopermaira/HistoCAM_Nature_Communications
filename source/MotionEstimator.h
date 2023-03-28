@@ -29,10 +29,17 @@ public:
 class RegInfo{
 public:
   bool successful;
-  Bbox bbox;
   Vec2 vec;
-  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0), Bbox bbox = Bbox()):
-  successful(successful), vec(vec), bbox(bbox) {};
+  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0)):
+  successful(successful), vec(vec) {};
+  
+  std::string toString(){
+    std::stringstream ss;
+    ss << ((successful) ? "good" : "bad") << "\t";
+    ss << vec.toString();
+    return ss.str();
+  }
+  
 };
 
 }

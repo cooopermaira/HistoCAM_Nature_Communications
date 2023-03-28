@@ -19,6 +19,10 @@ public:
   Image(MemoryPool *mempool=0);
   ~Image();
   
+  void set_memory_pool(MemoryPool *mempool_in){
+    mempool = mempool_in;
+  }
+  
   void set_disk_file(std::string _filename){
     filename = _filename;
   }
@@ -48,7 +52,11 @@ public:
   
   inline void free_memory_RAW(){
     if(raw_buffer != 0){
-      if(mempool){mempool->release(raw_buffer);}else{ delete[] raw_buffer; }
+      if(mempool){
+        mempool->release(raw_buffer);
+      }else{
+        delete[] raw_buffer;
+      }
     }
     raw_buffer = 0;
   }

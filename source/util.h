@@ -14,6 +14,11 @@ class Vec2{
 public:
   double x, y;
   Vec2(double x, double y): x(x), y(y){};
+  std::string toString(){
+    std::stringstream ss;
+    ss << "(" << x << "," << y << ")";
+    return ss.str();
+  }
 };
 
 class Bbox{
@@ -24,6 +29,13 @@ public:
        double max_x=-std::numeric_limits<double>::infinity(),
        double max_y=-std::numeric_limits<double>::infinity()):
   min_x(min_x), min_y(min_y), max_x(max_x), max_y(max_y) {};
+  
+  std::string toString(){
+    std::stringstream ss;
+    ss << "[" << min_x << "," << min_y << "," << max_x << "," << max_y << "]";
+    return ss.str();
+  }
+  
 };
 
 class ThreadQueue{
