@@ -23,23 +23,6 @@ endif()
 
 set(CMAKE_SKIP_INSTALL_RULES YES)
 
-
-IF(APPLE)
-	SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
-ELSEIF(WINDOWS)
-    SET(OpenCV_DIR "C:\Users\CooperMaxS\Documents\opencv\opencv-4.6.0\opencv-4.6.0")
-ENDIF()
-
-
-find_package( OpenCV REQUIRED )
-include_directories( ${OpenCV_INCLUDE_DIRS} )
-
-IF(APPLE)
-	add_subdirectory(spinnaker/mac)
-ENDIF()
-
-include_directories( ${SPINNAKER_INCLUDE} )
-
     
 OPTION(ENABLE_UTIL "" ON)
 OPTION(ENABLE_XML "" ON)
@@ -64,6 +47,35 @@ OPTION(ENABLE_ZIP "" OFF)
 OPTION(ENABLE_ENCODINGS "" OFF)
 
 add_subdirectory(poco)
+
+IF(APPLE)
+  SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
+ELSEIF(WINDOWS)
+    SET(OpenCV_DIR "C:\Users\CooperMaxS\Documents\opencv\opencv-4.6.0\opencv-4.6.0")
+ELSEIF(LINUX)
+    SET(OpenCV_DIR "/usr/local/cmake/opencv4")
+ENDIF()
+
+
+find_package( OpenCV REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+
+OPTION(BUILD_SPINNAKER "" OFF)
+
+IF(APPLE)
+  IF(EXISTS "/Applications/Spinnaker")
+    OPTION(BUILD_SPINNAKER "" ON)
+    include_directories( "/Applications/Spinnaker/include" )
+    SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
+                    "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
+                    "/Applications/Spinnaker/lib/libSpinVideo.dylib")
+  ENDIF()
+ENDIF()
+
+IF(BUILD_SPINNAKER)
+  #set(CMAKE_CXX_STANDARD 14)
+  #set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ENDIF()
 
 
 add_library(pathCamLib source/pathCam.h
@@ -99,5 +111,6 @@ target_link_libraries(process_list_orb pathCamLib)
 target_link_libraries(process_list_xml pathCamLib)
 target_link_libraries(debayer pathCamLib)
 target_link_libraries(poco_test pathCamLib)
-target_link_libraries(spinnaker_acquisition pathCamLib ${SPINNAKER_LIBRARIES})
-
+IF(BUILD_SPINNAKER)
+	target_link_libraries(spinnaker_acquisition pathCamLib ${SPINNAKER_LIBRARIES})
+ENDIF()
