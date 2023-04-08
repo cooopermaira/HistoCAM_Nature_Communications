@@ -48,6 +48,15 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 
 add_subdirectory(poco)
 
+
+OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
+OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
+OPTION(NANOGUI_BUILD_PYTHON "" OFF)
+OPTION(NANOGUI_INSTALL "" OFF)
+
+add_subdirectory(nanogui)
+
+
 IF(APPLE)
   SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
 ELSEIF(WINDOWS)
