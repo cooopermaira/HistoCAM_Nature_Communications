@@ -86,32 +86,34 @@ IF(BUILD_SPINNAKER)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
 
+add_library(pathCamLib pathcam/pathCam.h
+                pathcam/Image.cpp
+                pathcam/Image.h
+                pathcam/MotionEstimator.cpp
+                pathcam/MotionEstimator.h
+                pathcam/Match.cpp
+                pathcam/Match.h
+                pathcam/ImageList.cpp
+                pathcam/ImageList.h
+                pathcam/DescriptorMatcher.h
+                pathcam/DescriptorMatcher.cpp
+                pathcam/FeatureDetector.h
+                pathcam/FeatureDetector.cpp 
+                pathcam/BatchCam.h
+                pathcam/BatchCam.cpp
+                pathcam/util.h)
 
-add_library(pathCamLib source/pathCam.h
-                source/Image.cpp
-                source/Image.h
-                source/MotionEstimator.cpp
-                source/MotionEstimator.h
-                source/Match.cpp
-                source/Match.h
-                source/ImageList.cpp
-                source/ImageList.h
-                source/DescriptorMatcher.h
-                source/DescriptorMatcher.cpp
-                source/FeatureDetector.h
-                source/FeatureDetector.cpp 
-                source/BatchCam.h
-                source/BatchCam.cpp
-                source/util.h)
+include_directories(pathcam)
 
-add_executable( test source/test.cpp)
-add_executable( process_list_truth source/process_list_truth.cpp)
-add_executable( process_list_orb source/process_list_orb.cpp)
-add_executable( process_list_xml source/process_list_xml.cpp)
-add_executable( debayer source/debayer.cpp)
-add_executable( poco_test source/poco_test.cpp)
-add_executable( spinnaker_acquisition source/spinnaker_acquisition.cpp)
-
+add_executable( test programs/test.cpp)
+add_executable( process_list_truth programs/process_list_truth.cpp)
+add_executable( process_list_orb programs/process_list_orb.cpp)
+add_executable( process_list_xml programs/process_list_xml.cpp)
+add_executable( debayer programs/debayer.cpp)
+add_executable( poco_test programs/poco_test.cpp)
+IF(BUILD_SPINNAKER)
+	add_executable( spinnaker_acquisition programs/spinnaker_acquisition.cpp)
+ENDIF()
 
 target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util)
 target_link_libraries(test pathCamLib)
