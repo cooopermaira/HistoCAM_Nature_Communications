@@ -69,7 +69,7 @@ int main( int argc, char* argv[] )
     
     if(i==0){
         Bbox box = Bbox(0, 0, pathCam_session->images[0]->width, pathCam_session->images[0]->height);
-        reg_results[0] = RegInfo(true, Vec2(0, 0), box);
+        reg_results[0] = RegInfo(true, Vec2(0, 0));
     }
       
     pathCam::Image * last_registered = pathCam_session->images[last_index];

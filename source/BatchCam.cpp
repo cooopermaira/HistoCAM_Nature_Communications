@@ -834,7 +834,7 @@ bool BatchCam::compositing(){
       Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
       
-      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)));
+      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y, image_Mat.cols, image_Mat.rows)));
       
       temp->free_memory_RAW();
     }

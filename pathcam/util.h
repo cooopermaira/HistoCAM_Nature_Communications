@@ -48,7 +48,7 @@ public:
     pool = new Poco::ThreadPool(min_threads,max_threads,60,POCO_THREAD_STACK_SIZE);
   }
   
-  bool run_jobs(std::vector < Poco::Runnable * > jobs){
+  void run_jobs(std::vector < Poco::Runnable * > jobs){
     for(unsigned int i=0; i < jobs.size(); i++){
       jobQueue.push(jobs[i]);
     }
