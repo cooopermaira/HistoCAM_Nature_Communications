@@ -10,7 +10,9 @@ using Poco::MemoryPool;
 class Image{
 public:
   unsigned int width, height;
-
+  unsigned int reference_count;
+  
+  Poco::FastMutex buffer_mutex;
   
   std::vector<cv::KeyPoint> keypoints;
   cv::Mat descriptors;
@@ -29,11 +31,14 @@ public:
   
   void load_raw_from_disk(){
     if(filename != ""){
+      buffer_mutex.lock();
       std::ifstream stream;
       stream.open(filename, std::ios::binary);
       if(raw_buffer == 0){ allocate_memory_RAW(); }
       stream.read(raw_buffer,width*height);
       stream.close();
+      reference_count++;
+      buffer_mutex.unlock();
     }
   }
   
@@ -51,14 +56,20 @@ public:
   inline double get_reg_scale(){ return reg_scale; }
   
   inline void free_memory_RAW(){
+    buffer_mutex.lock();
     if(raw_buffer != 0){
-      if(mempool){
-        mempool->release(raw_buffer);
+      if(reference_count == 0){
+        if(mempool){
+          mempool->release(raw_buffer);
+        }else{
+          delete[] raw_buffer;
+        }
+        raw_buffer = 0;
       }else{
-        delete[] raw_buffer;
+        reference_count--;
       }
     }
-    raw_buffer = 0;
+    buffer_mutex.unlock();
   }
   
   
@@ -67,6 +78,7 @@ private:
   std::string filename;
   MemoryPool *mempool;
   
+  //already protected by mutex in calling function
   inline void allocate_memory_RAW(){
     if(raw_buffer ==0){
       if(mempool){raw_buffer = reinterpret_cast<char*>(mempool->get());

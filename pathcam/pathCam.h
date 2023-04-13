@@ -24,6 +24,7 @@
 #include "opencv2/xfeatures2d.hpp"
 #endif
 
+#include "Poco/Mutex.h"
 #include "Poco/Runnable.h"
 #include "Poco/Thread.h"
 #include "Poco/MemoryPool.h"

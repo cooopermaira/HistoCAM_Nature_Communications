@@ -17,7 +17,7 @@ namespace pathCam{
 
 class BatchCam{
   
-  friend class RegRunnable;
+  friend class PairRegRunnable;
   
 private:
   std::vector <MemoryPool *> mempool;
@@ -75,7 +75,7 @@ private:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
   
-  bool registration(unsigned int thread_id=0);
+  bool pairwise_registration(unsigned int thread_id=0);
   bool compositing();
   
 };

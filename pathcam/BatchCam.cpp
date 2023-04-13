@@ -404,7 +404,7 @@ bool BatchCam::loadFileList(){
   return true;
 }
 
-class RegRunnable: public Poco::Runnable{
+class PairRegRunnable: public Poco::Runnable{
 private:
   BatchCam *parent;
   pathCam::MotionEstimator * mot;
@@ -414,7 +414,7 @@ private:
   
 public:
   
-  RegRunnable(BatchCam *parent): parent(parent), successful(false){};
+  PairRegRunnable(BatchCam *parent): parent(parent), successful(false){};
   bool successful;
   
   virtual void run(){
@@ -572,7 +572,7 @@ bool BatchCam::run(){
   logger->information("Performing Registration:\n");
   auto reg_begin = std::chrono::high_resolution_clock::now();
 
-  std::vector < RegRunnable> runnable(threads, RegRunnable(this));
+  std::vector < PairRegRunnable > runnable(threads, PairRegRunnable(this));
   std::vector < Poco::Thread > thread(threads);
   
   reg_results.resize(images.size());

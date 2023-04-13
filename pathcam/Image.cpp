@@ -4,19 +4,21 @@ using namespace cv;
 
 namespace pathCam{
 
-Image::Image(MemoryPool *mempool): width(6464), height(4852), mempool(mempool), raw_buffer(0), filename(""){};
+Image::Image(MemoryPool *mempool): width(6464), height(4852), mempool(mempool), raw_buffer(0), reference_count(0), filename(""){};
 
 Image::~Image(){
+  reference_count = 0;
   free_memory_RAW();
 }
 
 void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real){
+  if(raw_buffer == 0){ return; }
+  
+  buffer_mutex.lock();
   reg_scale = _reg_scale;
   reg_crop = _reg_crop;
   
   Size image_size = Size(width,height);
-
-  if(raw_buffer == 0){ return; }
   reg_image.release();
   //cvtColor will change the raw_buffer, not a copy!
   reg_image = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
@@ -38,6 +40,8 @@ void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, 
                    image_size.width, image_size.height);
     reg_image = reg_image(myROI);
   }
+  
+  buffer_mutex.unlock();
 
 };
 
