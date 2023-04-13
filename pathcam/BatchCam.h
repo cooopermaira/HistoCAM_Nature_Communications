@@ -47,6 +47,7 @@ private:
 
     
   std::vector < Image *> images;
+  MatchMatrix *matchM;
   std::vector < RegInfo > reg_results;
 
 

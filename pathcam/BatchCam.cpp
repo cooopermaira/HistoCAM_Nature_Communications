@@ -589,9 +589,6 @@ bool BatchCam::run(){
     if(!runnable[i].successful){ logger->error("Registration failed. %d", i); return false; }
   }
   
-  //good = registration();
-  
-  
   
   auto reg_end = std::chrono::high_resolution_clock::now();
   auto reg_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(reg_end - reg_begin);
