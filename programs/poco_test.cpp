@@ -11,6 +11,8 @@
 #include "Poco/Runnable.h"
 #include <iostream>
 
+using namespace pathCam;
+
 class ThreadQueue{
 private:
   Poco::ThreadPool *pool;
@@ -44,15 +46,23 @@ public:
 
 class HelloRunnable: public Poco::Runnable{
 private:
-  int temp;
+  Image * image;
 
 public:
   
-  HelloRunnable(int temp): temp(temp){};
+  HelloRunnable(Image * image): image(image){};
 
   virtual void run(){
-    Poco::Thread::sleep(5000);
-    std::cout << temp << std::endl;
+    
+    Poco::Thread::sleep(int(rand()/RAND_MAX * 100));
+    image->load_raw_from_disk();
+    image->create_reg_image(1.0, 1.0);
+    assert(image->get_Raw() != 0);
+    Poco::Thread::sleep(int(rand()/RAND_MAX * 100));
+    
+    
+//    Poco::Thread::sleep(5000);
+//    std::cout << temp << std::endl;
   }
     
 };
@@ -60,14 +70,16 @@ public:
 
 int main(int argc, char** argv){
 
-  std::vector < Poco::Runnable * > jobs;
+//  std::vector < Poco::Runnable * > jobs;
+//
+//  for (unsigned int i=0; i < 20; i++){
+//    jobs.push_back(new HelloRunnable(i));
+//  }
+//
+//  ThreadQueue q(2,5);
+//  q.run_jobs(jobs);
   
-  for (unsigned int i=0; i < 20; i++){
-    jobs.push_back(new HelloRunnable(i));
-  }
- 
-  ThreadQueue q(2,5);
-  q.run_jobs(jobs);
+  
   
   
   return 0;
