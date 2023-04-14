@@ -7,8 +7,7 @@ namespace pathCam{
 Image::Image(MemoryPool *mempool): width(6464), height(4852), mempool(mempool), raw_buffer(0), reference_count(0), filename(""){};
 
 Image::~Image(){
-  reference_count = 0;
-  free_memory_RAW();
+  free_memory_RAW(true);
 }
 
 void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real){

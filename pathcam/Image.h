@@ -55,10 +55,10 @@ public:
   
   inline double get_reg_scale(){ return reg_scale; }
   
-  inline void free_memory_RAW(){
+  inline void free_memory_RAW(bool force=false){
     buffer_mutex.lock();
     if(raw_buffer != 0){
-      if(reference_count == 0){
+      if(force || reference_count == 0){
         if(mempool){
           mempool->release(raw_buffer);
         }else{
