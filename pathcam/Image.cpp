@@ -11,16 +11,17 @@ Image::~Image(){
 }
 
 void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real){
-  if(raw_buffer == 0){ return; }
-  
   buffer_mutex.lock();
+  if(raw_buffer == 0 || !reg_image.empty()){ buffer_mutex.unlock(); return; }
+  
   reg_scale = _reg_scale;
   reg_crop = _reg_crop;
   
   Size image_size = Size(width,height);
-  reg_image.release();
-  //cvtColor will change the raw_buffer, not a copy!
-  reg_image = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
+
+  cv::Mat temp = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
+  temp.copyTo(reg_image);
+ 
   if(convert){
     cvtColor(reg_image,reg_image,COLOR_BayerBG2GRAY);
   }

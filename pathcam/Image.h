@@ -32,11 +32,13 @@ public:
   void load_raw_from_disk(){
     if(filename != ""){
       buffer_mutex.lock();
-      std::ifstream stream;
-      stream.open(filename, std::ios::binary);
-      if(raw_buffer == 0){ allocate_memory_RAW(); }
-      stream.read(raw_buffer,width*height);
-      stream.close();
+      if(raw_buffer == 0){
+        std::ifstream stream;
+        stream.open(filename, std::ios::binary);
+        allocate_memory_RAW();
+        stream.read(raw_buffer,width*height);
+        stream.close();
+      }
       reference_count++;
       buffer_mutex.unlock();
     }
@@ -58,13 +60,14 @@ public:
   inline void free_memory_RAW(bool force=false){
     buffer_mutex.lock();
     if(raw_buffer != 0){
-      if(force || reference_count == 0){
+      if(force || reference_count == 1){
         if(mempool){
           mempool->release(raw_buffer);
         }else{
           delete[] raw_buffer;
         }
         raw_buffer = 0;
+        reference_count = 0;
       }else{
         reference_count--;
       }
