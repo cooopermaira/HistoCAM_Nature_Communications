@@ -50,7 +50,7 @@ public:
   
   void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR, bool real=false);
   
-  //I'm not sure if this makes a copy
+  //This does not copy the buffer
   inline cv::Mat get_reg_image(){ return reg_image; }
   
   inline bool in_memory(){ return (raw_buffer != 0); }
@@ -60,16 +60,14 @@ public:
   inline void free_memory_RAW(bool force=false){
     buffer_mutex.lock();
     if(raw_buffer != 0){
-      if(force || reference_count == 1){
+      reference_count--;
+      if(force || reference_count == 0){
         if(mempool){
           mempool->release(raw_buffer);
         }else{
           delete[] raw_buffer;
         }
         raw_buffer = 0;
-        reference_count = 0;
-      }else{
-        reference_count--;
       }
     }
     buffer_mutex.unlock();
