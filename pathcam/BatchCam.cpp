@@ -595,7 +595,7 @@ bool BatchCam::run(){
   logger->information("Done Registering Images.");
   logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
 
-  
+  if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
   
   if(out_image.toString() != ""){
     logger->information("Compositing Images.");
@@ -619,10 +619,10 @@ bool BatchCam::run(){
 }
 
 
-bool BatchCam::compositing(){
+bool BatchCam::resolve_bboxes(){
   
-  std::vector < Bbox > box(reg_results.size());
-  Bbox combined_box = Bbox();
+  box.resize(reg_results.size());
+  combined_box = Bbox();
   
   for(unsigned int i=0; i < reg_results.size(); i++){
     if(i == 0){
@@ -663,12 +663,6 @@ bool BatchCam::compositing(){
     }
   }
   
-  
-//  std::cout << "combined bbox: ";
-//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
-//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
-  
-  
   if(combined_box.min_x < 0.0){
     for(unsigned int i=0; i < reg_results.size(); i++){
       if(reg_results[i].successful){
@@ -690,6 +684,12 @@ bool BatchCam::compositing(){
     combined_box.max_y -= combined_box.min_y;
     combined_box.min_y -= combined_box.min_y;
   }
+  
+  return true;
+}
+
+
+bool BatchCam::compositing(){
   
 //  std::cout << "combined bbox: ";
 //  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";

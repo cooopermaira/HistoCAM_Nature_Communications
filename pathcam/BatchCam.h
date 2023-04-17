@@ -50,6 +50,9 @@ private:
   std::vector < Image *> images;
   MatchMatrix *matchM;
   std::vector < RegInfo > reg_results;
+  
+  std::vector < Bbox > box;
+  Bbox combined_box;
 
 
 public:
@@ -76,6 +79,7 @@ private:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
 
+  bool resolve_bboxes();
   bool compositing();
   
 };
