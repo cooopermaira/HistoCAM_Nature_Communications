@@ -24,6 +24,7 @@ private:
   Poco::Logger *logger;
   unsigned int threads;
   
+  
   Poco::Path input_images;
   Poco::Path output_log;
   Poco::Path out_image;
@@ -70,12 +71,11 @@ public:
   }
   
   bool run();
-
+  
 private:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
-  
-  bool pairwise_registration(unsigned int thread_id=0);
+
   bool compositing();
   
 };
