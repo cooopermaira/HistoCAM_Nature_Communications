@@ -48,10 +48,11 @@ private:
 
     
   std::vector < Image *> images;
-  MatchMatrix *matchM;
+  MatchMatrix matchM;
   std::vector < RegInfo > reg_results;
   
   std::vector < Bbox > box;
+  OverlapMatrix overlapM;
   Bbox combined_box;
 
 
@@ -80,6 +81,7 @@ private:
   bool loadFileList();
 
   bool resolve_bboxes();
+  bool find_overlaps();
   bool compositing();
   
 };

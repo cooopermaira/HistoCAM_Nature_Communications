@@ -30,6 +30,13 @@ public:
        double max_y=-std::numeric_limits<double>::infinity()):
   min_x(min_x), min_y(min_y), max_x(max_x), max_y(max_y) {};
   
+  bool intersect(Bbox b){
+    
+    return ((min_x > b.min_x && min_x < b.max_x) || (max_x >= b.min_x && max_x < b.max_x)) &&
+           ((min_y > b.min_y && min_y < b.max_y) || (max_y >= b.min_y && max_x < b.max_y));
+    
+  }
+  
   std::string toString(){
     std::stringstream ss;
     ss << "[" << min_x << "," << min_y << "," << max_x << "," << max_y << "]";
@@ -37,6 +44,29 @@ public:
   }
   
 };
+
+class OverlapMatrix{
+public:
+  std::vector < std:: vector < bool > > overlap;
+  
+  OverlapMatrix(){};
+  
+  void resize(unsigned long size=0){
+    overlap.resize(size);
+    for(unsigned long i=0; i < size; i++){
+      overlap[i].resize(size, 0);
+    }
+  };
+  
+  ~OverlapMatrix(){
+    for(unsigned int i=0; i < overlap.size(); i++){
+      overlap[i].clear();
+    }
+    overlap.clear();
+  };
+  
+};
+
 
 class ThreadQueue{
 private:

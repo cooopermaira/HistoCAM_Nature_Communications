@@ -688,6 +688,20 @@ bool BatchCam::resolve_bboxes(){
   return true;
 }
 
+bool BatchCam::find_overlaps(){
+  overlapM.resize(images.size());
+  
+  for(unsigned int i=0; i < overlapM.overlap.size(); i++){
+    for(unsigned int j=0; j < overlapM.overlap[i].size(); j++){
+      overlapM.overlap[i][j] = 0;
+      
+    }
+  }
+  
+  
+  
+}
+
 
 bool BatchCam::compositing(){
   
