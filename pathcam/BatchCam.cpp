@@ -693,7 +693,14 @@ bool BatchCam::find_overlaps(){
   
   for(unsigned int i=0; i < overlapM.overlap.size(); i++){
     for(unsigned int j=0; j < overlapM.overlap[i].size(); j++){
-      overlapM.overlap[i][j] = 0;
+      overlapM.overlap[i][j] = box[i].intersect(box[j]);
+      //area
+      if(overlapM.overlap[i][j]){
+        double area = box[i].area(box[j]);
+        if(area < 0.3 || area > 0.9){
+          overlapM.overlap[i][j] = 0;
+        }
+      }
       
     }
   }
