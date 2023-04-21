@@ -4,7 +4,7 @@ using namespace cv;
 
 namespace pathCam{
 
-Image::Image(MemoryPool *mempool): width(6464), height(4852), mempool(mempool), raw_buffer(0), reference_count(0), filename(""){};
+Image::Image(MemoryPool *mempool): width(6464), height(4852), mempool(mempool), raw_buffer(0), reference_count(0), image_file(Poco::Path()){};
 
 Image::~Image(){
   free_memory_RAW(true);

@@ -25,16 +25,16 @@ public:
     mempool = mempool_in;
   }
   
-  void set_disk_file(std::string _filename){
-    filename = _filename;
+  void set_disk_file(Poco::Path _image_file){
+    image_file = _image_file;
   }
   
   void load_raw_from_disk(){
-    if(filename != ""){
+    if(image_file.toString() != ""){
       buffer_mutex.lock();
       if(raw_buffer == 0){
         std::ifstream stream;
-        stream.open(filename, std::ios::binary);
+        stream.open(image_file.toString(), std::ios::binary);
         allocate_memory_RAW();
         stream.read(raw_buffer,width*height);
         stream.close();
@@ -46,7 +46,7 @@ public:
   
   inline char * get_Raw(){ return raw_buffer;}
   
-  inline std::string get_File(){ return filename;}
+  inline Poco::Path get_ImageFile(){ return image_file;}
   
   void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR, bool real=false);
   
@@ -76,7 +76,7 @@ public:
   
 private:
   
-  std::string filename;
+  Poco::Path image_file;
   MemoryPool *mempool;
   
   //already protected by mutex in calling function

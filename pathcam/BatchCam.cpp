@@ -455,7 +455,7 @@ public:
     
     
     
-    unsigned int num_images = parent->images.size()/parent->threads;
+    unsigned int num_images = (unsigned int)parent->images.size()/parent->threads;
     int start = (thread_id*num_images)-1;
     int end = (thread_id+1)*num_images;
     if(end == parent->images.size()){ end--;}
@@ -482,8 +482,8 @@ public:
       }
       
       if(parent->output_log.toString() != ""){
-        outfile << last_registered->get_File() << "\t";
-        outfile << next_image->get_File() << "\t";
+        outfile << last_registered->get_ImageFile().toString() << "\t";
+        outfile << next_image->get_ImageFile().toString() << "\t";
       }
       
       auto begin = std::chrono::high_resolution_clock::now();
@@ -508,7 +508,9 @@ public:
         continue;
       }
       
-      pathCam::Match *m = new pathCam::Match(last_registered,next_image);
+      parent->matchM.match[last_index][i+1] = new pathCam::Match(last_registered,next_image);
+      
+      pathCam::Match *m = parent->matchM.match[last_index][i+1];
       matcher->match(m);
       
       int result = mot->findHomography(m, parent->estimator_type);
@@ -528,6 +530,7 @@ public:
           outfile << elapsed.count() * 1e-9 << "\n";
         }
         parent->reg_results[i+1] = RegInfo(true, Vec2(m->t_x, m->t_y));
+        parent->matchM.match[i+1][last_index] = new pathCam::Match(m);
         last_index = i+1;
       }
       if(result == -1){
@@ -535,12 +538,16 @@ public:
           outfile << "failed. Not enough matches\n";
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
+        delete m;
+        parent->matchM.match[last_index][i+1] = NULL;
       }
       if(result == -2){
         if(parent->output_log.toString() != ""){
           outfile << "failed.  Not enough keypoints.\n";
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
+        delete m;
+        parent->matchM.match[last_index][i+1] = NULL;
       }
       
       //Need to only unload if not using again, but doing this to make sure
@@ -549,7 +556,6 @@ public:
       last_registered->free_memory_RAW();
       next_image->free_memory_RAW();
         
-      delete m;
     }
 
     if(parent->output_log.toString() != ""){
@@ -576,6 +582,7 @@ bool BatchCam::run(){
   std::vector < Poco::Thread > thread(threads);
   
   reg_results.resize(images.size());
+  matchM.resize(images.size());
 
   for(unsigned int i=0; i < threads; i++){
     thread[i].start(runnable[i]);
@@ -596,6 +603,8 @@ bool BatchCam::run(){
   logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
 
   if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
+  
+  matchM.output(images);
   
   if(out_image.toString() != ""){
     logger->information("Compositing Images.");
@@ -688,23 +697,22 @@ bool BatchCam::resolve_bboxes(){
   return true;
 }
 
-bool BatchCam::find_overlaps(){
+void BatchCam::find_overlaps(){
   overlapM.resize(images.size());
   
   for(unsigned int i=0; i < overlapM.overlap.size(); i++){
     for(unsigned int j=0; j < overlapM.overlap[i].size(); j++){
+      if(matchM.match[i][j] != NULL){ overlapM.overlap[i][j] = true; continue; }
       overlapM.overlap[i][j] = box[i].intersect(box[j]);
       //area
       if(overlapM.overlap[i][j]){
         double area = box[i].area(box[j]);
         if(area < 0.3 || area > 0.9){
-          overlapM.overlap[i][j] = 0;
+          overlapM.overlap[i][j] = false;
         }
       }
-      
     }
   }
-  
   
   
 }
