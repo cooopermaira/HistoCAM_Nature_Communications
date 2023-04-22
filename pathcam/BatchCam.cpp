@@ -714,6 +714,7 @@ void BatchCam::find_overlaps(){
     }
   }
   
+  overlapM.output(images);
   
 }
 

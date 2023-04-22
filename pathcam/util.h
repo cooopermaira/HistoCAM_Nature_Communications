@@ -57,28 +57,6 @@ public:
   
 };
 
-class OverlapMatrix{
-public:
-  std::vector < std:: vector < bool > > overlap;
-  
-  OverlapMatrix(){};
-  
-  void resize(unsigned long size=0){
-    overlap.resize(size);
-    for(unsigned long i=0; i < size; i++){
-      overlap[i].resize(size, 0);
-    }
-  };
-  
-  ~OverlapMatrix(){
-    for(unsigned int i=0; i < overlap.size(); i++){
-      overlap[i].clear();
-    }
-    overlap.clear();
-  };
-  
-};
-
 
 class ThreadQueue{
 private:

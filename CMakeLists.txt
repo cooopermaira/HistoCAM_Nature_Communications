@@ -93,6 +93,8 @@ add_library(pathCamLib pathcam/pathCam.h
                 pathcam/MotionEstimator.h
                 pathcam/Match.cpp
                 pathcam/Match.h
+                pathcam/OverlapMatrix.cpp
+                pathcam/OverlapMatrix.h
                 pathcam/ImageList.cpp
                 pathcam/ImageList.h
                 pathcam/DescriptorMatcher.h

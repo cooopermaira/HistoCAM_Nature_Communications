@@ -42,6 +42,7 @@
 #include "Match.h"
 #include "DescriptorMatcher.h"
 #include "MotionEstimator.h"
+#include "OverlapMatrix.h"
 #include "BatchCam.h"
 
 
