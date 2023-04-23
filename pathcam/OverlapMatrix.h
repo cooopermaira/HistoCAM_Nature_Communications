@@ -14,14 +14,14 @@ namespace pathCam{
 
 class OverlapMatrix{
 public:
-  std::vector < std:: vector < bool > > overlap;
+  std::vector < std:: vector < double > > overlap;
   
   OverlapMatrix(){};
   
   void resize(unsigned long size=0){
     overlap.resize(size);
     for(unsigned long i=0; i < size; i++){
-      overlap[i].resize(size, 0);
+      overlap[i].resize(size, 0.0);
     }
   };
   
@@ -57,7 +57,7 @@ public:
       outfile << images[i]->get_ImageFile().getBaseName();
       for(unsigned int j=0; j < overlap[i].size(); j++){
         outfile << ";";
-        outfile << (int)overlap[i][j];
+        outfile << overlap[i][j];
       }
       outfile << "\n";
     }

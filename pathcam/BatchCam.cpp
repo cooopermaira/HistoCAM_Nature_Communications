@@ -472,8 +472,6 @@ public:
       pathCam::Image * last_registered = parent->images[last_index];
       pathCam::Image * next_image = parent->images[i+1];
 
-      //so, right now no mutex.  Assuming given the array split these won't hit each other
-      //bad assumption long term
       last_registered->load_raw_from_disk();
       next_image->load_raw_from_disk();
       
@@ -702,14 +700,10 @@ void BatchCam::find_overlaps(){
   
   for(unsigned int i=0; i < overlapM.overlap.size(); i++){
     for(unsigned int j=0; j < overlapM.overlap[i].size(); j++){
-      if(matchM.match[i][j] != NULL){ overlapM.overlap[i][j] = true; continue; }
-      overlapM.overlap[i][j] = box[i].intersect(box[j]);
+      if(matchM.match[i][j] != NULL){ overlapM.overlap[i][j] = 1.0; continue; }
       //area
-      if(overlapM.overlap[i][j]){
-        double area = box[i].area(box[j]);
-        if(area < 0.3 || area > 0.9){
-          overlapM.overlap[i][j] = false;
-        }
+      if(box[i].intersect(box[j])){
+        overlapM.overlap[i][j] =  box[i].area(box[j]);
       }
     }
   }
