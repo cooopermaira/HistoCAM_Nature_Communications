@@ -31,8 +31,8 @@ public:
   min_x(min_x), min_y(min_y), max_x(max_x), max_y(max_y) {};
   
   bool intersect(Bbox b){
-    return ((min_x > b.min_x && min_x < b.max_x) || (max_x >= b.min_x && max_x < b.max_x)) &&
-           ((min_y > b.min_y && min_y < b.max_y) || (max_y >= b.min_y && max_x < b.max_y));
+    return (min_x <= b.max_x && max_x >= b.min_x) &&
+           (min_y <= b.max_y && max_y >= b.min_y);
   }
 
   double area(Bbox b){

@@ -602,6 +602,8 @@ bool BatchCam::run(){
 
   if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
   
+  find_overlaps();
+  
   matchM.output(images);
   
   if(out_image.toString() != ""){
@@ -670,11 +672,15 @@ bool BatchCam::resolve_bboxes(){
     }
   }
   
+  for(unsigned int i=0; i < reg_results.size(); i++){
+    std::cout << box[i].min_x << "\t" << box[i].min_y << "\t" <<   box[i].max_x << "\t" << box[i].max_y << "\n";
+  }
+  
   if(combined_box.min_x < 0.0){
     for(unsigned int i=0; i < reg_results.size(); i++){
       if(reg_results[i].successful){
         box[i].min_x -= combined_box.min_x;
-        box[i].max_x -= combined_box.max_x;
+        box[i].max_x -= combined_box.min_x;
       }
     }
     combined_box.max_x -= combined_box.min_x;
@@ -685,11 +691,19 @@ bool BatchCam::resolve_bboxes(){
     for(unsigned int i=0; i < reg_results.size(); i++){
       if(reg_results[i].successful){
         box[i].min_y -= combined_box.min_y;
-        box[i].max_y -= combined_box.max_y;
+        box[i].max_y -= combined_box.min_y;
       }
     }
     combined_box.max_y -= combined_box.min_y;
     combined_box.min_y -= combined_box.min_y;
+  }
+  std::cout << "=======================\n";
+  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t" <<   combined_box.max_x << "\t" << combined_box.max_y << "\n";
+  std::cout << "=======================\n";
+
+  
+  for(unsigned int i=0; i < reg_results.size(); i++){
+    std::cout << box[i].min_x << "\t" << box[i].min_y << "\t" <<   box[i].max_x << "\t" << box[i].max_y << "\n";
   }
   
   return true;
@@ -704,6 +718,10 @@ void BatchCam::find_overlaps(){
       //area
       if(box[i].intersect(box[j])){
         overlapM.overlap[i][j] =  box[i].area(box[j]);
+      }else{
+        std::cout << box[i].min_x << "\t" << box[i].min_y << "\t" <<   box[i].max_x << "\t" << box[i].max_y << "\n";
+        std::cout << box[j].min_x << "\t" << box[j].min_y << "\t" <<   box[j].max_x << "\t" << box[j].max_y << "\n";
+        int q = 0;
       }
     }
   }
