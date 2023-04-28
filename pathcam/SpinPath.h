@@ -22,12 +22,17 @@ namespace pathCam{
     CameraPtr pCam;
     SystemPtr system;
     CameraList camList;
+    
+    Poco::Path path;
         
   public:
     
     SpinPath();
     ~SpinPath();
     int RunCamera();
+    
+    void setFolder(Poco::Path _path){ path = _path; }
+    Poco::Path getPath(){ return path; }
     
   private:
     
