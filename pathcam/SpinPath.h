@@ -18,6 +18,7 @@ using namespace std;
 namespace pathCam{
   
   class SpinPath{
+  private:
     CameraPtr pCam;
     SystemPtr system;
     CameraList camList;
@@ -25,11 +26,12 @@ namespace pathCam{
   public:
     
     SpinPath();
-    ~SpinPath(){
-      pCam = nullptr;
-      camList.Clear();
-      system->ReleaseInstance();
-    }
+    ~SpinPath();
+    int RunCamera();
+    
+  private:
+    
+    int AcquireImages(INodeMap& nodeMap, INodeMap& nodeMapTLDevice);
     
     int ResetGVCPHeartbeat(){
         return ConfigureGVCPHeartbeat(true);
@@ -39,12 +41,9 @@ namespace pathCam{
         return ConfigureGVCPHeartbeat(false);
     }
     
-  private:
-    
     int ConfigureGVCPHeartbeat(bool enable);
     int PrintDeviceInfo(INodeMap& nodeMap);
-    int AcquireImages(INodeMap& nodeMap, INodeMap& nodeMapTLDevice);
-    int RunCamera();
+
     
   };
   

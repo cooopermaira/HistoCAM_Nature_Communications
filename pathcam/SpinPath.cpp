@@ -42,84 +42,10 @@ SpinPath::SpinPath(){
 
 }
 
-int SpinPath::ConfigureGVCPHeartbeat(bool enable){
-    // Retrieve TL device nodemap
-    INodeMap& nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
-
-    // Retrieve GenICam nodemap
-    INodeMap& nodeMap = pCam->GetNodeMap();
-
-    CEnumerationPtr ptrDeviceType = nodeMapTLDevice.GetNode("DeviceType");
-    if (!IsReadable(ptrDeviceType)){
-        return -1;
-    }
-
-    if (ptrDeviceType->GetIntValue() != DeviceType_GigEVision){
-        return 0;
-    }
-
-    if (enable){
-        cout << endl << "Resetting heartbeat..." << endl << endl;
-    }
-    else{
-        cout << endl << "Disabling heartbeat..." << endl << endl;
-    }
-
-    CBooleanPtr ptrDeviceHeartbeat = nodeMap.GetNode("GevGVCPHeartbeatDisable");
-    if (!IsWritable(ptrDeviceHeartbeat))
-    {
-        cout << "Unable to configure heartbeat. Continuing with execution as this may be non-fatal..."
-            << endl
-            << endl;
-    }
-    else
-    {
-        ptrDeviceHeartbeat->SetValue(enable);
-
-        if (!enable)
-        {
-            cout << "WARNING: Heartbeat has been disabled for the rest of this example run." << endl;
-            cout << "         Heartbeat will be reset upon the completion of this run.  If the " << endl;
-            cout << "         example is aborted unexpectedly before the heartbeat is reset, the" << endl;
-            cout << "         camera may need to be power cycled to reset the heartbeat." << endl << endl;
-        }
-        else
-        {
-            cout << "Heartbeat has been reset." << endl;
-        }
-    }
-
-    return 0;
-}
-
-int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
-    int result = 0;
-    cout << endl << "*** DEVICE INFORMATION ***" << endl << endl;
-
-    try{
-        FeatureList_t features;
-        const CCategoryPtr category = nodeMap.GetNode("DeviceInformation");
-        if (IsReadable(category)){
-            category->GetFeatures(features);
-
-            for (auto it = features.begin(); it != features.end(); ++it){
-                const CNodePtr pfeatureNode = *it;
-                cout << pfeatureNode->GetName() << " : ";
-                CValuePtr pValue = static_cast<CValuePtr>(pfeatureNode);
-                cout << (IsReadable(pValue) ? pValue->ToString() : "Node not readable");
-                cout << endl;
-            }
-        }
-        else{
-            cout << "Device control information not available." << endl;
-        }
-    }
-    catch (Spinnaker::Exception& e){
-        cout << "Error: " << e.what() << endl;
-        result = -1;
-    }
-
-    return result;
+SpinPath::~SpinPath(){
+  pCam = nullptr;
+  camList.Clear();
+  system->ReleaseInstance();
 }
 
 int SpinPath::AcquireImages(INodeMap& nodeMap, INodeMap& nodeMapTLDevice){
@@ -281,7 +207,6 @@ int SpinPath::AcquireImages(INodeMap& nodeMap, INodeMap& nodeMapTLDevice){
     return result;
 }
 
-
 int SpinPath::RunCamera(){
   
     int result;
@@ -323,5 +248,86 @@ int SpinPath::RunCamera(){
 
     return result;
 }
+
+int SpinPath::ConfigureGVCPHeartbeat(bool enable){
+    // Retrieve TL device nodemap
+    INodeMap& nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
+
+    // Retrieve GenICam nodemap
+    INodeMap& nodeMap = pCam->GetNodeMap();
+
+    CEnumerationPtr ptrDeviceType = nodeMapTLDevice.GetNode("DeviceType");
+    if (!IsReadable(ptrDeviceType)){
+        return -1;
+    }
+
+    if (ptrDeviceType->GetIntValue() != DeviceType_GigEVision){
+        return 0;
+    }
+
+    if (enable){
+        cout << endl << "Resetting heartbeat..." << endl << endl;
+    }
+    else{
+        cout << endl << "Disabling heartbeat..." << endl << endl;
+    }
+
+    CBooleanPtr ptrDeviceHeartbeat = nodeMap.GetNode("GevGVCPHeartbeatDisable");
+    if (!IsWritable(ptrDeviceHeartbeat))
+    {
+        cout << "Unable to configure heartbeat. Continuing with execution as this may be non-fatal..."
+            << endl
+            << endl;
+    }
+    else
+    {
+        ptrDeviceHeartbeat->SetValue(enable);
+
+        if (!enable)
+        {
+            cout << "WARNING: Heartbeat has been disabled for the rest of this example run." << endl;
+            cout << "         Heartbeat will be reset upon the completion of this run.  If the " << endl;
+            cout << "         example is aborted unexpectedly before the heartbeat is reset, the" << endl;
+            cout << "         camera may need to be power cycled to reset the heartbeat." << endl << endl;
+        }
+        else
+        {
+            cout << "Heartbeat has been reset." << endl;
+        }
+    }
+
+    return 0;
+}
+
+int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
+    int result = 0;
+    cout << endl << "*** DEVICE INFORMATION ***" << endl << endl;
+
+    try{
+        FeatureList_t features;
+        const CCategoryPtr category = nodeMap.GetNode("DeviceInformation");
+        if (IsReadable(category)){
+            category->GetFeatures(features);
+
+            for (auto it = features.begin(); it != features.end(); ++it){
+                const CNodePtr pfeatureNode = *it;
+                cout << pfeatureNode->GetName() << " : ";
+                CValuePtr pValue = static_cast<CValuePtr>(pfeatureNode);
+                cout << (IsReadable(pValue) ? pValue->ToString() : "Node not readable");
+                cout << endl;
+            }
+        }
+        else{
+            cout << "Device control information not available." << endl;
+        }
+    }
+    catch (Spinnaker::Exception& e){
+        cout << "Error: " << e.what() << endl;
+        result = -1;
+    }
+
+    return result;
+}
+
 
 }
