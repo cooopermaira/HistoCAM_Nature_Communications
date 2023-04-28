@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.2)
 project( pathCam )
 
+
+OPTION(BUILD_IO_TEST "" OFF)
+OPTION(BUILD_DEBAYER "" OFF)
+OPTION(BUILD_POCO_TEST "" OFF)
+OPTION(BUILD_TEST "" OFF)
+
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
 # Update submodules as needed
@@ -69,11 +75,11 @@ ENDIF()
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
-OPTION(BUILD_SPINNAKER "" OFF)
-
 IF(APPLE)
   IF(EXISTS "/Applications/Spinnaker")
-    OPTION(BUILD_SPINNAKER "" ON)
+	 MESSAGE(STATUS "Spinnaker directory found")
+    SET(BUILD_SPINNAKER ON)
+    add_compile_definitions(WITH_SPINNAKER)
     include_directories( "/Applications/Spinnaker/include" )
     SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
                     "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
@@ -86,7 +92,7 @@ IF(BUILD_SPINNAKER)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
 
-add_library(pathCamLib pathcam/pathCam.h
+SET(PATCAM_FILES pathcam/pathCam.h
                 pathcam/Image.cpp
                 pathcam/Image.h
                 pathcam/MotionEstimator.cpp
@@ -104,28 +110,46 @@ add_library(pathCamLib pathcam/pathCam.h
                 pathcam/BatchCam.h
                 pathcam/BatchCam.cpp
                 pathcam/util.h)
+                
+IF(BUILD_SPINNAKER)
+  set(PATCAM_FILES ${PATCAM_FILES} pathcam/SpinPath.h pathcam/SpinPath.cpp)
+ENDIF()
+
+add_library(pathCamLib ${PATCAM_FILES})
 
 include_directories(pathcam)
 
-add_executable( test programs/test.cpp)
-#add_executable( process_list_truth programs/process_list_truth.cpp)
-#add_executable( process_list_orb programs/process_list_orb.cpp)
-add_executable( process_list_xml programs/process_list_xml.cpp)
-add_executable( debayer programs/debayer.cpp)
-add_executable( poco_test programs/poco_test.cpp)
-add_executable( image_io_test programs/image_io_test.cpp)
-IF(BUILD_SPINNAKER)
-	add_executable( spinnaker_acquisition programs/spinnaker_acquisition.cpp)
-ENDIF()
 
 target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util)
-target_link_libraries(test pathCamLib)
-#target_link_libraries(process_list_truth pathCamLib)
-#target_link_libraries(process_list_orb pathCamLib)
-target_link_libraries(process_list_xml pathCamLib)
-target_link_libraries(debayer pathCamLib)
-target_link_libraries(poco_test pathCamLib)
-target_link_libraries(image_io_test pathCamLib)
+
 IF(BUILD_SPINNAKER)
+  target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})
+ENDIF()
+
+IF(BUILD_TEST)
+	add_executable( test programs/test.cpp)
+	target_link_libraries(test pathCamLib)
+ENDIF()
+
+add_executable( process_list_xml programs/process_list_xml.cpp)
+target_link_libraries(process_list_xml pathCamLib)
+
+IF(BUILD_DEBAYER)
+	add_executable( debayer programs/debayer.cpp)
+	target_link_libraries(debayer pathCamLib)
+ENDIF()
+
+IF(BUILD_POCO_TEST)
+	add_executable( poco_test programs/poco_test.cpp)
+	target_link_libraries(poco_test pathCamLib)
+ENDIF()
+
+IF(BUILD_IO_TEST)
+	add_executable( image_io_test programs/image_io_test.cpp)
+	target_link_libraries(image_io_test pathCamLib)
+ENDIF()
+
+IF(BUILD_SPINNAKER)
+	add_executable( spinnaker_acquisition programs/spinnaker_acquisition.cpp)
 	target_link_libraries(spinnaker_acquisition pathCamLib ${SPINNAKER_LIBRARIES})
 ENDIF()
