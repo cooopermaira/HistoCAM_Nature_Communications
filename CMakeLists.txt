@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.2)
 project( pathCam )
 
+set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "" )
+set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "" )
+
 
 OPTION(BUILD_IO_TEST "" OFF)
 OPTION(BUILD_DEBAYER "" OFF)
@@ -155,3 +158,4 @@ IF(BUILD_SPINNAKER)
   add_executable( pathcam_spin_test programs/pathcam_spin_test.cpp)
   target_link_libraries(pathcam_spin_test pathCamLib ${SPINNAKER_LIBRARIES})
 ENDIF()
+
