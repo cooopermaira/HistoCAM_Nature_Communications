@@ -117,7 +117,7 @@ IF(BUILD_SPINNAKER)
   set(PATCAM_FILES ${PATCAM_FILES} pathcam/SpinPath.h pathcam/SpinPath.cpp)
 ENDIF()
 
-add_library(pathCamLib ${PATCAM_FILES})
+add_library(pathCamLib STATIC ${PATCAM_FILES})
 
 include_directories(pathcam)
 
