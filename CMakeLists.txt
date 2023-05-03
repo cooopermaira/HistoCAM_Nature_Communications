@@ -86,7 +86,7 @@ IF(BUILD_SPINNAKER)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
 
-add_library(pathCamLib pathcam/pathCam.h
+add_library(pathCamLib STATIC pathcam/pathCam.h
                 pathcam/Image.cpp
                 pathcam/Image.h
                 pathcam/MotionEstimator.cpp
