@@ -159,3 +159,5 @@ IF(BUILD_SPINNAKER)
   target_link_libraries(pathcam_spin_test pathCamLib ${SPINNAKER_LIBRARIES})
 ENDIF()
 
+add_executable( simple_xml programs/simple_xml.cpp)
+target_link_libraries(simple_xml pathCamLib)
