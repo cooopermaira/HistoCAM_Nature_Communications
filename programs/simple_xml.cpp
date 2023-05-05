@@ -38,13 +38,13 @@ void printConfigXML(XMLConfiguration::Ptr config)
 }
 
 
-void printSubKeys(LayeredConfiguration::Ptr config, std::string key, std::string prefix){
+void printSubKeys(LayeredConfiguration::Ptr config, std::string short_key, std::string full_key, std::string print_prefix){
   std::vector<std::string> sub_keys;
-  config->keys(key, sub_keys);
-  std::cout << prefix << "< " << key << " > " << sub_keys.size() << "\n";
+  config->keys(full_key, sub_keys);
+  std::cout << print_prefix << "< " << short_key << " > " << sub_keys.size() << "\n";
   for(unsigned int i=0; i < sub_keys.size(); i++){
-    std::string new_prefix = "\t" + prefix;
-    printSubKeys(config, sub_keys[i], new_prefix);
+    std::string new_prefix = "\t" + print_prefix;
+    printSubKeys(config, sub_keys[i], full_key + "." + sub_keys[i], new_prefix);
   }
 }
 
@@ -54,7 +54,7 @@ void printConfig(LayeredConfiguration::Ptr config)
   config->keys(root_keys);
   
   for(unsigned int i=0; i < root_keys.size(); i++){
-    printSubKeys(config, root_keys[i], "" );
+    printSubKeys(config, root_keys[i], root_keys[i] , "");
   }
 
 }
@@ -62,14 +62,21 @@ void printConfig(LayeredConfiguration::Ptr config)
 
 
 int main(int argc, char** argv){
+  
+  Path input_path = Path("../../../resources/poco_test.xml");
 
-  AutoPtr<XMLConfiguration> pConf(new XMLConfiguration("../../../resources/poco_test.xml"));
+  AutoPtr<XMLConfiguration> pConf(new XMLConfiguration(input_path.toString()));
   
-  pConf->save("../../../resources/output_XML.xml");
+  Path output_path = Path("../../../resources/output_XML.xml");
+
   
+  pConf->save(output_path.toString());
+  
+
   AutoPtr<LayeredConfiguration> config(new LayeredConfiguration());
   config->add(pConf);
   
+  printConfig(config);
 
   
   return 0;
