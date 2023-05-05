@@ -1,5 +1,7 @@
 <config>
   
+  <processing threads="1" />
+  
   <io>
   
     <input_images>/Users/bsumma/Library/CloudStorage/Box-Box/PathCam/test_data/raw/process_test.txt</input_images>
