@@ -81,10 +81,10 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
   
   printConfig(pConf);
   
-  if(pConf->has("system")){
-    if(pConf->has("system[@threads]")){
+  if(pConf->has("processing")){
+    if(pConf->has("processing[@threads]")){
       try{
-        threads = pConf->getUInt("system[@threads]");
+        threads = pConf->getUInt("processing[@threads]");
         logger->information(Poco::format("Using %u threads", threads ));
       }catch(std::string bad_input){
         logger->warning("Bad input for threads: " + bad_input + ". Using default.\n");
