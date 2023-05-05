@@ -1,7 +1,7 @@
+[submodule "nanogui"]
+	path = nanogui
+	url = https://github.com/mitsuba-renderer/nanogui.git
 [submodule "poco"]
 	path = poco
 	url = https://github.com/bsumma/poco.git
 	branch = master
-[submodule "nanogui"]
-	path = nanogui
-	url = https://github.com/mitsuba-renderer/nanogui.git

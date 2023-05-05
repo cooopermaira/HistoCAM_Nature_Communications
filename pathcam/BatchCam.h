@@ -1,5 +1,5 @@
 //
-//  BatchCam.hp
+//  BatchCam.h
 //  pathCamLib
 //
 //  Created by Brian on 3/15/23.
