@@ -85,9 +85,9 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
     if(pConf->has("system[@threads]")){
       try{
         threads = pConf->getUInt("system[@threads]");
-        std::cout << "Using " << threads << " threads\n";
+        logger->information(Poco::format("Using %u threads", threads ));
       }catch(std::string bad_input){
-        std::cout << "Bad input for threads: " << bad_input << ". Using default.\n";
+        logger->warning("Bad input for threads: " + bad_input + ". Using default.\n");
         threads = 1;
       }
     }
@@ -100,18 +100,18 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       input_images = Path(temp);
       
       if(input_images.isDirectory()){
-        std::cout << "Input Images: Directories not supported.\n";
+        logger->fatal("Input Images: Directories not supported.");
         input_images = Path();
         return false;
       }
       
       if(input_images.getExtension() != "txt"){
-        std::cout << "Input Images: Only text files supported.\n";
+        logger->fatal("Input Images: Only text files supported.");
         input_images = Path();
         return false;
       }
     }else{
-      std::cout << "Input images required.\n";
+      logger->fatal("Input images required.");
       return false;
     }
     
@@ -120,19 +120,19 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       Path temp_log = Path(temp);
       
       if(temp_log.isDirectory()){
-        std::cout << "Output Log: Directories not supported. No registration output.\n";
+        logger->warning("Output Log: Directories not supported. No registration output.");
         temp_log.clear();
       }
 
       if(temp_log.getExtension() != "txt"){
-        std::cout << "Output Log:  No registration output.\n";
+        logger->warning("Output Log:  No registration output.");
         temp_log.clear();
       }
       
       if(temp_log.toString() != ""){ output_log = temp_log; }
       
     }else{
-      std::cout << "No output log supplied. No registration output.\n";
+      logger->warning("No output log supplied. No registration output.");
     }
     
     if(pConf->has("io.output_image")){
@@ -140,7 +140,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       out_image = Path(temp);
       
       if(out_image.getExtension() != "png" && out_image.getExtension() != "tif"){
-        std::cout << "Only PNG or TIF outputs supported. No image output.\n";
+        logger->warning("Only PNG or TIF outputs supported. No image output.");
         out_image = Path();
       }
     }
@@ -171,33 +171,33 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
           }else if (temp == "ORB"){
             feature_type = _ORB;
           }else{
-            std::cout << "Unknown feature type. Using default.\n";
+            logger->warning("Unknown feature type. Using default.");
           }
         }else{
-          std::cout << "No feature type supplied.  Using default.\n";
+            logger->warning("No feature type supplied.  Using default.");
         }
         
         if(pConf->has("registration.detector.features.params")){
         
           switch(feature_type){
             case _SIFT:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _SURF:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _AKAZE:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _BRISK:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _ORB:
               int nfeatures;
               try{
                 nfeatures = pConf->getInt("registration.detector.features.params[@nfeatures]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for nfeatures: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for nfeatures: " + bad_input + ". Using default.");
                 nfeatures = ORB_params.nfeatures;
               }
               ORB_params.nfeatures = nfeatures;
@@ -205,7 +205,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 scaleFactor = pConf->getDouble("registration.detector.features.params[@scaleFactor]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for scaleFactor: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for scaleFactor: " + bad_input + ". Using default.");
                 scaleFactor = ORB_params.scaleFactor;
               }
               ORB_params.scaleFactor = scaleFactor;
@@ -213,7 +213,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 nlevels = pConf->getInt("registration.detector.features.params[@nlevels]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for nlevels: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for nlevels: " + bad_input + ". Using default.");
                 nlevels = ORB_params.nlevels;
               }
               ORB_params.nlevels = nlevels;
@@ -221,7 +221,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 edgeThreshold = pConf->getInt("registration.detector.features.params[@edgeThreshold]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for edgeThreshold: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for edgeThreshold: " + bad_input + ". Using default.");
                 edgeThreshold = ORB_params.edgeThreshold;
               }
               ORB_params.edgeThreshold = edgeThreshold;
@@ -229,7 +229,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 firstLevel = pConf->getInt("registration.detector.features.params[@firstLevel]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for firstLevel: " + bad_input + ". Using default.");
                 firstLevel = ORB_params.firstLevel;
               }
               ORB_params.firstLevel = firstLevel;
@@ -237,7 +237,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 WTA_K = pConf->getInt("registration.detector.features.params[@WTA_K]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for WTA_K: " + bad_input + ". Using default.");
                 WTA_K = ORB_params.WTA_K;
               }
               ORB_params.WTA_K = WTA_K;
@@ -248,7 +248,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               } else if (temp == "FAST_SCORE"){
                 scoreType = ORB::FAST_SCORE;
               }else{
-                std::cout << "Unknown scoreType: " << temp << ". Using Defaults.\n";
+                logger->warning("Unknown scoreType: " + temp + ". Using default.");
                 scoreType = ORB_params.scoreType;
               }
               ORB_params.scoreType = scoreType;
@@ -256,7 +256,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 patchSize = pConf->getInt("registration.detector.features.params[@patchSize]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for patchSize: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for patchSize: " + bad_input + ". Using default.");
                 patchSize = ORB_params.patchSize;
               }
               ORB_params.patchSize = patchSize;
@@ -264,7 +264,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 fastThreshold = pConf->getInt("registration.detector.features.params[@fastThreshold]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for fastThreshold: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for fastThreshold: " + bad_input + ". Using default.");
                 fastThreshold = ORB_params.fastThreshold;
               }
               ORB_params.fastThreshold = fastThreshold;
@@ -274,11 +274,11 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
           
           
         }else{
-          std::cout << "No feature params supplied.  Using defaults.\n";
+          logger->warning("No feature params supplied.  Using defaults.");
         }
         
       }else{
-        std::cout << "No feature info supplied.  Using defaults.\n";
+        logger->warning("No feature info supplied.  Using defaults.");
       }
       
       if(pConf->has("registration.detector.FREAK")){
@@ -286,16 +286,16 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           use_FREAK = pConf->getBool("registration.detector.FREAK");
         }catch(std::string bad_input){
-          std::cout << "Bad input for FREAK: " << bad_input << ". Using default.\n";
+          logger->warning("Bad input for use_FREAK: " + bad_input + ". Using default.");
           use_FREAK = temp;
         }
         
       }else{
-        std::cout << "No FREAK preference supplied.  Using defaults.\n";
+        logger->warning("No FREAK preference supplied.  Using defaults.");
       }
       
     }else{
-      std::cout << "No detector info supplied.  Using defaults.\n";
+          logger->warning("No detector info supplied.  Using defaults.");
     }
     
     if(pConf->has("registration.image")){
@@ -305,11 +305,11 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           crop_factor = pConf->getDouble("registration.image.crop");
         }catch(std::string bad_input){
-          std::cout << "Bad input for crop: " << bad_input << "\n";
+          logger->warning("Bad input for crop: " + bad_input + ".");
           crop_factor = temp;
         }
         if(crop_factor < 0.0 || crop_factor > 1.0){
-          std::cout << "Bad crop factor given defaulting to 1.0\n";
+          logger->warning("Bad crop factor given defaulting to 1.0");
           crop_factor = 1.0;
         }
       }
@@ -319,11 +319,11 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           scale_factor = pConf->getDouble("registration.image.scale");
         }catch(std::string bad_input){
-          std::cout << "Bad input for scale: " << bad_input << "\n";
+          logger->warning("Bad input for scale: " + bad_input + ".");
           scale_factor = temp;
         }
         if(scale_factor < 0.0 || scale_factor > 1.0){
-          std::cout << "Bad scale factor given defaulting to 1.0\n";
+          logger->warning("Bad scale factor given defaulting to 1.0");
           scale_factor = 1.0;
         }
     
@@ -349,7 +349,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         }else if (temp == "MAX"){
           interpolation = INTER_MAX;
         }else{
-          std::cout << "Improper input for interpolation. Defaulting to CUBIC\n";
+          logger->warning("Improper input for interpolation. Defaulting to CUBIC");
           interpolation = INTER_CUBIC;
         }
         
@@ -360,7 +360,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           real = pConf->getBool("registration.image.real");
         }catch(std::string bad_input){
-          std::cout << "Bad input for real: " << bad_input << ". Using default.\n";
+          logger->warning("Bad input for real: " + bad_input + ". Using default.");
           real = temp;
         }
       }
@@ -370,29 +370,29 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           debayer = pConf->getBool("registration.image.debayer");
         }catch(std::string bad_input){
-          std::cout << "Bad input for debayer: " << bad_input << ". Using default\n";
+          logger->warning("Bad input for debayer: " + bad_input + ". Using default.");
           debayer = temp;
         }
       }
       
     }else{
-      std::cout << "No registation image info supplied.  Using defaults.\n";
+      logger->warning("No registation image info supplied.  Using defaults.");
     }
     
     if(pConf->has("registration.matcher")){
       
     }else{
-      std::cout << "No matcher info supplied.  Using defaults.\n";
+      logger->warning("No matcher info supplied.  Using defaults.");
     }
     
     if(pConf->has("registration.estimator")){
       
     }else{
-      std::cout << "No estimator info supplied.  Using defaults.\n";
+      logger->warning("No estimator info supplied.  Using defaults.");
     }
     
   }else{
-    std::cout << "No registration info supplied.  Using defaults.\n";
+      logger->warning("No registration info supplied.  Using defaults.");
   }
 
   
@@ -701,7 +701,7 @@ bool BatchCam::resolve_bboxes(){
   }
   
   for(unsigned int i=0; i < reg_results.size(); i++){
-    std::cout << box[i].min_x << "\t" << box[i].min_y << "\t" <<   box[i].max_x << "\t" << box[i].max_y << "\n";
+    logger->information(box[i].toString());
   }
   
   if(combined_box.min_x < 0.0){
@@ -725,13 +725,13 @@ bool BatchCam::resolve_bboxes(){
     combined_box.max_y -= combined_box.min_y;
     combined_box.min_y -= combined_box.min_y;
   }
-  std::cout << "=======================\n";
-  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t" <<   combined_box.max_x << "\t" << combined_box.max_y << "\n";
-  std::cout << "=======================\n";
+  logger->information("=======================");
+  logger->information(combined_box.toString());
+  logger->information("=======================");
 
   
   for(unsigned int i=0; i < reg_results.size(); i++){
-    std::cout << box[i].min_x << "\t" << box[i].min_y << "\t" <<   box[i].max_x << "\t" << box[i].max_y << "\n";
+    logger->information(box[i].toString());
   }
   
   return true;
@@ -747,9 +747,8 @@ void BatchCam::find_overlaps(){
       if(box[i].intersect(box[j])){
         overlapM.overlap[i][j] =  box[i].area(box[j]);
       }else{
-        std::cout << box[i].min_x << "\t" << box[i].min_y << "\t" <<   box[i].max_x << "\t" << box[i].max_y << "\n";
-        std::cout << box[j].min_x << "\t" << box[j].min_y << "\t" <<   box[j].max_x << "\t" << box[j].max_y << "\n";
-        int q = 0;
+        logger->information(box[i].toString());
+        logger->information(box[j].toString());
       }
     }
   }
