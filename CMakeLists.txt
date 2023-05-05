@@ -87,6 +87,7 @@ IF(APPLE)
     SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
                     "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
                     "/Applications/Spinnaker/lib/libSpinVideo.dylib")
+  ENDIF()
 ELSEIF(WINDOWS)
   IF(EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
      MESSAGE(STATUS "Spinnaker directory found")
@@ -98,10 +99,6 @@ ELSEIF(WINDOWS)
   ENDIF()
 ENDIF()
 
-
-
-IF(
-ENDIF()
 
 IF(BUILD_SPINNAKER)
   set(CMAKE_CXX_STANDARD 14)
