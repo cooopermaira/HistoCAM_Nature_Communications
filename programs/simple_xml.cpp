@@ -70,8 +70,6 @@ int main(int argc, char** argv){
   AutoPtr<LayeredConfiguration> config(new LayeredConfiguration());
   config->add(pConf);
   
-  config->save("../../../resources/output_layered.xml");
-
 
   
   return 0;
