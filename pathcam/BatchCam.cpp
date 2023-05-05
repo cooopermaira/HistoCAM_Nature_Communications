@@ -51,30 +51,34 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
 
 }
 
-void printSubKeys(LayeredConfiguration::Ptr config, std::string short_key, std::string full_key, std::string print_prefix){
+std::string printSubKeys(LayeredConfiguration::Ptr config, std::string short_key, std::string full_key, std::string print_prefix){
   std::vector<std::string> sub_keys;
   config->keys(full_key, sub_keys);
-  std::cout << print_prefix << "< " << short_key << " > " << sub_keys.size() << "\n";
+  std::string s = print_prefix + "< " + short_key + " > " + "\n";
   for(unsigned int i=0; i < sub_keys.size(); i++){
     std::string new_prefix = "\t" + print_prefix;
-    printSubKeys(config, sub_keys[i], full_key + "." + sub_keys[i], new_prefix);
+    s += printSubKeys(config, sub_keys[i], full_key + "." + sub_keys[i], new_prefix);
   }
+  return s;
 }
 
-void printConfig(LayeredConfiguration::Ptr config)
+std::string printConfig(LayeredConfiguration::Ptr config)
 {
   std::vector<std::string> root_keys;
   config->keys(root_keys);
   
+  std::string s = "";
+  
   for(unsigned int i=0; i < root_keys.size(); i++){
-    printSubKeys(config, root_keys[i], root_keys[i] , "");
+    s += printSubKeys(config, root_keys[i], root_keys[i] , "");
   }
 
+  return s;
 }
 
 bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
   
-  printConfig(pConf);
+  logger->information(printConfig(pConf));
   
   if(pConf->has("processing")){
     if(pConf->has("processing[@threads]")){
