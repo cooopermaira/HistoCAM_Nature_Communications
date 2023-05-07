@@ -9,6 +9,7 @@ OPTION(BUILD_IO_TEST "" OFF)
 OPTION(BUILD_DEBAYER "" OFF)
 OPTION(BUILD_POCO_TEST "" OFF)
 OPTION(BUILD_TEST "" OFF)
+OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -99,11 +100,13 @@ ELSEIF(WINDOWS)
   ENDIF()
 ENDIF()
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-IF(BUILD_SPINNAKER)
-  set(CMAKE_CXX_STANDARD 14)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-ENDIF()
+#IF(BUILD_SPINNAKER)
+#  set(CMAKE_CXX_STANDARD 14)
+#  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#ENDIF()
 
 SET(PATCAM_FILES pathcam/pathCam.h
                 pathcam/Image.cpp
@@ -169,5 +172,12 @@ IF(BUILD_SPINNAKER)
   target_link_libraries(pathcam_spin_test pathCamLib ${SPINNAKER_LIBRARIES})
 ENDIF()
 
-add_executable( simple_xml programs/simple_xml.cpp)
-target_link_libraries(simple_xml pathCamLib)
+IF(BUILD_XML_TEST)
+  add_executable( simple_xml programs/simple_xml.cpp)
+  target_link_libraries(simple_xml pathCamLib)
+ENDIF()
+
+IF(BUILD_NANOGUI_EXAMPLE)
+  add_executable( nanogui_example nanogui/src/example1.cpp)
+  target_link_libraries(nanogui_example nanogui pathCamLib)
+ENDIF()

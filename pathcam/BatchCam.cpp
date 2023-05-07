@@ -496,7 +496,7 @@ public:
 
     for(unsigned int i=start; i < end; i++){
 
-      string outfile = Poco::format("%u\t", thread_id);
+      std::string outfile = Poco::format("%u\t", thread_id);
       
       if(i==0){
           parent->reg_results[0] = RegInfo(true, Vec2(0, 0));
