@@ -34,6 +34,9 @@
 #include "Poco/Util/XMLConfiguration.h"
 #include "Poco/Util/Application.h"
 #include "Poco/Util/HelpFormatter.h"
+#include "Poco/SimpleFileChannel.h"
+#include "Poco/FileChannel.h"
+#include "Poco/LogStream.h"
 
 #include "util.h"
 #include "Image.h"

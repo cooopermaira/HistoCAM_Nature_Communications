@@ -29,7 +29,7 @@ protected:
 
   void initialize(Application& self){
     Application::initialize(self);
-    if(!_helpRequested){ bcam = new BatchCam(configPtr(), logger()); }
+    if(!_helpRequested){ bcam = new BatchCam(configPtr()); }
   }
   
   void uninitialize(){

@@ -14,10 +14,13 @@ using Poco::Path;
 using Poco::Util::XMLConfiguration;
 using Poco::Util::LayeredConfiguration;
 using Poco::Logger;
+using Poco::LogStream;
 using Poco::Environment;
+using Poco::FileChannel;
 
-BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
-  logger = &Applogger;
+BatchCam::BatchCam(LayeredConfiguration::Ptr config){
+  logger = &Logger::get("PathCamLogger");
+  
   logger->information(Poco::format("System OS: %s", Environment::osDisplayName()));
   logger->information(Poco::format("System Arch: %s", Environment::osArchitecture()));
   logger->information(Poco::format("System OS: %u\n", Environment::processorCount()));
@@ -33,11 +36,12 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
   matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   estimator_type = RANSAC;
   threads = 1;
-
+  
   if(!parseConfig(config)){
     logger->fatal("Problem parsing XML. Exiting...");
     exit(-1);
   }
+  
   
   mempool.resize(threads);
    
@@ -472,16 +476,20 @@ public:
   }
   
   bool registration(unsigned int thread_id){
-    std::ofstream outfile;
-    std::stringstream ss;
-    ss << thread_id;
+    
+    Logger::Ptr results_logger = NULL;
     
     if(parent->output_log.toString() != ""){
-      outfile.open(parent->output_log.toString() + ss.str());
+      results_logger = &Logger::get("ResultsLogger" + Poco::format("%u",thread_id));
+      AutoPtr<FileChannel> pChannel(new FileChannel);
+      Path temp = Path(parent->output_log);
+      temp.setBaseName(temp.getBaseName() + Poco::format("%u",thread_id));
+      pChannel->setProperty("path", temp.toString());
+      pChannel->setProperty("rotateOnOpen", "true");
+      results_logger->setChannel(pChannel);
     }
     
-    
-    
+
     unsigned int num_images = (unsigned int)parent->images.size()/parent->threads;
     int start = (thread_id*num_images)-1;
     int end = (thread_id+1)*num_images;
@@ -491,6 +499,8 @@ public:
     unsigned int last_index = start;
 
     for(unsigned int i=start; i < end; i++){
+      string outfile = "";
+
       
       if(i==0){
           parent->reg_results[0] = RegInfo(true, Vec2(0, 0));
@@ -506,9 +516,9 @@ public:
         continue;
       }
       
-      if(parent->output_log.toString() != ""){
-        outfile << last_registered->get_ImageFile().toString() << "\t";
-        outfile << next_image->get_ImageFile().toString() << "\t";
+      if(results_logger){
+        outfile += last_registered->get_ImageFile().toString() + "\t";
+        outfile += next_image->get_ImageFile().toString()+ "\t";
       }
       
       auto begin = std::chrono::high_resolution_clock::now();
@@ -528,7 +538,7 @@ public:
       }
       
       if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
-        if(parent->output_log.toString() != ""){ outfile << "failed. Not enough keypoints\n"; }
+        if(results_logger){  results_logger->information(outfile + "failed. Not enough keypoints"); }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
         continue;
       }
@@ -543,32 +553,33 @@ public:
       auto end = std::chrono::high_resolution_clock::now();
       auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
       
-      if(parent->output_log.toString() != ""){
-        outfile << last_registered->keypoints.size() << "\t";
-        outfile << next_image->keypoints.size() << "\t";
+      if(results_logger){
+        outfile += Poco::format("%u\t", (unsigned int)last_registered->keypoints.size());
+        outfile += Poco::format("%u\t", (unsigned int)next_image->keypoints.size());
       }
       
       
       if(result == 1){
-        if(parent->output_log.toString() != ""){
-          outfile << m->t_x << "\t" << m->t_y << "\t";
-          outfile << elapsed.count() * 1e-9 << "\n";
+        if(results_logger){
+            results_logger->information(outfile +
+                                              Poco::format("%f\t%f\t", m->t_x, m->t_y) +
+                                              Poco::format("%f", elapsed.count() * 1e-9));
         }
         parent->reg_results[i+1] = RegInfo(true, Vec2(m->t_x, m->t_y));
         parent->matchM.match[i+1][last_index] = new pathCam::Match(m);
         last_index = i+1;
       }
       if(result == -1){
-        if(parent->output_log.toString() != ""){
-          outfile << "failed. Not enough matches\n";
+        if(results_logger){
+          results_logger->information(outfile + "failed. Not enough matches.");
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
         delete m;
         parent->matchM.match[last_index][i+1] = NULL;
       }
       if(result == -2){
-        if(parent->output_log.toString() != ""){
-          outfile << "failed.  Not enough keypoints.\n";
+        if(results_logger){
+          results_logger->information(outfile + "failed. Not enough keypoints.");
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
         delete m;
@@ -581,10 +592,6 @@ public:
       last_registered->free_memory_RAW();
       next_image->free_memory_RAW();
         
-    }
-
-    if(parent->output_log.toString() != ""){
-      outfile.close();
     }
 
     return true;

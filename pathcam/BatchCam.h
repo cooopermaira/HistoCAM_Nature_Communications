@@ -57,7 +57,7 @@ private:
 
 
 public:
-  BatchCam(Poco::Util::LayeredConfiguration::Ptr config, Poco::Logger &Applogger);
+  BatchCam(Poco::Util::LayeredConfiguration::Ptr config);
   
   ~BatchCam(){
     
