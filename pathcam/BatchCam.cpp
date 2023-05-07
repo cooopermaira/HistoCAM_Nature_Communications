@@ -36,11 +36,14 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config){
   matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   estimator_type = RANSAC;
   threads = 1;
+  results_logger = NULL;
+
   
   if(!parseConfig(config)){
     logger->fatal("Problem parsing XML. Exiting...");
     exit(-1);
   }
+
   
   
   mempool.resize(threads);
@@ -132,7 +135,13 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         temp_log.clear();
       }
       
-      if(temp_log.toString() != ""){ output_log = temp_log; }
+      if(temp_log.toString() != ""){
+        results_logger = &Logger::get("ResultsLogger");
+        AutoPtr<FileChannel> pChannel(new FileChannel);
+        pChannel->setProperty("path", temp_log.toString());
+        pChannel->setProperty("rotateOnOpen", "true");
+        results_logger->setChannel(pChannel);
+      }
       
     }else{
       logger->warning("No output log supplied. No registration output.");
@@ -477,19 +486,6 @@ public:
   
   bool registration(unsigned int thread_id){
     
-    Logger::Ptr results_logger = NULL;
-    
-    if(parent->output_log.toString() != ""){
-      results_logger = &Logger::get("ResultsLogger" + Poco::format("%u",thread_id));
-      AutoPtr<FileChannel> pChannel(new FileChannel);
-      Path temp = Path(parent->output_log);
-      temp.setBaseName(temp.getBaseName() + Poco::format("%u",thread_id));
-      pChannel->setProperty("path", temp.toString());
-      pChannel->setProperty("rotateOnOpen", "true");
-      results_logger->setChannel(pChannel);
-    }
-    
-
     unsigned int num_images = (unsigned int)parent->images.size()/parent->threads;
     int start = (thread_id*num_images)-1;
     int end = (thread_id+1)*num_images;
@@ -499,8 +495,8 @@ public:
     unsigned int last_index = start;
 
     for(unsigned int i=start; i < end; i++){
-      string outfile = "";
 
+      string outfile = Poco::format("%u\t", thread_id);
       
       if(i==0){
           parent->reg_results[0] = RegInfo(true, Vec2(0, 0));
@@ -516,7 +512,7 @@ public:
         continue;
       }
       
-      if(results_logger){
+      if(parent->results_logger){
         outfile += last_registered->get_ImageFile().toString() + "\t";
         outfile += next_image->get_ImageFile().toString()+ "\t";
       }
@@ -538,7 +534,7 @@ public:
       }
       
       if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
-        if(results_logger){  results_logger->information(outfile + "failed. Not enough keypoints"); }
+        if(parent->results_logger){  parent->results_logger->information(outfile + "failed. Not enough keypoints"); }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
         continue;
       }
@@ -553,15 +549,15 @@ public:
       auto end = std::chrono::high_resolution_clock::now();
       auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
       
-      if(results_logger){
+      if(parent->results_logger){
         outfile += Poco::format("%u\t", (unsigned int)last_registered->keypoints.size());
         outfile += Poco::format("%u\t", (unsigned int)next_image->keypoints.size());
       }
       
       
       if(result == 1){
-        if(results_logger){
-            results_logger->information(outfile +
+        if(parent->results_logger){
+          parent->results_logger->information(outfile +
                                               Poco::format("%f\t%f\t", m->t_x, m->t_y) +
                                               Poco::format("%f", elapsed.count() * 1e-9));
         }
@@ -570,16 +566,16 @@ public:
         last_index = i+1;
       }
       if(result == -1){
-        if(results_logger){
-          results_logger->information(outfile + "failed. Not enough matches.");
+        if(parent->results_logger){
+          parent->results_logger->information(outfile + "failed. Not enough matches.");
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
         delete m;
         parent->matchM.match[last_index][i+1] = NULL;
       }
       if(result == -2){
-        if(results_logger){
-          results_logger->information(outfile + "failed. Not enough keypoints.");
+        if(parent->results_logger){
+          parent->results_logger->information(outfile + "failed. Not enough keypoints.");
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
         delete m;

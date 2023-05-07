@@ -12,6 +12,7 @@
 
 using Poco::MemoryPool;
 using Poco::Path;
+using Poco::Logger;
 
 namespace pathCam{
 
@@ -21,12 +22,12 @@ class BatchCam{
   
 private:
   std::vector <MemoryPool *> mempool;
-  Poco::Logger *logger;
+  Logger *logger;
+  Logger::Ptr results_logger;
   unsigned int threads;
   
   
   Poco::Path input_images;
-  Poco::Path output_log;
   Poco::Path out_image;
   
   //Registration Params
