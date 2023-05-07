@@ -10,6 +10,7 @@ OPTION(BUILD_DEBAYER "" OFF)
 OPTION(BUILD_POCO_TEST "" OFF)
 OPTION(BUILD_TEST "" OFF)
 OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
+OPTION(BUILD_SPINNAKER "" ON)
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -79,24 +80,32 @@ ENDIF()
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
-IF(APPLE)
-  IF(EXISTS "/Applications/Spinnaker")
-	 MESSAGE(STATUS "Spinnaker directory found")
-    SET(BUILD_SPINNAKER ON)
-    add_compile_definitions(WITH_SPINNAKER)
-    include_directories( "/Applications/Spinnaker/include" )
-    SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
-                    "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
-                    "/Applications/Spinnaker/lib/libSpinVideo.dylib")
+IF(BUILD_SPINNAKER)
+  IF(APPLE)
+    IF(EXISTS "/Applications/Spinnaker")
+      MESSAGE(STATUS "Spinnaker directory found")
+    
+      add_compile_definitions(WITH_SPINNAKER)
+      include_directories( "/Applications/Spinnaker/include" )
+      SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
+                      "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
+                      "/Applications/Spinnaker/lib/libSpinVideo.dylib")
+  ELSEIF()
+      MESSAGE(WARNING "Spinnaker directory not found")
+      SET(BUILD_SPINNAKER "" OFF)
   ENDIF()
-ELSEIF(WINDOWS)
-  IF(EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
-     MESSAGE(STATUS "Spinnaker directory found")
-     SET(BUILD_SPINNAKER "" ON)
-     include_directories( "C:/Program Files/FLIR Systems/Spinnaker/include" )
-     SET(SPINNAKER_LIBRARIES "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/Spinnaker_v140.lib"
+  ELSEIF(WINDOWS)
+    IF(EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
+      MESSAGE(STATUS "Spinnaker directory found")
+      SET(BUILD_SPINNAKER "" ON)
+      include_directories( "C:/Program Files/FLIR Systems/Spinnaker/include" )
+      SET(SPINNAKER_LIBRARIES "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/Spinnaker_v140.lib"
                              "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinUpdate_v140.lib"
                              "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinVideo_v140.lib")
+    ELSEIF()
+        MESSAGE(WARNING "Spinnaker directory not found")
+        SET(BUILD_SPINNAKER "" OFF)
+    ENDIF()
   ENDIF()
 ENDIF()
 
