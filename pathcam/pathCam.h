@@ -45,10 +45,10 @@
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
 
-#ifdef WITH_SPINNAKER
+//#ifdef WITH_SPINNAKER
 #include "Spinnaker.h"
 #include "SpinPath.h"
-#endif
+//#endif
 
 
 

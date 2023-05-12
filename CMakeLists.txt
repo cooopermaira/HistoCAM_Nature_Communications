@@ -80,15 +80,23 @@ include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 IF(APPLE)
   IF(EXISTS "/Applications/Spinnaker")
-	 MESSAGE(STATUS "Spinnaker directory found")
-    SET(BUILD_SPINNAKER ON)
-    add_compile_definitions(WITH_SPINNAKER)
+    OPTION(BUILD_SPINNAKER "" ON)
     include_directories( "/Applications/Spinnaker/include" )
     SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
                     "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
                     "/Applications/Spinnaker/lib/libSpinVideo.dylib")
   ENDIF()
+ELSEIF(WINDOWS)
+   IF(EXISTS "C:\Program Files\FLIR Systems\Spinnaker")
+    ENDIF()
 ENDIF()
+
+OPTION(BUILD_SPINNAKER "" ON)
+include_directories( "C:/Program Files/FLIR Systems/Spinnaker/include" )
+SET(SPINNAKER_LIBRARIES "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/Spinnaker_v140.lib"
+                    "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinUpdate_v140.lib"
+                    "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinVideo_v140.lib")
+
 
 IF(BUILD_SPINNAKER)
   set(CMAKE_CXX_STANDARD 14)
