@@ -52,7 +52,7 @@ protected:
         
     options.addOption(
       Option("config-file", "c", "load configuration data from a file")
-        .required(false)
+        .required(true)
         .repeatable(true)
         .argument("file")
         .callback(OptionCallback<BatchCamApp>(this, &BatchCamApp::handleConfig)));
