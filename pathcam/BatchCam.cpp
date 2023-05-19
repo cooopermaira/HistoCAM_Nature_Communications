@@ -603,7 +603,7 @@ bool BatchCam::run(){
   good = loadFileList();
   if(!good){ logger->fatal("Exiting run."); return false; }
   
-  logger->information("Performing Registration:\n");
+  logger->information(Poco::format("Performing Registration w/ %u threads\n", threads));
   auto reg_begin = std::chrono::high_resolution_clock::now();
 
   std::vector < PairRegRunnable > runnable(threads, PairRegRunnable(this));
