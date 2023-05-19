@@ -10,6 +10,8 @@ OPTION(BUILD_DEBAYER "" OFF)
 OPTION(BUILD_POCO_TEST "" OFF)
 OPTION(BUILD_TEST "" OFF)
 OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
+OPTION(BUILD_THREAD_TEST "" OFF)
+
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -160,9 +162,14 @@ IF(BUILD_POCO_TEST)
 	target_link_libraries(poco_test pathCamLib)
 ENDIF()
 
+IF(BUILD_THREAD_TEST)
+	add_executable( thread_test programs/thread_test.cpp)
+	target_link_libraries(thread_test pathCamLib)
+ENDIF()
+
 IF(BUILD_IO_TEST)
-	add_executable( image_io_test programs/image_io_test.cpp)
-	target_link_libraries(image_io_test pathCamLib)
+  add_executable( image_io_test programs/image_io_test.cpp)
+  target_link_libraries(image_io_test pathCamLib)
 ENDIF()
 
 IF(BUILD_SPINNAKER)
