@@ -7,39 +7,111 @@
 
 #include "pathCam.h"
 
+using Poco::Logger;
 
 namespace pathCam{
 
+void CameraStream::run(){
+    int result = 0;
+    
+    parent->camlogger.information("*** IMAGE ACQUISITION ***");
 
-SpinPath::SpinPath(){
+    try{
+
+      
+      parent->pCam->BeginAcquisition();
+      
+      parent->camlogger.information("Acquiring images...");
+      
+      interrupt = false;
+      
+      //Will run until killed
+      while (!interrupt){
+        try{
+
+          //pResultImage is on the camera
+          ImagePtr pResultImage = parent->pCam->GetNextImage(1000);
+          
+          if (pResultImage->IsIncomplete()){
+            parent->camlogger.warning(Poco::format("Image incomplete: %s",
+                                           Spinnaker::Image::GetImageStatusDescription(pResultImage->GetImageStatus())));
+            
+          }else{
+            
+            const size_t width = pResultImage->GetWidth();
+            const size_t height = pResultImage->GetHeight();
+            
+            pathCam::Image *image = new pathCam::Image();
+            image->copy_in(pResultImage->GetData());
+                      
+          }
+          
+          pResultImage->Release();
+          
+        }
+        catch (Spinnaker::Exception& e)
+        {
+          parent->camlogger.error("Error: %s", e.what());
+          result = -1;
+        }
+      }
+      
+      parent->pCam->EndAcquisition();
+    }
+    catch (Spinnaker::Exception& e){
+      parent->camlogger.error("Error: %s", e.what());
+      return -1;
+    }
+    
+    return result;
+    
+  }
+
+
+
+SpinPath::SpinPath():  pChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")){
+  
+  camlogger.setChannel(pChannel);
+  pChannel->setProperty("path", "camera.log");
+  pChannel->setProperty("rotation", "2 K");
+  
   // Print out current library version
   const LibraryVersion spinnakerLibraryVersion = system->GetLibraryVersion();
-  cout << "Spinnaker library version: " << spinnakerLibraryVersion.major << "." << spinnakerLibraryVersion.minor
-      << "." << spinnakerLibraryVersion.type << "." << spinnakerLibraryVersion.build << endl
-      << endl;
-
+  
+  
+  camlogger.information(Poco::format("Spinnaker library version: %u.%u.%u.%u",
+                                     spinnakerLibraryVersion.major,
+                                     spinnakerLibraryVersion.minor,
+                                     spinnakerLibraryVersion.type,
+                                     spinnakerLibraryVersion.build));
+  
+  
+  
+  
   // Retrieve list of cameras from the system
   camList = system->GetCameras();
   
   const unsigned int numCameras = camList.GetSize();
-
-  cout << "Number of cameras detected: " << numCameras << endl << endl;
-
+    
+  camlogger.information(Poco::format("Number of cameras detected: %u",
+                                     numCameras));
+  
   if (numCameras != 1){
-      // Clear camera list before releasing system
-      camList.Clear();
-
-      // Release system
-      system->ReleaseInstance();
-
-      cout << "No or multiple cameras deteched!" << endl;
+    // Clear camera list before releasing system
+    camList.Clear();
+    
+    // Release system
+    system->ReleaseInstance();
+    
+    camlogger.error("No or multiple cameras deteched!");
+    
   }
   
   pCam = nullptr;
   
   pCam = camList.GetByIndex(0);
-
-
+  
+  
 }
 
 SpinPath::~SpinPath(){
@@ -48,285 +120,248 @@ SpinPath::~SpinPath(){
   system->ReleaseInstance();
 }
 
-int SpinPath::AcquireImages(INodeMap& nodeMap, INodeMap& nodeMapTLDevice){
-    int result = 0;
+//int SpinPath::Aquisition(){
+//  int result = 0;
+//
+//  camlogger.information("*** IMAGE ACQUISITION ***");
+//
+//  try{
+//
+//
+//    pCam->BeginAcquisition();
+//
+//    camlogger.information("Acquiring images...");
+//
+//    interrupt = false;
+//
+//    //Will run until killed
+//    while (!interrupt){
+//      try{
+//
+//        //pResultImage is on the camera
+//        ImagePtr pResultImage = pCam->GetNextImage(1000);
+//
+//        if (pResultImage->IsIncomplete()){
+//          camlogger.warning(Poco::format("Image incomplete: %s",
+//                                         Spinnaker::Image::GetImageStatusDescription(pResultImage->GetImageStatus())));
+//
+//        }else{
+//
+//          const size_t width = pResultImage->GetWidth();
+//          const size_t height = pResultImage->GetHeight();
+//
+//          pathCam::Image *image = new pathCam::Image();
+//          image->copy_in(pResultImage->GetData());
+//
+//        }
+//
+//        pResultImage->Release();
+//
+//      }
+//      catch (Spinnaker::Exception& e)
+//      {
+//        camlogger.error("Error: %s", e.what());
+//        result = -1;
+//      }
+//    }
+//
+//    pCam->EndAcquisition();
+//  }
+//  catch (Spinnaker::Exception& e){
+//    camlogger.error("Error: %s", e.what());
+//    return -1;
+//  }
+//
+//  return result;
+//}
 
-    cout << endl << endl << "*** IMAGE ACQUISITION ***" << endl << endl;
+int SpinPath::FileIOThread(){
+  
+  camlogger.information("Starting File IO Thread");
+  while(!interrupt || !cache.empty()){
+    
+    cache_mutex.lock();
+    cache_element front = cache.front();
+    cache.pop();
+    cache_mutex.unlock();
+    Image * image = front.image;
+    std::string name = front.name;
 
-    try{
-        CEnumerationPtr ptrAcquisitionMode = nodeMap.GetNode("AcquisitionMode");
-        if (!IsReadable(ptrAcquisitionMode) || !IsWritable(ptrAcquisitionMode)){
-            cout << "Unable to set acquisition mode to continuous (enum retrieval). Aborting..." << endl << endl;
-            return -1;
-        }
+    //  auto myfile = std::fstream("file.binary", std::ios::out | std::ios::binary);
+    //  myfile.write(image->get_Raw(), bytes);
 
-        // Retrieve entry node from enumeration node
-        CEnumEntryPtr ptrAcquisitionModeContinuous = ptrAcquisitionMode->GetEntryByName("Continuous");
-        if (!IsReadable(ptrAcquisitionModeContinuous)){
-            cout << "Unable to get or set acquisition mode to continuous (entry retrieval). Aborting..." << endl << endl;
-            return -1;
-        }
+    //image->get_Raw()
+    //delete image;
+    
+    
+  }
+  
 
-        // Retrieve integer value from entry node
-        const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
+  camlogger.information("Stopping File IO Thread");
 
-        // Set integer value from entry node as new value of enumeration node
-        ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
-
-        cout << "Acquisition mode set to continuous..." << endl;
-
-        //
-        // Begin acquiring images
-        //
-        // *** NOTES ***
-        // What happens when the camera begins acquiring images depends on the
-        // acquisition mode. Single frame captures only a single image, multi
-        // frame captures a set number of images, and continuous captures a
-        // continuous stream of images. Because the example calls for the
-        // retrieval of 10 images, continuous mode has been set.
-        //
-        // *** LATER ***
-        // Image acquisition must be ended when no more images are needed.
-        //
-        pCam->BeginAcquisition();
-
-        cout << "Acquiring images..." << endl;
-
-        //
-        // Retrieve device serial number for filename
-        //
-        // *** NOTES ***
-        // The device serial number is retrieved in order to keep cameras from
-        // overwriting one another. Grabbing image IDs could also accomplish
-        // this.
-        //
-        gcstring deviceSerialNumber("");
-        CStringPtr ptrStringSerial = nodeMapTLDevice.GetNode("DeviceSerialNumber");
-        if (IsReadable(ptrStringSerial)){
-            deviceSerialNumber = ptrStringSerial->GetValue();
-
-            cout << "Device serial number retrieved as " << deviceSerialNumber << "..." << endl;
-        }
-        cout << endl;
-
-        // Retrieve, convert, and save images
-        const unsigned int k_numImages = 10;
-
-        //
-        // Create ImageProcessor instance for post processing images
-        //
-        ImageProcessor processor;
-
-        //
-        // Set default image processor color processing method
-        //
-        // *** NOTES ***
-        // By default, if no specific color processing algorithm is set, the image
-        // processor will default to NEAREST_NEIGHBOR method.
-        //
-        processor.SetColorProcessing(SPINNAKER_COLOR_PROCESSING_ALGORITHM_HQ_LINEAR);
-
-        for (unsigned int imageCnt = 0; imageCnt < k_numImages; imageCnt++){
-            try{
-                //
-                // Retrieve next received image
-                //
-                // *** NOTES ***
-                // Capturing an image houses images on the camera buffer. Trying
-                // to capture an image that does not exist will hang the camera.
-                //
-                // *** LATER ***
-                // Once an image from the buffer is saved and/or no longer
-                // needed, the image must be released in order to keep the
-                // buffer from filling up.
-                //
-                ImagePtr pResultImage = pCam->GetNextImage(1000);
-
-                //
-                // Ensure image completion
-                //
-                // *** NOTES ***
-                // Images can easily be checked for completion. This should be
-                // done whenever a complete image is expected or required.
-                // Further, check image status for a little more insight into
-                // why an image is incomplete.
-                //
-                if (pResultImage->IsIncomplete()){
-                    // Retrieve and print the image status description
-                    cout << "Image incomplete: " << Spinnaker::Image::GetImageStatusDescription(pResultImage->GetImageStatus())
-                        << "..." << endl
-                        << endl;
-                }else{
-
-                    const size_t width = pResultImage->GetWidth();
-                    const size_t height = pResultImage->GetHeight();
-
-                    cout << "Grabbed image " << imageCnt << ", width = " << width << ", height = " << height << endl;
-                  
-                    // Create a unique filename
-                    ostringstream filename;
-
-                    filename << "Acquisition-";
-                    if (!deviceSerialNumber.empty())
-                    {
-                        filename << deviceSerialNumber.c_str() << "-";
-                    }
-                    filename << imageCnt << ".raw";
-
-                    pResultImage->Save(filename.str().c_str(), SPINNAKER_IMAGE_FILE_FORMAT_RAW);
-
-                    cout << "Image saved at " << filename.str() << endl;
-                }
-
-                //pResultImage is on the camera, needs to be released
-                pResultImage->Release();
-
-            }
-            catch (Spinnaker::Exception& e)
-            {
-                cout << "Error: " << e.what() << endl;
-                result = -1;
-            }
-        }
-
-        //
-        // End acquisition
-        //
-        // *** NOTES ***
-        // Ending acquisition appropriately helps ensure that devices clean up
-        // properly and do not need to be power-cycled to maintain integrity.
-        //
-
-        pCam->EndAcquisition();
-    }
-    catch (Spinnaker::Exception& e){
-        cout << "Error: " << e.what() << endl;
-        return -1;
-    }
-
-    return result;
+  return 1;
 }
 
-int SpinPath::RunCamera(){
+int SpinPath::spinUpCamera(){
+
+  int result;
   
-    int result;
-
-    try{
-        // Retrieve TL device nodemap and print device information
-        INodeMap& nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
-
-        result = PrintDeviceInfo(nodeMapTLDevice);
-
-        // Initialize camera
-        pCam->Init();
-
-        // Retrieve GenICam nodemap
-        INodeMap& nodeMap = pCam->GetNodeMap();
-
-        // Configure heartbeat for GEV camera
-#ifdef _DEBUG
-        result = result | DisableGVCPHeartbeat();
-#else
-        result = result | ResetGVCPHeartbeat();
-#endif
-
-        // Acquire images
-        result = result | AcquireImages(nodeMap, nodeMapTLDevice);
-
-#ifdef _DEBUG
-        // Reset heartbeat for GEV camera
-        result = result | ResetGVCPHeartbeat();
-#endif
-
-        // Deinitialize camera
-        pCam->DeInit();
+  try{
+   
+    INodeMap& nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
+    result = PrintDeviceInfo(nodeMapTLDevice);
+    INodeMap& nodeMap = pCam->GetNodeMap();
+    
+    // Initialize camera
+    pCam->Init();
+        
+    // Configure heartbeat for GEV camera
+    result = result | ResetGVCPHeartbeat();
+    
+    CEnumerationPtr ptrAcquisitionMode = nodeMap.GetNode("AcquisitionMode");
+    if (!IsReadable(ptrAcquisitionMode) || !IsWritable(ptrAcquisitionMode)){
+      camlogger.error("Unable to set acquisition mode to continuous (enum retrieval). Aborting...");
+      return -1;
     }
-    catch (Spinnaker::Exception& e){
-        cout << "Error: " << e.what() << endl;
-        result = -1;
+    
+    // Retrieve entry node from enumeration node
+    CEnumEntryPtr ptrAcquisitionModeContinuous = ptrAcquisitionMode->GetEntryByName("Continuous");
+    if (!IsReadable(ptrAcquisitionModeContinuous)){
+      camlogger.error("Unable to get or set acquisition mode to continuous (entry retrieval). Aborting...");
+      return -1;
     }
+    
+    // Retrieve integer value from entry node
+    const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
+    
+    // Set integer value from entry node as new value of enumeration node
+    ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
+    
+    camlogger.information("Acquisition mode set to continuous...");
+    
+  }
+  catch (Spinnaker::Exception& e){
+    camlogger.error(Poco::format("Error Spinning up camera: %s", e.what()));
+    result = -1;
+  }
+  
+}
 
-    return result;
+void SpinPath::spinDownCamera(){
+  
+  try{
+    // Deinitialize camera
+    pCam->DeInit();
+  }
+  catch (Spinnaker::Exception& e){
+    camlogger.error(Poco::format("Error Spinning down camera: %s", e.what()));
+  }
+    
 }
 
 int SpinPath::ConfigureGVCPHeartbeat(bool enable){
-    // Retrieve TL device nodemap
-    INodeMap& nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
-
-    // Retrieve GenICam nodemap
-    INodeMap& nodeMap = pCam->GetNodeMap();
-
-    CEnumerationPtr ptrDeviceType = nodeMapTLDevice.GetNode("DeviceType");
-    if (!IsReadable(ptrDeviceType)){
-        return -1;
-    }
-
-    if (ptrDeviceType->GetIntValue() != DeviceType_GigEVision){
-        return 0;
-    }
-
-    if (enable){
-        cout << endl << "Resetting heartbeat..." << endl << endl;
-    }
-    else{
-        cout << endl << "Disabling heartbeat..." << endl << endl;
-    }
-
-    CBooleanPtr ptrDeviceHeartbeat = nodeMap.GetNode("GevGVCPHeartbeatDisable");
-    if (!IsWritable(ptrDeviceHeartbeat))
+  // Retrieve TL device nodemap
+  INodeMap& nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
+  
+  // Retrieve GenICam nodemap
+  INodeMap& nodeMap = pCam->GetNodeMap();
+  
+  CEnumerationPtr ptrDeviceType = nodeMapTLDevice.GetNode("DeviceType");
+  if (!IsReadable(ptrDeviceType)){
+    return -1;
+  }
+  
+  if (ptrDeviceType->GetIntValue() != DeviceType_GigEVision){
+    return 0;
+  }
+  
+  if (enable){
+    camlogger.information("Resetting heartbeat...");
+  }
+  else{
+    camlogger.information("Disabling heartbeat...");
+  }
+  
+  CBooleanPtr ptrDeviceHeartbeat = nodeMap.GetNode("GevGVCPHeartbeatDisable");
+  if (!IsWritable(ptrDeviceHeartbeat))
+  {
+    camlogger.warning("Unable to configure heartbeat. Continuing with execution as this may be non-fatal...");
+  }
+  else
+  {
+    ptrDeviceHeartbeat->SetValue(enable);
+    
+    if (!enable)
     {
-        cout << "Unable to configure heartbeat. Continuing with execution as this may be non-fatal..."
-            << endl
-            << endl;
+      camlogger.warning("WARNING: Heartbeat has been disabled for the rest of this example run.");
+      camlogger.warning("         Heartbeat will be reset upon the completion of this run.  If the ");
+      camlogger.warning("         program is aborted unexpectedly before the heartbeat is reset, the");
+      camlogger.warning("         camera may need to be power cycled to reset the heartbeat.");
     }
     else
     {
-        ptrDeviceHeartbeat->SetValue(enable);
-
-        if (!enable)
-        {
-            cout << "WARNING: Heartbeat has been disabled for the rest of this example run." << endl;
-            cout << "         Heartbeat will be reset upon the completion of this run.  If the " << endl;
-            cout << "         example is aborted unexpectedly before the heartbeat is reset, the" << endl;
-            cout << "         camera may need to be power cycled to reset the heartbeat." << endl << endl;
-        }
-        else
-        {
-            cout << "Heartbeat has been reset." << endl;
-        }
+      camlogger.information("Heartbeat has been reset.");
     }
-
-    return 0;
+  }
+  
+  return 0;
 }
 
 int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
-    int result = 0;
-    cout << endl << "*** DEVICE INFORMATION ***" << endl << endl;
-
-    try{
-        FeatureList_t features;
-        const CCategoryPtr category = nodeMap.GetNode("DeviceInformation");
-        if (IsReadable(category)){
-            category->GetFeatures(features);
-
-            for (auto it = features.begin(); it != features.end(); ++it){
-                const CNodePtr pfeatureNode = *it;
-                cout << pfeatureNode->GetName() << " : ";
-                CValuePtr pValue = static_cast<CValuePtr>(pfeatureNode);
-                cout << (IsReadable(pValue) ? pValue->ToString() : "Node not readable");
-                cout << endl;
-            }
-        }
-        else{
-            cout << "Device control information not available." << endl;
-        }
+  int result = 0;
+  
+  camlogger.information("*** DEVICE INFORMATION ***");
+  
+  try{
+    FeatureList_t features;
+    const CCategoryPtr category = nodeMap.GetNode("DeviceInformation");
+    if (IsReadable(category)){
+      category->GetFeatures(features);
+      
+      for (auto it = features.begin(); it != features.end(); ++it){
+        const CNodePtr pfeatureNode = *it;
+        
+        CValuePtr pValue = static_cast<CValuePtr>(pfeatureNode);
+        camlogger.information(Poco::format("%s : %s",
+                                           pfeatureNode->GetName(),
+                                           (IsReadable(pValue) ? pValue->ToString() : "Node not readable")));
+      }
     }
-    catch (Spinnaker::Exception& e){
-        cout << "Error: " << e.what() << endl;
-        result = -1;
+    else{
+      camlogger.warning("Device control information not available.");
     }
+  }
+  catch (Spinnaker::Exception& e){
+    camlogger.error(Poco::format("Error: %s", e.what()));
+    result = -1;
+  }
+  
+  return result;
+}
 
-    return result;
+
+int SpinPath::RunCamera(){
+  
+  int result;
+  
+  
+  //Poco::RunnableAdapter<SpinPathAbstract> runnable(greeter, &Greeter::greet);
+
+  
+  //setOSPriority(getMaxOSPriority())
+  
+  result = result | spinUpCamera();
+  
+  CameraStream cameraStream(this);
+  
+  Poco::Thread thread;
+  thread.start(cameraStream);
+  thread.join();
+  
+  //result = result | AquisitionThread();
+  spinDownCamera();
+  
+  return result;
 }
 
 

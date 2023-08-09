@@ -44,6 +44,10 @@ public:
     }
   }
   
+  void copy_in(void *buffer){
+    memcpy ( raw_buffer, buffer, width*height );
+  }
+  
   inline char * get_Raw(){ return raw_buffer;}
   
   inline Poco::Path get_ImageFile(){ return image_file;}

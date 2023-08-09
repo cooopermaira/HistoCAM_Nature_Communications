@@ -23,8 +23,8 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config){
   
   logger->information(Poco::format("System OS: %s", Environment::osDisplayName()));
   logger->information(Poco::format("System Arch: %s", Environment::osArchitecture()));
-  logger->information(Poco::format("System OS: %u\n", Environment::processorCount()));
-    
+  logger->information(Poco::format("System Processor Count: %u\n", Environment::processorCount()));
+
   //Defaults
   crop_factor = 1.0;
   scale_factor  = 1.0;
