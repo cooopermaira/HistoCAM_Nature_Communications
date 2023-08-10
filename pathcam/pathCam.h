@@ -38,6 +38,7 @@
 #include "Poco/FileChannel.h"
 #include "Poco/LogStream.h"
 #include "Poco/Process.h"
+#include "Poco/DateTime.h"
 
 #include "util.h"
 #include "Image.h"

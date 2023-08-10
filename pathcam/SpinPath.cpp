@@ -43,6 +43,24 @@ void CameraStream::run(){
             
             pathCam::Image *image = new pathCam::Image();
             image->copy_in(pResultImage->GetData());
+            
+            Poco::DateTime time = Poco::DateTime();
+            
+            std::stringstream ss;
+            ss << time.year() << time.month();
+            ss << time.day() << time.hour();
+            ss << time.minute() << time.millisecond();
+            
+            cache_element image_in_cache;
+            image_in_cache.image = image;
+            image_in_cache.name = ss.str();
+            
+            parent->cache_mutex.lock();
+            
+            parent->cache.push(image_in_cache);
+            
+            parent->cache_mutex.unlock();
+            
                       
           }
           
@@ -67,7 +85,32 @@ void CameraStream::run(){
     
   }
 
+void FileStream::run(){
+  
+  parent->camlogger.information("*** FILE IO ***");
+  
+  while(!interrupt || !parent->thread_safe_cache_empty()){
+    
+    parent->cache_mutex.lock();
+    cache_element front = parent->cache.front();
+    parent->cache.pop();
+    parent->cache_mutex.unlock();
+    Image * image = front.image;
+    std::string name = front.name + ".raw";
+    
+    size_t image_bytes = image->width*image->height;
+    Poco::Path image_path = parent->getRootPath();
+    image_path.append(Poco::Path(name));
 
+    auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
+    myfile.write(image->get_Raw(), image_bytes);
+    
+    parent->camlogger.information(Poco::format("Wrote: %s", image_path.toString()));
+    
+    delete image;
+  }
+  
+}
 
 SpinPath::SpinPath():  pChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")){
   
@@ -175,32 +218,32 @@ SpinPath::~SpinPath(){
 //  return result;
 //}
 
-int SpinPath::FileIOThread(){
-  
-  camlogger.information("Starting File IO Thread");
-  while(!interrupt || !cache.empty()){
-    
-    cache_mutex.lock();
-    cache_element front = cache.front();
-    cache.pop();
-    cache_mutex.unlock();
-    Image * image = front.image;
-    std::string name = front.name;
-
-    //  auto myfile = std::fstream("file.binary", std::ios::out | std::ios::binary);
-    //  myfile.write(image->get_Raw(), bytes);
-
-    //image->get_Raw()
-    //delete image;
-    
-    
-  }
-  
-
-  camlogger.information("Stopping File IO Thread");
-
-  return 1;
-}
+//int SpinPath::FileIOThread(){
+//
+//  camlogger.information("Starting File IO Thread");
+//  while(!interrupt || !cache.empty()){
+//
+//    cache_mutex.lock();
+//    cache_element front = cache.front();
+//    cache.pop();
+//    cache_mutex.unlock();
+//    Image * image = front.image;
+//    std::string name = front.name;
+//
+//    //  auto myfile = std::fstream("file.binary", std::ios::out | std::ios::binary);
+//    //  myfile.write(image->get_Raw(), bytes);
+//
+//    //image->get_Raw()
+//    //delete image;
+//
+//
+//  }
+//
+//
+//  camlogger.information("Stopping File IO Thread");
+//
+//  return 1;
+//}
 
 int SpinPath::spinUpCamera(){
 
@@ -353,10 +396,19 @@ int SpinPath::RunCamera(){
   result = result | spinUpCamera();
   
   CameraStream cameraStream(this);
+  FileStream fileStream(this);
+
   
-  Poco::Thread thread;
-  thread.start(cameraStream);
-  thread.join();
+  Poco::Thread thread_cam, thread_file;
+  thread_cam.start(cameraStream);
+  thread_file.start(fileStream);
+
+  sleep(5000);
+  cameraStream.interrupt = true;
+  fileStream.interrupt = true;
+  
+  thread_cam.join();
+  thread_file.join();
   
   //result = result | AquisitionThread();
   spinDownCamera();

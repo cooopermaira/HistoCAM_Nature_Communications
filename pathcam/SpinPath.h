@@ -23,6 +23,12 @@ namespace pathCam{
 
 class SpinPath;
 
+typedef struct cache_element{
+  pathCam::Image * image;
+  std::string name;
+} cache_element;
+
+
 class CameraStream: public Poco::Runnable{
 public:
   SpinPath * parent;
@@ -32,11 +38,18 @@ public:
 };
 
 
-
+class FileStream: public Poco::Runnable{
+public:
+  SpinPath * parent;
+  bool interrupt;
+  FileStream(SpinPath * parent): parent(parent) {};
+  virtual void run();
+};
 
 
 class SpinPath{
   friend class CameraStream;
+  friend class FileStream;
 private:
   CameraPtr pCam;
   SystemPtr system;
@@ -49,12 +62,15 @@ private:
   
   Poco::FastMutex cache_mutex;
   
-  typedef struct cache_element{
-    pathCam::Image * image;
-    std::string name;
-  } cache_element;
-  
   std::queue < cache_element > cache;
+  
+  bool thread_safe_cache_empty(){
+    bool result;
+    cache_mutex.lock();
+    result = cache.empty();
+    cache_mutex.unlock();
+    return result;
+  }
   
 public:
   
