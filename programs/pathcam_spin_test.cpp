@@ -14,7 +14,7 @@ int main( int argc, char* argv[] ){
   
   SpinPath *camera = new SpinPath();
   
-  Poco::Path root_path = Poco::Path("/Users/bsumma/Documents/pcamTest");
+  Poco::Path root_path = Poco::Path("D:/pcamTest");
   
   camera->setRootPath(root_path);
   

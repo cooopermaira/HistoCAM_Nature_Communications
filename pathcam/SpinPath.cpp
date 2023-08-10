@@ -123,6 +123,8 @@ SpinPath::SpinPath():  camChannel(new SimpleFileChannel), camlogger(Logger::get(
   IOChannel->setProperty("path", "IO.log");
   IOChannel->setProperty("rotation", "2 K");
 
+  system = System::GetInstance();
+
   
   // Print out current library version
   const LibraryVersion spinnakerLibraryVersion = system->GetLibraryVersion();
