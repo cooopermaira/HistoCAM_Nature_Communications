@@ -408,10 +408,12 @@ int SpinPath::RunCamera(){
 
   
   Poco::Thread thread_cam, thread_file;
+  thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
+  thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
   thread_cam.start(cameraStream);
   thread_file.start(fileStream);
 
-  sleep(5000);
+  Poco::Thread::sleep(5000);
   cameraStream.interrupt = true;
   fileStream.interrupt = true;
   
