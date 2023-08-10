@@ -12,8 +12,7 @@ using Poco::Logger;
 namespace pathCam{
 
 void CameraStream::run(){
-    int result = 0;
-    
+  
     parent->camlogger.information("*** IMAGE ACQUISITION ***");
 
     try{
@@ -70,7 +69,6 @@ void CameraStream::run(){
         catch (Spinnaker::Exception& e)
         {
           parent->camlogger.error("Error: %s", e.what());
-          result = -1;
         }
       }
       
@@ -78,11 +76,9 @@ void CameraStream::run(){
     }
     catch (Spinnaker::Exception& e){
       parent->camlogger.error("Error: %s", e.what());
-      return -1;
+      return;
     }
-    
-    return result;
-    
+        
   }
 
 void FileStream::run(){
@@ -124,7 +120,6 @@ SpinPath::SpinPath():  camChannel(new SimpleFileChannel), camlogger(Logger::get(
   IOChannel->setProperty("rotation", "2 K");
 
   system = System::GetInstance();
-
   
   // Print out current library version
   const LibraryVersion spinnakerLibraryVersion = system->GetLibraryVersion();
@@ -261,10 +256,12 @@ int SpinPath::spinUpCamera(){
    
     INodeMap& nodeMapTLDevice = pCam->GetTLDeviceNodeMap();
     result = PrintDeviceInfo(nodeMapTLDevice);
-    INodeMap& nodeMap = pCam->GetNodeMap();
     
     // Initialize camera
     pCam->Init();
+    
+    INodeMap& nodeMap = pCam->GetNodeMap();
+
         
     // Configure heartbeat for GEV camera
     result = result | ResetGVCPHeartbeat();
@@ -395,12 +392,7 @@ int SpinPath::RunCamera(){
   
   int result;
   
-  
-  //Poco::RunnableAdapter<SpinPathAbstract> runnable(greeter, &Greeter::greet);
-
-  
-  //setOSPriority(getMaxOSPriority())
-  
+    
   result = result | spinUpCamera();
   
   CameraStream cameraStream(this);
@@ -420,7 +412,6 @@ int SpinPath::RunCamera(){
   thread_cam.join();
   thread_file.join();
   
-  //result = result | AquisitionThread();
   spinDownCamera();
   
   return result;
