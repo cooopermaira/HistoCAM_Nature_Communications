@@ -63,7 +63,7 @@ void printConfig(LayeredConfiguration::Ptr config)
 
 int main(int argc, char** argv){
   
-  Path input_path = Path("../../../resources/poco_test.xml");
+  Path input_path = Path("../../../resources/config_example.xml");
 
   AutoPtr<XMLConfiguration> pConf(new XMLConfiguration(input_path.toString()));
   

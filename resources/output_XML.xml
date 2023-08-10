@@ -1,0 +1,26 @@
+<config>
+	<processing threads="1"/>
+	<io>
+		<input_images>/Users/bsumma/Library/CloudStorage/Box-Box/PathCam/test_data/raw/process_test.txt</input_images>
+		<output_log>/Users/bsumma/log.txt</output_log>
+		<output_image>/Users/bsumma/result.png</output_image>
+	</io>
+	<registration>
+		<detector>
+			<features>
+				<type>ORB</type>
+				<params WTA_K="2" edgeThreshold="31" fastThreshold="20" firstLevel="0" nfeatures="500" nlevels="1" patchSize="31" scaleFactor="1.0" scoreType="HARRIS_SCORE"/>
+			</features>
+			<FREAK>False</FREAK>
+		</detector>
+		<image>
+			<crop>0.5</crop>
+			<scale>0.25</scale>
+			<interpolation>CUBIC</interpolation>
+			<real>false</real>
+			<debayer>true</debayer>
+		</image>
+		<matcher>BRUTEFORCE_HAMMING</matcher>
+		<estimator>RANSAC</estimator>
+	</registration>
+</config>
