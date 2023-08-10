@@ -58,7 +58,11 @@ private:
   Poco::Path root_path;
   
   Logger& camlogger;
-  AutoPtr<SimpleFileChannel> pChannel;
+  AutoPtr<SimpleFileChannel> camChannel;
+  
+  Logger& IOlogger;
+  AutoPtr<SimpleFileChannel> IOChannel;
+ 
   
   Poco::FastMutex cache_mutex;
   

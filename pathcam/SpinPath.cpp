@@ -87,7 +87,7 @@ void CameraStream::run(){
 
 void FileStream::run(){
   
-  parent->camlogger.information("*** FILE IO ***");
+  parent->IOlogger.information("*** FILE IO ***");
   
   while(!interrupt || !parent->thread_safe_cache_empty()){
     
@@ -105,18 +105,24 @@ void FileStream::run(){
     auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
     myfile.write(image->get_Raw(), image_bytes);
     
-    parent->camlogger.information(Poco::format("Wrote: %s", image_path.toString()));
+    parent->IOlogger.information(Poco::format("Wrote: %s", image_path.toString()));
     
     delete image;
   }
   
 }
 
-SpinPath::SpinPath():  pChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")){
-  
-  camlogger.setChannel(pChannel);
-  pChannel->setProperty("path", "camera.log");
-  pChannel->setProperty("rotation", "2 K");
+SpinPath::SpinPath():  camChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")),
+                       IOChannel(new SimpleFileChannel), IOlogger(Logger::get("IOLogger"))
+{
+  camlogger.setChannel(camChannel);
+  camChannel->setProperty("path", "camera.log");
+  camChannel->setProperty("rotation", "2 K");
+                         
+  IOlogger.setChannel(IOChannel);
+  IOChannel->setProperty("path", "IO.log");
+  IOChannel->setProperty("rotation", "2 K");
+
   
   // Print out current library version
   const LibraryVersion spinnakerLibraryVersion = system->GetLibraryVersion();
