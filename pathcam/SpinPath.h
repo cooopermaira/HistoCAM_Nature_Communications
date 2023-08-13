@@ -56,6 +56,7 @@ private:
   CameraList camList;
   
   Poco::Path root_path;
+  string captureSetName;
   
   Logger& camlogger;
   AutoPtr<SimpleFileChannel> camChannel;
@@ -68,10 +69,10 @@ private:
   
   std::queue < cache_element > cache;
   
-  bool thread_safe_cache_empty(){
-    bool result;
+  size_t thread_safe_cache_size(){
+    size_t result;
     cache_mutex.lock();
-    result = cache.empty();
+    result = cache.size();
     cache_mutex.unlock();
     return result;
   }
@@ -82,7 +83,7 @@ public:
   ~SpinPath();
   int RunCamera();
   
-  
+  void newCaptureSet();
   
   void setRootPath(Poco::Path _root_path){ root_path = _root_path; }
   Poco::Path getRootPath(){ return root_path; }
@@ -94,7 +95,6 @@ private:
   bool interrupt;
     
   int spinUpCamera();
-  int FileIOThread();
   
   void spinDownCamera();
   

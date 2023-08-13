@@ -90,7 +90,7 @@ void FileStream::run(){
 
   Poco::Thread::sleep(100);
   
-  while(!interrupt || !parent->thread_safe_cache_empty()){
+  while(!interrupt || parent->thread_safe_cache_size() != 0){
 
       parent->IOlogger.information("loading next image");
     
@@ -103,7 +103,8 @@ void FileStream::run(){
     
     size_t image_bytes = image->width*image->height;
     Poco::Path image_path = parent->getRootPath();
-    image_path.append(Poco::Path(name));
+    image_path.pushDirectory(parent->captureSetName);
+    image_path.setFileName(name);
 
     auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
     myfile.write(image->get_Raw(), image_bytes);
@@ -424,5 +425,24 @@ int SpinPath::RunCamera(){
   return result;
 }
 
+
+void SpinPath::newCaptureSet(){
+  
+  Poco::DateTime time = Poco::DateTime();
+  
+  std::stringstream ss;
+  ss << time.year() << time.month();
+  ss << time.day() << time.hour();
+  ss << time.minute() << time.millisecond();
+  
+  captureSetName = ss.str();
+  
+  Poco::Path capture_path = getRootPath();
+  capture_path.pushDirectory(captureSetName);
+  
+  Poco::File tmpDir(capture_path);
+  tmpDir.createDirectories();
+  
+}
 
 }
