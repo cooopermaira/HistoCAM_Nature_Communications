@@ -103,7 +103,9 @@ void FileStream::run(){
     
     size_t image_bytes = image->width*image->height;
     Poco::Path image_path = parent->getRootPath();
+    parent->caputure_set_mutex.lock();
     image_path.pushDirectory(parent->captureSetName);
+    parent->caputure_set_mutex.unlock();
     image_path.setFileName(name);
 
     auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
@@ -398,7 +400,7 @@ int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
 
 int SpinPath::RunCamera(){
   
-  int result;
+  int result = 0;
   
     
   result = result | spinUpCamera();
@@ -435,6 +437,7 @@ void SpinPath::newCaptureSet(){
   ss << time.day() << time.hour();
   ss << time.minute() << time.millisecond();
   
+  caputure_set_mutex.lock();
   captureSetName = ss.str();
   
   Poco::Path capture_path = getRootPath();
@@ -442,6 +445,9 @@ void SpinPath::newCaptureSet(){
   
   Poco::File tmpDir(capture_path);
   tmpDir.createDirectories();
+  
+  caputure_set_mutex.unlock();
+
   
 }
 

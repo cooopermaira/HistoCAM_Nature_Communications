@@ -66,6 +66,7 @@ private:
  
   
   Poco::FastMutex cache_mutex;
+  Poco::FastMutex caputure_set_mutex;
   
   std::queue < cache_element > cache;
   
