@@ -45,6 +45,7 @@ public:
   }
   
   void copy_in(void *buffer){
+    allocate_memory_RAW();
     memcpy ( raw_buffer, buffer, width*height );
   }
   

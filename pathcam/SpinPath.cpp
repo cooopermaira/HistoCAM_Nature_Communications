@@ -39,7 +39,7 @@ void CameraStream::run(){
             
             const size_t width = pResultImage->GetWidth();
             const size_t height = pResultImage->GetHeight();
-            
+            parent->camlogger.information(Poco::format("Got image: %u %u", (unsigned int)width, (unsigned int)height));
             pathCam::Image *image = new pathCam::Image();
             image->copy_in(pResultImage->GetData());
             
@@ -50,12 +50,15 @@ void CameraStream::run(){
             ss << time.day() << time.hour();
             ss << time.minute() << time.millisecond();
             
+            parent->camlogger.information(Poco::format("%s", ss.str()));
+
             cache_element image_in_cache;
             image_in_cache.image = image;
             image_in_cache.name = ss.str();
             
             parent->cache_mutex.lock();
-            
+            parent->camlogger.information("Put on Queue");
+
             parent->cache.push(image_in_cache);
             
             parent->cache_mutex.unlock();
@@ -84,8 +87,12 @@ void CameraStream::run(){
 void FileStream::run(){
   
   parent->IOlogger.information("*** FILE IO ***");
+
+  Poco::Thread::sleep(100);
   
   while(!interrupt || !parent->thread_safe_cache_empty()){
+
+      parent->IOlogger.information("loading next image");
     
     parent->cache_mutex.lock();
     cache_element front = parent->cache.front();
