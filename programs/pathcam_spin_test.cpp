@@ -18,6 +18,8 @@ int main( int argc, char* argv[] ){
   
   camera->setRootPath(root_path);
   
+  camera->newCaptureSet();
+  
   camera->RunCamera();
   
   delete camera;

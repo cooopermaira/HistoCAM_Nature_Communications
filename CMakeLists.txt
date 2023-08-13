@@ -11,6 +11,7 @@ OPTION(BUILD_POCO_TEST "" OFF)
 OPTION(BUILD_TEST "" OFF)
 OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
 OPTION(BUILD_THREAD_TEST "" OFF)
+OPTION(BUILD_PATHCAM_GUI "" ON)
 
 
 find_package(Git QUIET)
@@ -187,4 +188,9 @@ ENDIF()
 IF(BUILD_NANOGUI_EXAMPLE)
   add_executable( nanogui_example nanogui/src/example1.cpp)
   target_link_libraries(nanogui_example nanogui pathCamLib)
+ENDIF()
+
+IF(BUILD_PATHCAM_GUI)
+  add_executable(pathCam programs/pathCam_GUI.cpp)
+  target_link_libraries(pathCam nanogui pathCamLib)
 ENDIF()
