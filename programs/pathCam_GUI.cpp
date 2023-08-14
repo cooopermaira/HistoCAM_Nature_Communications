@@ -30,9 +30,13 @@ using namespace pathCam;
 
 class ExampleApplication : public Screen {
   nanogui::ref<Window> capture_window;
-  SpinPath *camera;
   Button *capture_button;
+//  Button *circleButton;
   bool capturing;
+  
+#ifdef WITH_SPINNAKER
+  SpinPath *camera;
+#endif
   
 public:
   ExampleApplication() : Screen(Vector2i(512, 768), "pathCam") {
@@ -53,17 +57,21 @@ public:
     });
                            
     perform_layout();
-    
+
+#ifdef WITH_SPINNAKER
     camera = new SpinPath();
     Poco::Path root_path = Poco::Path("D:/pcamTest");
     camera->setRootPath(root_path);
     camera->newCaptureSet();
+#endif
     capturing = false;
 
   }
   
   ~ExampleApplication(){
+#ifdef WITH_SPINNAKER
     delete camera;
+#endif
   }
   
   void openCaptureWindow() {
@@ -73,20 +81,30 @@ public:
 
     
     Button * b = new Button(capture_window, "New Capture Set");
-    b->set_callback([this] { camera->newCaptureSet(); });
+    b->set_callback([this] {
+#ifdef WITH_SPINNAKER
+      camera->newCaptureSet();
+#endif
+    });
     new Label(capture_window, "", "sans-bold");
-    
+//    Widget * tools = new Widget(capture_window);
+//    tools->set_layout(new BoxLayout(Orientation::Horizontal,
+//                                   Alignment::Middle, 0, 6));
     capture_button = new Button(capture_window, "Capture");
     capture_button->set_flags(Button::ToggleButton);
+    if(capturing){ capture_button->set_pushed(true); }
     capture_button->set_change_callback([this](bool state) {
+#ifdef WITH_SPINNAKER
       if(state){
-        capturing = true;
-        camera->startCamera();
+        capturing = camera->startCamera();
       }else{
         capturing = false;
         camera->stopCamera();
       }
+#endif
     });
+    
+
     perform_layout();
     
   }
@@ -100,18 +118,45 @@ public:
       return true;
     }
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS){
-      capture_button->set_pushed(true);
+      if(capturing){
+        if(capture_button){ capture_button->set_pushed(false); }
+        capturing = false;
+#ifdef WITH_SPINNAKER
+        camera->stopCamera();
+#endif
+      }else{
+        if(capture_button){ capture_button->set_pushed(true); }
+        capturing = true;
+#ifdef WITH_SPINNAKER
+        camera->startCamera();
+#endif
+      }
       return true;
     }
     return false;
   }
   
-  virtual void draw(NVGcontext *ctx) {
+  virtual void draw(NVGcontext *ctx) override {
     /* Animate the scrollbar */
     //        m_progress->set_value(std::fmod((float) glfwGetTime() / 10, 1.0f));
     
     /* Draw the user interface */
     Screen::draw(ctx);
+    
+//    if(circleButton){
+//      nvgBeginPath(ctx);
+//      nvgCircle(ctx, capture_window->position().x() + circleButton->position().x() + circleButton->width() / 2.0f,
+//                capture_window->position().y() + circleButton->position().y() + circleButton->height() / 2.0f,
+//                20.0f);
+//      
+//      if (capturing) {
+//        nvgFillColor(ctx, nvgRGBf(0.0f, 1.0f, 0.0f)); // Green color
+//      } else {
+//        nvgFillColor(ctx, nvgRGBf(1.0f, 0.0f, 0.0f)); // Red color
+//      }
+//      
+//      nvgFill(ctx);
+//    }
   }
   
 
