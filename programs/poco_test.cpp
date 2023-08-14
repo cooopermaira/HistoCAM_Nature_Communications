@@ -7,68 +7,55 @@
 
 #include "pathCam.h"
 
-#include "Poco/ThreadPool.h"
-#include "Poco/Runnable.h"
 #include <iostream>
 
 using namespace pathCam;
 
-class ThreadQueue{
-private:
-  Poco::ThreadPool *pool;
-  std::queue < Poco::Runnable * > jobQueue;
 
-public:
-  ThreadQueue(int min_threads, int max_threads){
-    pool = new Poco::ThreadPool(min_threads,max_threads,60,POCO_THREAD_STACK_SIZE);
-  }
-  
-  bool run_jobs(std::vector < Poco::Runnable * > jobs){
-    for(unsigned int i=0; i < jobs.size(); i++){
-      jobQueue.push(jobs[i]);
-    }
-      
-    while(!jobQueue.empty()){
-      if(pool->available() > 0){
-        pool->start(*jobQueue.front());
-        jobQueue.pop();
-      }else{
-        Poco::Thread::sleep(100);
-      }
-    }
-    
-    pool->joinAll();
-  }
+typedef struct cache_element{
+  std::string name;
+} cache_element;
 
-  
-};
-
-
-class HelloRunnable: public Poco::Runnable{
-private:
-  Image * image;
-
-public:
-  
-  HelloRunnable(Image * image): image(image){};
-
-  virtual void run(){
-    
-    Poco::Thread::sleep(int(rand()/RAND_MAX * 100));
-    image->load_raw_from_disk();
-    image->create_reg_image(1.0, 1.0);
-    assert(image->get_Raw() != 0);
-    Poco::Thread::sleep(int(rand()/RAND_MAX * 100));
-    
-    
-//    Poco::Thread::sleep(5000);
-//    std::cout << temp << std::endl;
-  }
-    
-};
 
 
 int main(int argc, char** argv){
+  
+  
+  Poco::DateTime time = Poco::DateTime();
+  
+  std::stringstream ss1;
+  ss1 << time.year() << time.month();
+  ss1 << time.day() << time.hour();
+  ss1 << time.minute() << time.millisecond();
+  
+  std::string captureSetName = ss1.str();
+  
+  
+  std::queue < cache_element > cache;
+  Poco::Path root_path = Poco::Path("D:/pcamTest");
+
+  
+  time = Poco::DateTime();
+  
+  std::stringstream ss;
+  ss << time.year() << time.month();
+  ss << time.day() << time.hour();
+  ss << time.minute() << time.millisecond();
+  cache_element image_in_cache;
+  image_in_cache.name = ss.str();
+  
+
+  cache.push(image_in_cache);
+  
+  cache_element front = cache.front();
+  std::string name = front.name + ".raw";
+  
+  Poco::Path image_path = root_path;
+  image_path.append(Poco::Path(captureSetName));
+  image_path.append(Poco::Path(name));
+
+  std::cout << image_path.toString(Poco::Path::PATH_WINDOWS) << "\n";
+  
 
 //  std::vector < Poco::Runnable * > jobs;
 //
