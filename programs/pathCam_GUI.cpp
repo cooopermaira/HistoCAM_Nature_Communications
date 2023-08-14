@@ -31,6 +31,8 @@ using namespace pathCam;
 class ExampleApplication : public Screen {
   nanogui::ref<Window> capture_window;
   SpinPath *camera;
+  Button *capture_button;
+  bool capturing;
   
 public:
   ExampleApplication() : Screen(Vector2i(512, 768), "pathCam") {
@@ -56,6 +58,7 @@ public:
     Poco::Path root_path = Poco::Path("D:/pcamTest");
     camera->setRootPath(root_path);
     camera->newCaptureSet();
+    capturing = false;
 
   }
   
@@ -73,12 +76,14 @@ public:
     b->set_callback([this] { camera->newCaptureSet(); });
     new Label(capture_window, "", "sans-bold");
     
-    b = new Button(capture_window, "Capture");
-    b->set_flags(Button::ToggleButton);
-    b->set_change_callback([this](bool state) {
+    capture_button = new Button(capture_window, "Capture");
+    capture_button->set_flags(Button::ToggleButton);
+    capture_button->set_change_callback([this](bool state) {
       if(state){
+        capturing = true;
         camera->startCamera();
       }else{
+        capturing = false;
         camera->stopCamera();
       }
     });
@@ -92,6 +97,10 @@ public:
       return true;
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
       set_visible(false);
+      return true;
+    }
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS){
+      capture_button->set_pushed(true);
       return true;
     }
     return false;
