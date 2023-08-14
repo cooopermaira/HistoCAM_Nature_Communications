@@ -74,12 +74,12 @@ private:
   Poco::FastMutex cache_mutex;
   Poco::FastMutex caputure_set_mutex;
   
-  std::queue < cache_element > cache;
+  std::queue < cache_element > * cache;
   
   size_t thread_safe_cache_size(){
     size_t result;
     cache_mutex.lock();
-    result = cache.size();
+    result = cache->size();
     cache_mutex.unlock();
     return result;
   }

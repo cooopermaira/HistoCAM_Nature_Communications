@@ -45,8 +45,11 @@ public:
   }
   
   void copy_in(void *buffer){
-    allocate_memory_RAW();
-    memcpy ( raw_buffer, buffer, width*height );
+      buffer_mutex.lock();
+      allocate_memory_RAW();
+      memcpy ( raw_buffer, buffer, width*height );
+      reference_count++;
+      buffer_mutex.unlock();
   }
   
   inline char * get_Raw(){ return raw_buffer;}

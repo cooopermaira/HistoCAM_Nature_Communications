@@ -59,7 +59,7 @@ void CameraStream::run(){
             parent->cache_mutex.lock();
             parent->camlogger.information("Put on Queue");
 
-            parent->cache.push(image_in_cache);
+            parent->cache->push(image_in_cache);
             
             parent->cache_mutex.unlock();
             
@@ -87,16 +87,17 @@ void CameraStream::run(){
 void FileStream::run(){
   
   parent->IOlogger.information("*** FILE IO ***");
-
-  Poco::Thread::sleep(500);
   
-  while(!interrupt || parent->thread_safe_cache_size() != 0){
+  Poco::Thread::sleep(100);
+  
+  while(!interrupt ){
 
       parent->IOlogger.information("loading next image");
     
+      if (parent->thread_safe_cache_size() == 0) { Poco::Thread::sleep(100);  continue; }
     parent->cache_mutex.lock();
-    cache_element front = parent->cache.front();
-    parent->cache.pop();
+    cache_element front = parent->cache->front();
+    parent->cache->pop();
     parent->cache_mutex.unlock();
     Image * image = front.image;
     std::string name = front.name + ".raw";
@@ -117,12 +118,15 @@ void FileStream::run(){
     
     delete image;
   }
-  
+
+
 }
 
 SpinPath::SpinPath():  camChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")),
                        IOChannel(new SimpleFileChannel), IOlogger(Logger::get("IOLogger"))
 {
+
+  cache = new std::queue < cache_element >();
   camlogger.setChannel(camChannel);
   camChannel->setProperty("path", "camera.log");
   camChannel->setProperty("rotation", "2 K");
