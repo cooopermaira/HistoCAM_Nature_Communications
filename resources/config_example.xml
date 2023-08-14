@@ -1,6 +1,6 @@
 <config>
   
-  <processing threads="1" />
+  <processing threads="5" />
   
   <io>
   

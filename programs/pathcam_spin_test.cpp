@@ -20,7 +20,10 @@ int main( int argc, char* argv[] ){
   
   camera->newCaptureSet();
   
-  camera->RunCamera();
+  camera->startCamera();
+  Poco::Thread::sleep(5000);
+  camera->stopCamera();
+  
   
   delete camera;
   

@@ -82,7 +82,9 @@ public:
   
   SpinPath();
   ~SpinPath();
-  int RunCamera();
+  int StartCamera();
+  void StopCamera();
+
   
   void newCaptureSet();
   

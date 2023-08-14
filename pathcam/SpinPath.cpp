@@ -398,12 +398,9 @@ int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
 }
 
 
-int SpinPath::RunCamera(){
+int SpinPath::StartCamera(){
   
-  int result = 0;
-  
-    
-  result = result | spinUpCamera();
+  int result = spinUpCamera();
   
   CameraStream cameraStream(this);
   FileStream fileStream(this);
@@ -415,7 +412,11 @@ int SpinPath::RunCamera(){
   thread_cam.start(cameraStream);
   thread_file.start(fileStream);
 
-  Poco::Thread::sleep(5000);
+ 
+  return result;
+}
+
+void SpinPath::StopCamera(){
   cameraStream.interrupt = true;
   fileStream.interrupt = true;
   
@@ -423,8 +424,6 @@ int SpinPath::RunCamera(){
   thread_file.join();
   
   spinDownCamera();
-  
-  return result;
 }
 
 
