@@ -109,6 +109,7 @@ void FileStream::run(){
     image_path.append(Poco::Path(parent->captureSetName));
     parent->caputure_set_mutex.unlock();
     image_path.append(Poco::Path(name));
+    std::cout << image_path.toString() << "\n";
 
 
     auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
@@ -449,7 +450,7 @@ void SpinPath::newCaptureSet(){
   captureSetName = ss.str();
   
   Poco::Path capture_path = getRootPath();
-  capture_path.pushDirectory(captureSetName);
+  capture_path.append(Poco::Path(captureSetName));
   
   Poco::File tmpDir(capture_path);
   tmpDir.createDirectories();
