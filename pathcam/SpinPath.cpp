@@ -88,7 +88,7 @@ void FileStream::run(){
   
   parent->IOlogger.information("*** FILE IO ***");
 
-  Poco::Thread::sleep(100);
+  Poco::Thread::sleep(500);
   
   while(!interrupt || parent->thread_safe_cache_size() != 0){
 
@@ -103,10 +103,15 @@ void FileStream::run(){
     
     size_t image_bytes = image->width*image->height;
     Poco::Path image_path = parent->getRootPath();
+    std::cout << image_path.toString() << "\n";
+    std::cout << parent->captureSetName << "\n";
+
     parent->caputure_set_mutex.lock();
     image_path.pushDirectory(parent->captureSetName);
     parent->caputure_set_mutex.unlock();
+    std::cout << image_path.toString() << "\n";
     image_path.setFileName(name);
+    std::cout << image_path.toString() << "\n";
 
     auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
     myfile.write(image->get_Raw(), image_bytes);
