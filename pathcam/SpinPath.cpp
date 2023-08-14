@@ -103,15 +103,12 @@ void FileStream::run(){
     
     size_t image_bytes = image->width*image->height;
     Poco::Path image_path = parent->getRootPath();
-    std::cout << image_path.toString() << "\n";
-    std::cout << parent->captureSetName << "\n";
 
     parent->caputure_set_mutex.lock();
-    image_path.pushDirectory(parent->captureSetName);
+    image_path.append(Poco::Path(parent->captureSetName));
     parent->caputure_set_mutex.unlock();
-    std::cout << image_path.toString() << "\n";
-    image_path.setFileName(name);
-    std::cout << image_path.toString() << "\n";
+    image_path.append(Poco::Path(name));
+
 
     auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
     myfile.write(image->get_Raw(), image_bytes);
