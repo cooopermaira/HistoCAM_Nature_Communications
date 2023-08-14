@@ -34,6 +34,7 @@ public:
   SpinPath * parent;
   bool interrupt;
   CameraStream(SpinPath * parent): parent(parent) {};
+  ~CameraStream() {};
   virtual void run();
 };
 
@@ -43,6 +44,7 @@ public:
   SpinPath * parent;
   bool interrupt;
   FileStream(SpinPath * parent): parent(parent) {};
+  ~FileStream() {};
   virtual void run();
 };
 
@@ -64,6 +66,10 @@ private:
   Logger& IOlogger;
   AutoPtr<SimpleFileChannel> IOChannel;
  
+ CameraStream * cameraStream;
+ FileStream  * fileStream;
+
+  Poco::Thread thread_cam, thread_file;
   
   Poco::FastMutex cache_mutex;
   Poco::FastMutex caputure_set_mutex;
@@ -82,8 +88,8 @@ public:
   
   SpinPath();
   ~SpinPath();
-  int StartCamera();
-  void StopCamera();
+  int startCamera();
+  void stopCamera();
 
   
   void newCaptureSet();

@@ -28,7 +28,7 @@
 using namespace nanogui;
 
 class ExampleApplication : public Screen {
-  ref<Window> capture_window;
+  nanogui::ref<Window> capture_window;
   
 public:
   ExampleApplication() : Screen(Vector2i(512, 768), "pathCam") {
@@ -111,7 +111,7 @@ int main(int /* argc */, char ** /* argv */) {
 
     
     /* scoped variables */ {
-      ref<ExampleApplication> app = new ExampleApplication();
+      nanogui::ref<ExampleApplication> app = new ExampleApplication();
       app->dec_ref();
       app->draw_all();
       app->set_visible(true);

@@ -398,31 +398,34 @@ int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
 }
 
 
-int SpinPath::StartCamera(){
+int SpinPath::startCamera(){
   
   int result = spinUpCamera();
   
-  CameraStream cameraStream(this);
-  FileStream fileStream(this);
+  cameraStream = new CameraStream(this);
+  fileStream =  new FileStream(this);
 
   
-  Poco::Thread thread_cam, thread_file;
+  
   thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
   thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
-  thread_cam.start(cameraStream);
-  thread_file.start(fileStream);
+  thread_cam.start(*cameraStream);
+  thread_file.start(*fileStream);
 
  
   return result;
 }
 
-void SpinPath::StopCamera(){
-  cameraStream.interrupt = true;
-  fileStream.interrupt = true;
+void SpinPath::stopCamera(){
+  cameraStream->interrupt = true;
+  fileStream->interrupt = true;
   
   thread_cam.join();
   thread_file.join();
   
+  delete cameraStream;
+  delete fileStream;
+
   spinDownCamera();
 }
 
