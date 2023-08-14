@@ -26,9 +26,11 @@
 
 
 using namespace nanogui;
+using namespace pathCam;
 
 class ExampleApplication : public Screen {
   nanogui::ref<Window> capture_window;
+  SpinPath *camera;
   
 public:
   ExampleApplication() : Screen(Vector2i(512, 768), "pathCam") {
@@ -50,17 +52,15 @@ public:
                            
     perform_layout();
     
-//    SpinPath *camera = new SpinPath();
-//
-//    Poco::Path root_path = Poco::Path("D:/pcamTest");
-//
-//    camera->setRootPath(root_path);
-//
-//    camera->newCaptureSet();
-//
-//    camera->RunCamera();
-//
-//    delete camera;
+    camera = new SpinPath();
+    Poco::Path root_path = Poco::Path("D:/pcamTest");
+    camera->setRootPath(root_path);
+    camera->newCaptureSet();
+
+  }
+  
+  ~ExampleApplication(){
+    delete camera;
   }
   
   void openCaptureWindow() {
@@ -70,12 +70,18 @@ public:
 
     
     Button * b = new Button(capture_window, "New Capture Set");
-    b->set_callback([this] { /*camera->newCaptureSet(); */});
+    b->set_callback([this] { camera->newCaptureSet(); });
     new Label(capture_window, "", "sans-bold");
     
     b = new Button(capture_window, "Capture");
     b->set_flags(Button::ToggleButton);
-    b->set_change_callback([](bool state) { std::cout << "Toggle button state: " << state << std::endl; });
+    b->set_change_callback([this](bool state) {
+      if(state){
+        camera->startCamera();
+      }else{
+        camera->stopCamera();
+      }
+    });
     perform_layout();
     
   }
