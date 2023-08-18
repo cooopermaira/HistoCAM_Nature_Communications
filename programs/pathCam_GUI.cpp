@@ -30,7 +30,7 @@ using namespace pathCam;
 
 class ExampleApplication : public Screen {
   nanogui::ref<Window> capture_window;
-  Button *capture_button;
+  Button *capture_button, *capture_set_button;
 //  Button *circleButton;
   bool capturing;
   
@@ -80,8 +80,8 @@ public:
     capture_window->set_layout(new GroupLayout());
 
     
-    Button * b = new Button(capture_window, "New Capture Set");
-    b->set_callback([this] {
+    capture_set_button = new Button(capture_window, "New Capture Set");
+    capture_set_button->set_callback([this] {
 //#ifdef WITH_SPINNAKER
       camera->newCaptureSet();
 //#endif
@@ -116,6 +116,10 @@ public:
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
       set_visible(false);
       return true;
+    }
+    if (key == GLFW_KEY_1 && action == GLFW_PRESS) {
+        std::cout << "Press\n";
+        camera->newCaptureSet();
     }
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS){
       if(capturing){
