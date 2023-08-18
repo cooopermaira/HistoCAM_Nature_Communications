@@ -310,6 +310,7 @@ int SpinPath::spinUpCamera(){
     result = -1;
   }
   
+  return 0;
 }
 
 void SpinPath::spinDownCamera(){
@@ -409,15 +410,15 @@ int SpinPath::startCamera(){
   
   int result = spinUpCamera();
   
-  cameraStream = new CameraStream(this);
-  fileStream =  new FileStream(this);
-
-  
-  
-  thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
-  thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
-  thread_cam.start(*cameraStream);
-  thread_file.start(*fileStream);
+  if(result != -1){
+    cameraStream = new CameraStream(this);
+    fileStream =  new FileStream(this);
+    
+    thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
+    thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
+    thread_cam.start(*cameraStream);
+    thread_file.start(*fileStream);
+  }
 
  
   return result;
