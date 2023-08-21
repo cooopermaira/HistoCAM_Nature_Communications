@@ -4,10 +4,12 @@ project( pathCam )
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "" )
 set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "" )
 
+add_definitions(-DPROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 OPTION(BUILD_IO_TEST "" OFF)
 OPTION(BUILD_DEBAYER "" OFF)
 OPTION(BUILD_POCO_TEST "" OFF)
+OPTION(BUILD_SFML_TEST "" ON)
 OPTION(BUILD_TEST "" OFF)
 OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
 OPTION(BUILD_THREAD_TEST "" OFF)
@@ -69,15 +71,30 @@ OPTION(NANOGUI_INSTALL "" OFF)
 
 add_subdirectory(nanogui)
 
+OPTION(SFML_BUILD_AUDIO "" ON)
+OPTION(SFML_BUILD_EXAMPLES "" OFF)
+OPTION(SFML_BUILD_GRAPHICS "" OFF)
+OPTION(SFML_BUILD_NETWORK "" OFF)
+OPTION(SFML_BUILD_WINDOW "" OFF)
+
+
+add_subdirectory(SFML)
+
+message(STATUS ${SFML_INCLUDE_DIRS})
+message(STATUS ${SFML_LIBRARIES})
 
 IF(APPLE)
-  SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
+    SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
+    SET(SFML_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/SFML/include")
+	SET(SFML_LIBRARIES "${CMAKE_BUILD_DIR}/libsfml-system-d.3.0.dylib" 
+					   "${CMAKE_BUILD_DIR}/libsfml-audio-d.3.0.dylib")
 ELSEIF(WIN32)
     SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install")
 ELSEIF(LINUX)
     SET(OpenCV_DIR "/usr/local/cmake/opencv4")
 ENDIF()
 
+INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
@@ -166,6 +183,11 @@ ENDIF()
 IF(BUILD_POCO_TEST)
 	add_executable( poco_test programs/poco_test.cpp)
 	target_link_libraries(poco_test pathCamLib)
+ENDIF()
+
+IF(BUILD_SFML_TEST)
+  add_executable( sfml_test programs/sfml_test.cpp)
+  target_link_libraries(sfml_test sfml-audio sfml-system pathCamLib)
 ENDIF()
 
 IF(BUILD_THREAD_TEST)
