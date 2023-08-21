@@ -5,3 +5,6 @@
 	path = poco
 	url = https://github.com/bsumma/poco.git
 	branch = master
+[submodule "SFML"]
+	path = SFML
+	url = https://github.com/SFML/SFML.git
