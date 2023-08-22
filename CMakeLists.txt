@@ -105,7 +105,6 @@ IF(NOT OVERRRIDE_SPINNAKER)
     IF(EXISTS "/Applications/Spinnaker")
       MESSAGE(STATUS "Spinnaker directory found")
       SET(BUILD_SPINNAKER "" ON)
-      SET(BUILD_PATHCAM_GUI "" ON)
       add_compile_definitions(WITH_SPINNAKER)
       include_directories( "/Applications/Spinnaker/include" )
       SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
@@ -116,7 +115,6 @@ IF(NOT OVERRRIDE_SPINNAKER)
     IF(EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
       MESSAGE(STATUS "Spinnaker directory found")
       SET(BUILD_SPINNAKER "" ON)
-      SET(BUILD_PATHCAM_GUI "" ON)
       include_directories( "C:/Program Files/FLIR Systems/Spinnaker/include" )
       SET(SPINNAKER_LIBRARIES "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/Spinnaker_v140.lib"
                              "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinUpdate_v140.lib"
@@ -127,11 +125,6 @@ ENDIF()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-#IF(BUILD_SPINNAKER)
-#  set(CMAKE_CXX_STANDARD 14)
-#  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-#ENDIF()
 
 SET(PATCAM_FILES pathcam/pathCam.h
                 pathcam/Image.cpp
@@ -219,5 +212,5 @@ ENDIF()
 
 IF(BUILD_PATHCAM_GUI)
   add_executable(pathCam programs/pathCam_GUI.cpp)
-  target_link_libraries(pathCam nanogui pathCamLib)
+  target_link_libraries(pathCam nanogui sfml-audio sfml-system pathCamLib)
 ENDIF()

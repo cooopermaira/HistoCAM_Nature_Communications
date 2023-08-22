@@ -87,10 +87,11 @@ int main(int argc, char** argv)
 {
   BeginSound start;
   Poco::Thread thread_start;
-  thread_start.start(start);
   
   EndSound stop;
   Poco::Thread thread_stop;
+
+  thread_start.start(start);
   thread_stop.start(stop);
 
   thread_start.join();

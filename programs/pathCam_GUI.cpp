@@ -20,6 +20,7 @@
 #include <nanogui/toolbutton.h>
 #include <nanogui/popupbutton.h>
 #include <nanogui/progressbar.h>
+#include <SFML/Audio.hpp>
 
 
 #include "pathCam.h"
@@ -28,18 +29,96 @@
 using namespace nanogui;
 using namespace pathCam;
 
-class ExampleApplication : public Screen {
+class BeginSound: public Poco::Runnable {
+public:
+  sf::Sound *sound;
+  sf::SoundBuffer *buffer;
+  
+  BeginSound():sound(0), buffer(0){
+    
+    std::stringstream ss;
+    ss <<  PROJECT_SOURCE_DIR << "/resources/start.wav";
+
+    Poco::Path start_wav_path = Poco::Path(ss.str());
+    
+    buffer = new sf::SoundBuffer();
+      
+    if (buffer->loadFromFile(start_wav_path.toString())){
+      sound = new sf::Sound(*buffer);
+    }
+  }
+
+  ~BeginSound(){
+    if(sound){delete sound;}
+    if(buffer){delete buffer;}
+  }
+  
+  virtual void run(){
+    if(sound){
+      sound->play();
+      while (sound->getStatus() == sf::Sound::Playing){
+        // Leave some CPU time for other processes
+        Poco::Thread::sleep(100);
+      }
+    }
+  }
+};
+
+class EndSound: public Poco::Runnable {
+public:
+  sf::Sound *sound;
+  sf::SoundBuffer *buffer;
+  
+  EndSound():sound(0), buffer(0){
+    
+    std::stringstream ss;
+    ss <<  PROJECT_SOURCE_DIR << "/resources/stop.wav";
+
+    Poco::Path start_wav_path = Poco::Path(ss.str());
+    
+    buffer = new sf::SoundBuffer();
+      
+    if (buffer->loadFromFile(start_wav_path.toString())){
+      sound = new sf::Sound(*buffer);
+    }
+  }
+
+  ~EndSound(){
+    if(sound){delete sound;}
+    if(buffer){delete buffer;}
+  }
+  
+  virtual void run(){
+    if(sound){
+      sound->play();
+      while (sound->getStatus() == sf::Sound::Playing){
+        // Leave some CPU time for other processes
+        Poco::Thread::sleep(100);
+      }
+    }
+  }
+};
+
+
+
+class PathCamApplication : public Screen {
   nanogui::ref<Window> capture_window;
   Button *capture_button, *capture_set_button;
-//  Button *circleButton;
+
+  BeginSound start;
+  Poco::Thread thread_start;
+  
+  EndSound stop;
+  Poco::Thread thread_stop;
+  
   bool capturing;
   
-//#ifdef WITH_SPINNAKER
+#ifdef WITH_SPINNAKER
   SpinPath *camera;
-//#endif
+#endif
   
 public:
-  ExampleApplication() : Screen(Vector2i(512, 768), "pathCam") {
+  PathCamApplication() : Screen(Vector2i(512, 768), "pathCam") {
     inc_ref();
     Window *window = new Window(this, "Toolbox");
     window->set_position(Vector2i(15, 15));
@@ -58,20 +137,20 @@ public:
                            
     perform_layout();
 
-//#ifdef WITH_SPINNAKER
+#ifdef WITH_SPINNAKER
     camera = new SpinPath();
     Poco::Path root_path = Poco::Path("D:/pcamTest");
     camera->setRootPath(root_path);
     camera->newCaptureSet();
-//#endif
+#endif
     capturing = false;
 
   }
   
-  ~ExampleApplication(){
-//#ifdef WITH_SPINNAKER
+  ~PathCamApplication(){
+#ifdef WITH_SPINNAKER
     delete camera;
-//#endif
+#endif
   }
   
   void openCaptureWindow() {
@@ -82,9 +161,9 @@ public:
     
     capture_set_button = new Button(capture_window, "New Capture Set");
     capture_set_button->set_callback([this] {
-//#ifdef WITH_SPINNAKER
+#ifdef WITH_SPINNAKER
       camera->newCaptureSet();
-//#endif
+#endif
     });
     new Label(capture_window, "", "sans-bold");
 //    Widget * tools = new Widget(capture_window);
@@ -94,14 +173,14 @@ public:
     capture_button->set_flags(Button::ToggleButton);
     if(capturing){ capture_button->set_pushed(true); }
     capture_button->set_change_callback([this](bool state) {
-//#ifdef WITH_SPINNAKER
+#ifdef WITH_SPINNAKER
       if(state){
         capturing = (camera->startCamera() != -1);
       }else{
         capturing = false;
         camera->stopCamera();
       }
-//#endif
+#endif
     });
     
 
@@ -118,24 +197,36 @@ public:
       return true;
     }
     if (key == GLFW_KEY_1 && action == GLFW_PRESS) {
+#ifdef WITH_SPINNAKER
         std::cout << "Press\n";
         camera->newCaptureSet();
+#endif
     }
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS){
       if(capturing){
+        thread_start.start(stop);
+        //I'm assuming this will just stop when the thread is over, so no blocking
+      }else{
+        thread_start.start(start);
+      }
+      
+      if(capturing){
         if(capture_button){ capture_button->set_pushed(false); }
         capturing = false;
-//#ifdef WITH_SPINNAKER
+#ifdef WITH_SPINNAKER
         camera->stopCamera();
-//#endif
+#endif
       }else{
+#ifdef WITH_SPINNAKER
         int result = camera->startCamera();
+#else
+        int result = -1;
+#endif
         if(result != -1){
           capturing = true;
           if(capture_button){ capture_button->set_pushed(true); }
         }
-//#ifdef WITH_SPINNAKER
-        //#endif
+
       }
       return true;
     }
@@ -143,26 +234,9 @@ public:
   }
   
   virtual void draw(NVGcontext *ctx) override {
-    /* Animate the scrollbar */
-    //        m_progress->set_value(std::fmod((float) glfwGetTime() / 10, 1.0f));
-    
     /* Draw the user interface */
     Screen::draw(ctx);
     
-//    if(circleButton){
-//      nvgBeginPath(ctx);
-//      nvgCircle(ctx, capture_window->position().x() + circleButton->position().x() + circleButton->width() / 2.0f,
-//                capture_window->position().y() + circleButton->position().y() + circleButton->height() / 2.0f,
-//                20.0f);
-//      
-//      if (capturing) {
-//        nvgFillColor(ctx, nvgRGBf(0.0f, 1.0f, 0.0f)); // Green color
-//      } else {
-//        nvgFillColor(ctx, nvgRGBf(1.0f, 0.0f, 0.0f)); // Red color
-//      }
-//      
-//      nvgFill(ctx);
-//    }
   }
   
 
@@ -177,7 +251,7 @@ int main(int /* argc */, char ** /* argv */) {
 
     
     /* scoped variables */ {
-      nanogui::ref<ExampleApplication> app = new ExampleApplication();
+      nanogui::ref<PathCamApplication> app = new PathCamApplication();
       app->dec_ref();
       app->draw_all();
       app->set_visible(true);
