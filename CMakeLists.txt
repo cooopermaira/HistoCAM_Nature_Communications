@@ -85,10 +85,7 @@ message(STATUS ${SFML_LIBRARIES})
 
 IF(APPLE)
     SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
-    SET(SFML_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/SFML/include")
-	SET(SFML_LIBRARIES "${CMAKE_BUILD_DIR}/libsfml-system-d.3.0.dylib" 
-					   "${CMAKE_BUILD_DIR}/libsfml-audio-d.3.0.dylib")
-ELSEIF(WIN32)
+ ELSEIF(WIN32)
     SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install")
 ELSEIF(LINUX)
     SET(OpenCV_DIR "/usr/local/cmake/opencv4")

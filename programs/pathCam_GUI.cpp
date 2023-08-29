@@ -25,6 +25,13 @@
 
 #include "pathCam.h"
 
+using Poco::Util::Application;
+using Poco::Util::Option;
+using Poco::Util::OptionSet;
+using Poco::Util::HelpFormatter;
+using Poco::Util::AbstractConfiguration;
+using Poco::Util::OptionCallback;
+using Poco::AutoPtr;
 
 using namespace nanogui;
 using namespace pathCam;
@@ -101,10 +108,11 @@ public:
 
 
 
-class PathCamApplication : public Screen {
+class PathCamApplication : public Screen, public Application {
+private:
   nanogui::ref<Window> capture_window;
   Button *capture_button, *capture_set_button;
-
+  
   BeginSound start;
   Poco::Thread thread_start;
   
@@ -117,8 +125,12 @@ class PathCamApplication : public Screen {
   SpinPath *camera;
 #endif
   
+  bool _helpRequested;
+  
+  ProgressBar *m_progress;
+  
 public:
-  PathCamApplication() : Screen(Vector2i(512, 768), "pathCam") {
+  PathCamApplication() : Screen(Vector2i(512, 768), "pathCam"), _helpRequested(false){
     inc_ref();
     Window *window = new Window(this, "Toolbox");
     window->set_position(Vector2i(15, 15));
@@ -134,9 +146,9 @@ public:
         capture_window->dispose();
       }
     });
-                           
+    
     perform_layout();
-
+    
 #ifdef WITH_SPINNAKER
     camera = new SpinPath();
     Poco::Path root_path = Poco::Path("D:/pcamTest");
@@ -144,7 +156,7 @@ public:
     camera->newCaptureSet();
 #endif
     capturing = false;
-
+    
   }
   
   ~PathCamApplication(){
@@ -157,7 +169,7 @@ public:
     capture_window = new Window(this, "Capture Toolbox");
     capture_window->set_position(Vector2i(150, 30));
     capture_window->set_layout(new GroupLayout());
-
+    
     
     capture_set_button = new Button(capture_window, "New Capture Set");
     capture_set_button->set_callback([this] {
@@ -166,9 +178,6 @@ public:
 #endif
     });
     new Label(capture_window, "", "sans-bold");
-//    Widget * tools = new Widget(capture_window);
-//    tools->set_layout(new BoxLayout(Orientation::Horizontal,
-//                                   Alignment::Middle, 0, 6));
     capture_button = new Button(capture_window, "Capture");
     capture_button->set_flags(Button::ToggleButton);
     if(capturing){ capture_button->set_pushed(true); }
@@ -183,13 +192,13 @@ public:
 #endif
     });
     
-
+    
     perform_layout();
     
   }
-
   
-  virtual bool keyboard_event(int key, int scancode, int action, int modifiers) {
+  
+  virtual bool keyboard_event(int key, int scancode, int action, int modifiers) override {
     if (Screen::keyboard_event(key, scancode, action, modifiers))
       return true;
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
@@ -198,8 +207,8 @@ public:
     }
     if (key == GLFW_KEY_1 && action == GLFW_PRESS) {
 #ifdef WITH_SPINNAKER
-        std::cout << "Press\n";
-        camera->newCaptureSet();
+      std::cout << "Press\n";
+      camera->newCaptureSet();
 #endif
     }
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS){
@@ -226,7 +235,7 @@ public:
           capturing = true;
           if(capture_button){ capture_button->set_pushed(true); }
         }
-
+        
       }
       return true;
     }
@@ -236,22 +245,57 @@ public:
   virtual void draw(NVGcontext *ctx) override {
     /* Draw the user interface */
     Screen::draw(ctx);
-    
   }
   
+protected:
+  
+  void defineOptions(OptionSet& options) override{
+    Application::defineOptions(options);
 
-private:
-  ProgressBar *m_progress;
+    options.addOption(
+      Option("help", "h", "display help information on command line arguments")
+        .required(false)
+        .repeatable(false)
+        .callback(OptionCallback<PathCamApplication>(this, &PathCamApplication::handleHelp)));
+        
+    options.addOption(
+      Option("config-file", "c", "load configuration data from a file")
+        .required(false)
+        .repeatable(true)
+        .argument("file")
+        .callback(OptionCallback<PathCamApplication>(this, &PathCamApplication::handleConfig)));
+
+  }
+  
+  void handleHelp(const std::string& name, const std::string& value){
+    _helpRequested = true;
+    displayHelp();
+    stopOptionsProcessing();
+  }
+  
+  
+  void handleConfig(const std::string& name, const std::string& value){
+    loadConfiguration(value);
+  }
+    
+  void displayHelp(){
+    HelpFormatter helpFormatter(options());
+    helpFormatter.setCommand(commandName());
+    helpFormatter.setUsage("OPTIONS");
+    helpFormatter.setHeader("Pathcam batch image processing application.");
+    helpFormatter.format(std::cout);
+  }
+  
 };
 
-int main(int /* argc */, char ** /* argv */) {
+int main(int argc , char ** argv) {
   try {
     nanogui::init();
     
-
-    
     /* scoped variables */ {
       nanogui::ref<PathCamApplication> app = new PathCamApplication();
+      
+      app->init(argc, argv);
       app->dec_ref();
       app->draw_all();
       app->set_visible(true);
