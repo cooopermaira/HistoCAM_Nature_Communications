@@ -52,6 +52,8 @@ public:
       buffer_mutex.unlock();
   }
   
+  bool is_mostly_black(double threshold_value);
+  
   inline char * get_Raw(){ return raw_buffer;}
   
   inline Poco::Path get_ImageFile(){ return image_file;}

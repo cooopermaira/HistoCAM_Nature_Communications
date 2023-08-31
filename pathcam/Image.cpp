@@ -10,6 +10,18 @@ Image::~Image(){
   free_memory_RAW(true);
 }
 
+bool Image::is_mostly_black(double threshold_value){
+  if(!reg_image.empty()){
+    Mat thresholded;
+    threshold(reg_image, thresholded, threshold_value, 255, THRESH_BINARY);
+    unsigned int black_pixels = countNonZero(thresholded);
+    unsigned int total_pixels = (unsigned int)reg_image.total();
+    
+    return black_pixels > (total_pixels/2);
+  }
+  return false;
+}
+
 void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real){
   buffer_mutex.lock();
   if(raw_buffer == 0 || !reg_image.empty()){ buffer_mutex.unlock(); return; }
