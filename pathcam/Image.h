@@ -12,6 +12,9 @@ public:
   unsigned int width, height;
   unsigned int reference_count;
   
+  enum{ _NOLABEL, _2X, _UNKNOWN, _UNDEREXP, _OVEREXP};
+  unsigned int label;
+  
   Poco::FastMutex buffer_mutex;
   
   std::vector<cv::KeyPoint> keypoints;
