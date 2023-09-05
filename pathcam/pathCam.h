@@ -39,6 +39,7 @@
 #include "Poco/LogStream.h"
 #include "Poco/Process.h"
 #include "Poco/DateTime.h"
+#include "Poco/ThreadPool.h"
 
 #include "util.h"
 #include "Image.h"
@@ -49,6 +50,7 @@
 #include "MotionEstimator.h"
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
+#include "FastCam.h"
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"
