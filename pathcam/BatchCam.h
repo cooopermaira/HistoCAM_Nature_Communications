@@ -20,7 +20,7 @@ class BatchCam{
   
   friend class PairRegRunnable;
   
-private:
+protected:
   std::vector <MemoryPool *> mempool;
   Logger *logger;
   Logger::Ptr results_logger;
@@ -75,9 +75,9 @@ public:
 
   }
   
-  bool run();
+  virtual bool run();
   
-private:
+protected:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
 
