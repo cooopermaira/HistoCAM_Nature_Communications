@@ -509,45 +509,10 @@ public:
   bool successful;
 
   
-  MatchRunnable(FastCam *parent,  pathCam::Image * image): parent(parent), image(image), successful(false){};
+  MatchRunnable(FastCam *parent): parent(parent), successful(false){};
   
   virtual void run(){
-    pathCam::FeatureDetector * detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
-    switch(parent->feature_type){
-      case _SIFT:
-        detector->set_SIFT_params(parent->SIFT_params);
-        break;
-      case _SURF:
-        detector->set_SURF_params(parent->SURF_params);
-        break;
-      case _AKAZE:
-        detector->set_AKAZE_params(parent->AKAZE_params);
-        break;
-      case _BRISK:
-        detector->set_BRISK_params(parent->BRISK_params);
-        break;
-      case _ORB:
-        detector->set_ORB_params(parent->ORB_params);
-        break;
-    }
     
-    
-    image->load_raw_from_disk();
-    
-    if(!image->in_memory()){
-      return;
-    }
-        
-    image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
-
-    detector->detect_and_compute(image);
-    
-    if(image->keypoints.size() < 200){
-      detector->set_ORB_params();
-      detector->detect_and_compute(image);
-    }
-    
-    delete detector;
   }
 
     
