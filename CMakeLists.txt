@@ -168,6 +168,10 @@ ENDIF()
 add_executable( process_list_xml programs/process_list_xml.cpp)
 target_link_libraries(process_list_xml pathCamLib)
 
+add_executable( new_process_list_xml programs/new_process_list_xml.cpp)
+target_link_libraries(new_process_list_xml pathCamLib)
+
+
 IF(BUILD_DEBAYER)
 	add_executable( debayer programs/debayer.cpp)
 	target_link_libraries(debayer pathCamLib)

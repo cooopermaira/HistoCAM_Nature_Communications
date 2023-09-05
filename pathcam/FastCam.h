@@ -24,7 +24,7 @@ class FastCam: public BatchCam{
 public:
   FastCam(Poco::Util::LayeredConfiguration::Ptr config);
   
-  ~FastCam(){ BatchCam::~BatchCam();}
+  ~FastCam(){}
   
   bool run();
   

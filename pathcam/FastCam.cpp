@@ -57,7 +57,6 @@ private:
 public:
   
   bool successful;
-
   
   FeaturesRunnable(FastCam *parent,  pathCam::Image * image): parent(parent), image(image), successful(false){};
   
@@ -67,6 +66,7 @@ public:
     
     if(!image->in_memory()){
       successful = false;
+      image->label = Image::_LOWFEAT;
       return;
     }
 
@@ -101,8 +101,12 @@ public:
     
     if(image->keypoints.size() < 200){
       successful = false;
+      image->label = Image::_LOWFEAT;
       return;
     }
+    
+    successful = true;
+    image->label = Image::_UNKOWN;
     
   }
 
@@ -164,7 +168,7 @@ bool FastCam::run(){
   good = loadFileList();
   if(!good){ logger->fatal("Exiting run."); return false; }
 
-  logger->information(Poco::format("Performing Registration w/ %u threads\n", threads));
+  logger->information(Poco::format("Performing FastCam Registration w/ %u threads\n", threads));
   auto reg_begin = std::chrono::high_resolution_clock::now();
   
   matchM.resize(images.size());
@@ -176,22 +180,23 @@ bool FastCam::run(){
   for(unsigned int i=0; i < images.size(); i++){
     feat_runnable[i] = new FeaturesRunnable(this, images[i]);
   }
+  
    
   queue.run_jobs(feat_runnable);
   
-  std::vector < Poco::Runnable * > match_runnable(images.size());
+  std::vector < Poco::Runnable * > match_runnable(images.size()-1);
 
-  for(unsigned int i=0; i < images.size(); i++){
+  for(unsigned int i=1; i < images.size(); i++){
     match_runnable[i] = new MatchRunnable(this, i);
   }
-   
+
   queue.run_jobs(match_runnable);
-  
+
   auto reg_end = std::chrono::high_resolution_clock::now();
   auto reg_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(reg_end - reg_begin);
   logger->information("Done Registering Images.");
   logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
-  
+
   for(unsigned int i=0; i < images.size(); i++){
     for(unsigned int j=0; j < images.size(); j++){
       if(matchM.match[i][j]){
@@ -200,36 +205,39 @@ bool FastCam::run(){
     }
   }
   
-  if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
+  logger->fatal("Done.");
 
-  find_overlaps();
 
-  matchM.output(images);
-  
-  reg_results.resize(images.size());
-  
-  for(unsigned int i=0; i < images.size(); i++){
-    //Need to figure out the reg_results
-  }
-  
-
-  if(out_image.toString() != ""){
-    logger->information("Compositing Images.");
-
-    auto comp_begin = std::chrono::high_resolution_clock::now();
-
-    good = compositing();
-    if(!good){ logger->error("Compositing failed.");  return false; }
-
-    auto comp_end = std::chrono::high_resolution_clock::now();
-
-    logger->information("Done Compositing Images.");
-
-    auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
-    logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
-    auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
-    logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
-  }
+//  if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
+//
+//  find_overlaps();
+//
+//  matchM.output(images);
+//
+//  reg_results.resize(images.size());
+//
+//  for(unsigned int i=0; i < images.size(); i++){
+//    //Need to figure out the reg_results
+//  }
+//
+//
+//  if(out_image.toString() != ""){
+//    logger->information("Compositing Images.");
+//
+//    auto comp_begin = std::chrono::high_resolution_clock::now();
+//
+//    good = compositing();
+//    if(!good){ logger->error("Compositing failed.");  return false; }
+//
+//    auto comp_end = std::chrono::high_resolution_clock::now();
+//
+//    logger->information("Done Compositing Images.");
+//
+//    auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
+//    logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
+//    auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
+//    logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
+//  }
   
   return true;
 }

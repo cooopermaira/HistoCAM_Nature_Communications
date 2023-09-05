@@ -12,7 +12,7 @@ public:
   unsigned int width, height;
   unsigned int reference_count;
   
-  enum{ _NOLABEL, _2X, _UNKNOWN, _UNDEREXP, _OVEREXP};
+  enum{ _NOLABEL=0, _2X, _4X, _10x, _20x, _40X, _UNKOWN, _LOWFEAT, _UNDEREXP, _OVEREXP};
   unsigned int label;
   
   Poco::FastMutex buffer_mutex;
