@@ -186,8 +186,8 @@ bool FastCam::run(){
   
   std::vector < Poco::Runnable * > match_runnable(images.size()-1);
 
-  for(unsigned int i=1; i < images.size(); i++){
-    match_runnable[i] = new MatchRunnable(this, i);
+  for(unsigned int i=0; i < images.size()-1; i++){
+    match_runnable[i] = new MatchRunnable(this, i+1);
   }
 
   queue.run_jobs(match_runnable);
@@ -205,7 +205,17 @@ bool FastCam::run(){
     }
   }
   
-  logger->fatal("Done.");
+  reg_results.resize(images.size(), RegInfo());
+  visited.resize(images.size(), false);
+  reg_results[0] = RegInfo(true, Vec2(0,0));
+  reg_spanning_tree(0,Vec2(0,0));
+  
+  
+  for(unsigned int i=0; i < images.size(); i++){
+    logger->information(Poco::format("%s\t%f\t%f", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y));
+  }
+  
+  
 
 
 //  if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
@@ -214,11 +224,6 @@ bool FastCam::run(){
 //
 //  matchM.output(images);
 //
-//  reg_results.resize(images.size());
-//
-//  for(unsigned int i=0; i < images.size(); i++){
-//    //Need to figure out the reg_results
-//  }
 //
 //
 //  if(out_image.toString() != ""){
@@ -242,5 +247,26 @@ bool FastCam::run(){
   return true;
 }
 
+
+//DFS, BFS might be better
+void FastCam::reg_spanning_tree(unsigned int root_idx, Vec2 offset){
+  visited[root_idx] = true;
+  for(unsigned int j=0; j < images.size(); j++){
+    if(matchM.match[root_idx][j]){
+      if(!visited[j]){
+        Vec2 accum_offset = Vec2(matchM.match[j][root_idx]->t_x+offset.x, matchM.match[j][root_idx]->t_y+offset.y);
+        reg_results[j] = RegInfo(true, accum_offset);
+        reg_spanning_tree(j, accum_offset);
+      }
+    }
+    
+  }
+  
+  
+  
+  
+  
+  
+}
 
 }

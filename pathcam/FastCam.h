@@ -28,6 +28,11 @@ public:
   
   bool run();
   
+protected:
+  bool resolve_bboxes() {};
+  void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
+  
+  std::vector < bool > visited;
   
 };
 

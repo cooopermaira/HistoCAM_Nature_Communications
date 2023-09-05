@@ -81,7 +81,7 @@ protected:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
 
-  bool resolve_bboxes();
+  virtual bool resolve_bboxes();
   void find_overlaps();
   bool compositing();
   
