@@ -748,9 +748,6 @@ void BatchCam::find_overlaps(){
       //area
       if(box[i].intersect(box[j])){
         overlapM.overlap[i][j] =  box[i].area(box[j]);
-      }else{
-        logger->information(box[i].toString());
-        logger->information(box[j].toString());
       }
     }
   }

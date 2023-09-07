@@ -10,16 +10,72 @@ Image::~Image(){
   free_memory_RAW(true);
 }
 
-bool Image::is_mostly_black(double threshold_value){
+bool Image::is_mostly_black(Mat ROI){
+  unsigned int threshold_value = 25;
+  Mat thresholded;
+  threshold(ROI, thresholded, threshold_value, 255, THRESH_BINARY);
+  unsigned int total_pixels = (unsigned int)ROI.total();
+  unsigned int black_pixels = total_pixels-countNonZero(thresholded);
+  return black_pixels > (total_pixels/2);
+  
+}
+
+bool Image::is_mostly_white(Mat ROI){
+  unsigned int threshold_value = 225;
+  Mat thresholded;
+  threshold(ROI, thresholded, threshold_value, 255, THRESH_BINARY);
+  unsigned int total_pixels = (unsigned int)ROI.total();
+  unsigned int white_pixels = countNonZero(thresholded);
+  return white_pixels > (total_pixels/2);
+}
+
+bool Image::is_2x(){
+  
+//  unsigned int pixelValue4 = (int)img.at<uchar>(3232, 4850); // center of bottom edge
+//
+// // unsigned int pixelValue1 = (int)img.at<uchar>(3232, 2); // center of bottom edge
+// // unsigned int pixelValue2 = (int)img.at<uchar>(2, 2426); // center of left edge
+// // unsigned int pixelValue3 = (int)img.at<uchar>(6462, 2426); // center of right edge
+//  unsigned int pixelValue5 = (int)img.at<uchar>(3232, 2426); // center
+//  if (pixelValue5 - pixelValue4 <= 180) {
+//      return bitwise_and(img, img, mask = mask);
+//  }
+//  cv::Mat outframe;
+//  img.copyTo(outframe, mask);
+  
+  
+}
+
+void Image::find_label(){
+  Mat ROI;
   if(!reg_image.empty()){
-    Mat thresholded;
-    threshold(reg_image, thresholded, threshold_value, 255, THRESH_BINARY);
-    unsigned int black_pixels = countNonZero(thresholded);
-    unsigned int total_pixels = (unsigned int)reg_image.total();
-    
-    return black_pixels > (total_pixels/2);
+    if(reg_image.cols < 64 || reg_image.rows < 64){
+      reg_image.copyTo(ROI);
+    }else{
+      Size ROI_size = Size(64,64);
+      cv::Rect ROIrect (reg_image.cols/2 - 32, reg_image.rows/2 - 32, 64, 64);
+      ROI = reg_image(ROIrect);
+    }
+  }else{
+    buffer_mutex.lock();
+    Size image_size = Size(width,height);
+    cv::Mat temp = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
+    unsigned int center_x = width/2;
+    center_x += center_x%2; //force it to be even
+    unsigned int center_y = height/2;
+    center_y += center_y%2; //force it to be even
+    cv::Rect ROIrect (center_x - 32, center_y - 32, 64, 64);
+    ROI = temp(ROIrect);
+    cvtColor(ROI,ROI,COLOR_BayerBG2GRAY);
+    buffer_mutex.unlock();
   }
-  return false;
+  
+  
+  if(is_mostly_black(ROI)){ label = _UNDEREXP; return; }
+
+  
+  label = _UNKOWN;
+  return;
 }
 
 void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real){

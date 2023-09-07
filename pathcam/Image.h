@@ -12,7 +12,7 @@ public:
   unsigned int width, height;
   unsigned int reference_count;
   
-  enum{ _NOLABEL=0, _2X, _4X, _10x, _20x, _40X, _UNKOWN, _LOWFEAT, _UNDEREXP, _OVEREXP};
+  enum{ _NOLABEL=0, _2X, _4X, _10x, _20x, _40X, _UNKOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP};
   unsigned int label;
   
   Poco::FastMutex buffer_mutex;
@@ -55,7 +55,48 @@ public:
       buffer_mutex.unlock();
   }
   
-  bool is_mostly_black(double threshold_value);
+  bool is_mostly_black(cv::Mat ROI);
+  bool is_mostly_white(cv::Mat ROI);
+  bool is_2x();
+
+  void find_label();
+  
+  std::string get_label(){
+    switch(label){
+      case _NOLABEL:
+        return "No label";
+        break;
+      case _2X:
+        return "2x";
+        break;
+      case _4X:
+        return "4x";
+        break;
+      case _10x:
+        return "10x";
+        break;
+      case _40X:
+        return "40x";
+        break;
+      case _UNKOWN:
+        return "Unknown";
+        break;
+      case _LOWFEAT:
+        return "Low Features";
+        break;
+      case _UNDEREXP:
+        return "Under exposed";
+        break;
+      case _OVEREXP:
+        return "Over exposed";
+        break;
+      case _BAD_FILE:
+        return "Bad File";
+        break;
+    }
+    
+    
+  }
   
   inline char * get_Raw(){ return raw_buffer;}
   

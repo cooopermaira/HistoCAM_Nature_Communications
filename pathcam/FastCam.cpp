@@ -63,51 +63,56 @@ public:
   virtual void run(){
 
     image->load_raw_from_disk();
-    
+        
     if(!image->in_memory()){
       successful = false;
-      image->label = Image::_LOWFEAT;
+      image->label = Image::_BAD_FILE;
       return;
     }
 
-    image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
+    image->find_label();
     
-    pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
-    
-    switch(parent->feature_type){
-      case _SIFT:
-        detector->set_SIFT_params(parent->SIFT_params);
-        break;
-      case _SURF:
-        detector->set_SURF_params(parent->SURF_params);
-        break;
-      case _AKAZE:
-        detector->set_AKAZE_params(parent->AKAZE_params);
-        break;
-      case _BRISK:
-        detector->set_BRISK_params(parent->BRISK_params);
-        break;
-      case _ORB:
-        detector->set_ORB_params(parent->ORB_params);
-        break;
-    }
-
-    detector->detect_and_compute(image);
-    
-    if(image->keypoints.size() < 200){
-      detector->set_ORB_params();
+    if(image->label == Image::_UNKOWN){
+      image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
+      
+      pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
+      
+      switch(parent->feature_type){
+        case _SIFT:
+          detector->set_SIFT_params(parent->SIFT_params);
+          break;
+        case _SURF:
+          detector->set_SURF_params(parent->SURF_params);
+          break;
+        case _AKAZE:
+          detector->set_AKAZE_params(parent->AKAZE_params);
+          break;
+        case _BRISK:
+          detector->set_BRISK_params(parent->BRISK_params);
+          break;
+        case _ORB:
+          detector->set_ORB_params(parent->ORB_params);
+          break;
+      }
+      
       detector->detect_and_compute(image);
+      
+      if(image->keypoints.size() < 200){
+        detector->set_ORB_params();
+        detector->detect_and_compute(image);
+      }
+      
+      if(image->keypoints.size() < 200){
+        successful = false;
+        image->label = Image::_LOWFEAT;
+        return;
+      }
+      
+      successful = true;
     }
     
-    if(image->keypoints.size() < 200){
-      successful = false;
-      image->label = Image::_LOWFEAT;
-      return;
-    }
-    
-    successful = true;
-    image->label = Image::_UNKOWN;
-    
+    image->free_memory_RAW();
+    return;
   }
 
     
@@ -127,12 +132,14 @@ public:
   
   virtual void run(){
     pathCam::Image * image = parent->images[image_idx];
+    if(image->label != Image::_UNKOWN){ return; }
     
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
     pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
     
     for(long int prev_idx=image_idx-1; prev_idx >=0; prev_idx--){
       pathCam::Image *previous = parent->images[prev_idx];
+      if(previous->label != Image::_UNKOWN){ continue; }
       parent->matchM.match[prev_idx][image_idx] = new pathCam::Match(previous,image);
       pathCam::Match *m = parent->matchM.match[prev_idx][image_idx];
       matcher->match(m);
@@ -207,42 +214,55 @@ bool FastCam::run(){
   
   reg_results.resize(images.size(), RegInfo());
   visited.resize(images.size(), false);
-  reg_results[0] = RegInfo(true, Vec2(0,0));
-  reg_spanning_tree(0,Vec2(0,0));
+  
+  unsigned int start;
+  for(start = 0; start < images.size(); start++){
+    if(images[start]->label == Image::_UNKOWN){ break; }
+  }
+  
+  if(start == images.size()-1){ return; }
+  
+  reg_results[start] = RegInfo(true, Vec2(0,0));
+  reg_spanning_tree(start,Vec2(0,0));
   
   
   for(unsigned int i=0; i < images.size(); i++){
-    logger->information(Poco::format("%s\t%f\t%f", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y));
+    if(images[i]->label == Image::_UNKOWN){
+      logger->information(Poco::format("%s\t%f\t%f\t%s", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y, images[i]->get_label()));
+    }
   }
   
   
 
 
-//  if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
-//
-//  find_overlaps();
-//
-//  matchM.output(images);
-//
-//
-//
-//  if(out_image.toString() != ""){
-//    logger->information("Compositing Images.");
-//
-//    auto comp_begin = std::chrono::high_resolution_clock::now();
-//
-//    good = compositing();
-//    if(!good){ logger->error("Compositing failed.");  return false; }
-//
-//    auto comp_end = std::chrono::high_resolution_clock::now();
-//
-//    logger->information("Done Compositing Images.");
-//
-//    auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
-//    logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
-//    auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
-//    logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
-//  }
+  if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
+
+  find_overlaps();
+  
+  logger->information("here");
+
+
+  matchM.output(images);
+
+
+
+  if(out_image.toString() != ""){
+    logger->information("Compositing Images.");
+
+    auto comp_begin = std::chrono::high_resolution_clock::now();
+
+    good = compositing();
+    if(!good){ logger->error("Compositing failed.");  return false; }
+
+    auto comp_end = std::chrono::high_resolution_clock::now();
+
+    logger->information("Done Compositing Images.");
+
+    auto comp_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - comp_begin);
+    logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
+    auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
+    logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
+  }
   
   return true;
 }
@@ -252,6 +272,7 @@ bool FastCam::run(){
 void FastCam::reg_spanning_tree(unsigned int root_idx, Vec2 offset){
   visited[root_idx] = true;
   for(unsigned int j=0; j < images.size(); j++){
+    if(images[j]->label != Image::_UNKOWN){ continue; }
     if(matchM.match[root_idx][j]){
       if(!visited[j]){
         Vec2 accum_offset = Vec2(matchM.match[j][root_idx]->t_x+offset.x, matchM.match[j][root_idx]->t_y+offset.y);
@@ -269,4 +290,73 @@ void FastCam::reg_spanning_tree(unsigned int root_idx, Vec2 offset){
   
 }
 
+
+bool FastCam::resolve_bboxes(){
+  box.resize(images.size());
+  combined_box = Bbox();
+  
+  for(unsigned int i=0; i < images.size(); i++){
+    if(images[i]->label != Image::_UNKOWN){ continue; }
+    if(i == 0){
+      double t_x = 0.0;
+      box[0] = Bbox(0, 0, images[0]->width, images[0]->height);
+    }else{
+      if(reg_results[i].successful){
+        box[i] = Bbox(reg_results[i].vec.x, reg_results[i].vec.y, images[i]->width+reg_results[i].vec.x, images[i]->height+reg_results[i].vec.y);
+      }
+    }
+    
+    
+    if(reg_results[i].successful){
+      if(box[i].min_x <  combined_box.min_x){
+        combined_box.min_x = box[i].min_x;
+      }
+      if(box[i].min_y <  combined_box.min_y){
+        combined_box.min_y = box[i].min_y;
+      }
+      if(box[i].max_x >  combined_box.max_x){
+        combined_box.max_x = box[i].max_x;
+      }
+      if(box[i].max_y >  combined_box.max_y){
+        combined_box.max_y = box[i].max_y;
+      }
+    }
+  }
+  
+  for(unsigned int i=0; i < reg_results.size(); i++){
+    logger->information(box[i].toString());
+  }
+  
+  if(combined_box.min_x < 0.0){
+    for(unsigned int i=0; i < reg_results.size(); i++){
+      if(reg_results[i].successful){
+        box[i].min_x -= combined_box.min_x;
+        box[i].max_x -= combined_box.min_x;
+      }
+    }
+    combined_box.max_x -= combined_box.min_x;
+    combined_box.min_x -= combined_box.min_x;
+  }
+  
+  if(combined_box.min_y < 0.0){
+    for(unsigned int i=0; i < reg_results.size(); i++){
+      if(reg_results[i].successful){
+        box[i].min_y -= combined_box.min_y;
+        box[i].max_y -= combined_box.min_y;
+      }
+    }
+    combined_box.max_y -= combined_box.min_y;
+    combined_box.min_y -= combined_box.min_y;
+  }
+  logger->information("=======================");
+  logger->information(combined_box.toString());
+  logger->information("=======================");
+
+  
+  for(unsigned int i=0; i < reg_results.size(); i++){
+    logger->information(box[i].toString());
+  }
+
+  return true;
+}
 }
