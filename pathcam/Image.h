@@ -12,7 +12,7 @@ public:
   unsigned int width, height;
   unsigned int reference_count;
   
-  enum{ _NOLABEL=0, _2X, _4X, _10x, _20x, _40X, _UNKOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP};
+  enum{ _NOLABEL=0, _2X, _4X, _10x, _20x, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP};
   unsigned int label;
   
   Poco::FastMutex buffer_mutex;
@@ -61,6 +61,12 @@ public:
 
   void find_label();
   
+  bool is_good(){
+    return label == _UNKNOWN || label == _2X;
+  }
+  
+  float debayer(int x, int y);
+  
   std::string get_label(){
     switch(label){
       case _NOLABEL:
@@ -78,7 +84,7 @@ public:
       case _40X:
         return "40x";
         break;
-      case _UNKOWN:
+      case _UNKNOWN:
         return "Unknown";
         break;
       case _LOWFEAT:

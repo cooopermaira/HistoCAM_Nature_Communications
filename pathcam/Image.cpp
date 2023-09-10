@@ -29,20 +29,30 @@ bool Image::is_mostly_white(Mat ROI){
   return white_pixels > (total_pixels/2);
 }
 
+float Image::debayer(int x, int y){
+  //Assuming RGGB
+  float red = (uint8_t)raw_buffer[y*width + x];
+  float green = (uint8_t)raw_buffer[(y+1)*width + x];
+  green += (uint8_t)raw_buffer[(y-1)*width + x];
+  green += (uint8_t)raw_buffer[(y)*width + x+1];
+  green += (uint8_t)raw_buffer[(y)*width + x-1];
+  green /= 4.0;
+  float blue = (uint8_t)raw_buffer[(y+1)*width + x+1];
+  blue += (uint8_t)raw_buffer[(y+1)*width + x-1];
+  blue += (uint8_t)raw_buffer[(y-1)*width + x-1];
+  blue += (uint8_t)raw_buffer[(y-1)*width + x+1];
+  blue /= 4.0;
+  return 0.30*red + 0.59*green + 0.11*blue;
+}
+
 bool Image::is_2x(){
+  buffer_mutex.lock();
+  float center = debayer(width/2, height/2);
+  float center_bottom = debayer(width/2, height-3);
+  std::cout << center << "\t" << center_bottom << "\n";
+  buffer_mutex.unlock();
   
-//  unsigned int pixelValue4 = (int)img.at<uchar>(3232, 4850); // center of bottom edge
-//
-// // unsigned int pixelValue1 = (int)img.at<uchar>(3232, 2); // center of bottom edge
-// // unsigned int pixelValue2 = (int)img.at<uchar>(2, 2426); // center of left edge
-// // unsigned int pixelValue3 = (int)img.at<uchar>(6462, 2426); // center of right edge
-//  unsigned int pixelValue5 = (int)img.at<uchar>(3232, 2426); // center
-//  if (pixelValue5 - pixelValue4 <= 180) {
-//      return bitwise_and(img, img, mask = mask);
-//  }
-//  cv::Mat outframe;
-//  img.copyTo(outframe, mask);
-  
+  return (center - center_bottom) >= 180;
   
 }
 
@@ -72,9 +82,10 @@ void Image::find_label(){
   
   
   if(is_mostly_black(ROI)){ label = _UNDEREXP; return; }
-
+  if(is_2x()){ label = _2X; return; }
   
-  label = _UNKOWN;
+  
+  label = _UNKNOWN;
   return;
 }
 

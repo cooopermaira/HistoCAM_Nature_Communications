@@ -72,7 +72,7 @@ public:
 
     image->find_label();
     
-    if(image->label == Image::_UNKOWN){
+    if(image->is_good()){
       image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
       
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
@@ -132,14 +132,14 @@ public:
   
   virtual void run(){
     pathCam::Image * image = parent->images[image_idx];
-    if(image->label != Image::_UNKOWN){ return; }
+    if(!image->is_good()){ return; }
     
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
     pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
     
     for(long int prev_idx=image_idx-1; prev_idx >=0; prev_idx--){
       pathCam::Image *previous = parent->images[prev_idx];
-      if(previous->label != Image::_UNKOWN){ continue; }
+      if(!previous->is_good()){ continue; }
       parent->matchM.match[prev_idx][image_idx] = new pathCam::Match(previous,image);
       pathCam::Match *m = parent->matchM.match[prev_idx][image_idx];
       matcher->match(m);
@@ -217,7 +217,7 @@ bool FastCam::run(){
   
   unsigned int start;
   for(start = 0; start < images.size(); start++){
-    if(images[start]->label == Image::_UNKOWN){ break; }
+    if(images[start]->is_good()){ break; }
   }
   
   if(start == images.size()-1){ return; }
@@ -225,9 +225,12 @@ bool FastCam::run(){
   reg_results[start] = RegInfo(true, Vec2(0,0));
   reg_spanning_tree(start,Vec2(0,0));
   
+  //Need to compute spanning tree for images not visited
+  //then produce an image for each spanning tree
+  
   
   for(unsigned int i=0; i < images.size(); i++){
-    if(images[i]->label == Image::_UNKOWN){
+    if(images[i]->is_good()){
       logger->information(Poco::format("%s\t%f\t%f\t%s", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y, images[i]->get_label()));
     }
   }
@@ -272,7 +275,7 @@ bool FastCam::run(){
 void FastCam::reg_spanning_tree(unsigned int root_idx, Vec2 offset){
   visited[root_idx] = true;
   for(unsigned int j=0; j < images.size(); j++){
-    if(images[j]->label != Image::_UNKOWN){ continue; }
+    if(!images[j]->is_good()){ continue; }
     if(matchM.match[root_idx][j]){
       if(!visited[j]){
         Vec2 accum_offset = Vec2(matchM.match[j][root_idx]->t_x+offset.x, matchM.match[j][root_idx]->t_y+offset.y);
@@ -296,7 +299,7 @@ bool FastCam::resolve_bboxes(){
   combined_box = Bbox();
   
   for(unsigned int i=0; i < images.size(); i++){
-    if(images[i]->label != Image::_UNKOWN){ continue; }
+    if(!images[i]->is_good()){ continue; }
     if(i == 0){
       double t_x = 0.0;
       box[0] = Bbox(0, 0, images[0]->width, images[0]->height);
