@@ -113,6 +113,7 @@ IF(NOT OVERRRIDE_SPINNAKER)
     IF(EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
       MESSAGE(STATUS "Spinnaker directory found")
       SET(BUILD_SPINNAKER "" ON)
+      add_compile_definitions(WITH_SPINNAKER)
       include_directories( "C:/Program Files/FLIR Systems/Spinnaker/include" )
       SET(SPINNAKER_LIBRARIES "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/Spinnaker_v140.lib"
                              "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinUpdate_v140.lib"
