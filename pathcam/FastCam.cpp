@@ -220,7 +220,7 @@ bool FastCam::run(){
     if(images[start]->is_good()){ break; }
   }
   
-  if(start == images.size()-1){ return; }
+  if(start == images.size()-1){ return false; }
   
   reg_results[start] = RegInfo(true, Vec2(0,0));
   reg_spanning_tree(start,Vec2(0,0));

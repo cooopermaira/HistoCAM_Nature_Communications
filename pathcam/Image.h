@@ -62,7 +62,7 @@ public:
   void find_label();
   
   bool is_good(){
-    return label == _UNKNOWN || label == _2X;
+      return label == _2X; // label == _NOLABEL ||
   }
   
   float debayer(int x, int y);
