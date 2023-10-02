@@ -777,7 +777,21 @@ bool BatchCam::compositing(){
       
       Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
-      
+
+      Mat mask = cv::Mat::zeros(cv::Size(temp->width, temp->height), CV_8UC3);
+      circle(mask, cv::Point(3232, 2426), int(2190), (255, 255, 255), -1);
+
+      // unsigned int pixelValue1 = (int)img.at<uchar>(3232, 2); // center of bottom edge
+      // unsigned int pixelValue2 = (int)img.at<uchar>(2, 2426); // center of left edge                         
+      // unsigned int pixelValue3 = (int)img.at<uchar>(6462, 2426); // center of right edge
+      //unsigned int pixelValue4 = (int)img.at<uchar>(3232, 4850); // center of top edge
+      //unsigned int pixelValue5 = (int)img.at<uchar>(3232, 2426); // center
+
+      //if (pixelValue5 - pixelValue4 <= 180) {
+      bitwise_and(image_Mat, image_Mat, mask = mask);
+      //}
+      // imwrite("outframe.png", outframe);
+      image_Mat.copyTo(image_Mat, mask);
       image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)));
       
       temp->free_memory_RAW();

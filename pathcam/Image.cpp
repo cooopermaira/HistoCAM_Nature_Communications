@@ -118,6 +118,11 @@ void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, 
                    (old_image_size.height/2) - image_size.height/2,
                    image_size.width, image_size.height);
     reg_image = reg_image(myROI);
+    //Mat mask = cv::Mat::zeros(cv::Size(image_size), CV_64F);
+    //circle(mask, cv::Point(3232, 2426), int(2190), (255, 255, 255), -1);
+    //bitwise_and(reg_image, reg_image, mask = mask);
+    //Mat outframe;
+    //reg_image.copyTo(outframe, mask);
   }
   
   buffer_mutex.unlock();

@@ -74,7 +74,7 @@ public:
     
     if(image->is_good()){
       image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
-      
+     
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
       
       switch(parent->feature_type){
