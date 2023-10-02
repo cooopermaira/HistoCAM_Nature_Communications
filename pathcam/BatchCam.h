@@ -29,6 +29,8 @@ protected:
   
   Poco::Path input_images;
   Poco::Path out_image;
+  Poco::Path flat_field_file;
+
   
   //Registration Params
   double crop_factor;

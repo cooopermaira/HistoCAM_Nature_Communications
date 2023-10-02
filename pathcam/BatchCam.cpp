@@ -157,6 +157,19 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       }
     }
     
+    if(pConf->has("io.flat_field_images")){
+      if(pConf->has("io.flat_field_images.twoX")){
+        std::string temp = pConf->getString("io.flat_field_images.twoX");
+        flat_field_file = Path(temp);
+        
+        if(flat_field_file.getExtension() != "png" && flat_field_file.getExtension() != "tif"){
+          logger->warning("Only PNG or TIF outputs supported. No image output.");
+          flat_field_file = Path();
+        }
+        
+      }
+    }
+    
   }else{
     logger->fatal("No IO info supplied.");
     return false;
@@ -759,16 +772,19 @@ void BatchCam::find_overlaps(){
 
 bool BatchCam::compositing(){
   
-//  std::cout << "combined bbox: ";
-//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
-//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
-//
-//  std::cout << "width height: ";
-//  std::cout << "[ " << combined_box.max_x-combined_box.min_x << ", ";
-//  std::cout << combined_box.max_y-combined_box.min_y << "]\n";
-  
-  
   Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
+  
+  cv::Mat flat_field;
+  
+  if(flat_field_file.toString() != ""){
+    flat_field = cv::imread(flat_field_file.toString());
+    std::cout << flat_field.cols << "\t" << flat_field.rows << "\n";
+    std::cout << images[0]->width << "\t" << images[0]->height << "\n";
+    
+    flat_field.convertTo(flat_field, CV_32F);
+    flat_field *= 1/170.0;
+  }
+
   
   for(unsigned int i=0; i < images.size(); i++){
     if(reg_results[i].successful){
@@ -777,22 +793,18 @@ bool BatchCam::compositing(){
       
       Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
+      
+      if(temp->is_2x() && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
+        image_Mat.convertTo(image_Mat, CV_32F);
+        cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_32F);
+        image_Mat.convertTo(image_Mat, CV_8U);
+      }
+      
+      Mat mask = cv::Mat::zeros(cv::Size(image_Mat.cols, image_Mat.rows), CV_8UC3);
+      circle(mask, cv::Point(image_Mat.cols/2, image_Mat.rows/2), 2190, cv::Scalar(255, 255, 255), -1);
 
-      Mat mask = cv::Mat::zeros(cv::Size(temp->width, temp->height), CV_8UC3);
-      circle(mask, cv::Point(3232, 2426), int(2190), (255, 255, 255), -1);
 
-      // unsigned int pixelValue1 = (int)img.at<uchar>(3232, 2); // center of bottom edge
-      // unsigned int pixelValue2 = (int)img.at<uchar>(2, 2426); // center of left edge                         
-      // unsigned int pixelValue3 = (int)img.at<uchar>(6462, 2426); // center of right edge
-      //unsigned int pixelValue4 = (int)img.at<uchar>(3232, 4850); // center of top edge
-      //unsigned int pixelValue5 = (int)img.at<uchar>(3232, 2426); // center
-
-      //if (pixelValue5 - pixelValue4 <= 180) {
-      bitwise_and(image_Mat, image_Mat, mask = mask);
-      //}
-      // imwrite("outframe.png", outframe);
-      image_Mat.copyTo(image_Mat, mask);
-      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)));
+      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)), mask);
       
       temp->free_memory_RAW();
     }

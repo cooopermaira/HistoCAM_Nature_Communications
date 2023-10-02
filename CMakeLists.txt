@@ -7,6 +7,7 @@ set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "" )
 add_definitions(-DPROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 
 OPTION(BUILD_IO_TEST "" OFF)
+OPTION(BUILD_FLATFIELD_TEST "" OFF)
 OPTION(BUILD_DEBAYER "" OFF)
 OPTION(BUILD_POCO_TEST "" OFF)
 OPTION(BUILD_SFML_TEST "" ON)
@@ -198,6 +199,11 @@ IF(BUILD_IO_TEST)
   target_link_libraries(image_io_test pathCamLib)
 ENDIF()
 
+IF(BUILD_FLATFIELD_TEST)
+  add_executable( flatfield_test programs/flatfield_test.cpp)
+  target_link_libraries(flatfield_test pathCamLib)
+ENDIF()
+
 IF(BUILD_SPINNAKER)
 	add_executable( spinnaker_acquisition programs/spinnaker_acquisition.cpp)
 	target_link_libraries(spinnaker_acquisition pathCamLib ${SPINNAKER_LIBRARIES})
@@ -219,3 +225,6 @@ IF(BUILD_PATHCAM_GUI)
   add_executable(pathCam programs/pathCam_GUI.cpp)
   target_link_libraries(pathCam nanogui sfml-audio sfml-system pathCamLib)
 ENDIF()
+
+
+
