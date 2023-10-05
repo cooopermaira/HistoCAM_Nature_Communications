@@ -4,7 +4,7 @@
   
   <io>
   
-    <input_images>/Users/bsumma/Library/CloudStorage/Box-Box/PathCam/test_data/raw/process_test_small.txt</input_images>
+    <input_images>/Users/bsumma/Source/tulane/pathcam/resources/4253_3_input_small.txt</input_images>
     <output_log>/Users/bsumma/log.txt</output_log>
     <output_image>/Users/bsumma/result.png</output_image>
     <flat_field_images>

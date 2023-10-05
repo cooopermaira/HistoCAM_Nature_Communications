@@ -242,8 +242,6 @@ bool FastCam::run(){
 
   find_overlaps();
   
-  logger->information("here");
-
 
   matchM.output(images);
 
@@ -265,6 +263,8 @@ bool FastCam::run(){
     logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
     auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
     logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
+  }else{
+    logger->information("Not Compositing Images.");
   }
   
   return true;
