@@ -1,13 +1,16 @@
 <config>
-	
-	<system threads="24" />
+  
+  <processing threads="24" />
   
   <io>
   
-    <input_images>D:/4253_3/4253_3_input.txt</input_images>
-    <output_log>D:/4253_3/log.txt</output_log>
-    <output_image>D:/4253_3/result.png</output_image>
-    
+    <input_images>C:\4253_3\4253_3_input_small.txt</input_images>
+    <output_log>C:\4253_3\log.txt</output_log>
+    <output_image>C:\4253_3\result.png</output_image>
+    <flat_field_images>
+      <twoX>C:\Users\Max Cooper\Documents\calibration\2x_wb.tif</twoX>
+    </flat_field_images>
+
   </io>
   
   <registration>
@@ -35,3 +38,5 @@
   </registration>
   
 </config>
+
+

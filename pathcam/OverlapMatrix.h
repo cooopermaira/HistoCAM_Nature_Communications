@@ -25,6 +25,9 @@ public:
     }
   };
   
+  unsigned int getSize(){ return overlap.size(); }
+
+  
   ~OverlapMatrix(){
     for(unsigned int i=0; i < overlap.size(); i++){
       overlap[i].clear();

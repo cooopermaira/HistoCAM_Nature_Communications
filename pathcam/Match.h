@@ -67,6 +67,8 @@ public:
     }
   };
   
+  unsigned int getSize(){ return match.size(); }
+  
   ~MatchMatrix(){
     for(unsigned int i=0; i < match.size(); i++){
       for(unsigned int j=0; j < match[i].size(); j++){

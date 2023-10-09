@@ -647,7 +647,7 @@ bool BatchCam::run(){
   
   find_overlaps();
   
-  matchM.output(images);
+  //matchM.output(images);
   
   if(out_image.toString() != ""){
     logger->information("Compositing Images.");
@@ -665,6 +665,9 @@ bool BatchCam::run(){
     logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
     auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
     logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
+  }else{
+    logger->information("No image provided.  Not compositing.");
+
   }
   
   return true;
@@ -755,6 +758,9 @@ bool BatchCam::resolve_bboxes(){
 void BatchCam::find_overlaps(){
   overlapM.resize(images.size());
   
+  logger->information(Poco::format("Overlap Size: %d", overlapM.getSize()));
+  logger->information(Poco::format("Match Size: %d", matchM.getSizer()));
+
   for(unsigned int i=0; i < overlapM.overlap.size(); i++){
     for(unsigned int j=0; j < overlapM.overlap[i].size(); j++){
       if(matchM.match[i][j] != NULL){ overlapM.overlap[i][j] = 1.0; continue; }
