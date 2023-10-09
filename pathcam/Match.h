@@ -32,6 +32,8 @@ public:
   Match(Match *to_invert){
     this->image_1 = to_invert->image_2;
     this->image_2 = to_invert->image_1;
+    
+    std::cout << to_invert->H << "\n";
 
     this->H = to_invert->H.inv();
     this->t_x = -to_invert->t_x;
@@ -43,7 +45,7 @@ public:
       this->good_matches[i].trainIdx = to_invert->good_matches[i].queryIdx;
       this->good_matches[i].queryIdx = to_invert->good_matches[i].trainIdx;
       this->good_matches[i].distance = to_invert->good_matches[i].distance;
-      //I am not dealing with imgIdx since this does not seem to be set in kour workflow
+      //I am not dealing with imgIdx since this does not seem to be set in our workflow
     }
     
   }
