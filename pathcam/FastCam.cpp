@@ -150,11 +150,12 @@ public:
       }
       if(result == -1){
         delete m;
-        parent->matchM.match[image_idx-1][image_idx] = NULL;
+        parent->matchM.match[prev_idx][image_idx] = NULL;
+
       }
       if(result == -2){
         delete m;
-        parent->matchM.match[image_idx-1][image_idx] = NULL;
+        parent->matchM.match[prev_idx][image_idx] = NULL;
       }
     }
     
@@ -207,6 +208,7 @@ bool FastCam::run(){
   logger->information("Here 1");
   for(unsigned int i=0; i < images.size(); i++){
     for(unsigned int j=0; j < images.size(); j++){
+      logger->information(Poco::format("========== (%d, %d)", i, j));
       if(matchM.match[i][j]){
         matchM.match[j][i] = new pathCam::Match(matchM.match[i][j]);
       }
