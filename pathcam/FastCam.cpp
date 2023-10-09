@@ -205,17 +205,16 @@ bool FastCam::run(){
   logger->information("Done Registering Images.");
   logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
 
-  logger->information("Here 1");
   for(unsigned int i=0; i < images.size(); i++){
     for(unsigned int j=0; j < images.size(); j++){
-      logger->information(Poco::format("========== (%d, %d)", i, j));
+      //logger->information(Poco::format("========== (%u, %u)", i, j));
       if(matchM.match[i][j]){
         matchM.match[j][i] = new pathCam::Match(matchM.match[i][j]);
       }
     }
   }
   
-  logger->information("Here 2");
+  //logger->information("Here 2");
 
   reg_results.resize(images.size(), RegInfo());
   visited.resize(images.size(), false);
@@ -225,7 +224,7 @@ bool FastCam::run(){
   for(start = 0; start < images.size(); start++){
     if(images[start]->is_good()){ break; }
   }
-  logger->information("Here 3");
+  //logger->information("Here 3");
 
   if(start == images.size()-1){ return false; }
   
@@ -235,7 +234,7 @@ bool FastCam::run(){
   //Need to compute spanning tree for images not visited
   //then produce an image for each spanning tree
   
-  logger->information("Here 4");
+  //logger->information("Here 4");
 
   for(unsigned int i=0; i < images.size(); i++){
     if(images[i]->is_good()){

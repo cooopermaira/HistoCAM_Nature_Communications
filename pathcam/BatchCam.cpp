@@ -758,8 +758,8 @@ bool BatchCam::resolve_bboxes(){
 void BatchCam::find_overlaps(){
   overlapM.resize(images.size());
   
-  logger->information(Poco::format("Overlap Size: %d", overlapM.getSize()));
-  logger->information(Poco::format("Match Size: %d", matchM.getSize()));
+//  logger->information(Poco::format("Overlap Size: %u", overlapM.getSize()));
+//  logger->information(Poco::format("Match Size: %u", matchM.getSize()));
 
   for(unsigned int i=0; i < overlapM.overlap.size(); i++){
     for(unsigned int j=0; j < overlapM.overlap[i].size(); j++){
