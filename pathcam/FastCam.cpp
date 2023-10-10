@@ -214,8 +214,6 @@ bool FastCam::run(){
     }
   }
   
-  //logger->information("Here 2");
-
   reg_results.resize(images.size(), RegInfo());
   visited.resize(images.size(), false);
   
@@ -224,7 +222,6 @@ bool FastCam::run(){
   for(start = 0; start < images.size(); start++){
     if(images[start]->is_good()){ break; }
   }
-  //logger->information("Here 3");
 
   if(start == images.size()-1){ return false; }
   
@@ -234,11 +231,12 @@ bool FastCam::run(){
   //Need to compute spanning tree for images not visited
   //then produce an image for each spanning tree
   
-  //logger->information("Here 4");
 
   for(unsigned int i=0; i < images.size(); i++){
     if(images[i]->is_good()){
       logger->information(Poco::format("%s\t%f\t%f\t%s", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y, images[i]->get_label()));
+    }else{
+      logger->information(Poco::format("Bad:%s\t%f\t%f\t%s", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y, images[i]->get_label()));
     }
   }
   
@@ -334,7 +332,7 @@ bool FastCam::resolve_bboxes(){
   }
   
   for(unsigned int i=0; i < reg_results.size(); i++){
-    logger->information(box[i].toString());
+    logger->information(Poco::format("%s %s", images[i]->get_ImageFile().getFileName(), box[i].toString()));
   }
   
   if(combined_box.min_x < 0.0){
@@ -359,12 +357,12 @@ bool FastCam::resolve_bboxes(){
     combined_box.min_y -= combined_box.min_y;
   }
   logger->information("=======================");
-  logger->information(combined_box.toString());
+  logger->information(Poco::format("Image size: %s",combined_box.toString()));
   logger->information("=======================");
 
   
   for(unsigned int i=0; i < reg_results.size(); i++){
-    logger->information(box[i].toString());
+    logger->information(Poco::format("%s %s", images[i]->get_ImageFile().getFileName(), box[i].toString()));
   }
 
   return true;

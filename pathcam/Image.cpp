@@ -49,7 +49,7 @@ bool Image::is_2x(){
   buffer_mutex.lock();
   float center = debayer(width/2, height/2);
   float center_bottom = debayer(width/2, height-3);
-  std::cout << center << "\t" << center_bottom << "\n";
+  //std::cout << center << "\t" << center_bottom << "\n";
   buffer_mutex.unlock();
   
   return (center - center_bottom) >= 180;

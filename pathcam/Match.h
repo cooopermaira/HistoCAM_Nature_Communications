@@ -33,8 +33,6 @@ public:
     this->image_1 = to_invert->image_2;
     this->image_2 = to_invert->image_1;
     
-    std::cout << to_invert->H << "\n";
-
     this->H = to_invert->H.inv();
     this->t_x = -to_invert->t_x;
     this->t_y = -to_invert->t_y;
