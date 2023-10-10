@@ -800,7 +800,7 @@ bool BatchCam::compositing(){
       Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
       
-      if(temp->is_2x() && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
+      if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
         image_Mat.convertTo(image_Mat, CV_32F);
         cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_32F);
         image_Mat.convertTo(image_Mat, CV_8U);
