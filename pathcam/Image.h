@@ -99,6 +99,8 @@ public:
       case _BAD_FILE:
         return "Bad File";
         break;
+      case _LENS_CHANGE:
+        return "Lens Change";
     }
     
     

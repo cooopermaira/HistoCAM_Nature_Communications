@@ -83,7 +83,7 @@ void Image::find_label(){
   if(is_mostly_black(ROI)){ label = _UNDEREXP; return; }
   if(is_2x()){
     label = _2X;
-    
+    /*
     unsigned int count_non_black = 0;
     for(unsigned int i=0; i < width; i++){
       if(raw_buffer[int(height/2)*width + i] > 50){
@@ -94,7 +94,7 @@ void Image::find_label(){
     if(count_non_black < 4800){
       label = _LENS_CHANGE;
     }
-    
+    */
     return;
   }
   

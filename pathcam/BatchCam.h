@@ -86,6 +86,8 @@ protected:
   virtual bool resolve_bboxes();
   void find_overlaps();
   bool compositing();
+  Mat dome_score_image( int, int, int);
+  Mat donut_score_image( int, int, int);
   
 };
 

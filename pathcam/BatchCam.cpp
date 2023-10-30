@@ -775,12 +775,66 @@ void BatchCam::find_overlaps(){
   
 }
 
+Mat donut_score_image(int rows, int cols, int radius){
+  
+  Mat img = cv::Mat_<int>(rows,cols);
+  float idist,jdist,dist_from_center,peak,center_val;
+  peak = 0.76;
+  center_val = 100.0;
+  
+  for (int i = img.rows/2 - radius;i < img.rows/2 + radius;i++){
+    idist = pow(i - img.rows/2,2);
+    
+    for (int j = img.cols/2 - radius; j < img.cols/2 + radius;j++){
+      jdist = pow(j - img.cols/2,2);
+      dist_from_center = sqrt(idist+jdist);
+      
+      if(dist_from_center <= peak * radius){
+        img.at<int>(i,j) = std::max(0,int(floor( ( 255 - center_val ) / ( peak * radius ) * dist_from_center + center_val ) ) );
+      }
+      else{
+        img.at<int>(i,j) = std::max(0,int(floor( -255 / ( ( 1.0 - peak ) * radius ) * (dist_from_center - radius ) ) ) );
+      }
+    }
+  }
+  
+  img.convertTo(img, CV_8U);
+  /*
+  cv::namedWindow("test");
+  cv::imshow("test", img);
+  cv::waitKey();
+  */
+  return img;
+}
+
+Mat dome_score_image(int rows, int cols, int radius){
+  
+  Mat img = cv::Mat_<int>(rows,cols);
+  double idist,jdist,rad_sq;
+  rad_sq = pow(radius,2);
+  
+  for (int i = 0;i < img.rows;i++){
+    idist = pow(i - img.rows/2,2);
+    
+    for (int j = 0; j < img.cols;j++){
+      jdist = pow(j - img.cols/2,2);
+      img.at<int>(i,j) = std::max( 0 , int( floor( 255.0 / rad_sq * (rad_sq - idist - jdist) ) ) );
+    }
+  }
+  
+  img.convertTo(img, CV_8U);
+  return img;
+}
 
 bool BatchCam::compositing(){
   
   Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
   
-  cv::Mat flat_field;
+  Mat combined_z_buffer = cv::Mat::zeros(cv::Size(combined.cols, combined.rows), CV_8U);
+  
+  Mat quality_score= pathCam::dome_score_image(images[0]->height,images[0]->width,2190);
+  
+  Mat flat_field;
   
   if(flat_field_file.toString() != ""){
     flat_field = cv::imread(flat_field_file.toString());
@@ -805,19 +859,30 @@ bool BatchCam::compositing(){
         cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_32F);
         image_Mat.convertTo(image_Mat, CV_8U);
       }
+
+      Mat use_locations = quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows));
+      Mat use_locations3,mask_first_channel;
+      std::vector<cv::Mat> copies{use_locations,use_locations,use_locations};
+      cv::merge(copies,use_locations3);
       
       Mat mask = cv::Mat::zeros(cv::Size(image_Mat.cols, image_Mat.rows), CV_8UC3);
       circle(mask, cv::Point(image_Mat.cols/2, image_Mat.rows/2), 2190, cv::Scalar(255, 255, 255), -1);
-
-
-      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)), mask);
+      cv::extractChannel(mask, mask_first_channel, 0);
       
+      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)), mask.mul(use_locations3));
+
+      // update global z buffer
+      quality_score.copyTo(combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)), mask_first_channel.mul(use_locations));
+
       temp->free_memory_RAW();
     }
   }
-  
+  /*
+  cv::namedWindow("test");
+  cv::imshow("test", combined_z_buffer);
+  cv::waitKey();
+  */
   imwrite(out_image.toString(), combined);
- 
   return true;
 
 }

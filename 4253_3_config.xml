@@ -1,13 +1,16 @@
 <config>
-	
-	<system threads="1" />
+  
+  <processing threads="24" />
   
   <io>
   
-    <input_images>D:/4253_3/4253_3_input.txt</input_images>
-    <output_log>D:/4253_3/log.txt</output_log>
-    <output_image>D:/4253_3/result.png</output_image>
-    
+    <input_images>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/4253_3_input.txt</input_images>
+    <output_log>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/log_new.txt</output_log>
+    <output_image>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/result.png</output_image>
+    <flat_field_images>
+      <twoX>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/2x_wb.tif</twoX>
+    </flat_field_images>
+
   </io>
   
   <registration>
@@ -35,3 +38,5 @@
   </registration>
   
 </config>
+
+
