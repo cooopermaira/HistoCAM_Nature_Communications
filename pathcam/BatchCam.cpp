@@ -798,7 +798,7 @@ Mat donut_score_image(int rows, int cols, int radius){
     }
   }
   
-  img.convertTo(img, CV_8U);
+  //img.convertTo(img, CV_8U);
   /*
   cv::namedWindow("test");
   cv::imshow("test", img);
@@ -832,7 +832,7 @@ bool BatchCam::compositing(){
   
   Mat combined_z_buffer = cv::Mat::zeros(cv::Size(combined.cols, combined.rows), CV_8U);
   
-  Mat quality_score= pathCam::dome_score_image(images[0]->height,images[0]->width,2190);
+  Mat quality_score = pathCam::dome_score_image(images[0]->height,images[0]->width,2190);
   
   Mat flat_field;
   
@@ -844,30 +844,33 @@ bool BatchCam::compositing(){
     flat_field.convertTo(flat_field, CV_32F);
     flat_field *= 1/170.0;
   }
-
+  
+  cv::Size image_size(images[0]->width,images[0]->height);
+  Mat use_locations3,mask_first_channel;
+  Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8UC3);
+  
+  circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255, 255, 255), -1);
+  cv::extractChannel(mask, mask_first_channel, 0);
   
   for(unsigned int i=0; i < images.size(); i++){
     if(reg_results[i].successful){
       pathCam::Image * temp = images[i];
       temp->load_raw_from_disk();
       
-      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
+      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
       
+      // if these conditions aren't met, throw exception
       if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
-        image_Mat.convertTo(image_Mat, CV_32F);
-        cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_32F);
-        image_Mat.convertTo(image_Mat, CV_8U);
+        //image_Mat.convertTo(image_Mat, CV_32F);
+        cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
+        //image_Mat.convertTo(image_Mat, CV_8U);
       }
 
       Mat use_locations = quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows));
-      Mat use_locations3,mask_first_channel;
+      
       std::vector<cv::Mat> copies{use_locations,use_locations,use_locations};
       cv::merge(copies,use_locations3);
-      
-      Mat mask = cv::Mat::zeros(cv::Size(image_Mat.cols, image_Mat.rows), CV_8UC3);
-      circle(mask, cv::Point(image_Mat.cols/2, image_Mat.rows/2), 2190, cv::Scalar(255, 255, 255), -1);
-      cv::extractChannel(mask, mask_first_channel, 0);
       
       image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)), mask.mul(use_locations3));
 
