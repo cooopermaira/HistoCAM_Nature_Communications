@@ -830,11 +830,16 @@ bool BatchCam::compositing(){
   
   Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
   
+  Mat3f flat_field_buffer(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3f(0,0,0));
+  
   Mat combined_z_buffer = cv::Mat::zeros(cv::Size(combined.cols, combined.rows), CV_8U);
   
   Mat quality_score = pathCam::dome_score_image(images[0]->height,images[0]->width,2190);
   
   Mat flat_field;
+  
+  std::vector<cv::Mat> masks(images.size());
+  std::vector<cv::SparseMat*> frame_contributions;
   
   if(flat_field_file.toString() != ""){
     flat_field = cv::imread(flat_field_file.toString());
@@ -846,45 +851,76 @@ bool BatchCam::compositing(){
   }
   
   cv::Size image_size(images[0]->width,images[0]->height);
-  Mat use_locations3,mask_first_channel;
-  Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8UC3);
+  Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
   
-  circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255, 255, 255), -1);
-  cv::extractChannel(mask, mask_first_channel, 0);
+  circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255), -1);
+  //cv::extractChannel(mask, mask_first_channel, 0);
   
   for(unsigned int i=0; i < images.size(); i++){
     if(reg_results[i].successful){
+      Mat use_locations = mask.mul(quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[0]->width, images[0]->height)));
+      //masks[i] = use_locations.clone();
+      
+      
       pathCam::Image * temp = images[i];
       temp->load_raw_from_disk();
       
       Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
-      
-      // if these conditions aren't met, throw exception
-      if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
-        //image_Mat.convertTo(image_Mat, CV_32F);
-        cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
-        //image_Mat.convertTo(image_Mat, CV_8U);
-      }
 
-      Mat use_locations = quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows));
       
-      std::vector<cv::Mat> copies{use_locations,use_locations,use_locations};
-      cv::merge(copies,use_locations3);
+      //std::vector<cv::Mat> copies{use_locations,use_locations,use_locations};
+      //cv::merge(copies,use_locations3);
       
-      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)), mask.mul(use_locations3));
+      if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
+        flat_field.copyTo(flat_field_buffer(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)),use_locations);
+      }
+      
+      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)), use_locations);
+      temp->free_memory_RAW();
 
       // update global z buffer
-      quality_score.copyTo(combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)), mask_first_channel.mul(use_locations));
-
-      temp->free_memory_RAW();
+      quality_score.copyTo(combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[0]->width, images[0]->height)), use_locations);
+      
     }
   }
   /*
-  cv::namedWindow("test");
-  cv::imshow("test", combined_z_buffer);
-  cv::waitKey();
-  */
+  for (unsigned int r = 0; r < images.size(); r++){
+    if(reg_results[r].successful){
+      pathCam::Image * temp = images[r];
+      temp->load_raw_from_disk();
+      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
+      
+      image_Mat.copyTo(combined(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)), masks[r]);
+      
+      if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
+        flat_field.copyTo(flat_field_buffer(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)),masks[r]);
+      }
+      temp->free_memory_RAW();
+    }
+  }*/
+    /*
+  cv::parallel_for_(Range( 0 , uint(images.size()) ) , [&](const Range& range){
+    for (unsigned int r = range.start; r < range.end; r++){
+      if(reg_results[r].successful){
+        pathCam::Image * temp = images[r];
+        temp->load_raw_from_disk();
+        Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
+        cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
+        
+        image_Mat.copyTo(combined(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)), masks[r]);
+        
+        if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
+          flat_field.copyTo(flat_field_buffer(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)),masks[r]);
+        }
+        temp->free_memory_RAW();
+      }
+    }
+  });
+*/
+  cv::divide(combined,flat_field_buffer,combined,1.0,CV_8U);
+  
   imwrite(out_image.toString(), combined);
   return true;
 
