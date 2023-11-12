@@ -809,7 +809,7 @@ Mat donut_score_image(int rows, int cols, int radius){
 
 Mat dome_score_image(int rows, int cols, int radius){
   
-  Mat img = cv::Mat_<int>(rows,cols);
+  Mat img = cv::Mat_<uint8_t>(rows,cols);
   double idist,jdist,rad_sq;
   rad_sq = pow(radius,2);
   
@@ -818,11 +818,9 @@ Mat dome_score_image(int rows, int cols, int radius){
     
     for (int j = 0; j < img.cols;j++){
       jdist = pow(j - img.cols/2,2);
-      img.at<int>(i,j) = std::max( 0 , int( floor( 255.0 / rad_sq * (rad_sq - idist - jdist) ) ) );
+      img.at<uint8_t>(i,j) = std::max( (uint8_t) 0 , uint8_t( floor( 255.0 / rad_sq * (rad_sq - idist - jdist) ) ) );
     }
   }
-  
-  img.convertTo(img, CV_8U);
   return img;
 }
 
@@ -854,23 +852,16 @@ bool BatchCam::compositing(){
   Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
   
   circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255), -1);
-  //cv::extractChannel(mask, mask_first_channel, 0);
   
   for(unsigned int i=0; i < images.size(); i++){
     if(reg_results[i].successful){
       Mat use_locations = mask.mul(quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[0]->width, images[0]->height)));
-      //masks[i] = use_locations.clone();
-      
-      
+ 
       pathCam::Image * temp = images[i];
       temp->load_raw_from_disk();
       
       Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
-
-      
-      //std::vector<cv::Mat> copies{use_locations,use_locations,use_locations};
-      //cv::merge(copies,use_locations3);
       
       if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
         flat_field.copyTo(flat_field_buffer(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)),use_locations);
@@ -884,41 +875,7 @@ bool BatchCam::compositing(){
       
     }
   }
-  /*
-  for (unsigned int r = 0; r < images.size(); r++){
-    if(reg_results[r].successful){
-      pathCam::Image * temp = images[r];
-      temp->load_raw_from_disk();
-      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
-      cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
-      
-      image_Mat.copyTo(combined(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)), masks[r]);
-      
-      if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
-        flat_field.copyTo(flat_field_buffer(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)),masks[r]);
-      }
-      temp->free_memory_RAW();
-    }
-  }*/
-    /*
-  cv::parallel_for_(Range( 0 , uint(images.size()) ) , [&](const Range& range){
-    for (unsigned int r = range.start; r < range.end; r++){
-      if(reg_results[r].successful){
-        pathCam::Image * temp = images[r];
-        temp->load_raw_from_disk();
-        Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
-        cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
-        
-        image_Mat.copyTo(combined(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)), masks[r]);
-        
-        if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
-          flat_field.copyTo(flat_field_buffer(Rect(box[r].min_x, box[r].min_y,image_Mat.cols, image_Mat.rows)),masks[r]);
-        }
-        temp->free_memory_RAW();
-      }
-    }
-  });
-*/
+
   cv::divide(combined,flat_field_buffer,combined,1.0,CV_8U);
   
   imwrite(out_image.toString(), combined);
