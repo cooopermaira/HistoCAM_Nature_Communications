@@ -47,6 +47,28 @@ public:
     }
   }
   
+  void selective_read(cv::Rect region){
+    if(image_file.toString() != ""){
+      buffer_mutex.lock();
+      if(raw_buffer == 0){
+        std::ifstream stream;
+        stream.open(image_file.toString(), std::ios::binary);
+        allocate_memory_RAW();
+        unsigned int read_location = region.x + (region.y - 1) * width;
+        for(unsigned int i = 0; i < region.height; i++){
+          stream.seekg(read_location);
+          stream.read(&raw_buffer[i * region.width],region.width);
+          //stream.read(raw_buffer + (i*region.width), region.width);
+          read_location += width;
+        }
+        stream.close();
+      }
+      reference_count++;
+      buffer_mutex.unlock();
+    }
+  }
+
+  
   void copy_in(void *buffer){
       buffer_mutex.lock();
       allocate_memory_RAW();
@@ -58,7 +80,8 @@ public:
   bool is_mostly_black(cv::Mat ROI);
   bool is_mostly_white(cv::Mat ROI);
   bool is_2x();
-
+  
+  void extract_features();
   void find_label();
   
   bool is_good(){
@@ -159,6 +182,5 @@ private:
   
 };
 }
-
 
 #endif // IMAGE

@@ -145,6 +145,8 @@ SET(PATCAM_FILES pathcam/pathCam.h
                 pathcam/BatchCam.cpp
                 pathcam/FastCam.h
                 pathcam/FastCam.cpp
+		pathcam/StreamCam.hpp
+		pathcam/StreamCam.cpp
                 pathcam/util.h)
                 
 IF(BUILD_SPINNAKER)

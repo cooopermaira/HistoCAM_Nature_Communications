@@ -55,6 +55,7 @@ bool Image::is_2x(){
   
 }
 
+
 void Image::find_label(){
   Mat ROI;
   if(!reg_image.empty()){

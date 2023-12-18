@@ -20,6 +20,7 @@ using Poco::FileChannel;
 
 FastCam::FastCam(LayeredConfiguration::Ptr config): BatchCam(config){ }
 
+
 class JobQueue{
 private:
   Poco::ThreadPool *pool;
@@ -163,10 +164,7 @@ public:
     
     delete matcher;
     delete mot;
-
   }
-
-    
 };
 
 

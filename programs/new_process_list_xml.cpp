@@ -25,11 +25,11 @@ public:
   }
 
 protected:
-  FastCam *bcam;
+  StreamCam *bcam;
 
   void initialize(Application& self){
     Application::initialize(self);
-    if(!_helpRequested){ bcam = new FastCam(configPtr()); }
+    if(!_helpRequested){ bcam = new StreamCam(configPtr()); }
   }
   
   void uninitialize(){

@@ -74,7 +74,6 @@ public:
     }
     images.clear();
     
-
   }
   
   virtual bool run();

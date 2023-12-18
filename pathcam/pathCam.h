@@ -51,6 +51,7 @@
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
 #include "FastCam.h"
+#include "StreamCam.hpp"
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"

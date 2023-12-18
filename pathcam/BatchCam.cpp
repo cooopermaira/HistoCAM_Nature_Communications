@@ -853,25 +853,45 @@ bool BatchCam::compositing(){
   
   circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255), -1);
   
+  unsigned int k = 0;
   for(unsigned int i=0; i < images.size(); i++){
     if(reg_results[i].successful){
-      Mat use_locations = mask.mul(quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[0]->width, images[0]->height)));
- 
+      k++;
+      Mat use_locations = mask.mul(quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[i]->width, images[i]->height)));
+      if (countNonZero(use_locations) == 0){continue;}// this image is not contributing to composite
+      /*
+       //this is for a selective read
+      Rect reading_bounds = boundingRect(use_locations);
+      if (reading_bounds.x == 0 && reading_bounds.y == 0){continue;} // this image is not contributing to composite
+      
+      if(reading_bounds.x % 2 == 1){
+        reading_bounds.x -= 1;
+        reading_bounds.width += 1;
+      }
+      reading_bounds.width += reading_bounds.width % 2;
+      
+      if(reading_bounds.y % 2 == 1){
+        reading_bounds.y -= 1;
+        reading_bounds.height += 1;
+      }
+      reading_bounds.height += reading_bounds.height % 2;
+      */
       pathCam::Image * temp = images[i];
+      //temp->selective_read(reading_bounds);
       temp->load_raw_from_disk();
       
-      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
+      Mat image_Mat = cv::Mat(image_size, CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
       
-      if(temp->label == Image::_2X && image_Mat.rows == flat_field.rows && image_Mat.cols == flat_field.cols){
-        flat_field.copyTo(flat_field_buffer(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)),use_locations);
+      if(temp->label == Image::_2X && images[i]->height == flat_field.rows && images[i]->width == flat_field.cols){
+        flat_field.copyTo(flat_field_buffer(Rect(box[i].min_x, box[i].min_y,flat_field.cols, flat_field.rows)),use_locations);
       }
       
       image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)), use_locations);
       temp->free_memory_RAW();
 
       // update global z buffer
-      quality_score.copyTo(combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[0]->width, images[0]->height)), use_locations);
+      quality_score.copyTo(combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[i]->width, images[i]->height)), use_locations);
       
     }
   }
