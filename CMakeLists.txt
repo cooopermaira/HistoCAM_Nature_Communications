@@ -143,10 +143,16 @@ SET(PATCAM_FILES pathcam/pathCam.h
                 pathcam/FeatureDetector.cpp 
                 pathcam/BatchCam.h
                 pathcam/BatchCam.cpp
-                pathcam/FastCam.h
-                pathcam/FastCam.cpp
-		pathcam/StreamCam.hpp
+		pathcam/StreamCam.h
 		pathcam/StreamCam.cpp
+		pathcam/ConsecQ.h
+		pathcam/ConsecQ.cpp
+		pathcam/Runnables.h
+		pathcam/MatchRunnable.cpp
+		pathcam/DiskStreamer.cpp
+		pathcam/JobQueue.h
+		pathcam/JobQueue.cpp
+		pathcam/QManager.cpp
                 pathcam/util.h)
                 
 IF(BUILD_SPINNAKER)

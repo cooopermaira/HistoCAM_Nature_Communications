@@ -28,9 +28,9 @@ public:
 
 class RegInfo{
 public:
-  bool successful;
+  bool successful,root;
   Vec2 vec;
-  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0)):
+  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0),bool root = false):
   successful(successful), vec(vec) {};
   
   std::string toString(){

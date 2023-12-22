@@ -50,8 +50,11 @@
 #include "MotionEstimator.h"
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
-#include "FastCam.h"
-#include "StreamCam.hpp"
+//#include "FastCam.h"
+#include "ConsecQ.h"
+#include "StreamCam.h"
+#include "Runnables.h"
+#include "JobQueue.h"
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"
