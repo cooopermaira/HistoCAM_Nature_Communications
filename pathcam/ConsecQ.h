@@ -24,10 +24,10 @@ namespace pathCam{
  ~ConsecQ(){delete deque_mutex;}
  
  void add_index(long int);
- unsigned int get_run();
+ unsigned long int get_run(bool consequtive = true);
  
  bool is_empty();
- std::vector<long int> return_run(unsigned int);
+ std::vector<unsigned long int> return_run(unsigned long int);
  };
 
 }

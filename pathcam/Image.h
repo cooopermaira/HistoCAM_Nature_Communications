@@ -20,7 +20,6 @@ public:
   std::vector<cv::KeyPoint> keypoints;
   cv::Mat descriptors;
   
-  
   Image(MemoryPool *mempool=0);
   ~Image();
   

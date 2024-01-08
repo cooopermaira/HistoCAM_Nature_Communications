@@ -22,7 +22,7 @@ public:
   std::vector<DMatch> good_matches;
   
   //image_2 from image_1
-  cv::Mat H, H_accum;
+  cv::Mat H;
   double t_x, t_y;
   
   Match(Image * image_1, Image * image_2): image_1(image_1),

@@ -21,181 +21,23 @@ using Poco::FileChannel;
 
 
 StreamCam::StreamCam(LayeredConfiguration::Ptr config): BatchCam(config), buffer_mutex(new Poco::FastMutex()),
- image_mutex(new Poco::FastMutex()),
- offset_to_root(0.0,0.0),Bbox_max(0.0,0.0){
+ image_mutex(new Poco::FastMutex()),compositeQ_mutex(new Poco::FastMutex()){
   
-  reg_results.resize(1,RegInfo(false, Vec2(0,0)));
-  
+   reg_results.resize(1,RegInfo(false, Vec2(0,0),true,0));
+   reg_results[0].index = 0;
 }
 
 
 
-class RegManager: public Poco::Runnable{
-private:
-  pathCam::StreamCam *parent;
-  pathCam::JobQueue *queue;
-  unsigned int current_index = 0;
-  
-  
-public:
-  bool successful;
-  
-  RegManager(pathCam::StreamCam *parent, pathCam::JobQueue *queue): parent(parent), queue(queue), successful(false){}
-  
-  virtual void run(){
-    
-    bool check_done = false;
-    
-    while(!(parent->disk_empty and parent->jobs_queued and queue->is_empty() and parent->ConseqQ.is_empty())){
-      
-      if(parent->ConseqQ.get_run() > 10 or check_done){
-        
-        check_done = false;
-        std::vector < long int > indexes;
-        indexes = parent->ConseqQ.return_run(parent->ConseqQ.get_run());
-        
-        for(int i = 0; i < indexes.size(); i++){
-
-          if(parent->reg_results[indexes[i]].root){continue;} //create new component
-          
-          Vec2 accum = Vec2(0.0,0.0);
-          for(long int j = indexes[i] - 1; j >= 0; j--){
-            
-            if (parent->matchM.match[j][indexes[i]]){
-              
-              accum.x = parent->reg_results[j].vec.x + parent->matchM.match[indexes[i]][j]->t_x;
-              
-              accum.y = parent->reg_results[j].vec.y + parent->matchM.match[indexes[i]][j]->t_y;
-              
-              parent->offset_to_root.x = min(parent->offset_to_root.x,accum.x);
-              parent->offset_to_root.y = min(parent->offset_to_root.y,accum.y);
-              
-              parent->reg_results[indexes[i]] = RegInfo(true, accum);
-              break;
-            }
-          }
-          
-        }
-      }else if(parent->ConseqQ.get_run() == 0){
-        Poco::Thread::sleep(100);
-      }else{
-        check_done = true;
-        Poco::Thread::sleep(100);
-      }//end if
-    }//end while
-  }//end run()
-};//end class
-
-
-class Loader: public Poco::Runnable{
-private:
-  StreamCam *parent;
-  JobQueue *queue;
-  unsigned long int image_index = 0;
-  
-public:
-  
-  bool successful;
-  
-  Loader(StreamCam *parent, JobQueue *queue): parent(parent), queue(queue), successful(false){};
-  
-  virtual void run(){
-    
-    while(!parent->disk_empty){
-      if(parent->buffer.empty()){
-        Poco::Thread::sleep(100);
-      }else{
-        pathCam::Image *image = new pathCam::Image;
-        
-        parent->buffer_mutex->lock();
-        image->set_disk_file(parent->disk_image.front());
-        parent->disk_image.pop();
-        
-        image->copy_in(parent->buffer.front());
-        delete [] parent->buffer.front();
-        parent->buffer.pop();
-        parent->buffer_mutex->unlock();
-        
-        if(!image->in_memory()){
-          successful = false;
-          image->label = Image::_BAD_FILE;
-          return;
-        }
-        
-        image->find_label();
-        
-        if(image->is_good()){
-          image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
-          
-          pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
-          
-          switch(parent->feature_type){
-            case _SIFT:
-              detector->set_SIFT_params(parent->SIFT_params);
-              break;
-            case _SURF:
-              detector->set_SURF_params(parent->SURF_params);
-              break;
-            case _AKAZE:
-              detector->set_AKAZE_params(parent->AKAZE_params);
-              break;
-            case _BRISK:
-              detector->set_BRISK_params(parent->BRISK_params);
-              break;
-            case _ORB:
-              detector->set_ORB_params(parent->ORB_params);
-              break;
-          }
-          
-          detector->detect_and_compute(image);
-          
-          if(image->keypoints.size() < 200){
-            detector->set_ORB_params();
-            detector->detect_and_compute(image);
-          }
-          
-          delete detector;
-          
-          if(image->keypoints.size() < 200){
-            successful = false;
-            image->label = Image::_LOWFEAT;
-            return;
-          }
-          
-          parent->add_image(image);
-          
-          if(image_index % 100 == 0){
-            parent->matchM.resize(image_index + 100);
-            parent->reg_results.resize(image_index + 100, RegInfo());
-            parent->visited.resize(image_index + 100, false);
-          }
-          
-          MatchRunnable *matchjob = new MatchRunnable(parent,image_index);
-          queue->add_runnable(matchjob);
-          
-          image_index++;
-          successful = true;
-          
-        }
-        
-        image->free_memory_RAW();
-        
-      }//end if
-      
-    }//end while
-    parent->jobs_queued = true;
-  }//end run
-  
-};//end class
 
 bool StreamCam::run(){
   
-  Poco::Thread stream_thread, loader_thread, Q_thread, reg_thread;
+  Poco::Thread stream_thread, loader_thread, Q_thread, reg_thread, composite_thread;
   
   DiskStreamer *ds = new DiskStreamer(this);
   stream_thread.start(ds);
   
-  JobQueue *jq = new JobQueue(10,10);
+  JobQueue *jq = new JobQueue(1,1);
   
   Loader *loader = new Loader(this,jq);
   loader_thread.start(loader);
@@ -206,11 +48,14 @@ bool StreamCam::run(){
   RegManager *rm = new RegManager(this,jq);
   reg_thread.start(rm);
   
+  CompositeManager *cm = new CompositeManager(this);
+  composite_thread.start(cm);
+  
   stream_thread.join();
   loader_thread.join();
   Q_thread.join();
   reg_thread.join();
-  
+  composite_thread.join();
   //**********************************
   /*
    This logic has been moved to MatchRunnable class
@@ -242,7 +87,7 @@ bool StreamCam::run(){
   }
   */
   
-  if(0 == images.size()-1){ return false; }
+  //if(0 == images.size()-1){ return false; }
   
   
   //reg_spanning_tree(0,Vec2(0,0));
@@ -250,7 +95,7 @@ bool StreamCam::run(){
   //Need to compute spanning tree for images not visited
   //then produce an image for each spanning tree
   
-  
+  /* commenting this out for brevity in cout during run
   for(unsigned int i=0; i < images.size(); i++){
     if(images[i]->is_good()){
       logger->information(Poco::format("%s\t%f\t%f\t%s", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y, images[i]->get_label()));
@@ -258,7 +103,9 @@ bool StreamCam::run(){
       logger->information(Poco::format("Bad:%s\t%f\t%f\t%s", images[i]->get_ImageFile().getFileName(),  reg_results[i].vec.x, reg_results[i].vec.y, images[i]->get_label()));
     }
   }
+   */
   
+  /*
   if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
   
   find_overlaps();
@@ -291,7 +138,7 @@ bool StreamCam::run(){
     logger->information("Not Compositing Images.");
   }
   
-  
+  */
   
   return true;
 }
@@ -311,6 +158,7 @@ void StreamCam::reg_spanning_tree(unsigned int root_idx, Vec2 offset){
   }
   
 }
+
 
 bool StreamCam::resolve_bboxes(){
   box.resize(images.size());
@@ -392,6 +240,19 @@ unsigned long int StreamCam::add_image(Image * image){
   return index;
 }
 
+std::vector<Image*> StreamCam::get_image_refs(std::vector<unsigned long int> indexes){
+  
+  std::vector<Image*> temp;
+  
+  image_mutex->lock();
+  for(unsigned int i = 0; i <indexes.size(); i++){
+    temp.push_back(images[i]);
+  }
+  image_mutex->unlock();
+  
+  return temp;
+}
+
 Image* StreamCam::get_image_ref(unsigned long int index){
   Image * temp;
   image_mutex->lock();
@@ -400,5 +261,35 @@ Image* StreamCam::get_image_ref(unsigned long int index){
   return temp;
 }
 
+void StreamCam::add_new_component(unsigned long image_index){
+  reg_results[image_index] = RegInfo(false,Vec2(0.0,0.0),true,increment_and_get_components());
+  reg_results[image_index].index = image_index;
+  //delete these pointers when destroyed
+  Composite * temp = new Composite(this);
+  composites.push_back(temp);
+  int k;
+}
+
+std::vector < RegInfo > StreamCam::get_Q_front(){
+  compositeQ_mutex->lock();
+  std::vector < RegInfo > temp = compositeQ.front();
+  compositeQ.pop();
+  compositeQ_mutex->unlock();
+  return temp;
+}
+
+void StreamCam::push_compositeQ(std::vector<RegInfo> indexes){
+  compositeQ_mutex->lock();
+  compositeQ.push(indexes);
+  compositeQ_mutex->unlock();
+}
+
+bool StreamCam::compositeQ_empty(){
+  bool temp;
+  compositeQ_mutex->lock();
+  temp = compositeQ.empty();
+  compositeQ_mutex->unlock();
+  return temp;
+}
 }
 

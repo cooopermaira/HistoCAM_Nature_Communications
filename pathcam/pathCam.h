@@ -55,6 +55,7 @@
 #include "StreamCam.h"
 #include "Runnables.h"
 #include "JobQueue.h"
+#include "Composite.h"
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"

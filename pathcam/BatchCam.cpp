@@ -836,8 +836,10 @@ bool BatchCam::compositing(){
   
   Mat flat_field;
   
+  /*
   std::vector<cv::Mat> masks(images.size());
   std::vector<cv::SparseMat*> frame_contributions;
+  */
   
   if(flat_field_file.toString() != ""){
     flat_field = cv::imread(flat_field_file.toString());

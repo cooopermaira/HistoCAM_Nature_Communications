@@ -33,6 +33,7 @@ void DiskStreamer::run(){
   }
   successful = true;
   parent->disk_empty = true;
+  std::cout << "disk empty";
 }
 
 }

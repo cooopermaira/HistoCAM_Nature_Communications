@@ -21,13 +21,14 @@ bool ConsecQ::is_empty(){
 void ConsecQ::add_index(long int idx){
   deque_mutex->lock();
   c_queue.push_back(idx);
-  std::sort(c_queue.begin(),c_queue.end());
   deque_mutex->unlock();
   }
   
-unsigned int ConsecQ::get_run(){
+unsigned long int ConsecQ::get_run(bool consequtive){
+  if (!consequtive){return c_queue.size();}
   unsigned int length = 1;
   deque_mutex->lock();
+  std::sort(c_queue.begin(),c_queue.end());
   if(c_queue.empty()){
     deque_mutex->unlock();
     return 0;
@@ -44,10 +45,10 @@ unsigned int ConsecQ::get_run(){
   return length;
 }
 
-std::vector<long int> ConsecQ::return_run(unsigned int length){
-  std::vector<long int> k;
+std::vector<long unsigned int> ConsecQ::return_run(unsigned long int length){
+  std::vector<long unsigned int> k;
   deque_mutex->lock();
-  for(unsigned int i = 0;i<length;i++){
+  for(unsigned int i = 0; i<length; i++){
     k.push_back(c_queue.front());
     c_queue.pop_front();
   }

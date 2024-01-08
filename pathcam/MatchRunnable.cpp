@@ -13,6 +13,9 @@ namespace pathCam{
 
 MatchRunnable::MatchRunnable(StreamCam *parent, unsigned long int image_idx): parent(parent), image_idx(image_idx), successful(false){};
 
+
+
+
 void MatchRunnable::run(){
   
   pathCam::Image * image = parent->get_image_ref(image_idx);
@@ -22,19 +25,20 @@ void MatchRunnable::run(){
   }
   
   pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
-  pathCam::MotionEstimator *mot = new pathCam::MotionEstimator();
+  
+  pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
   
   for(long int prev_idx=image_idx-1; prev_idx >=0; prev_idx--){
     
     pathCam::Image *previous = parent->get_image_ref(prev_idx);
     
     if(!previous->is_good()){ continue; }
-    parent->matchM.match[prev_idx][image_idx] = new pathCam::Match(previous,image);
-    pathCam::Match *m = parent->matchM.match[prev_idx][image_idx];
+    parent->matchM.match[prev_idx][image_idx] = new Match(previous,image);
+    Match *m = parent->matchM.match[prev_idx][image_idx];
     matcher->match(m);
-    int result = mot->findHomography(m, parent->estimator_type);
+    int result = motion_est->findHomography(m, parent->estimator_type);
     if(result == 1){
-      parent->matchM.match[image_idx][prev_idx] = new pathCam::Match(parent->matchM.match[prev_idx][image_idx]);
+      parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
       
       successful = true;
       break;
@@ -44,14 +48,20 @@ void MatchRunnable::run(){
     }
     delete m;
   }
-  //beginning of new connected component
-  if(!successful){parent->reg_results[image_idx] = RegInfo(false,Vec2(0.0,0.0),true);}
-  parent->ConseqQ.add_index(image_idx);
-  delete matcher;
-  delete mot;
   
-}
+  if(successful){
+    parent->RegistrationConsecQ.add_index(image_idx);
+  }else{
+    parent->add_new_component(image_idx);
+  }
+  
+  delete matcher;
+  delete motion_est;
+  
+}//end run
 
-};
+
+
+};//end namespace
 
 
