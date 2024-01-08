@@ -76,7 +76,7 @@ void Loader::run(){
           return;
         }
         
-        parent->add_image(image);
+        image_index = parent->add_image(image);
         
         if(image_index % 100 == 0){
           parent->matchM.resize(image_index + 100);
@@ -87,9 +87,6 @@ void Loader::run(){
         MatchRunnable *matchjob = new MatchRunnable(parent,image_index);
         queue->add_runnable(matchjob);
         
-        image_index++;
-        successful = true;
-        
       }
       
       image->free_memory_RAW();
@@ -97,6 +94,7 @@ void Loader::run(){
     }//end if
     
   }//end while
+  successful = true;
   parent->jobs_queued = true;
   std::cout << "jobs queued";
 }//end run

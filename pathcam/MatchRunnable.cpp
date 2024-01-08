@@ -48,12 +48,12 @@ void MatchRunnable::run(){
     }
     delete m;
   }
-  
-  if(successful){
-    parent->RegistrationConsecQ.add_index(image_idx);
-  }else{
+
+  if(!successful){
     parent->add_new_component(image_idx);
   }
+  
+  parent->RegistrationConsecQ.add_index(image_idx);
   
   delete matcher;
   delete motion_est;

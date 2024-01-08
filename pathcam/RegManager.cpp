@@ -30,6 +30,7 @@ void RegManager::run(){
       for(int i = 0; i < indexes.size(); i++){
         
         unsigned long int current_index = indexes[i];
+        //reg_results only exists for this index if it was a root, otherwise this is finding an expanded spot w a default reginfo object which has root=true i bet.
         if(parent->reg_results[current_index].root){
           regvec.push_back(parent->reg_results[current_index]);
           continue;

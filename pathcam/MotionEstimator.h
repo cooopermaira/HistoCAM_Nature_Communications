@@ -35,7 +35,7 @@ public:
   Vec2 vec;
   
   RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
-  successful(successful), vec(vec),component_membership(component_membership) {};
+  successful(successful), vec(vec),component_membership(component_membership),root(root) {};
   
   bool operator < (const RegInfo& other) const {
     return component_membership < other.component_membership;

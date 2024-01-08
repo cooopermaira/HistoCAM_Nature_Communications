@@ -42,6 +42,7 @@ public:
   Poco::FastMutex *buffer_mutex;
   Poco::FastMutex *image_mutex;
   Poco::FastMutex *compositeQ_mutex;
+  Poco::FastMutex *component_mutex;
   
   bool run();
   
@@ -56,7 +57,6 @@ protected:
   std::vector < RegInfo > get_Q_front();
   
   bool compositeQ_empty();
-  bool resolve_bboxes();
   
   void push_compositeQ(std::vector < RegInfo >);
   void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
