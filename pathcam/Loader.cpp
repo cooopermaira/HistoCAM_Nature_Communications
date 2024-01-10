@@ -78,6 +78,7 @@ void Loader::run(){
         
         image_index = parent->add_image(image);
         
+        //since we dont know the number of frames ahead of time, these 3 vectors have to be dynamically resized. To avoid doing this constantly, it's done 100 slots at a time. This is probably not thread safe and likely needs a mutex since the resize might cause a reallocation. If it doesn't cause a reallocation, it's fine since its only adding onto the end of the vector.
         if(image_index % 100 == 0){
           parent->matchM.resize(image_index + 100);
           parent->reg_results.resize(image_index + 100, RegInfo());
@@ -95,8 +96,8 @@ void Loader::run(){
     
   }//end while
   successful = true;
-  parent->jobs_queued = true;
-  std::cout << "jobs queued";
+  parent->jobs_queued = true; //termination condition for other processes
+  std::cout << "jobs queued ";
 }//end run
 
 

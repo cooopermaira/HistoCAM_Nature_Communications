@@ -30,7 +30,7 @@ public:
 };
 
 
-
+//loader class takes data from disk streamer/microscope and prepares matchable jobs
 class Loader: public Poco::Runnable{
 private:
   StreamCam *parent;
@@ -47,7 +47,7 @@ public:
 };
     
 
-
+//takes matchable pairs and computes final registration locations
 class RegManager: public Poco::Runnable{
 private:
   pathCam::StreamCam *parent;

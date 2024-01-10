@@ -40,8 +40,10 @@ void Composite::update_Bbox(std::vector < RegInfo > new_info){
   
   bool update_box = false;
   
+  //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
   Vec2 temp_offset = root_offset;
   
+  // If any new frames extend beyond the current extent, expand cv image dimensions
   for(int i = 0; i < new_info.size(); i++){
     if(new_info[i].vec.x < root_offset.x){
       update_box = true;
@@ -63,9 +65,8 @@ void Composite::update_Bbox(std::vector < RegInfo > new_info){
   }
   
   if (update_box){
-    
+    //if we are updating the bounding box, create a new combined image and copy old image into the correct location
     Mat3b new_combined(int(max_offset.y - root_offset.y),int(max_offset.x - root_offset.x), Vec3b(0,0,0));
-    //Mat3f new_flatfield_buffer(new_combined.rows,new_combined.cols);
     Mat new_combined_z_buffer = cv::Mat::zeros(cv::Size(new_combined.cols, new_combined.rows), CV_8U);
     
     if (composite.data){
@@ -73,12 +74,11 @@ void Composite::update_Bbox(std::vector < RegInfo > new_info){
       Rect copyzone = Rect(temp_offset.x - root_offset.x, temp_offset.y - root_offset.y, composite.cols, composite.rows);
       
       composite.copyTo(new_combined(copyzone));
-      //flat_field_composite.copyTo(new_flatfield_buffer(copyzone));
       composite_z_buffer.copyTo(new_combined_z_buffer(copyzone));
+      
     }
     
     composite = new_combined;
-    //flat_field_composite = new_flatfield_buffer;
     composite_z_buffer = new_combined_z_buffer;
     
   }
@@ -90,12 +90,15 @@ void Composite::update_Bbox(std::vector < RegInfo > new_info){
 void Composite::add_images(std::vector < RegInfo > new_info){
   
   std::vector<unsigned long int> indexes;
-  //try {
+  
   for (int i = 0; i < new_info.size(); i++){
     indexes.push_back(new_info[i].index);
   }
   
+  // get a copy of references to all images at once so that only one mutex lock is needed
   std::vector<Image*> images = parent->get_image_refs(indexes);
+  
+  //this may need to be placed inside the below for loop if frames ever vary in size. For now it is here so the mask only needs to be built once
   cv::Size image_size(images[0]->width,images[0]->height);
   
   Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
@@ -104,29 +107,31 @@ void Composite::add_images(std::vector < RegInfo > new_info){
   
 
   for (int i = 0; i < images.size(); i++){
-    
+    //calculate where the new image will be copied to in the composite
     Rect copyzone = Rect(new_info[i].vec.x - root_offset.x, new_info[i].vec.y - root_offset.y,                                                     images[i]->width, images[i]->height);
     
+    //calculate which pixels of the new image will be copied into the composite
     Mat use_locations = mask.mul(local_quality_score > composite_z_buffer(copyzone));
     
-    if (countNonZero(use_locations) == 0){
-      continue; //not contributing
-    }
-    images[i]->load_raw_from_disk();
     
+    if (countNonZero(use_locations) == 0){
+      continue; //not contributing, don't bother loading from disk
+    }
+    
+    images[i]->load_raw_from_disk();
     Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
     cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
     cv::divide(image_Mat,flat_field,image_Mat,1.0,CV_8U);
     
     image_Mat.copyTo(composite(copyzone),use_locations);
-    images[i]->free_memory_RAW();
-    //flat_field.copyTo(flat_field_composite(copyzone),use_locations);
     local_quality_score.copyTo(composite_z_buffer(copyzone),use_locations);
+    
+    images[i]->free_memory_RAW();
   }
-  
+  /*
   imshow("display",composite);
   waitKey(10);
-  
+  */
 }
 
 void Composite::update(std::vector < RegInfo > new_info){

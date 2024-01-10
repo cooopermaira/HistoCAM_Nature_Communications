@@ -13,7 +13,7 @@ namespace pathCam{
 QManager::QManager(StreamCam *parent, JobQueue *queue): parent(parent), queue(queue){};
 
 void QManager::run(){
-  while(!parent->disk_empty and !parent->disk_empty){
+  while(!parent->jobs_queued or !queue->is_empty()){
     
     queue->run_jobs(false);
     

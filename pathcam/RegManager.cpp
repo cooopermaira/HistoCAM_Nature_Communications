@@ -19,8 +19,9 @@ void RegManager::run(){
   
   bool check_done = false;
   
-  while(!(parent->disk_empty and parent->jobs_queued and queue->is_empty() and parent->RegistrationConsecQ.is_empty())){
+  while( !parent->jobs_queued or !queue->is_empty() or !parent->RegistrationConsecQ.is_empty() ){
     
+    //for an image to be registered, all frames between it and a root must also be registered. These frames may not have been matched in that order. ConsecQ serves to assemble consecutive runs of matched images so that they may be registered. This code waits for a run of at least ten before processing, or if it has waited long enough (check_done) proceeds with what it has. This is mostly to allow for final frames to be processed if they dont amount to a run of ten.
     if(parent->RegistrationConsecQ.get_run() > 10 or check_done){
       
       check_done = false;
@@ -30,7 +31,7 @@ void RegManager::run(){
       for(int i = 0; i < indexes.size(); i++){
         
         unsigned long int current_index = indexes[i];
-        //reg_results only exists for this index if it was a root, otherwise this is finding an expanded spot w a default reginfo object which has root=true i bet.
+        //reg_results only exists at this point for an index if it was a root, otherwise this is finding an expanded spot w/ a default reginfo object
         if(parent->reg_results[current_index].root){
           regvec.push_back(parent->reg_results[current_index]);
           continue;
@@ -61,13 +62,18 @@ void RegManager::run(){
       parent->push_compositeQ(regvec);
       
     }else if(parent->RegistrationConsecQ.get_run() == 0){
+      //termination condition not met but nothing in the Q
       Poco::Thread::sleep(100);
     }else{
+      //something in the Q but less than 10
       check_done = true;
       Poco::Thread::sleep(100);
     }//end if
+    
   }//end while
-  parent->reg_complete = true;
+  
+  parent->reg_complete = true; //part of a termination condition for other processes
+  
 }//end run()
 
 
