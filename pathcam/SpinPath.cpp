@@ -8,7 +8,7 @@
 #include "pathCam.h"
 
 using Poco::Logger;
-
+using Poco::Util::LayeredConfiguration;
 namespace pathCam{
 
 void CameraStream::run(){
@@ -40,9 +40,11 @@ void CameraStream::run(){
             const size_t width = pResultImage->GetWidth();
             const size_t height = pResultImage->GetHeight();
             parent->camlogger.information(Poco::format("Got image: %u %u", (unsigned int)width, (unsigned int)height));
+            
             pathCam::Image *image = new pathCam::Image();
             image->copy_in(pResultImage->GetData());
-            
+            parent->sCam->pass_image(image);
+
             Poco::DateTime time = Poco::DateTime();
             
             std::stringstream ss;
@@ -89,6 +91,8 @@ void FileStream::run(){
   parent->IOlogger.information("*** FILE IO ***");
   
   Poco::Thread::sleep(100);
+
+  interrupt = false;
   
   while(!interrupt ){
 
@@ -109,22 +113,33 @@ void FileStream::run(){
     image_path.append(Poco::Path(parent->captureSetName));
     parent->caputure_set_mutex.unlock();
     image_path.append(Poco::Path(name));
-    std::cout << image_path.toString() << "\n";
-
-
-    auto myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
-    myfile.write(image->get_Raw(), image_bytes);
+    image->set_disk_file(image_path);
     
+    //std::cout << image_path.toString() << "\n";
+    
+    std::fstream myfile;
+    myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
+    if (myfile.fail()) {
+        std::cout << strerror(errno);
+    }
+    myfile.write(image->get_Raw(), image_bytes);
+    image->set_disk_file(image_path.toString());
     parent->IOlogger.information(Poco::format("Wrote: %s", image_path.toString()));
     
-    delete image;
+    image->free_memory_RAW();
   }
 
 
 }
 
-SpinPath::SpinPath():  camChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")),
-                       IOChannel(new SimpleFileChannel), IOlogger(Logger::get("IOLogger"))
+void ProcessStream::run() {
+
+    parent->sCam->spin_run();
+
+}
+
+SpinPath::SpinPath(LayeredConfiguration::Ptr config):  camChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")),
+                       IOChannel(new SimpleFileChannel), IOlogger(Logger::get("IOLogger")),sCam(new StreamCam(config))
 {
 
   cache = new std::queue < cache_element >();
@@ -181,6 +196,7 @@ SpinPath::~SpinPath(){
   pCam = nullptr;
   camList.Clear();
   system->ReleaseInstance();
+  delete sCam;
 }
 
 //int SpinPath::Aquisition(){
@@ -413,11 +429,15 @@ int SpinPath::startCamera(){
   if(result != -1){
     cameraStream = new CameraStream(this);
     fileStream =  new FileStream(this);
+    processStream = new ProcessStream(this);
     
     thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
     thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
     thread_cam.start(*cameraStream);
     thread_file.start(*fileStream);
+    sCam->microscope_input = true;
+    thread_sCam.start(*processStream);
+    if (0 == 0) { int j = 0;  }
   }
 
  
@@ -428,11 +448,15 @@ void SpinPath::stopCamera(){
   cameraStream->interrupt = true;
   fileStream->interrupt = true;
   
+  sCam->microscope_input = false;
+  std::cout << "Collection complete, processing " << std::endl;
   thread_cam.join();
   thread_file.join();
+  thread_sCam.join();
   
   delete cameraStream;
   delete fileStream;
+  delete processStream;
 
   spinDownCamera();
 }

@@ -13,7 +13,7 @@ namespace pathCam{
 CompositeManager::CompositeManager(StreamCam *parent):parent(parent),successful(false){};
 
 void CompositeManager::run(){
-  while(!parent->reg_complete or !parent->compositeQ_empty()){
+  while(!parent->reg_complete || !parent->compositeQ_empty()){
     
     //if nothing in the Q but termination condition not met, wait
     if( parent->compositeQ_empty()){
@@ -45,8 +45,10 @@ void CompositeManager::run(){
       parent->composites[current_component]->update(new_info);
     }
   }
+
   
   for (int i = 0; i < parent->composites.size(); i++){
+    std::cout << "Writing image of size: " << parent->composites[i]->get_composite().size() << "\n";
     imwrite("finish" + std::to_string(i) + ".png", parent->composites[i]->get_composite());
   }
   

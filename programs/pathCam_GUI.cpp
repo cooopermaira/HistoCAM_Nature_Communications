@@ -150,7 +150,7 @@ public:
     perform_layout();
     
 #ifdef WITH_SPINNAKER
-    camera = new SpinPath();
+    //camera = new SpinPath();
     Poco::Path root_path = Poco::Path("D:/pcamTest");
     camera->setRootPath(root_path);
     camera->newCaptureSet();

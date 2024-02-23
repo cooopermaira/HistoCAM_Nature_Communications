@@ -19,10 +19,10 @@ void RegManager::run(){
   
   bool check_done = false;
   
-  while( !parent->jobs_queued or !queue->is_empty() or !parent->RegistrationConsecQ.is_empty() ){
+  while( !parent->jobs_queued || !queue->is_empty() || !parent->RegistrationConsecQ.is_empty() ){
     
     //for an image to be registered, all frames between it and a root must also be registered. These frames may not have been matched in that order. ConsecQ serves to assemble consecutive runs of matched images so that they may be registered. This code waits for a run of at least ten before processing, or if it has waited long enough (check_done) proceeds with what it has. This is mostly to allow for final frames to be processed if they dont amount to a run of ten.
-    if(parent->RegistrationConsecQ.get_run() > 10 or check_done){
+    if(parent->RegistrationConsecQ.get_run() > 10 || check_done){
       
       check_done = false;
       std::vector < RegInfo > regvec;

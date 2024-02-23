@@ -45,6 +45,23 @@ public:
   virtual void run();
     
 };
+
+
+class SpinLoader : public Poco::Runnable {
+private:
+    StreamCam* parent;
+    JobQueue* queue;
+    unsigned long int image_index = 0;
+
+public:
+    bool successful;
+
+    SpinLoader(StreamCam* parent, JobQueue* queue);
+
+    virtual void run();
+
+};
+
     
 
 //takes matchable pairs and computes final registration locations

@@ -69,8 +69,7 @@ std::string printSubKeys(LayeredConfiguration::Ptr config, std::string short_key
   return s;
 }
 
-std::string printConfig(LayeredConfiguration::Ptr config)
-{
+std::string printConfig(LayeredConfiguration::Ptr config){
   std::vector<std::string> root_keys;
   config->keys(root_keys);
   

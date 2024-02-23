@@ -20,22 +20,58 @@ using Poco::FileChannel;
 
 
 
-StreamCam::StreamCam(LayeredConfiguration::Ptr config): BatchCam(config), buffer_mutex(new Poco::FastMutex()),
- image_mutex(new Poco::FastMutex()),compositeQ_mutex(new Poco::FastMutex()),component_mutex(new Poco::FastMutex()){
+StreamCam::StreamCam(LayeredConfiguration::Ptr config): BatchCam(config), buffer_mutex(new Poco::FastMutex()),image_mutex(new Poco::FastMutex()),compositeQ_mutex(new Poco::FastMutex()),component_mutex(new Poco::FastMutex()),spin_buffer_mutex(new Poco::FastMutex()){
   
    reg_results.resize(1,RegInfo(false, Vec2(0,0),true,0));
    reg_results[0].index = 0;
 }
 
 
+bool StreamCam::spin_run() {
+    Poco::Thread loader_thread, Q_thread, reg_thread, composite_thread;
 
+    std::cout << "spin_run started " << std::endl;
+
+    JobQueue* jq = new JobQueue(3, 3);
+    SpinLoader* sl = new SpinLoader(this,jq);
+    loader_thread.start(sl);
+
+    QManager* qm = new QManager(this, jq);
+    Q_thread.start(qm);
+
+    RegManager* rm = new RegManager(this, jq);
+    reg_thread.start(rm);
+
+    CompositeManager* cm = new CompositeManager(this);
+    cm->run();
+    //composite_thread.start(cm);
+    //UI can only be altered from the main thread, this will change when I'm not demoing
+
+    loader_thread.join();
+    Q_thread.join();
+    reg_thread.join();
+    composite_thread.join();
+
+    std::cout << "spin_run done" << std::endl;
+
+    return true;
+}
 
 bool StreamCam::run(){
-  cv::namedWindow("display");
-  cv::namedWindow("display2");
+  //cv::namedWindow("display");
+  //cv::namedWindow("display2");
   Poco::Thread stream_thread, loader_thread, Q_thread, reg_thread, composite_thread;
   
   DiskStreamer *ds = new DiskStreamer(this);
+
+  /*
+  eliminate disk streamer
+  create new function on streamcam object class to accept an image pointer
+  push image pointer to loader class
+  loader extracts features as normal, releases memory
+
+  */
+
   stream_thread.start(ds);
   
   JobQueue *jq = new JobQueue(10,10);
@@ -125,6 +161,20 @@ std::vector < RegInfo > StreamCam::get_Q_front(){
   compositeQ.pop();
   compositeQ_mutex->unlock();
   return temp;
+}
+
+Image* StreamCam::get_Q_front_Spin() {
+    spin_buffer_mutex->lock();
+    Image* temp = spin_image_buffer.front();
+    spin_image_buffer.pop();
+    spin_buffer_mutex->unlock();
+    return temp;
+}
+
+void StreamCam::pass_image(Image* image){
+    spin_buffer_mutex->lock();
+    spin_image_buffer.push(image);
+    spin_buffer_mutex->unlock();
 }
 
 void StreamCam::push_compositeQ(std::vector<RegInfo> indexes){

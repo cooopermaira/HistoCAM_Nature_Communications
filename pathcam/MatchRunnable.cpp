@@ -43,7 +43,7 @@ void MatchRunnable::run(){
       successful = true;
       break;
     }
-    else if(result == -1 or result == -2){
+    else if(result == -1 || result == -2){
       parent->matchM.match[prev_idx][image_idx] = NULL;
     }
     delete m;

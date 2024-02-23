@@ -18,6 +18,7 @@ using namespace std;
 using Poco::Logger;
 using Poco::SimpleFileChannel;
 using Poco::AutoPtr;
+using Poco::Util::LayeredConfiguration;
 
 namespace pathCam{
 
@@ -48,14 +49,25 @@ public:
   virtual void run();
 };
 
+class ProcessStream : public Poco::Runnable {
+public:
+    SpinPath* parent;
+    bool interrupt;
+    ProcessStream(SpinPath* parent) : parent(parent) {};
+    ~ProcessStream() {};
+    virtual void run();
+};
 
 class SpinPath{
   friend class CameraStream;
   friend class FileStream;
+  friend class ProcessStream;
 private:
   CameraPtr pCam;
   SystemPtr system;
   CameraList camList;
+  StreamCam *sCam;
+  
   
   Poco::Path root_path;
   string captureSetName;
@@ -68,8 +80,9 @@ private:
  
  CameraStream * cameraStream;
  FileStream  * fileStream;
+ ProcessStream* processStream;
 
-  Poco::Thread thread_cam, thread_file;
+  Poco::Thread thread_cam, thread_file, thread_sCam;
   
   Poco::FastMutex cache_mutex;
   Poco::FastMutex caputure_set_mutex;
@@ -86,7 +99,7 @@ private:
   
 public:
   
-  SpinPath();
+  SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();
   int startCamera();
   void stopCamera();

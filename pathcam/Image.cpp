@@ -46,6 +46,7 @@ float Image::debayer(int x, int y){
 }
 
 bool Image::is_2x(){
+    return true;
   buffer_mutex.lock();
   float center = debayer(width/2, height/2);
   float center_bottom = debayer(width/2, height-3);

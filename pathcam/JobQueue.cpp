@@ -33,6 +33,7 @@ bool JobQueue::run_jobs(bool join_all){
     }
   }
   if(join_all){pool->joinAll();}
+  return true;
 };
 
 bool JobQueue::run_jobs(std::vector < Poco::Runnable * > jobs){
@@ -48,6 +49,7 @@ bool JobQueue::run_jobs(std::vector < Poco::Runnable * > jobs){
       Poco::Thread::sleep(100);
     }
   }
+  return true;
   
   pool->joinAll();
 }
