@@ -14,13 +14,13 @@
 namespace pathCam{
 
 class Composite{
-private:
+protected:
   StreamCam *parent;
   Mat local_quality_score, composite_z_buffer, flat_field;
   Mat3f flat_field_composite;
   Mat3b composite;
   Vec2 root_offset,max_offset;
-  Bbox composite_Bbox;
+  Bbox composite_Bbox,subdiv_Bbox;
   
   
 public:
@@ -34,6 +34,20 @@ public:
   Mat score_image_2X(int,int,int);
 };
 
+
+class CompositeVoronoi : public Composite {
+private:
+	cv::Subdiv2D subdiv;
+	std::vector<Point2f> centers;
+	std::vector<std::vector<Point2f>> facets;
+
+public:
+	CompositeVoronoi(StreamCam* parent);
+	void update(std::vector < RegInfo > new_info);
+	void add_images(std::vector < RegInfo > new_info);
+	void expand_subdiv(std::vector < RegInfo > new_info);
+
+};
 }
 
-#endif /* CompositeManager_h */
+#endif /* Composite_h */

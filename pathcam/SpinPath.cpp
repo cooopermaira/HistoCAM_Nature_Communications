@@ -16,8 +16,61 @@ void CameraStream::run(){
     parent->camlogger.information("*** IMAGE ACQUISITION ***");
 
     try{
+        Spinnaker::GenApi::INodeMap& sNodeMap = parent->pCam->GetTLStreamNodeMap();
+        CEnumEntryPtr ptrHandlingModeEntry; 
+        CEnumerationPtr ptrHandlingMode = sNodeMap.GetNode("StreamBufferHandlingMode");
+        ptrHandlingModeEntry = ptrHandlingMode->GetEntryByName("OldestFirst");
+        ptrHandlingMode->SetIntValue(ptrHandlingModeEntry->GetValue());
+        const std::string bufferModeName = ptrHandlingMode->GetCurrentEntry()->GetDisplayName().c_str();
+        cout << endl << endl << "*** Buffer Handling Mode has been set to " << bufferModeName << " ***" << endl;
+        //
+// Set acquisition mode to continuous
+//
+// *** NOTES ***
+// Because the example acquires and saves 10 images, setting acquisition
+// mode to continuous lets the example finish. If set to single frame
+// or multiframe (at a lower number of images), the example would just
+// hang. This would happen because the example has been written to
+// acquire 10 images while the camera would have been programmed to
+// retrieve less than that.
+//
+// Setting the value of an enumeration node is slightly more complicated
+// than other node types. Two nodes must be retrieved: first, the
+// enumeration node is retrieved from the nodemap; and second, the entry
+// node is retrieved from the enumeration node. The integer value of the
+// entry node is then set as the new value of the enumeration node.
+//
+// Notice that both the enumeration and the entry nodes are checked for
+// availability and readability/writability. Enumeration nodes are
+// generally readable and writable whereas their entry nodes are only
+// ever readable.
+//
+// Retrieve enumeration node from nodemap
+        Spinnaker::GenApi::INodeMap& iNodeMap = parent->pCam->GetNodeMap();
+        CEnumerationPtr ptrAcquisitionMode = iNodeMap.GetNode("AcquisitionMode");
+        if (!IsReadable(ptrAcquisitionMode) ||
+            !IsWritable(ptrAcquisitionMode))
+        {
+            cout << "Unable to set acquisition mode to continuous (enum retrieval). Aborting..." << endl << endl;
+            //throw exception
+        }
 
-      
+        // Retrieve entry node from enumeration node
+        CEnumEntryPtr ptrAcquisitionModeContinuous = ptrAcquisitionMode->GetEntryByName("Continuous");
+        if (!IsReadable(ptrAcquisitionModeContinuous))
+        {
+            cout << "Unable to get or set acquisition mode to continuous (entry retrieval). Aborting..." << endl << endl;
+            //throw exception
+        }
+        CEnumerationPtr bufferLength = iNodeMap.GetNode("TransferQueueMaxBlockCount");
+
+        // Retrieve integer value from entry node
+        const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
+
+        // Set integer value from entry node as new value of enumeration node
+        ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
+
+        cout << "Acquisition mode set to continuous..." << endl;
       parent->pCam->BeginAcquisition();
       
       parent->camlogger.information("Acquiring images...");
@@ -43,7 +96,8 @@ void CameraStream::run(){
             
             pathCam::Image *image = new pathCam::Image();
             image->copy_in(pResultImage->GetData());
-            parent->sCam->pass_image(image);
+            image->increment_smart_pointer();
+            //parent->sCam->pass_image(image);
 
             Poco::DateTime time = Poco::DateTime();
             
@@ -90,11 +144,11 @@ void FileStream::run(){
   
   parent->IOlogger.information("*** FILE IO ***");
   
-  Poco::Thread::sleep(100);
+  Poco::Thread::sleep(50);
 
   interrupt = false;
   
-  while(!interrupt ){
+  while( !interrupt || !parent->cache->empty()){
 
       parent->IOlogger.information("loading next image");
     
@@ -104,7 +158,7 @@ void FileStream::run(){
     parent->cache->pop();
     parent->cache_mutex.unlock();
     Image * image = front.image;
-    std::string name = front.name + ".raw";
+    std::string name = front.name + ".Raw";
     
     size_t image_bytes = image->width*image->height;
     Poco::Path image_path = parent->getRootPath();
@@ -116,7 +170,12 @@ void FileStream::run(){
     image->set_disk_file(image_path);
     
     //std::cout << image_path.toString() << "\n";
-    
+    /*
+    Mat image_Mat = cv::Mat(Size(image->height,image->width), CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+    cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+    std::string namep = front.name + ".png";
+    imwrite(namep, image_Mat);
+    */
     std::fstream myfile;
     myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
     if (myfile.fail()) {
@@ -134,7 +193,7 @@ void FileStream::run(){
 
 void ProcessStream::run() {
 
-    parent->sCam->spin_run();
+    //parent->sCam->spin_run();
 
 }
 
@@ -325,7 +384,7 @@ int SpinPath::spinUpCamera(){
     camlogger.error(Poco::format("Error Spinning up camera: %s", e.what()));
     result = -1;
   }
-  
+ 
   return 0;
 }
 

@@ -85,14 +85,14 @@ protected:
     int main(const ArgVec& args) {
         if (!_helpRequested)
         {
-            Poco::Path root_path = Poco::Path("D:/pcamTest4");
+            Poco::Path root_path = Poco::Path("D:/pcamTestBarebones");
 
             camera->setRootPath(root_path);
 
             camera->newCaptureSet();
 
             camera->startCamera();
-            Poco::Thread::sleep(30000);
+            Poco::Thread::sleep(5000);
             camera->stopCamera();
 
 

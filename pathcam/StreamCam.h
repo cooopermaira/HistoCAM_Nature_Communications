@@ -17,6 +17,7 @@ using Poco::Logger;
 
 namespace pathCam{
 class Composite;
+class CompositeVoronoi;
 class CompositeManager;
 
 class StreamCam: public BatchCam{
@@ -29,6 +30,7 @@ class StreamCam: public BatchCam{
   friend class QManager;
   friend class RegManager;
   friend class Composite;
+  friend class CompositeVoronoi;
   friend class CompositeManager;
   
 private:
@@ -68,7 +70,7 @@ protected:
   void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
   void add_new_component(unsigned long image_index);
   
-  std::vector < Composite* > composites;
+  std::vector < CompositeVoronoi* > composites;
   std::vector < bool > visited;
   
 

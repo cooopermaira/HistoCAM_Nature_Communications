@@ -11,7 +11,7 @@ class Image{
 public:
   unsigned int width, height;
   unsigned int reference_count;
-  
+
   enum{ _NOLABEL=0, _2X, _4X, _10x, _20x, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _LENS_CHANGE};
   unsigned int label;
   
@@ -31,9 +31,14 @@ public:
     image_file = _image_file;
   }
   
-  void load_raw_from_disk(){
+  void load_raw_from_disk(bool compositing=false){
       buffer_mutex.lock();
       if (raw_buffer == 0) {
+          /*
+          if (compositing) {
+              std::cout << "loaded from disk while compositing " << std::endl;
+          }
+          */
           if (image_file.toString() != "") {
               std::ifstream stream;
               stream.open(image_file.toString(), std::ios::binary);
@@ -50,7 +55,7 @@ public:
       reference_count++;
       buffer_mutex.unlock();
   }
-  
+  /*
   void selective_read(cv::Rect region){
     if(image_file.toString() != ""){
       buffer_mutex.lock();
@@ -71,8 +76,9 @@ public:
       buffer_mutex.unlock();
     }
   }
+  */
+  void increment_smart_pointer() { reference_count++; }
 
-  
   void copy_in(void *buffer){
       buffer_mutex.lock();
       allocate_memory_RAW();
@@ -176,8 +182,8 @@ private:
     }
   }
   
-  char *raw_buffer;
-  
+
+  char* raw_buffer;
   cv::Mat reg_image;
   double reg_scale;
   double reg_crop;

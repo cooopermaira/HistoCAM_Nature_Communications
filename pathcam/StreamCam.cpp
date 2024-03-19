@@ -76,7 +76,7 @@ bool StreamCam::run(){
   
   JobQueue *jq = new JobQueue(10,10);
   
-  Loader *loader = new Loader(this,jq);
+  SpinLoader *loader = new SpinLoader(this,jq);
   loader_thread.start(loader);
   
   QManager *qm = new QManager(this,jq);
@@ -148,7 +148,7 @@ void StreamCam::add_new_component(unsigned long image_index){
   reg_results[image_index] = RegInfo(false,Vec2(0.0,0.0),true,increment_and_get_components());
   reg_results[image_index].index = image_index;
   //delete these pointers when destroyed
-  Composite * temp = new Composite(this);
+  auto * temp = new CompositeVoronoi(this);
   component_mutex->lock();
   composites.push_back(temp);
   component_mutex->unlock();

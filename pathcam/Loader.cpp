@@ -14,8 +14,8 @@ Loader::Loader(StreamCam *parent, JobQueue *queue): parent(parent), queue(queue)
 
 
 void Loader::run(){
-  
-  while(!parent->disk_empty){
+    int j = 0;
+  while(!parent->disk_empty || !parent->buffer.empty()){
     if(parent->buffer.empty()){
       Poco::Thread::sleep(100);
     }else{
@@ -29,9 +29,7 @@ void Loader::run(){
       delete [] parent->buffer.front();
       parent->buffer.pop();
       parent->buffer_mutex->unlock();
-
-      image->load_raw_from_disk();
-
+      j++;
       if(!image->in_memory()){
         successful = false;
         image->label = Image::_BAD_FILE;
@@ -39,7 +37,7 @@ void Loader::run(){
       }
       
       image->find_label();
-      
+
       if(image->is_good()){
         image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
         image->free_memory_RAW();
@@ -80,7 +78,7 @@ void Loader::run(){
         }
         
         image_index = parent->add_image(image);
-        
+
         //since we dont know the number of frames ahead of time, these 3 vectors have to be dynamically resized. To avoid doing this constantly, it's done 100 slots at a time. This is probably not thread safe and likely needs a mutex since the resize might cause a reallocation. If it doesn't cause a reallocation, it's fine since its only adding onto the end of the vector.
         if(image_index % 100 == 0){
           parent->matchM.resize(image_index + 100);
@@ -100,6 +98,7 @@ void Loader::run(){
   }//end while
   successful = true;
   parent->jobs_queued = true; //termination condition for other processes
+  std::cout << j << std::endl;
   std::cout << "jobs queued ";
 }//end run
 
@@ -109,27 +108,17 @@ SpinLoader::SpinLoader(StreamCam* parent, JobQueue* queue) : parent(parent), que
 
 void SpinLoader::run() {
 
-    while (parent->microscope_input) {
+    while (parent->microscope_input || !parent->spin_image_buffer.empty()) {
         if (parent->spin_image_buffer.empty()) {
             Poco::Thread::sleep(100);
         }
         else {
             pathCam::Image* image = parent->get_Q_front_Spin();
-            /*
-            parent->buffer_mutex->lock();
-            image->set_disk_file(parent->disk_image.front());
-            parent->disk_image.pop();
-            
-            image->copy_in(parent->buffer.front());
-            delete[] parent->buffer.front();
-            parent->buffer.pop();
-            parent->buffer_mutex->unlock();
-            */
-            image->load_raw_from_disk();
 
             if (!image->in_memory()) {
                 successful = false;
                 image->label = Image::_BAD_FILE;
+                std::cout << "Image failed to load" << std::endl;
                 return;
             }
 
