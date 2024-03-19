@@ -7,6 +7,10 @@
 
 #include "pathCam.h"
 
+#include "Poco/DirectoryIterator.h"
+
+using Poco::DirectoryIterator;
+
 int main( int argc, char* argv[] )
 {
   
@@ -14,27 +18,80 @@ int main( int argc, char* argv[] )
   if(argc < 3){
     std::cout << "Missing input. Use:\n";
     std::cout << "debayer <path to input image> <path to output image>\n";
-  }
-  
-  std::string file = argv[1];
-  std::string outfile_name = argv[2];
-  
-  pathCam::Image * image = new pathCam::Image();
-  
-  image->set_disk_file(file);
-  image->load_raw_from_disk();
-  
-  
-  if(!image->in_memory() ){
-    std::cout << "Issue loading image.\n";
     return -1;
   }
   
-  image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
+  Path inFile = Path(argv[1]);
+  Path outFile = Path(argv[2]);
   
-  imwrite(outfile_name, image->get_reg_image());
+  if(!(inFile.isDirectory() == outFile.isDirectory())){
+    std::cout << "Input needs to be both directories or files.\n";
+    return -1;
+  }
   
-  delete image;
+  if(inFile.isDirectory()){
+    
+    std::cout << "Processing Directories\n";
+    
+    DirectoryIterator it(inFile);
+    DirectoryIterator end;
+    while (it != end){
+      
+      Path p(it.path());
+      
+      if(p.getExtension() == "Raw"){
+        std::cout << "read:" << p.toString() << "\n";
+        
+        pathCam::Image * image = new pathCam::Image();
+        
+        image->set_disk_file(p);
+        image->load_raw_from_disk();
+
+        if(!image->in_memory() ){
+          std::cout << "Issue loading image.\n";
+          return -1;
+        }
+        
+        image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
+        
+        Path o = outFile;
+        o.append(p.getFileName());
+        o.setExtension("png");
+        
+        std::cout << "write:" << o.toString() << "\n";
+
+        imwrite(o.toString(), image->get_reg_image());
+        
+        delete image;
+      }
+      
+      ++it;
+    }
+    
+    
+    
+  }else{
+    
+    std::cout << "Processing File\n";
+
+    pathCam::Image * image = new pathCam::Image();
+    
+    image->set_disk_file(inFile);
+    image->load_raw_from_disk();
+    
+    
+    if(!image->in_memory() ){
+      std::cout << "Issue loading image.\n";
+      return -1;
+    }
+    
+    image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
+    
+    imwrite(outFile.toString(), image->get_reg_image());
+
+    delete image;
+  }
+
   return 0;
   
 }
