@@ -1,0 +1,42 @@
+<config>
+  
+  <processing threads="24" />
+  
+  <io>
+  
+    <input_images>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/4253_3_input.txt</input_images>
+    <output_log>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/log_new.txt</output_log>
+    <output_image>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/result.png</output_image>
+    <flat_field_images>
+      <twoX>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/2x_wb.tif</twoX>
+    </flat_field_images>
+
+  </io>
+  
+  <registration>
+    
+    <detector>
+      <features>
+          <type>ORB</type>
+          <params nfeatures="500" scaleFactor="1.0" nlevels="1" edgeThreshold="31"
+          firstLevel="0" WTA_K="2" scoreType="HARRIS_SCORE" patchSize="31" fastThreshold="20"/>
+      </features>
+      <FREAK>False</FREAK>
+    </detector>
+    
+    <image>
+      <crop>0.5</crop>
+      <scale>0.25</scale>
+      <interpolation>CUBIC</interpolation>
+      <real>false</real>
+      <debayer>true</debayer>
+    </image>
+    
+    <matcher>BRUTEFORCE_HAMMING</matcher>
+    <estimator>RANSAC</estimator>
+    
+  </registration>
+  
+</config>
+
+

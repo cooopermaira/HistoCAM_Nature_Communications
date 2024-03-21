@@ -30,6 +30,25 @@ public:
        double max_y=-std::numeric_limits<double>::infinity()):
   min_x(min_x), min_y(min_y), max_x(max_x), max_y(max_y) {};
   
+  bool intersect(Bbox b){
+    return (min_x <= b.max_x && max_x >= b.min_x) &&
+           (min_y <= b.max_y && max_y >= b.min_y);
+  }
+
+  double area(Bbox b){
+    double Omin_x = fmax(min_x, b.min_x);
+    double Omin_y = fmax(min_y, b.min_y);
+    double Omax_x = fmin(max_x, b.max_x);
+    double Omax_y = fmin(max_y, b.max_y);
+
+    //Assuming both boxes are the same size
+    double one_area = (max_x-min_x)*(max_x-min_x) + (max_y-min_y)*(max_y-min_y);
+    double Oarea = (Omax_x-Omin_x)*(Omax_x-Omin_x) + (Omax_y-Omin_y)*(Omax_y-Omin_y);
+    
+    return Oarea/one_area;
+  }
+
+  
   std::string toString(){
     std::stringstream ss;
     ss << "[" << min_x << "," << min_y << "," << max_x << "," << max_y << "]";
@@ -37,6 +56,7 @@ public:
   }
   
 };
+
 
 class ThreadQueue{
 private:

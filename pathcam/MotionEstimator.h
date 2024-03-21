@@ -26,12 +26,21 @@ public:
   
 };
 
+
 class RegInfo{
 public:
-  bool successful;
+  unsigned long int index;
+  bool successful,root;
+  unsigned int component_membership;
   Vec2 vec;
-  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0)):
-  successful(successful), vec(vec) {};
+  
+  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
+  successful(successful), vec(vec),component_membership(component_membership),root(root) {};
+  
+  // to allow for sorting of reginfo objects by component membership
+  bool operator < (const RegInfo& other) const {
+    return component_membership < other.component_membership;
+  }
   
   std::string toString(){
     std::stringstream ss;

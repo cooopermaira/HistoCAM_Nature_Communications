@@ -1,5 +1,5 @@
 //
-//  BatchCam.hp
+//  BatchCam.h
 //  pathCamLib
 //
 //  Created by Brian on 3/15/23.
@@ -12,21 +12,25 @@
 
 using Poco::MemoryPool;
 using Poco::Path;
+using Poco::Logger;
 
 namespace pathCam{
 
 class BatchCam{
   
-  friend class RegRunnable;
+  friend class PairRegRunnable;
   
-private:
+protected:
   std::vector <MemoryPool *> mempool;
-  Poco::Logger *logger;
+  Logger *logger;
+  Logger::Ptr results_logger;
   unsigned int threads;
   
+  
   Poco::Path input_images;
-  Poco::Path output_log;
   Poco::Path out_image;
+  Poco::Path flat_field_file;
+
   
   //Registration Params
   double crop_factor;
@@ -47,12 +51,16 @@ private:
 
     
   std::vector < Image *> images;
-  MatchMatrix *matchM;
   std::vector < RegInfo > reg_results;
+  std::vector < Bbox > box;
+  
+  MatchMatrix matchM;
+  OverlapMatrix overlapM;
+  Bbox combined_box;
 
 
 public:
-  BatchCam(Poco::Util::LayeredConfiguration::Ptr config, Poco::Logger &Applogger);
+  BatchCam(Poco::Util::LayeredConfiguration::Ptr config);
   
   ~BatchCam(){
     
@@ -66,17 +74,19 @@ public:
     }
     images.clear();
     
-
   }
   
-  bool run();
-
-private:
+  virtual bool run();
+  
+protected:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
-  
-  bool registration(unsigned int thread_id=0);
+
+  virtual bool resolve_bboxes();
+  void find_overlaps();
   bool compositing();
+  Mat dome_score_image( int, int, int);
+  Mat donut_score_image( int, int, int);
   
 };
 

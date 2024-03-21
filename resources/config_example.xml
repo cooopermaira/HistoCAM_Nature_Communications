@@ -1,11 +1,16 @@
 <config>
   
+  <processing threads="5" />
+  
   <io>
   
     <input_images>/Users/bsumma/Library/CloudStorage/Box-Box/PathCam/test_data/raw/process_test.txt</input_images>
     <output_log>/Users/bsumma/log.txt</output_log>
     <output_image>/Users/bsumma/result.png</output_image>
-    
+    <flat_field_images>
+      <2X>/Users/bsumma/Library/CloudStorage/Box-Box/PathCam/calibration/2x_wb.tif</2X>
+    </flat_field_image>
+
   </io>
   
   <registration>
@@ -33,4 +38,5 @@
   </registration>
   
 </config>
+
 

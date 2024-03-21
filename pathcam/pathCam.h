@@ -24,6 +24,7 @@
 #include "opencv2/xfeatures2d.hpp"
 #endif
 
+#include "Poco/Mutex.h"
 #include "Poco/Runnable.h"
 #include "Poco/Thread.h"
 #include "Poco/MemoryPool.h"
@@ -33,6 +34,12 @@
 #include "Poco/Util/XMLConfiguration.h"
 #include "Poco/Util/Application.h"
 #include "Poco/Util/HelpFormatter.h"
+#include "Poco/SimpleFileChannel.h"
+#include "Poco/FileChannel.h"
+#include "Poco/LogStream.h"
+#include "Poco/Process.h"
+#include "Poco/DateTime.h"
+#include "Poco/ThreadPool.h"
 
 #include "util.h"
 #include "Image.h"
@@ -41,8 +48,19 @@
 #include "Match.h"
 #include "DescriptorMatcher.h"
 #include "MotionEstimator.h"
+#include "OverlapMatrix.h"
 #include "BatchCam.h"
+//#include "FastCam.h"
+#include "ConsecQ.h"
+#include "StreamCam.h"
+#include "Runnables.h"
+#include "JobQueue.h"
+#include "Composite.h"
 
+#ifdef WITH_SPINNAKER
+#include "Spinnaker.h"
+#include "SpinPath.h"
+#endif
 
 
 #endif /* pathCam_h */

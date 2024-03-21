@@ -14,14 +14,17 @@ using Poco::Path;
 using Poco::Util::XMLConfiguration;
 using Poco::Util::LayeredConfiguration;
 using Poco::Logger;
+using Poco::LogStream;
 using Poco::Environment;
+using Poco::FileChannel;
 
-BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
-  logger = &Applogger;
+BatchCam::BatchCam(LayeredConfiguration::Ptr config){
+  logger = &Logger::get("PathCamLogger");
+  
   logger->information(Poco::format("System OS: %s", Environment::osDisplayName()));
   logger->information(Poco::format("System Arch: %s", Environment::osArchitecture()));
-  logger->information(Poco::format("System OS: %u\n", Environment::processorCount()));
-    
+  logger->information(Poco::format("System Processor Count: %u\n", Environment::processorCount()));
+
   //Defaults
   crop_factor = 1.0;
   scale_factor  = 1.0;
@@ -33,11 +36,15 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
   matcher_type = cv::DescriptorMatcher::BRUTEFORCE_HAMMING;
   estimator_type = RANSAC;
   threads = 1;
+  results_logger = NULL;
 
+  
   if(!parseConfig(config)){
     logger->fatal("Problem parsing XML. Exiting...");
     exit(-1);
   }
+
+  
   
   mempool.resize(threads);
    
@@ -51,15 +58,41 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config, Logger &Applogger){
 
 }
 
+std::string printSubKeys(LayeredConfiguration::Ptr config, std::string short_key, std::string full_key, std::string print_prefix){
+  std::vector<std::string> sub_keys;
+  config->keys(full_key, sub_keys);
+  std::string s = print_prefix + "< " + short_key + " > " + "\n";
+  for(unsigned int i=0; i < sub_keys.size(); i++){
+    std::string new_prefix = "\t" + print_prefix;
+    s += printSubKeys(config, sub_keys[i], full_key + "." + sub_keys[i], new_prefix);
+  }
+  return s;
+}
+
+std::string printConfig(LayeredConfiguration::Ptr config){
+  std::vector<std::string> root_keys;
+  config->keys(root_keys);
+  
+  std::string s = "";
+  
+  for(unsigned int i=0; i < root_keys.size(); i++){
+    s += printSubKeys(config, root_keys[i], root_keys[i] , "");
+  }
+
+  return s;
+}
+
 bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
   
-  if(pConf->has("system")){
-    if(pConf->has("system[@threads]")){
+  logger->information(printConfig(pConf));
+  
+  if(pConf->has("processing")){
+    if(pConf->has("processing[@threads]")){
       try{
-        threads = pConf->getUInt("system[@threads]");
-        std::cout << "Using " << threads << " threads\n";
+        threads = pConf->getUInt("processing[@threads]");
+        logger->information(Poco::format("Using %u threads", threads ));
       }catch(std::string bad_input){
-        std::cout << "Bad input for threads: " << bad_input << ". Using default.\n";
+        logger->warning("Bad input for threads: " + bad_input + ". Using default.\n");
         threads = 1;
       }
     }
@@ -72,18 +105,18 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       input_images = Path(temp);
       
       if(input_images.isDirectory()){
-        std::cout << "Input Images: Directories not supported.\n";
+        logger->fatal("Input Images: Directories not supported.");
         input_images = Path();
         return false;
       }
       
       if(input_images.getExtension() != "txt"){
-        std::cout << "Input Images: Only text files supported.\n";
+        logger->fatal("Input Images: Only text files supported.");
         input_images = Path();
         return false;
       }
     }else{
-      std::cout << "Input images required.\n";
+      logger->fatal("Input images required.");
       return false;
     }
     
@@ -92,19 +125,25 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       Path temp_log = Path(temp);
       
       if(temp_log.isDirectory()){
-        std::cout << "Output Log: Directories not supported. No registration output.\n";
+        logger->warning("Output Log: Directories not supported. No registration output.");
         temp_log.clear();
       }
 
       if(temp_log.getExtension() != "txt"){
-        std::cout << "Output Log:  No registration output.\n";
+        logger->warning("Output Log:  No registration output.");
         temp_log.clear();
       }
       
-      if(temp_log.toString() != ""){ output_log = temp_log; }
+      if(temp_log.toString() != ""){
+        results_logger = &Logger::get("ResultsLogger");
+        AutoPtr<FileChannel> pChannel(new FileChannel);
+        pChannel->setProperty("path", temp_log.toString());
+        pChannel->setProperty("rotateOnOpen", "true");
+        results_logger->setChannel(pChannel);
+      }
       
     }else{
-      std::cout << "No output log supplied. No registration output.\n";
+      logger->warning("No output log supplied. No registration output.");
     }
     
     if(pConf->has("io.output_image")){
@@ -112,8 +151,21 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       out_image = Path(temp);
       
       if(out_image.getExtension() != "png" && out_image.getExtension() != "tif"){
-        std::cout << "Only PNG or TIF outputs supported. No image output.\n";
+        logger->warning("Only PNG or TIF outputs supported. No image output.");
         out_image = Path();
+      }
+    }
+    
+    if(pConf->has("io.flat_field_images")){
+      if(pConf->has("io.flat_field_images.twoX")){
+        std::string temp = pConf->getString("io.flat_field_images.twoX");
+        flat_field_file = Path(temp);
+        
+        if(flat_field_file.getExtension() != "png" && flat_field_file.getExtension() != "tif"){
+          logger->warning("Only PNG or TIF outputs supported. No image output.");
+          flat_field_file = Path();
+        }
+        
       }
     }
     
@@ -143,33 +195,33 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
           }else if (temp == "ORB"){
             feature_type = _ORB;
           }else{
-            std::cout << "Unknown feature type. Using default.\n";
+            logger->warning("Unknown feature type. Using default.");
           }
         }else{
-          std::cout << "No feature type supplied.  Using default.\n";
+            logger->warning("No feature type supplied.  Using default.");
         }
         
         if(pConf->has("registration.detector.features.params")){
         
           switch(feature_type){
             case _SIFT:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _SURF:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _AKAZE:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _BRISK:
-              std::cout << "not yet implemented\n"; return false;
+              logger->warning("Params for this feature not yet implemented"); return false;
               break;
             case _ORB:
               int nfeatures;
               try{
                 nfeatures = pConf->getInt("registration.detector.features.params[@nfeatures]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for nfeatures: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for nfeatures: " + bad_input + ". Using default.");
                 nfeatures = ORB_params.nfeatures;
               }
               ORB_params.nfeatures = nfeatures;
@@ -177,7 +229,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 scaleFactor = pConf->getDouble("registration.detector.features.params[@scaleFactor]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for scaleFactor: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for scaleFactor: " + bad_input + ". Using default.");
                 scaleFactor = ORB_params.scaleFactor;
               }
               ORB_params.scaleFactor = scaleFactor;
@@ -185,7 +237,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 nlevels = pConf->getInt("registration.detector.features.params[@nlevels]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for nlevels: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for nlevels: " + bad_input + ". Using default.");
                 nlevels = ORB_params.nlevels;
               }
               ORB_params.nlevels = nlevels;
@@ -193,7 +245,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 edgeThreshold = pConf->getInt("registration.detector.features.params[@edgeThreshold]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for edgeThreshold: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for edgeThreshold: " + bad_input + ". Using default.");
                 edgeThreshold = ORB_params.edgeThreshold;
               }
               ORB_params.edgeThreshold = edgeThreshold;
@@ -201,7 +253,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 firstLevel = pConf->getInt("registration.detector.features.params[@firstLevel]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for firstLevel: " + bad_input + ". Using default.");
                 firstLevel = ORB_params.firstLevel;
               }
               ORB_params.firstLevel = firstLevel;
@@ -209,7 +261,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 WTA_K = pConf->getInt("registration.detector.features.params[@WTA_K]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for firstLevel: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for WTA_K: " + bad_input + ". Using default.");
                 WTA_K = ORB_params.WTA_K;
               }
               ORB_params.WTA_K = WTA_K;
@@ -220,7 +272,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               } else if (temp == "FAST_SCORE"){
                 scoreType = ORB::FAST_SCORE;
               }else{
-                std::cout << "Unknown scoreType: " << temp << ". Using Defaults.\n";
+                logger->warning("Unknown scoreType: " + temp + ". Using default.");
                 scoreType = ORB_params.scoreType;
               }
               ORB_params.scoreType = scoreType;
@@ -228,7 +280,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 patchSize = pConf->getInt("registration.detector.features.params[@patchSize]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for patchSize: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for patchSize: " + bad_input + ". Using default.");
                 patchSize = ORB_params.patchSize;
               }
               ORB_params.patchSize = patchSize;
@@ -236,7 +288,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
               try{
                 fastThreshold = pConf->getInt("registration.detector.features.params[@fastThreshold]");
               }catch(std::string bad_input){
-                std::cout << "Bad input for fastThreshold: " << bad_input << ". Using default.\n";
+                logger->warning("Bad input for fastThreshold: " + bad_input + ". Using default.");
                 fastThreshold = ORB_params.fastThreshold;
               }
               ORB_params.fastThreshold = fastThreshold;
@@ -246,11 +298,11 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
           
           
         }else{
-          std::cout << "No feature params supplied.  Using defaults.\n";
+          logger->warning("No feature params supplied.  Using defaults.");
         }
         
       }else{
-        std::cout << "No feature info supplied.  Using defaults.\n";
+        logger->warning("No feature info supplied.  Using defaults.");
       }
       
       if(pConf->has("registration.detector.FREAK")){
@@ -258,16 +310,16 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           use_FREAK = pConf->getBool("registration.detector.FREAK");
         }catch(std::string bad_input){
-          std::cout << "Bad input for FREAK: " << bad_input << ". Using default.\n";
+          logger->warning("Bad input for use_FREAK: " + bad_input + ". Using default.");
           use_FREAK = temp;
         }
         
       }else{
-        std::cout << "No FREAK preference supplied.  Using defaults.\n";
+        logger->warning("No FREAK preference supplied.  Using defaults.");
       }
       
     }else{
-      std::cout << "No detector info supplied.  Using defaults.\n";
+          logger->warning("No detector info supplied.  Using defaults.");
     }
     
     if(pConf->has("registration.image")){
@@ -277,11 +329,11 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           crop_factor = pConf->getDouble("registration.image.crop");
         }catch(std::string bad_input){
-          std::cout << "Bad input for crop: " << bad_input << "\n";
+          logger->warning("Bad input for crop: " + bad_input + ".");
           crop_factor = temp;
         }
         if(crop_factor < 0.0 || crop_factor > 1.0){
-          std::cout << "Bad crop factor given defaulting to 1.0\n";
+          logger->warning("Bad crop factor given defaulting to 1.0");
           crop_factor = 1.0;
         }
       }
@@ -291,11 +343,11 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           scale_factor = pConf->getDouble("registration.image.scale");
         }catch(std::string bad_input){
-          std::cout << "Bad input for scale: " << bad_input << "\n";
+          logger->warning("Bad input for scale: " + bad_input + ".");
           scale_factor = temp;
         }
         if(scale_factor < 0.0 || scale_factor > 1.0){
-          std::cout << "Bad scale factor given defaulting to 1.0\n";
+          logger->warning("Bad scale factor given defaulting to 1.0");
           scale_factor = 1.0;
         }
     
@@ -321,7 +373,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         }else if (temp == "MAX"){
           interpolation = INTER_MAX;
         }else{
-          std::cout << "Improper input for interpolation. Defaulting to CUBIC\n";
+          logger->warning("Improper input for interpolation. Defaulting to CUBIC");
           interpolation = INTER_CUBIC;
         }
         
@@ -332,7 +384,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           real = pConf->getBool("registration.image.real");
         }catch(std::string bad_input){
-          std::cout << "Bad input for real: " << bad_input << ". Using default.\n";
+          logger->warning("Bad input for real: " + bad_input + ". Using default.");
           real = temp;
         }
       }
@@ -342,29 +394,29 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         try {
           debayer = pConf->getBool("registration.image.debayer");
         }catch(std::string bad_input){
-          std::cout << "Bad input for debayer: " << bad_input << ". Using default\n";
+          logger->warning("Bad input for debayer: " + bad_input + ". Using default.");
           debayer = temp;
         }
       }
       
     }else{
-      std::cout << "No registation image info supplied.  Using defaults.\n";
+      logger->warning("No registation image info supplied.  Using defaults.");
     }
     
     if(pConf->has("registration.matcher")){
       
     }else{
-      std::cout << "No matcher info supplied.  Using defaults.\n";
+      logger->warning("No matcher info supplied.  Using defaults.");
     }
     
     if(pConf->has("registration.estimator")){
       
     }else{
-      std::cout << "No estimator info supplied.  Using defaults.\n";
+      logger->warning("No estimator info supplied.  Using defaults.");
     }
     
   }else{
-    std::cout << "No registration info supplied.  Using defaults.\n";
+      logger->warning("No registration info supplied.  Using defaults.");
   }
 
   
@@ -404,7 +456,7 @@ bool BatchCam::loadFileList(){
   return true;
 }
 
-class RegRunnable: public Poco::Runnable{
+class PairRegRunnable: public Poco::Runnable{
 private:
   BatchCam *parent;
   pathCam::MotionEstimator * mot;
@@ -414,7 +466,7 @@ private:
   
 public:
   
-  RegRunnable(BatchCam *parent): parent(parent), successful(false){};
+  PairRegRunnable(BatchCam *parent): parent(parent), successful(false){};
   bool successful;
   
   virtual void run(){
@@ -445,17 +497,8 @@ public:
   }
   
   bool registration(unsigned int thread_id){
-    std::ofstream outfile;
-    std::stringstream ss;
-    ss << thread_id;
     
-    if(parent->output_log.toString() != ""){
-      outfile.open(parent->output_log.toString() + ss.str());
-    }
-    
-    
-    
-    unsigned int num_images = parent->images.size()/parent->threads;
+    unsigned int num_images = (unsigned int)parent->images.size()/parent->threads;
     int start = (thread_id*num_images)-1;
     int end = (thread_id+1)*num_images;
     if(end == parent->images.size()){ end--;}
@@ -464,6 +507,8 @@ public:
     unsigned int last_index = start;
 
     for(unsigned int i=start; i < end; i++){
+
+      std::string outfile = Poco::format("%u\t", thread_id);
       
       if(i==0){
           parent->reg_results[0] = RegInfo(true, Vec2(0, 0));
@@ -472,8 +517,6 @@ public:
       pathCam::Image * last_registered = parent->images[last_index];
       pathCam::Image * next_image = parent->images[i+1];
 
-      //so, right now no mutex.  Assuming given the array split these won't hit each other
-      //bad assumption long term
       last_registered->load_raw_from_disk();
       next_image->load_raw_from_disk();
       
@@ -481,9 +524,9 @@ public:
         continue;
       }
       
-      if(parent->output_log.toString() != ""){
-        outfile << last_registered->get_File() << "\t";
-        outfile << next_image->get_File() << "\t";
+      if(parent->results_logger){
+        outfile += last_registered->get_ImageFile().toString() + "\t";
+        outfile += next_image->get_ImageFile().toString()+ "\t";
       }
       
       auto begin = std::chrono::high_resolution_clock::now();
@@ -503,12 +546,14 @@ public:
       }
       
       if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
-        if(parent->output_log.toString() != ""){ outfile << "failed. Not enough keypoints\n"; }
+        if(parent->results_logger){  parent->results_logger->information(outfile + "failed. Not enough keypoints"); }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
         continue;
       }
       
-      pathCam::Match *m = new pathCam::Match(last_registered,next_image);
+      parent->matchM.match[last_index][i+1] = new pathCam::Match(last_registered,next_image);
+      
+      pathCam::Match *m = parent->matchM.match[last_index][i+1];
       matcher->match(m);
       
       int result = mot->findHomography(m, parent->estimator_type);
@@ -516,31 +561,37 @@ public:
       auto end = std::chrono::high_resolution_clock::now();
       auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
       
-      if(parent->output_log.toString() != ""){
-        outfile << last_registered->keypoints.size() << "\t";
-        outfile << next_image->keypoints.size() << "\t";
+      if(parent->results_logger){
+        outfile += Poco::format("%u\t", (unsigned int)last_registered->keypoints.size());
+        outfile += Poco::format("%u\t", (unsigned int)next_image->keypoints.size());
       }
       
       
       if(result == 1){
-        if(parent->output_log.toString() != ""){
-          outfile << m->t_x << "\t" << m->t_y << "\t";
-          outfile << elapsed.count() * 1e-9 << "\n";
+        if(parent->results_logger){
+          parent->results_logger->information(outfile +
+                                              Poco::format("%f\t%f\t", m->t_x, m->t_y) +
+                                              Poco::format("%f", elapsed.count() * 1e-9));
         }
         parent->reg_results[i+1] = RegInfo(true, Vec2(m->t_x, m->t_y));
+        parent->matchM.match[i+1][last_index] = new pathCam::Match(m);
         last_index = i+1;
       }
       if(result == -1){
-        if(parent->output_log.toString() != ""){
-          outfile << "failed. Not enough matches\n";
+        if(parent->results_logger){
+          parent->results_logger->information(outfile + "failed. Not enough matches.");
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
+        delete m;
+        parent->matchM.match[last_index][i+1] = NULL;
       }
       if(result == -2){
-        if(parent->output_log.toString() != ""){
-          outfile << "failed.  Not enough keypoints.\n";
+        if(parent->results_logger){
+          parent->results_logger->information(outfile + "failed. Not enough keypoints.");
         }
         parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
+        delete m;
+        parent->matchM.match[last_index][i+1] = NULL;
       }
       
       //Need to only unload if not using again, but doing this to make sure
@@ -549,11 +600,6 @@ public:
       last_registered->free_memory_RAW();
       next_image->free_memory_RAW();
         
-      delete m;
-    }
-
-    if(parent->output_log.toString() != ""){
-      outfile.close();
     }
 
     return true;
@@ -569,13 +615,14 @@ bool BatchCam::run(){
   good = loadFileList();
   if(!good){ logger->fatal("Exiting run."); return false; }
   
-  logger->information("Performing Registration:\n");
+  logger->information(Poco::format("Performing Registration w/ %u threads\n", threads));
   auto reg_begin = std::chrono::high_resolution_clock::now();
 
-  std::vector < RegRunnable> runnable(threads, RegRunnable(this));
+  std::vector < PairRegRunnable > runnable(threads, PairRegRunnable(this));
   std::vector < Poco::Thread > thread(threads);
   
   reg_results.resize(images.size());
+  matchM.resize(images.size());
 
   for(unsigned int i=0; i < threads; i++){
     thread[i].start(runnable[i]);
@@ -595,7 +642,11 @@ bool BatchCam::run(){
   logger->information("Done Registering Images.");
   logger->information(Poco::format("%f seconds including I/O", reg_elapsed.count() * 1e-9));
 
+  if(!resolve_bboxes()){ logger->error("Error resolving image bounding boxes."); }
   
+  find_overlaps();
+  
+  //matchM.output(images);
   
   if(out_image.toString() != ""){
     logger->information("Compositing Images.");
@@ -613,137 +664,19 @@ bool BatchCam::run(){
     logger->information(Poco::format("%f seconds including I/O", comp_elapsed.count() * 1e-9));
     auto total_elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(comp_end - reg_begin);
     logger->information(Poco::format("%f total.", total_elapsed.count() * 1e-9));
+  }else{
+    logger->information("No image provided.  Not compositing.");
+
   }
   
   return true;
 }
 
 
-
-
-
-//
-//bool BatchCam::registration(unsigned int thread_id){
-//  std::ofstream outfile;
-//  std::stringstream ss;
-//  ss << thread_id;
-//  
-//  if(output_log.toString() != ""){
-//    outfile.open(output_log.toString() + ss.str());
-//  }
-//  
-//  unsigned int last_index = 0;
-//  
-//  unsigned int num_images = images.size()/threads;
-//  int start = thread_id*num_images;
-//  int end = (thread_id+1)*num_images;
-//  if(end == images.size()){ end--;}
-//  
-//  
-//  for(unsigned int i=start; i < end; i++){
-//    
-//    if(i==0){
-//        Bbox box = Bbox(0, 0, images[0]->width, images[0]->height);
-//        reg_results[0] = RegInfo(true, Vec2(0, 0), box);
-//    }
-//      
-//    pathCam::Image * last_registered = images[last_index];
-//    pathCam::Image * next_image = images[i+1];
-//
-//    //so, right now no mutex.  Assuming given the array split these won't hit each other
-//    //bad assumption long term
-//    last_registered->load_raw_from_disk();
-//    next_image->load_raw_from_disk();
-//    
-//    if(!last_registered->in_memory() || !next_image->in_memory()){
-//      continue;
-//    }
-//    
-//    if(output_log.toString() != ""){
-//      outfile << last_registered->get_File() << "\t";
-//      outfile << next_image->get_File() << "\t";
-//    }
-//    
-//    auto begin = std::chrono::high_resolution_clock::now();
-//    
-//    last_registered->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
-//    next_image->create_reg_image(scale_factor,crop_factor,debayer,interpolation, real);
-//    
-//    
-//    this->detector[thread_id]->detect_and_compute(last_registered);
-//    detector[thread_id]->detect_and_compute(next_image);
-//    
-//    if(last_registered->keypoints.size() < 200 || next_image->keypoints.size() < 200){
-//      detector[thread_id]->set_ORB_params();
-//      detector[thread_id]->detect_and_compute(last_registered);
-//      detector[thread_id]->detect_and_compute(next_image);
-//      detector[thread_id]->set_ORB_params(ORB_params);
-//    }
-//    
-//    if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
-//      if(output_log.toString() != ""){ outfile << "failed. Not enough keypoints\n"; }
-//      reg_results[i+1] = RegInfo(false, reg_results[i].vec);
-//      continue;
-//    }
-//    
-//    pathCam::Match *m = new pathCam::Match(last_registered,next_image);
-//    matcher[thread_id]->match(m);
-//    
-//    int result = mot[thread_id]->findHomography(m, estimator_type);
-//    
-//    auto end = std::chrono::high_resolution_clock::now();
-//    auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
-//    
-//    if(output_log.toString() != ""){
-//      outfile << last_registered->keypoints.size() << "\t";
-//      outfile << next_image->keypoints.size() << "\t";
-//    }
-//    
-//    
-//    if(result == 1){
-//      if(output_log.toString() != ""){
-//        outfile << m->t_x << "\t" << m->t_y << "\t";
-//        outfile << elapsed.count() * 1e-9 << "\n";
-//      }
-//      double t_x = reg_results[last_index].vec.x-m->t_x;
-//      double t_y = reg_results[last_index].vec.y-m->t_y;
-//      Bbox box = Bbox(t_x, t_y, next_image->width+t_x, next_image->height+t_y);
-//      reg_results[i+1] = RegInfo(true, Vec2(t_x, t_y), box);
-//      last_index = i+1;
-//    }
-//    if(result == -1){
-//      if(output_log.toString() != ""){
-//        outfile << "failed. Not enough matches\n";
-//      }
-//      reg_results[i+1] = RegInfo(false, reg_results[i].vec);
-//    }
-//    if(result == -2){
-//      if(output_log.toString() != ""){
-//        outfile << "failed.  Not enough keypoints.\n";
-//      }
-//      reg_results[i+1] = RegInfo(false, reg_results[i].vec);
-//    }
-//    
-//    //Need to only unload if not using again, but doing this to make sure
-//    //initial program has no memory leaks
-//    
-//    last_registered->free_memory_RAW();
-//    next_image->free_memory_RAW();
-//      
-//    delete m;
-//  }
-//
-//  if(output_log.toString() != ""){
-//    outfile.close();
-//  }
-//
-//  return true;
-//}
-
-bool BatchCam::compositing(){
+bool BatchCam::resolve_bboxes(){
   
-  std::vector < Bbox > box(reg_results.size());
-  Bbox combined_box = Bbox();
+  box.resize(reg_results.size());
+  combined_box = Bbox();
   
   for(unsigned int i=0; i < reg_results.size(); i++){
     if(i == 0){
@@ -784,17 +717,15 @@ bool BatchCam::compositing(){
     }
   }
   
-  
-//  std::cout << "combined bbox: ";
-//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
-//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
-  
+  for(unsigned int i=0; i < reg_results.size(); i++){
+    logger->information(box[i].toString());
+  }
   
   if(combined_box.min_x < 0.0){
     for(unsigned int i=0; i < reg_results.size(); i++){
       if(reg_results[i].successful){
         box[i].min_x -= combined_box.min_x;
-        box[i].max_x -= combined_box.max_x;
+        box[i].max_x -= combined_box.min_x;
       }
     }
     combined_box.max_x -= combined_box.min_x;
@@ -805,40 +736,170 @@ bool BatchCam::compositing(){
     for(unsigned int i=0; i < reg_results.size(); i++){
       if(reg_results[i].successful){
         box[i].min_y -= combined_box.min_y;
-        box[i].max_y -= combined_box.max_y;
+        box[i].max_y -= combined_box.min_y;
       }
     }
     combined_box.max_y -= combined_box.min_y;
     combined_box.min_y -= combined_box.min_y;
   }
+  logger->information("=======================");
+  logger->information(combined_box.toString());
+  logger->information("=======================");
+
   
-//  std::cout << "combined bbox: ";
-//  std::cout << combined_box.min_x << "\t" << combined_box.min_y << "\t";
-//  std::cout << combined_box.max_x << "\t" << combined_box.max_y << "\n";
-//
-//  std::cout << "width height: ";
-//  std::cout << "[ " << combined_box.max_x-combined_box.min_x << ", ";
-//  std::cout << combined_box.max_y-combined_box.min_y << "]\n";
+  for(unsigned int i=0; i < reg_results.size(); i++){
+    logger->information(box[i].toString());
+  }
   
+  return true;
+}
+
+void BatchCam::find_overlaps(){
+  overlapM.resize(images.size());
   
-  Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
-  
-  for(unsigned int i=0; i < images.size(); i++){
-    if(reg_results[i].successful){
-      pathCam::Image * temp = images[i];
-      temp->load_raw_from_disk();
-      
-      Mat image_Mat = cv::Mat(Size(temp->width,temp->height), CV_8UC1, temp->get_Raw(), Mat::AUTO_STEP);
-      cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
-      
-      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,                                                     image_Mat.cols, image_Mat.rows)));
-      
-      temp->free_memory_RAW();
+//  logger->information(Poco::format("Overlap Size: %u", overlapM.getSize()));
+//  logger->information(Poco::format("Match Size: %u", matchM.getSize()));
+
+  for(unsigned int i=0; i < overlapM.overlap.size(); i++){
+    for(unsigned int j=0; j < overlapM.overlap[i].size(); j++){
+      if(matchM.match[i][j] != NULL){ overlapM.overlap[i][j] = 1.0; continue; }
+      //area
+      if(box[i].intersect(box[j])){
+        overlapM.overlap[i][j] =  box[i].area(box[j]);
+      }
     }
   }
   
+  overlapM.output(images);
+  
+}
+
+Mat donut_score_image(int rows, int cols, int radius){
+  
+  Mat img = cv::Mat_<int>(rows,cols);
+  float idist,jdist,dist_from_center,peak,center_val;
+  peak = 0.76;
+  center_val = 100.0;
+  
+  for (int i = img.rows/2 - radius;i < img.rows/2 + radius;i++){
+    idist = pow(i - img.rows/2,2);
+    
+    for (int j = img.cols/2 - radius; j < img.cols/2 + radius;j++){
+      jdist = pow(j - img.cols/2,2);
+      dist_from_center = sqrt(idist+jdist);
+      
+      if(dist_from_center <= peak * radius){
+        img.at<int>(i,j) = std::max(0,int(floor( ( 255 - center_val ) / ( peak * radius ) * dist_from_center + center_val ) ) );
+      }
+      else{
+        img.at<int>(i,j) = std::max(0,int(floor( -255 / ( ( 1.0 - peak ) * radius ) * (dist_from_center - radius ) ) ) );
+      }
+    }
+  }
+  
+  //img.convertTo(img, CV_8U);
+  /*
+  cv::namedWindow("test");
+  cv::imshow("test", img);
+  cv::waitKey();
+  */
+  return img;
+}
+
+Mat dome_score_image(int rows, int cols, int radius){
+  
+  Mat img = cv::Mat_<uint8_t>(rows,cols);
+  double idist,jdist,rad_sq;
+  rad_sq = pow(radius,2);
+  
+  for (int i = 0;i < img.rows;i++){
+    idist = pow(i - img.rows/2,2);
+    
+    for (int j = 0; j < img.cols;j++){
+      jdist = pow(j - img.cols/2,2);
+      img.at<uint8_t>(i,j) = std::max( (uint8_t) 0 , uint8_t( floor( 255.0 / rad_sq * (rad_sq - idist - jdist) ) ) );
+    }
+  }
+  return img;
+}
+
+bool BatchCam::compositing(){
+  
+  Mat3b combined(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3b(0,0,0));
+  
+  Mat3f flat_field_buffer(combined_box.max_y-combined_box.min_y,combined_box.max_x-combined_box.min_x, Vec3f(0,0,0));
+  
+  Mat combined_z_buffer = cv::Mat::zeros(cv::Size(combined.cols, combined.rows), CV_8U);
+  
+  Mat quality_score = pathCam::dome_score_image(images[0]->height,images[0]->width,2190);
+  
+  Mat flat_field;
+  
+  /*
+  std::vector<cv::Mat> masks(images.size());
+  std::vector<cv::SparseMat*> frame_contributions;
+  */
+  
+  if(flat_field_file.toString() != ""){
+    flat_field = cv::imread(flat_field_file.toString());
+    std::cout << flat_field.cols << "\t" << flat_field.rows << "\n";
+    std::cout << images[0]->width << "\t" << images[0]->height << "\n";
+    
+    flat_field.convertTo(flat_field, CV_32F);
+    flat_field *= 1/170.0;
+  }
+  
+  cv::Size image_size(images[0]->width,images[0]->height);
+  Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
+  
+  circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255), -1);
+  
+  unsigned int k = 0;
+  for(unsigned int i=0; i < images.size(); i++){
+    if(reg_results[i].successful){
+      k++;
+      Mat use_locations = mask.mul(quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[i]->width, images[i]->height)));
+      if (countNonZero(use_locations) == 0){continue;}// this image is not contributing to composite
+      /*
+       //this is for a selective read
+      Rect reading_bounds = boundingRect(use_locations);
+      if (reading_bounds.x == 0 && reading_bounds.y == 0){continue;} // this image is not contributing to composite
+      
+      if(reading_bounds.x % 2 == 1){
+        reading_bounds.x -= 1;
+        reading_bounds.width += 1;
+      }
+      reading_bounds.width += reading_bounds.width % 2;
+      
+      if(reading_bounds.y % 2 == 1){
+        reading_bounds.y -= 1;
+        reading_bounds.height += 1;
+      }
+      reading_bounds.height += reading_bounds.height % 2;
+      */
+      pathCam::Image * temp = images[i];
+      //temp->selective_read(reading_bounds);
+      temp->load_raw_from_disk();
+      
+      Mat image_Mat = cv::Mat(image_size, CV_8U, temp->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
+      
+      if(temp->label == Image::_2X && images[i]->height == flat_field.rows && images[i]->width == flat_field.cols){
+        flat_field.copyTo(flat_field_buffer(Rect(box[i].min_x, box[i].min_y,flat_field.cols, flat_field.rows)),use_locations);
+      }
+      
+      image_Mat.copyTo(combined(Rect(box[i].min_x, box[i].min_y,image_Mat.cols, image_Mat.rows)), use_locations);
+      temp->free_memory_RAW();
+
+      // update global z buffer
+      quality_score.copyTo(combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[i]->width, images[i]->height)), use_locations);
+      
+    }
+  }
+
+  cv::divide(combined,flat_field_buffer,combined,1.0,CV_8U);
+  
   imwrite(out_image.toString(), combined);
- 
   return true;
 
 }
