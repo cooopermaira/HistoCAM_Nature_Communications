@@ -240,10 +240,10 @@ IF(BUILD_PATHCAM_GUI)
   juce_add_gui_app(pathCam VERSION "0.1")
   target_sources(${PROJECT_NAME}
     PRIVATE
-        programs/Main.cpp
-        programs/MainComponent.h
-        programs/MainComponent.cpp
-        programs/JuceHeader.h
+        programs/JUCE/Main.cpp
+        programs/JUCE/MainComponent.h
+        programs/JUCE/MainComponent.cpp
+        programs/JUCE/JuceHeader.h
   )
 
   target_link_libraries(pathCam PRIVATE

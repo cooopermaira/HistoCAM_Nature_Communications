@@ -22,8 +22,8 @@ class BatchCam{
   
 protected:
   std::vector <MemoryPool *> mempool;
-  Logger *logger;
-  Logger::Ptr results_logger;
+  Poco::Logger *logger;
+  Poco::Logger::Ptr results_logger;
   unsigned int threads;
   
   
