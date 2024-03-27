@@ -92,7 +92,7 @@ protected:
             camera->newCaptureSet();
 
             camera->startCamera();
-            Poco::Thread::sleep(5000);
+            Poco::Thread::sleep(10000);
             camera->stopCamera();
 
 

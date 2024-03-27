@@ -64,14 +64,14 @@ void Loader::run(){
         
         detector->detect_and_compute(image);
         
-        if(image->keypoints.size() < 200){
+        if(image->keypoints.size() < 400){
           detector->set_ORB_params();
           detector->detect_and_compute(image);
         }
         
         delete detector;
         
-        if(image->keypoints.size() < 200){
+        if(image->keypoints.size() < 400){
           successful = false;
           image->label = Image::_LOWFEAT;
           return;
@@ -150,14 +150,14 @@ void SpinLoader::run() {
 
                 detector->detect_and_compute(image);
 
-                if (image->keypoints.size() < 200) {
+                if (image->keypoints.size() < 400) {
                     detector->set_ORB_params();
                     detector->detect_and_compute(image);
                 }
 
                 delete detector;
 
-                if (image->keypoints.size() < 200) {
+                if (image->keypoints.size() < 400) {
                     successful = false;
                     image->label = Image::_LOWFEAT;
                     return;

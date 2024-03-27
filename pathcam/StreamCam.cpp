@@ -149,10 +149,10 @@ void StreamCam::add_new_component(unsigned long image_index){
   reg_results[image_index].index = image_index;
   //delete these pointers when destroyed
   auto * temp = new CompositeVoronoi(this);
+  temp->update(std::vector<RegInfo>{ reg_results[image_index] });
   component_mutex->lock();
   composites.push_back(temp);
   component_mutex->unlock();
-  int k = 0;
 }
 
 std::vector < RegInfo > StreamCam::get_Q_front(){

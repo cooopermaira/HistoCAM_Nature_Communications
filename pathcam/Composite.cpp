@@ -11,7 +11,7 @@
 namespace pathCam{
 
 CompositeVoronoi::CompositeVoronoi(StreamCam* parent) : Composite(parent) {        
-    subdiv_Bbox = Bbox(-5000000, -5000000, 5000000, 5000000);
+    subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
 
 }
@@ -35,6 +35,9 @@ void CompositeVoronoi::expand_subdiv(std::vector < RegInfo > new_info) {
         subdiv_Bbox.max_y *= 2;
     }
     if (extend) {
+        std::vector<std::vector<Point2f>> facets;
+        std::vector<Point2f> centers;
+
         subdiv.getVoronoiFacetList(std::vector<int>(), facets, centers);
         subdiv = Subdiv2D(subdiv_Bbox.as_cvRect());
         subdiv.insert(centers);
@@ -49,31 +52,85 @@ void CompositeVoronoi::update(std::vector < RegInfo > new_info) {
 
 void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
 
-    cv::Size image_size(6464, 4852);
+    // get a copy of references to all images at once so that only one mutex lock is needed
+    std::vector<unsigned long int> indexes;
     for (int i = 0; i < new_info.size(); i++) {
-        Subdiv2D temp(subdiv);
-        subdiv.insert(cv::Point2f(new_info[i].vec.x, new_info[i].vec.y));
+        indexes.push_back(new_info[i].index);
     }
-    //Mat img = Mat::zeros(Size(3000, 3000), CV_8U);
-    //draw_delaunay(img, subdiv, cv::Scalar(0, 0, 255));
-    //imwrite("delauney.png", img);
-    std::vector<std::vector<Point2f>> facets;
-    std::vector<Point2f> centers;
-    subdiv.getVoronoiFacetList(std::vector<int>(), facets, centers);
-    for (int i = 0; i < new_info.size(); i++) {
-        std::vector<Point2i> oneFacet;
-        for (int j = 0; j < facets[i].size();j++) {
-            facets[i][j].x -= centers[i].x ;
-            facets[i][j].x += 6464 / 2;
-            facets[i][j].y -= centers[i].y;
-            facets[i][j].y += 4852 / 2;
-            oneFacet.push_back((Point2i)facets[i][j]);
+    std::vector<Image*> images = parent->get_image_refs(indexes);
+
+    //this may need to be placed inside the below for loop if frames ever vary in size. For now it is here so the mask only needs to be built once
+    cv::Size image_size(images[0]->width, images[0]->height);
+
+    //build circle mask for 2X objective
+    Mat circleMask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
+    cv::circle(circleMask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(1), -1);
+
+    for (int i = 0; i < images.size(); i++) {
+        //calculate where the new image will be copied to in the composite
+        Rect copyzone = Rect(new_info[i].vec.x - root_offset.x, new_info[i].vec.y - root_offset.y, images[i]->width, images[i]->height);
+
+        //make copy of subdiv incase we decide not to use new point
+        Subdiv2D tempSubdiv(subdiv);
+
+        //add new point
+        int id = subdiv.insert(cv::Point2f(new_info[i].vec.x, new_info[i].vec.y));
+
+        //get voronoi facets for only this face
+        std::vector<std::vector<Point2f>> facets;
+        std::vector<Point2f> centers;
+        subdiv.getVoronoiFacetList(std::vector<int>{id}, facets, centers);
+
+        //shift and recast
+        std::vector<Point2i> face;
+        for (auto& i : facets[0]) {
+            i.x -= centers[0].x;
+            i.x += 6464 / 2;
+            i.y -= centers[0].y;
+            i.y += 4852 / 2;
+            face.push_back((Point2i) i );
         }
-        Mat mask = cv::Mat::zeros(image_size, CV_8U);
-        cv::fillConvexPoly(mask, oneFacet,cv::Scalar(255));
-        imwrite(std::to_string(i) + ".png", mask);
+
+        //build polygon mask for new point
+        Mat polyMask = cv::Mat::zeros(image_size, CV_8U);
+        cv::fillConvexPoly(polyMask, face, cv::Scalar(1));
+
+        //calculate which pixels of the new image will be copied into the composite
+        Mat use_locations = polyMask.mul(circleMask);
+
+        if (countNonZero(use_locations) <= 2190*2190*3.14*0.20) {
+            //contributing less than x% of its pixels, revert and don't bother loading from disk
+            subdiv = tempSubdiv;
+            continue;
+        }
+
+        images[i]->load_raw_from_disk(true);
+        Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+        //cv::imwrite(images[i]->get_ImageFile().getBaseName() + ".png", image_Mat);
+        cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+        //cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
+
+        //imwrite(images[i]->get_ImageFile().getBaseName()+".png", image_Mat);
+        /*
+        Mat temp;
+        composite_z_buffer.copyTo(temp, copyzone);
+            */
+
+        /*
+        Mat temp = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
+        image_Mat.copyTo(temp,use_locations);
+        imwrite(images[i]->get_ImageFile().getBaseName() + ".png", temp);
+        */  
+
+        image_Mat.copyTo(composite(copyzone), use_locations);
+        
+        images[i]->free_memory_RAW();
     }
-    std::cout << "done";
+    /*
+    imshow("display",composite);
+    waitKey(10);
+    */
+
 }
 
 Composite::Composite(StreamCam *parent): parent(parent), root_offset(0.0,0.0),max_offset(0.0, 0.0){

@@ -76,9 +76,14 @@ void Image::find_label(){
     unsigned int center_y = height/2;
     center_y += center_y%2; //force it to be even
     cv::Rect ROIrect (center_x - 32, center_y - 32, 64, 64);
-    ROI = temp(ROIrect);
+    cv::Mat  ROI_temp;
+    ROI_temp = temp(ROIrect);
+    ROI = ROI_temp.clone();
+    cvtColor(temp, temp, COLOR_BayerBG2BGR);
     cvtColor(ROI,ROI,COLOR_BayerBG2GRAY);
+    cv::imwrite(get_ImageFile().getBaseName() + ".png", temp);
     buffer_mutex.unlock();
+    //imwrite(get_ImageFile().getBaseName() + "after_debayer.png", temp);
   }
   
   

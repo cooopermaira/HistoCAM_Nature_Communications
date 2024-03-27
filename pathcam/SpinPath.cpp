@@ -77,6 +77,8 @@ void CameraStream::run(){
       
       interrupt = false;
       
+      unsigned int i = 0;
+      
       //Will run until killed
       while (!interrupt){
         try{
@@ -97,20 +99,24 @@ void CameraStream::run(){
             pathCam::Image *image = new pathCam::Image();
             image->copy_in(pResultImage->GetData());
             image->increment_smart_pointer();
-            //parent->sCam->pass_image(image);
+            parent->sCam->pass_image(image);
 
             Poco::DateTime time = Poco::DateTime();
+            std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i");
+
+            //i++;
+            //std::stringstream ss;
+            //ss << i;
+
+            //ss << time.year() << time.month();
+           // ss << time.day() << time.hour();
+           // ss << time.minute() << time.millisecond();
             
-            std::stringstream ss;
-            ss << time.year() << time.month();
-            ss << time.day() << time.hour();
-            ss << time.minute() << time.millisecond();
-            
-            parent->camlogger.information(Poco::format("%s", ss.str()));
+            parent->camlogger.information(Poco::format("%s", str));
 
             cache_element image_in_cache;
             image_in_cache.image = image;
-            image_in_cache.name = ss.str();
+            image_in_cache.name = str;
             
             parent->cache_mutex.lock();
             parent->camlogger.information("Put on Queue");
@@ -193,7 +199,7 @@ void FileStream::run(){
 
 void ProcessStream::run() {
 
-    //parent->sCam->spin_run();
+    parent->sCam->spin_run();
 
 }
 

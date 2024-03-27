@@ -38,8 +38,6 @@ public:
 class CompositeVoronoi : public Composite {
 private:
 	cv::Subdiv2D subdiv;
-	std::vector<Point2f> centers;
-	std::vector<std::vector<Point2f>> facets;
 
 public:
 	CompositeVoronoi(StreamCam* parent);
