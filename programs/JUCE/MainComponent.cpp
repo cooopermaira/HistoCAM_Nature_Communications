@@ -13,12 +13,11 @@ MainComponent::MainComponent()
   ss <<  PROJECT_SOURCE_DIR << "/resources/screen_texture_test.png";
 
   image = imread(ss.str());
-  std::cout << "Read image: " << image.cols << "X" << image.rows << "\n";
+  std::cout << "Read OpenCV image: " << image.cols << "X" << image.rows << "\n";
 }
 
 MainComponent::~MainComponent()
 {
-  std::cout << OpenGLContext::getCurrentContext() << "\n";
   // This shuts down the GL system and stops the rendering calls.
   shutdownOpenGL();
 }
@@ -36,6 +35,8 @@ void MainComponent::shutdown()
 {
   // Free any GL objects created for rendering here.
   using namespace ::juce::gl;
+  
+  texture.release();
   
   shader    .reset();
   squareBuffer     .reset();
@@ -220,22 +221,9 @@ void MainComponent::createShaders()
     attributes.reset (new Attributes (*shader));
     uniforms  .reset (new Uniforms (*shader));
     
-
+    //To get this to work need to copy into JUCE image format.
+    //Inefficient and can probably be fixed if needed.
     Image temp = convertOpenCVMatToJUCEImage(image);
-
-//    Image temp = createCheckerboardImage(1024, 768, 64, Colours::lightgrey, Colours::white);
-//
-//    juce::File file("/Users/bsumma/my_checkerboard.png");
-//    std::unique_ptr<juce::FileOutputStream> fileStream(file.createOutputStream());
-//    
-//    juce::PNGImageFormat pngFormat;
-//    
-//    // Write the image to the stream
-//    pngFormat.writeImageToStream(temp, *fileStream);
-//    
-    
-    
-    
     texture.loadImage(temp);
     
     statusText = "GLSL: v" + juce::String (OpenGLShaderProgram::getLanguageVersion(), 2);
