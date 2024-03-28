@@ -245,7 +245,7 @@ IF(BUILD_PATHCAM_GUI)
         programs/JUCE/MainComponent.cpp
         programs/JUCE/JuceHeader.h
   )
-
+  
   target_link_libraries(pathCam PRIVATE
       pathCamLib
       juce::juce_core
@@ -256,9 +256,12 @@ IF(BUILD_PATHCAM_GUI)
       juce::juce_opengl
     )
     
-    if(MSVC)
-      set_target_properties(pathCam PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/pathCam_artefacts")
-    endif()
+  if(MSVC)
+    add_custom_command(TARGET pathCamLib
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dll
+        ${CMAKE_BINARY_DIR}/pathCamLib_artefacts/)
+  endif()
 
 ENDIF()
 
