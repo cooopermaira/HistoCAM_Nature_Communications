@@ -70,7 +70,7 @@ void MainComponent::render()
   
   //Need the opengl context to get the right answer here.
   desktopScale = (float) openGLContext.getRenderingScale();
-  pixel_bounds = Rectangle(roundToInt (desktopScale * (float) bounds.getWidth()),
+  pixel_bounds = juce::Rectangle(roundToInt (desktopScale * (float) bounds.getWidth()),
                            roundToInt (desktopScale * (float) bounds.getHeight()));
   
   OpenGLHelpers::clear (getLookAndFeel().findColour (ResizableWindow::backgroundColourId));
@@ -223,7 +223,7 @@ void MainComponent::createShaders()
     
     //To get this to work need to copy into JUCE image format.
     //Inefficient and can probably be fixed if needed.
-    Image temp = convertOpenCVMatToJUCEImage(image);
+    juce::Image temp = convertOpenCVMatToJUCEImage(image);
     texture.loadImage(temp);
     
     statusText = "GLSL: v" + juce::String (OpenGLShaderProgram::getLanguageVersion(), 2);

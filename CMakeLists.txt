@@ -255,6 +255,11 @@ IF(BUILD_PATHCAM_GUI)
       juce::juce_graphics
       juce::juce_opengl
     )
+    
+    if(MSVC)
+      set_target_properties(pathCam PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/pathCam_artefacts")
+    endif()
+
 ENDIF()
 
 

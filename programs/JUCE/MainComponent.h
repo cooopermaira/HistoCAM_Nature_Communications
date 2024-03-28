@@ -25,7 +25,12 @@ public:
   
   void createShaders();
 
+//private:
+//  TextButton showCaptureButton      { "Browse Demos" };
+//  SidePanel demosPanel  { "Demos", 250, true };
+
 private:
+  // OPENGL FUNCTIONS AND VARIABLES
   //==============================================================================
   struct Vertex
   {
@@ -109,8 +114,7 @@ private:
   };
   
   //==============================================================================
-  /** This loads a 3D model from an OBJ file and converts it into some vertex buffers
-   that we can draw.
+  /** This loads a square on the gpu -1 to 1
    */
   struct SquareBuffer
   {
@@ -213,9 +217,9 @@ private:
   
   juce::String newVertexShader, newFragmentShader;  
   
-  Rectangle<int> bounds;
+  juce::Rectangle<int> bounds;
   float desktopScale;
-  Rectangle<int> pixel_bounds;
+  juce::Rectangle<int> pixel_bounds;
   
   CriticalSection mutex;
   
