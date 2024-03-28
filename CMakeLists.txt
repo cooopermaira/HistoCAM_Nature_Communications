@@ -257,10 +257,13 @@ IF(BUILD_PATHCAM_GUI)
     )
     
   if(MSVC)
-    add_custom_command(TARGET pathCamLib
+    file(GLOB DLL_FILES "{CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dll")
+    file(GLOB PDB_FILES "{CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.pdb")
+    
+    add_custom_command(TARGET pathCam
       POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/*.dll
-        ${CMAKE_BINARY_DIR}/pathCamLib_artefacts/)
+      COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES} ${PDB_FILES}
+        "${CMAKE_BINARY_DIR}/pathCam_artefacts/")
   endif()
 
 ENDIF()
