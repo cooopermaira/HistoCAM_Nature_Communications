@@ -1,5 +1,5 @@
 //
-//  new_process_list_xml.cpp
+//  process_list_truth.cpp
 //  pathCam
 //
 //  Created by Brian Summa on 11/11/22.
@@ -18,18 +18,18 @@ using Poco::Util::OptionCallback;
 using Poco::AutoPtr;
 
 
-class FastCamApp: public Application
+class BatchCamApp: public Application
 {
 public:
-  FastCamApp(): _helpRequested(false){
+  BatchCamApp(): _helpRequested(false){
   }
 
 protected:
-  StreamCam *bcam;
+  BatchCam *bcam;
 
   void initialize(Application& self){
     Application::initialize(self);
-    if(!_helpRequested){ bcam = new StreamCam(configPtr()); }
+    if(!_helpRequested){ bcam = new BatchCam(configPtr()); }
   }
   
   void uninitialize(){
@@ -48,14 +48,14 @@ protected:
       Option("help", "h", "display help information on command line arguments")
         .required(false)
         .repeatable(false)
-        .callback(OptionCallback<FastCamApp>(this, &FastCamApp::handleHelp)));
+        .callback(OptionCallback<BatchCamApp>(this, &BatchCamApp::handleHelp)));
         
     options.addOption(
       Option("config-file", "c", "load configuration data from a file")
         .required(true)
         .repeatable(true)
         .argument("file")
-        .callback(OptionCallback<FastCamApp>(this, &FastCamApp::handleConfig)));
+        .callback(OptionCallback<BatchCamApp>(this, &BatchCamApp::handleConfig)));
 
   }
   
@@ -74,7 +74,7 @@ protected:
     HelpFormatter helpFormatter(options());
     helpFormatter.setCommand(commandName());
     helpFormatter.setUsage("OPTIONS");
-    helpFormatter.setHeader("Pathcam Fast batch image processing application.");
+    helpFormatter.setHeader("Pathcam batch image processing application.");
     helpFormatter.format(std::cout);
   }
   
@@ -92,4 +92,4 @@ private:
 };
 
 
-POCO_APP_MAIN(FastCamApp)
+POCO_APP_MAIN(BatchCamApp)

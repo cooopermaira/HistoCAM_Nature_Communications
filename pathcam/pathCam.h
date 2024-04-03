@@ -33,6 +33,7 @@
 #include "Poco/Environment.h"
 #include "Poco/Util/XMLConfiguration.h"
 #include "Poco/Util/Application.h"
+#include "Poco/ConsoleChannel.h"
 #include "Poco/Util/HelpFormatter.h"
 #include "Poco/SimpleFileChannel.h"
 #include "Poco/FileChannel.h"
