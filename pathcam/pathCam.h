@@ -40,6 +40,7 @@
 #include "Poco/Process.h"
 #include "Poco/DateTime.h"
 #include "Poco/ThreadPool.h"
+#include "Poco/DateTimeFormatter.h"
 
 #include "util.h"
 #include "Image.h"

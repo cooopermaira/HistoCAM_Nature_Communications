@@ -182,7 +182,7 @@ int AcquireImages(CameraPtr pCam, INodeMap& nodeMap, INodeMap& nodeMapTLDevice)
         cout << endl;
 
         // Retrieve, convert, and save images
-        const unsigned int k_numImages = 10;
+        const unsigned int k_numImages = 100;
 
         //
         // Create ImageProcessor instance for post processing images
@@ -246,7 +246,7 @@ int AcquireImages(CameraPtr pCam, INodeMap& nodeMap, INodeMap& nodeMapTLDevice)
 
                     const size_t height = pResultImage->GetHeight();
 
-                    cout << "Grabbed image " << imageCnt << ", width = " << width << ", height = " << height << endl;
+                    //cout << "Grabbed image " << imageCnt << ", width = " << width << ", height = " << height << endl;
 
                     //
                     // Convert image to mono 8
@@ -282,7 +282,7 @@ int AcquireImages(CameraPtr pCam, INodeMap& nodeMap, INodeMap& nodeMapTLDevice)
                     //
                     convertedImage->Save(filename.str().c_str());
 
-                    cout << "Image saved at " << filename.str() << endl;
+                    //cout << "Image saved at " << filename.str() << endl;
                 }
 
                 //
@@ -335,6 +335,7 @@ int PrintDeviceInfo(INodeMap& nodeMap)
     {
         FeatureList_t features;
         const CCategoryPtr category = nodeMap.GetNode("DeviceInformation");
+        CEnumerationPtr bufferinfo = nodeMap.GetNode("TransferQueueMaxBlockCount");
         if (IsReadable(category))
         {
             category->GetFeatures(features);

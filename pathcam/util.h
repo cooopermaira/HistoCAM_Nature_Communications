@@ -35,6 +35,10 @@ public:
            (min_y <= b.max_y && max_y >= b.min_y);
   }
 
+  cv::Rect as_cvRect() {
+      return cv::Rect(min_x, min_y, max_x - min_x, max_y - min_y);
+  }
+
   double area(Bbox b){
     double Omin_x = fmax(min_x, b.min_x);
     double Omin_y = fmax(min_y, b.min_y);
