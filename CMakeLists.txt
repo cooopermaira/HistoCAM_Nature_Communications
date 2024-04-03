@@ -65,25 +65,26 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 add_subdirectory(poco)
 
 
-OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
-OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
-OPTION(NANOGUI_BUILD_PYTHON "" OFF)
-OPTION(NANOGUI_INSTALL "" OFF)
+#OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
+#OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
+#OPTION(NANOGUI_BUILD_PYTHON "" OFF)
+#OPTION(NANOGUI_INSTALL "" OFF)
 
-add_subdirectory(nanogui)
+#add_subdirectory(nanogui)
 
+add_subdirectory(JUCE)
 
-IF(BUILD_PATHCAM_GUI)
-  OPTION(SFML_BUILD_AUDIO "" ON)
-  OPTION(SFML_BUILD_EXAMPLES "" OFF)
-  OPTION(SFML_BUILD_GRAPHICS "" OFF)
-  OPTION(SFML_BUILD_NETWORK "" OFF)
-  OPTION(SFML_BUILD_WINDOW "" OFF)
-  add_subdirectory(SFML)
+#IF(BUILD_PATHCAM_GUI)
+# OPTION(SFML_BUILD_AUDIO "" ON)
+#  OPTION(SFML_BUILD_EXAMPLES "" OFF)
+#  OPTION(SFML_BUILD_GRAPHICS "" OFF)
+#  OPTION(SFML_BUILD_NETWORK "" OFF)
+#  OPTION(SFML_BUILD_WINDOW "" OFF)
+#  add_subdirectory(SFML)
   
-  message(STATUS ${SFML_INCLUDE_DIRS})
-  message(STATUS ${SFML_LIBRARIES})
-ENDIF()
+#  message(STATUS ${SFML_INCLUDE_DIRS})
+#  message(STATUS ${SFML_LIBRARIES})
+# ENDIF()
 
 IF(APPLE)
     SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
@@ -235,8 +236,35 @@ IF(BUILD_NANOGUI_EXAMPLE)
 ENDIF()
 
 IF(BUILD_PATHCAM_GUI)
-  add_executable(pathCam programs/pathCam_GUI.cpp)
-  target_link_libraries(pathCam nanogui sfml-audio sfml-system pathCamLib)
+	include_directories("${PROJECT_SOURCE_DIR}/JUCE/modules")
+  juce_add_gui_app(pathCam VERSION "0.1")
+  target_sources(${PROJECT_NAME}
+    PRIVATE
+        programs/JUCE/Main.cpp
+        programs/JUCE/MainComponent.h
+        programs/JUCE/MainComponent.cpp
+        programs/JUCE/JuceHeader.h
+  )
+  
+  target_link_libraries(pathCam PRIVATE
+      pathCamLib
+      juce::juce_core
+      juce::juce_gui_extra
+      juce::juce_data_structures
+      juce::juce_events
+      juce::juce_graphics
+      juce::juce_opengl
+    )
+    
+  if(MSVC)
+    file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.pdb")
+    
+    add_custom_command(TARGET pathCam
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
+        "${CMAKE_BINARY_DIR}/pathCam_artefacts/RelWithDebInfo/")
+  endif()
+
 ENDIF()
 
 
