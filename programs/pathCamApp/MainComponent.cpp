@@ -3,7 +3,7 @@
 
 
 //==============================================================================
-MainComponent::MainComponent()
+MainComponent::MainComponent(std::shared_ptr< StreamCam > bcam): bcam(bcam)
 {
   // Make sure you set the size of the component after
   // you add any child components.

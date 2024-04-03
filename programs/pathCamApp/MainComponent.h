@@ -11,7 +11,7 @@ class MainComponent final : public juce::OpenGLAppComponent
 {
 public:
   //==============================================================================
-  MainComponent();
+  MainComponent(std::shared_ptr< StreamCam > bcam);
   ~MainComponent() override;
   
   //==============================================================================
@@ -30,6 +30,9 @@ public:
 //  SidePanel demosPanel  { "Demos", 250, true };
 
 private:
+  
+  std::shared_ptr< StreamCam > bcam;
+  
   // OPENGL FUNCTIONS AND VARIABLES
   //==============================================================================
   struct Vertex

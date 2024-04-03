@@ -9,7 +9,6 @@
 #include "JuceHeader.h"
 #include "MainComponent.h"
 
-using namespace pathCam;
 
 //==============================================================================
 class PathCamApplication  : public juce::JUCEApplication
@@ -95,7 +94,7 @@ public:
       bcam = std::make_shared< StreamCam >(config);
       
       setUsingNativeTitleBar (true);
-      setContentOwned (new MainComponent(), true);
+      setContentOwned (new MainComponent(bcam), true);
       
 #if JUCE_IOS || JUCE_ANDROID
       setFullScreen (true);
