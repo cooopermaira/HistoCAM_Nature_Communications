@@ -16,6 +16,7 @@ OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
 OPTION(BUILD_THREAD_TEST "" OFF)
 OPTION(BUILD_PATHCAM_GUI "" OFF)
 OPTION(OVERRRIDE_SPINNAKER "" OFF)
+OPTION(BUILD_SPINNAKER "" OFF)
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -65,26 +66,8 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 add_subdirectory(poco)
 
 
-#OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
-#OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
-#OPTION(NANOGUI_BUILD_PYTHON "" OFF)
-#OPTION(NANOGUI_INSTALL "" OFF)
-
-#add_subdirectory(nanogui)
-
 add_subdirectory(JUCE)
 
-#IF(BUILD_PATHCAM_GUI)
-# OPTION(SFML_BUILD_AUDIO "" ON)
-#  OPTION(SFML_BUILD_EXAMPLES "" OFF)
-#  OPTION(SFML_BUILD_GRAPHICS "" OFF)
-#  OPTION(SFML_BUILD_NETWORK "" OFF)
-#  OPTION(SFML_BUILD_WINDOW "" OFF)
-#  add_subdirectory(SFML)
-  
-#  message(STATUS ${SFML_INCLUDE_DIRS})
-#  message(STATUS ${SFML_LIBRARIES})
-# ENDIF()
 
 IF(APPLE)
     SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
@@ -239,7 +222,11 @@ ENDIF()
 
 IF(BUILD_PATHCAM_GUI)
 	include_directories("${PROJECT_SOURCE_DIR}/JUCE/modules")
-  juce_add_gui_app(pathCamApp VERSION "0.1")
+  juce_add_gui_app(pathCamApp VERSION "0.1"
+                   PRODUCT_NAME "My Amazing App"
+                   ICON_BIG "${PROJECT_SOURCE_DIR}/resources/pathCam.png"
+                   )
+  message(STATUS "${PROJECT_SOURCE_DIR}/resources/pathCam.icns")
   target_sources(pathCamApp
     PRIVATE
         programs/pathCamApp/Main.cpp
@@ -266,6 +253,7 @@ IF(BUILD_PATHCAM_GUI)
       COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
         "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/RelWithDebInfo/")
   endif()
+  
 
 ENDIF()
 
