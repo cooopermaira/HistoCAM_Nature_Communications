@@ -223,7 +223,7 @@ ENDIF()
 IF(BUILD_PATHCAM_GUI)
 	include_directories("${PROJECT_SOURCE_DIR}/JUCE/modules")
   juce_add_gui_app(pathCamApp VERSION "0.1"
-                   PRODUCT_NAME "My Amazing App"
+                   PRODUCT_NAME "PathCam"
                    ICON_BIG "${PROJECT_SOURCE_DIR}/resources/pathCam.png"
                    )
   message(STATUS "${PROJECT_SOURCE_DIR}/resources/pathCam.icns")

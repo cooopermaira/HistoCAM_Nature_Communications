@@ -122,7 +122,7 @@ private:
 
                     auto drawable = std::make_unique<DrawableImage>();
                     File pathCamIconFile = File(ss.str().c_str());
-                    drawable->setImage (ImageFileFormat::loadFrom(pathCamIconFile));
+                    drawable->setImage (juce::ImageFileFormat::loadFrom(pathCamIconFile));
                     return new ToolbarButton (itemId, "PathCam", std::move (drawable), {});
                 }
                 default:                break;

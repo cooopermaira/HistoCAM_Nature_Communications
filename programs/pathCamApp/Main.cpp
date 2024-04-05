@@ -93,7 +93,7 @@ public:
       
       bcam = std::make_shared< pathCam::StreamCam >(config);
       
-      setUsingNativeTitleBar (false);
+      setUsingNativeTitleBar (true);
       setContentOwned (new MainComponent(bcam), true);
       
 #if JUCE_IOS || JUCE_ANDROID
