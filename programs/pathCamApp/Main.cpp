@@ -91,9 +91,9 @@ public:
     {
       
       
-      bcam = std::make_shared< StreamCam >(config);
+      bcam = std::make_shared< pathCam::StreamCam >(config);
       
-      setUsingNativeTitleBar (true);
+      setUsingNativeTitleBar (false);
       setContentOwned (new MainComponent(bcam), true);
       
 #if JUCE_IOS || JUCE_ANDROID
@@ -122,7 +122,7 @@ public:
      */
     
   private:
-    std::shared_ptr< StreamCam > bcam;
+    std::shared_ptr< pathCam::StreamCam > bcam;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
   };
   

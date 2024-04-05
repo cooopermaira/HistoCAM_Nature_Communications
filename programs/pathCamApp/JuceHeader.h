@@ -24,7 +24,12 @@
 #include "pathCam.h"
 
 using namespace juce;
-using namespace pathCam;
+
+#include "ToolBarComponent.h"
+#include "ImageViewComponent.h"
+
+
+
 
 #if defined (JUCE_PROJUCER_VERSION) && JUCE_PROJUCER_VERSION < JUCE_VERSION
  /** If you've hit this error then the version of the Projucer that was used to generate this project is
@@ -39,7 +44,7 @@ using namespace pathCam;
 #if ! JUCE_DONT_DECLARE_PROJECTINFO
 namespace ProjectInfo
 {
-    const char* const  projectName    = "pathCam";
+    const char* const  projectName    = "PathCam Computational Microscope";
     const char* const  companyName    = "Tulane University";
     const char* const  versionString  = "1.0.0";
     const int          versionNumber  = 0x10000;
