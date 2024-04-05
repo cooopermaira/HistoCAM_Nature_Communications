@@ -25,7 +25,7 @@ private:
   
   std::shared_ptr< pathCam::StreamCam > bcam;
   
-  ToolbarDemoComp * toolbar;
+  ToolbarComp * toolbar;
   ImageViewComponent * imageview;
   
 

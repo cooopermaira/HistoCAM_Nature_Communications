@@ -6,7 +6,7 @@
 MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(bcam)
 {
   
-  toolbar = new ToolbarDemoComp();
+  toolbar = new ToolbarComp();
   imageview = new ImageViewComponent(bcam);
   
   addAndMakeVisible(imageview);
