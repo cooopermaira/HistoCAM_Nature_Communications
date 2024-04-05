@@ -13,6 +13,7 @@ namespace pathCam{
 class Vec2{
 public:
   double x, y;
+  Vec2() :x(0.0), y(0.0) {};
   Vec2(double x, double y): x(x), y(y){};
   std::string toString(){
     std::stringstream ss;

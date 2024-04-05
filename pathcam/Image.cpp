@@ -46,7 +46,6 @@ float Image::debayer(int x, int y){
 }
 
 bool Image::is_2x(){
-    return true;
   buffer_mutex.lock();
   float center = debayer(width/2, height/2);
   float center_bottom = debayer(width/2, height-3);
@@ -76,14 +75,9 @@ void Image::find_label(){
     unsigned int center_y = height/2;
     center_y += center_y%2; //force it to be even
     cv::Rect ROIrect (center_x - 32, center_y - 32, 64, 64);
-    cv::Mat  ROI_temp;
-    ROI_temp = temp(ROIrect);
-    ROI = ROI_temp.clone();
-    cvtColor(temp, temp, COLOR_BayerBG2BGR);
+    cv::Mat ROI = temp(ROIrect).clone();
     cvtColor(ROI,ROI,COLOR_BayerBG2GRAY);
-    cv::imwrite(get_ImageFile().getBaseName() + ".png", temp);
     buffer_mutex.unlock();
-    //imwrite(get_ImageFile().getBaseName() + "after_debayer.png", temp);
   }
   
   

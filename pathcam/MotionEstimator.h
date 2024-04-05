@@ -29,13 +29,17 @@ public:
 
 class RegInfo{
 public:
-  unsigned long int index;
-  bool successful,root;
+  unsigned long int index,matchedTo;
+  bool successful,root,resolved;
   unsigned int component_membership;
-  Vec2 vec;
+  Vec2 absoluteCoords;
+  Vec2 relativeCoords = Vec2(0.0, 0.0);
+  Poco::FastMutex *mutex;
   
-  RegInfo(bool successful=false, Vec2 vec=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
-  successful(successful), vec(vec),component_membership(component_membership),root(root) {};
+  RegInfo(bool successful=false, Vec2 absoluteCoords=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
+  successful(successful), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),mutex(new Poco::FastMutex) {
+
+  };
   
   // to allow for sorting of reginfo objects by component membership
   bool operator < (const RegInfo& other) const {
@@ -45,7 +49,7 @@ public:
   std::string toString(){
     std::stringstream ss;
     ss << ((successful) ? "good" : "bad") << "\t";
-    ss << vec.toString();
+    ss << absoluteCoords.toString();
     return ss.str();
   }
   

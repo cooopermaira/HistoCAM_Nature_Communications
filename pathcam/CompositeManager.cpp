@@ -13,7 +13,13 @@ namespace pathCam{
 CompositeManager::CompositeManager(StreamCam *parent):parent(parent),successful(false){};
 
 void CompositeManager::run(){
-  while(!parent->reg_complete || !parent->compositeQ_empty()){
+    /*
+    std::ofstream outputfile("imageRegistration.txt");
+    if (!outputfile.is_open()) {
+        std::cerr << "couldn't open file" << std::endl;
+    }
+    */
+  while(parent->microscope_input || parent->regCount > 0 || parent->loaderCount > 0 || parent-> matchableCount > 0 || !parent->compositeQ_empty()){
     
     //if nothing in the Q but termination condition not met, wait
     if( parent->compositeQ_empty()){
@@ -34,6 +40,9 @@ void CompositeManager::run(){
       
       //sort the new frames by component and pass them to their respective components for compositing.
       for (int i = 0; i < indexes.size(); i++){
+          //outputfile << parent->images[indexes[i].index]->get_ImageFile().getBaseName()+".Raw ";
+          //outputfile << indexes[i].absoluteCoords.toString() << std::endl;
+
         if (current_component == indexes[i].component_membership){
           new_info.push_back(indexes[i]);
         }else{
@@ -46,7 +55,8 @@ void CompositeManager::run(){
     }
   }
 
-  
+  //outputfile.close();
+
   for (int i = 0; i < parent->composites.size(); i++){
     std::cout << "Writing image of size: " << parent->composites[i]->get_composite().size() << "\n";
     imwrite("finish" + std::to_string(i) + ".png", parent->composites[i]->get_composite());

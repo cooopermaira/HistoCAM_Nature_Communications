@@ -68,13 +68,13 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
 
     for (int i = 0; i < images.size(); i++) {
         //calculate where the new image will be copied to in the composite
-        Rect copyzone = Rect(new_info[i].vec.x - root_offset.x, new_info[i].vec.y - root_offset.y, images[i]->width, images[i]->height);
+        Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x, new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
 
         //make copy of subdiv incase we decide not to use new point
         Subdiv2D tempSubdiv(subdiv);
 
         //add new point
-        int id = subdiv.insert(cv::Point2f(new_info[i].vec.x, new_info[i].vec.y));
+        int id = subdiv.insert(cv::Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y));
 
         //get voronoi facets for only this face
         std::vector<std::vector<Point2f>> facets;
@@ -108,7 +108,7 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         //cv::imwrite(images[i]->get_ImageFile().getBaseName() + ".png", image_Mat);
         cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-        //cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
+        cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
 
         //imwrite(images[i]->get_ImageFile().getBaseName()+".png", image_Mat);
         /*
@@ -151,9 +151,10 @@ cv::Mat Composite::score_image_2X(int rows, int cols, int radius){
     
     
     for (int j = 0; j < radius;j++){
-        uint16_t x = rows / 2 - radius + i+1;
-        uint16_t y = cols / 2 - radius + j+1;
+        int16_t x = rows / 2 - radius + i+1;
+        int16_t y = cols / 2 - radius + j+1;
         /*
+        //pyramid
         if (j < i) {
             img.at<uint16_t>(x,y) = j;
             img.at<uint16_t>(img.rows - x, y) = j;
@@ -167,10 +168,12 @@ cv::Mat Composite::score_image_2X(int rows, int cols, int radius){
             img.at<uint16_t>(img.rows - x, img.cols - y) = i;
         }
         */
-        img.at<uint16_t>(x, y) = radius - sqrt(pow(x - img.rows / 2, 2) + pow(y - img.cols, 2));
-        img.at<uint16_t>(img.rows - x, y) = radius - sqrt(pow(x - img.rows / 2, 2) + pow(y - img.cols, 2));
-        img.at<uint16_t>(x, img.cols - y) = radius - sqrt(pow(x - img.rows / 2, 2) + pow(y - img.cols, 2));
-        img.at<uint16_t>(img.rows - x, img.cols - y) = radius - sqrt(pow(x - img.rows / 2, 2) + pow(y - img.cols, 2));
+
+        //cone
+        img.at<uint16_t>(x, y) = radius - max(sqrt(pow(img.rows/2 - x, 2) + pow(img.cols/2 - y, 2)),0.0);
+        img.at<uint16_t>(img.rows - x, y) = radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
+        img.at<uint16_t>(x, img.cols - y) = radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
+        img.at<uint16_t>(img.rows - x, img.cols - y) = radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
     }
     
   }
@@ -192,22 +195,22 @@ void Composite::update_Bbox(std::vector < RegInfo > new_info){
   
   // If any new frames extend beyond the current extent, expand cv image dimensions
   for(int i = 0; i < new_info.size(); i++){
-    if(new_info[i].vec.x < root_offset.x){
+    if(new_info[i].absoluteCoords.x < root_offset.x){
       update_box = true;
-      root_offset.x = new_info[i].vec.x;
+      root_offset.x = new_info[i].absoluteCoords.x;
     }
-    if(new_info[i].vec.y < root_offset.y){
+    if(new_info[i].absoluteCoords.y < root_offset.y){
       update_box = true;
-      root_offset.y = new_info[i].vec.y;
+      root_offset.y = new_info[i].absoluteCoords.y;
     }
     
-    if(new_info[i].vec.x + 6464 > max_offset.x){
+    if(new_info[i].absoluteCoords.x + 6464 > max_offset.x){
       update_box = true;
-      max_offset.x = new_info[i].vec.x + 6464;
+      max_offset.x = new_info[i].absoluteCoords.x + 6464;
     }
-    if(new_info[i].vec.y + 4852 > max_offset.y){
+    if(new_info[i].absoluteCoords.y + 4852 > max_offset.y){
       update_box = true;
-      max_offset.y = new_info[i].vec.y + 4852;
+      max_offset.y = new_info[i].absoluteCoords.y + 4852;
     }
   }
   
@@ -252,10 +255,10 @@ void Composite::add_images(std::vector < RegInfo > new_info){
 
   for (int i = 0; i < images.size(); i++){
     //calculate where the new image will be copied to in the composite
-    Rect copyzone = Rect(new_info[i].vec.x - root_offset.x, new_info[i].vec.y - root_offset.y,                                                     images[i]->width, images[i]->height);
+    Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x, new_info[i].absoluteCoords.y - root_offset.y,                                                     images[i]->width, images[i]->height);
     
     //calculate which pixels of the new image will be copied into the composite
-    Mat use_locations = local_quality_score >= composite_z_buffer(copyzone);
+    Mat use_locations = local_quality_score > composite_z_buffer(copyzone);
     
     
     if (countNonZero(use_locations) == 0){

@@ -19,6 +19,7 @@ namespace pathCam{
 class Composite;
 class CompositeVoronoi;
 class CompositeManager;
+class JobQueue;
 
 class StreamCam: public BatchCam{
   
@@ -32,17 +33,19 @@ class StreamCam: public BatchCam{
   friend class Composite;
   friend class CompositeVoronoi;
   friend class CompositeManager;
+  friend class LoaderLogicRunnable;
+  friend class RegistrationRunnable;
   
 private:
-  std::queue < std::vector < RegInfo > > compositeQ;
-  
+std::vector < RegInfo > compositeBatch;
+
   
 public:
   StreamCam(Poco::Util::LayeredConfiguration::Ptr config);
   
   ~StreamCam(){delete buffer_mutex, delete image_mutex;}
 
-  Poco::FastMutex *spin_buffer_mutex;
+  Poco::FastMutex *resize_buffer_mutex;
   Poco::FastMutex *buffer_mutex;
   Poco::FastMutex *image_mutex;
   Poco::FastMutex *compositeQ_mutex;
@@ -51,12 +54,13 @@ public:
   bool run();
   bool spin_run();
   void pass_image(Image*);
-  bool microscope_input = false;
+  bool microscope_input;
   //d::atomic < bool > microscope_input = false;
 protected:
+
   unsigned int increment_and_get_components(){return components++;}
   unsigned long int add_image(Image*);
-
+  JobQueue* JobQ;
 
   Image* get_image_ref(unsigned long int);
   
@@ -66,7 +70,7 @@ protected:
   
   bool compositeQ_empty();
   
-  void push_compositeQ(std::vector < RegInfo >);
+  void push_compositeQ(RegInfo index);
   void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
   void add_new_component(unsigned long image_index);
   
@@ -83,6 +87,9 @@ protected:
   std::atomic < bool > disk_empty = false;
   std::atomic < bool > jobs_queued = false;
   std::atomic < unsigned int > components = 0;
+  std::atomic < unsigned int > loaderCount = 0;
+  std::atomic < unsigned int > matchableCount = 0;
+  std::atomic < unsigned int > regCount = 0;
   
   pathCam::ConsecQ RegistrationConsecQ;
   

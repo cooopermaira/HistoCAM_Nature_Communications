@@ -8,14 +8,15 @@
 
 #include "JuceHeader.h"
 #include "MainComponent.h"
-
+#include "pathCam.h"
+class StreamCam;
 //==============================================================================
 class pathCamApplication  : public juce::JUCEApplication, public Poco::Util::Application
 {
 public:
     //==============================================================================
     pathCamApplication() {}
-
+    StreamCam* bcam;
     const juce::String getApplicationName() override       { return ProjectInfo::projectName; }
     const juce::String getApplicationVersion() override    { return ProjectInfo::versionString; }
     bool moreThanOneInstanceAllowed() override             { return true; }
@@ -26,6 +27,11 @@ public:
         // This method is where you should put your application's initialisation code..
 
         mainWindow.reset (new MainWindow (getApplicationName()));
+    }
+
+    void initialize(Application& self) {
+        Application::initialize(self);
+        //if (!_helpRequested) { bcam = new StreamCam(configPtr()); }
     }
 
     void shutdown() override

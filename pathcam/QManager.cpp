@@ -10,14 +10,15 @@
 
 namespace pathCam{
 
-QManager::QManager(StreamCam *parent, JobQueue *queue): parent(parent), queue(queue){};
+QManager::QManager(StreamCam *parent): parent(parent){};
 
 void QManager::run(){
-  while(!parent->jobs_queued || !queue->is_empty()){
+  Poco::Thread::sleep(500);
+  while(parent->microscope_input || parent->loaderCount > 0 || parent->matchableCount > 0 || parent->regCount > 0){
     
-    queue->run_jobs(false);
+    parent->JobQ->run_jobs(false);
     
-    Poco::Thread::sleep(100);
+    
   }
 }
 

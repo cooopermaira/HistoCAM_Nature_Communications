@@ -38,8 +38,9 @@ unsigned long int ConsecQ::get_run(bool consequtive){
     if (current_index + 1 == c_queue.at(i)){
       current_index++;
       length++;
-      continue;
-    }else{break;}
+    }else{
+        break;
+    }
   }
   deque_mutex->unlock();
   return length;

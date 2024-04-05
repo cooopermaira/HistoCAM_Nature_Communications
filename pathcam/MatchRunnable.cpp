@@ -39,7 +39,12 @@ void MatchRunnable::run(){
     int result = motion_est->findHomography(m, parent->estimator_type);
     if(result == 1){
       parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
-      
+      auto tempReg = RegInfo(true, Vec2(0.0, 0.0), false, 0);
+      tempReg.resolved = false;
+      tempReg.matchedTo = prev_idx;
+      tempReg.relativeCoords.x = parent->matchM.match[image_idx][prev_idx]->t_x;
+      tempReg.relativeCoords.y = parent->matchM.match[image_idx][prev_idx]->t_y;
+      parent->reg_results[image_idx] = tempReg;
       successful = true;
       break;
     }
@@ -52,12 +57,14 @@ void MatchRunnable::run(){
   if(!successful){
     parent->add_new_component(image_idx);
   }
-  
-  parent->RegistrationConsecQ.add_index(image_idx);
+  auto rj = new RegistrationRunnable(parent, image_idx);
+  parent->regCount++;
+  parent->JobQ->add_runnable(rj);
+  //parent->RegistrationConsecQ.add_index(image_idx);
   
   delete matcher;
   delete motion_est;
-  
+  parent->matchableCount--;
 }//end run
 
 

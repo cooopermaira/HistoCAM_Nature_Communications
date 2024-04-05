@@ -547,7 +547,7 @@ public:
       
       if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
         if(parent->results_logger){  parent->results_logger->information(outfile + "failed. Not enough keypoints"); }
-        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
+        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
         continue;
       }
       
@@ -581,7 +581,7 @@ public:
         if(parent->results_logger){
           parent->results_logger->information(outfile + "failed. Not enough matches.");
         }
-        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
+        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
         delete m;
         parent->matchM.match[last_index][i+1] = NULL;
       }
@@ -589,7 +589,7 @@ public:
         if(parent->results_logger){
           parent->results_logger->information(outfile + "failed. Not enough keypoints.");
         }
-        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].vec);
+        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
         delete m;
         parent->matchM.match[last_index][i+1] = NULL;
       }
@@ -694,9 +694,9 @@ bool BatchCam::resolve_bboxes(){
           }
         }
         
-        reg_results[i].vec.x = reg_results[last_index].vec.x-reg_results[i].vec.x;
-        reg_results[i].vec.y = reg_results[last_index].vec.y-reg_results[i].vec.y;
-        box[i] = Bbox(reg_results[i].vec.x, reg_results[i].vec.y, images[i]->width+reg_results[i].vec.x, images[i]->height+reg_results[i].vec.y);
+        reg_results[i].absoluteCoords.x = reg_results[last_index].absoluteCoords.x-reg_results[i].absoluteCoords.x;
+        reg_results[i].absoluteCoords.y = reg_results[last_index].absoluteCoords.y-reg_results[i].absoluteCoords.y;
+        box[i] = Bbox(reg_results[i].absoluteCoords.x, reg_results[i].absoluteCoords.y, images[i]->width+reg_results[i].absoluteCoords.x, images[i]->height+reg_results[i].absoluteCoords.y);
       }
     }
     
