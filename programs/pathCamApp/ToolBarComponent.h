@@ -55,7 +55,7 @@ private:
             settings        = 5,
             capture         = 6,
             annotate        = 7,
-            juceLogoButton  = 8,
+            pathCamIcon  = 8,
         };
 
         void getAllToolbarItemIds (Array<int>& ids) override
@@ -71,7 +71,7 @@ private:
             ids.add (settings);
             ids.add (capture);
             ids.add (annotate);
-            ids.add (juceLogoButton);
+            ids.add (pathCamIcon);
 
             // If you're going to use separators, then they must also be added explicitly
             // to the list.
@@ -100,7 +100,7 @@ private:
             ids.add (flexibleSpacerId);
             ids.add (settings);
             ids.add (separatorBarId);
-            ids.add (juceLogoButton);
+            ids.add (pathCamIcon);
         }
 
         ToolbarItemComponent* createItem (int itemId) override
@@ -114,18 +114,8 @@ private:
                 case settings:        return createButtonFromZipFileSVG (itemId, "settings",    "settings.svg");
                 case capture:         return createButtonFromZipFileSVG (itemId, "capture",     "capture.svg");
                 case annotate:        return createButtonFromZipFileSVG (itemId, "annotate",   "annotate.svg");
-
-                case juceLogoButton:
-                {
-                    std::stringstream ss;
-                    ss <<  PROJECT_SOURCE_DIR << "/resources/pathCam.png";
-
-                    auto drawable = std::make_unique<DrawableImage>();
-                    File pathCamIconFile = File(ss.str().c_str());
-                    drawable->setImage (juce::ImageFileFormat::loadFrom(pathCamIconFile));
-                    return new ToolbarButton (itemId, "PathCam", std::move (drawable), {});
-                }
-                default:                break;
+                case pathCamIcon:     return createButtonFromZipFileSVG (itemId, "pathCamIcon",   "pathCamIcon.svg");
+                default:              break;
             }
 
             return nullptr;
@@ -141,7 +131,7 @@ private:
         {
             if (iconsFromZipFile.size() == 0)
             {
-              
+                //Won't work for deployment, but ok for now
                 std::stringstream ss;
                 ss <<  PROJECT_SOURCE_DIR << "/resources/icons.zip";
               
