@@ -21,13 +21,17 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 #include <juce_opengl/juce_opengl.h>
 
+#include <math.h>
+
 #include "pathCam.h"
+
 
 using namespace juce;
 
+#include "TiledImage.h"
 #include "ToolBarComponent.h"
 #include "ImageViewComponent.h"
-
+#include "MainComponent.h"
 
 
 

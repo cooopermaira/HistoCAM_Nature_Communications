@@ -236,6 +236,8 @@ IF(BUILD_PATHCAM_GUI)
         programs/pathCamApp/ToolBarComponent.cpp
         programs/pathCamApp/ImageViewComponent.h
         programs/pathCamApp/ImageViewComponent.cpp
+        programs/pathCamApp/TiledImage.h
+        programs/pathCamApp/TiledImage.cpp
         programs/pathCamApp/JuceHeader.h
   )
   
