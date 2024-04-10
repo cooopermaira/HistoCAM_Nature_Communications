@@ -16,6 +16,7 @@ std::vector < TileQueryElem >  TiledImage::getTiles(pCApp::Rectangle box){
   bottom_right.x--;
   bottom_right.y--;
 
+  
   for(int i = getIJ(top_left).getX(); i <=  getIJ(bottom_right).getX(); i++){
     for(int j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
       box_tiles.push_back(TileQueryElem(tiles(i,j), i, j));

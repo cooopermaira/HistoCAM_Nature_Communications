@@ -8,7 +8,7 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr< pathCam::StreamCam > bca
   
   // Make sure you set the size of the component after
   // you add any child components.
-  setSize (1024, 768);
+  //setSize (1024, 768);
   
   std::stringstream ss;
   ss <<  PROJECT_SOURCE_DIR << "/resources/screen_texture_test.png";
@@ -32,7 +32,7 @@ void ImageViewComponent::mouseDown(const juce::MouseEvent& event)
 void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 {
     juce::Point<int> delta = event.getPosition() - lastMousePosition;
-    bounds += delta;
+    bounds -= delta;
     lastMousePosition = event.getPosition();
     repaint();
 }
@@ -49,32 +49,31 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
   
+  //bounds = pCApp::Rectangle(-100,-400, 1024, 708);
+  
   std::vector < TileQueryElem >  tiles = timage.getTiles(bounds);
+  
 
   for(unsigned int i = 0; i < tiles.size(); i++){
     juce::Image *im = timage.getTile(tiles[i].i,tiles[i].j);
+    std::cout << tiles[i].i << " , " << tiles[i].j  << "\t\t";
+    
     
     if(im != NULL){
       g.drawImageAt(*im,
-                    tiles[i].i*timage.getTileSize() + bounds.getX(),
-                    tiles[i].j*timage.getTileSize() + bounds.getY());
+                    tiles[i].i*timage.getTileSize() - bounds.getX(),
+                    tiles[i].j*timage.getTileSize() - bounds.getY());
     }
     g.setColour (juce::Colours::greenyellow);
-    int x = (int)(tiles[i].i*timage.getTileSize() + bounds.getX());
-    int y = (int)(tiles[i].j*timage.getTileSize() + bounds.getY());
+    int x = (int)(tiles[i].i*timage.getTileSize() - bounds.getX());
+    int y = (int)(tiles[i].j*timage.getTileSize() - bounds.getY());
     g.drawRect(x, y,
                (int)timage.getTileSize(), (int)timage.getTileSize(), 3);
     std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
     g.setFont (20);
     g.drawText ( ij,x + timage.getTileSize()/2-50, y + timage.getTileSize()/2-15, 100, 30, Justification::centred);
-    g.drawRect(x + timage.getTileSize()/2-50, y + timage.getTileSize()/2-15, 100, 30);
   }
-  
-  g.setColour (juce::Colours::red);
-  g.setFont (20);
-  g.drawText ("Example for Cooper", 25, 20, 300, 30, Justification::left);
-  g.drawLine (20, 20, 190, 20);
-  g.drawLine (20, 50, 190, 50);
+  std::cout << "\n\n";
 }
 
 juce::Image createCheckerboardImage(int width, int height, int squareSize, juce::Colour colour1, juce::Colour colour2) {
