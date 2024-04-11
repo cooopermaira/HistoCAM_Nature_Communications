@@ -26,7 +26,9 @@ private:
   
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
-  
+  juce::Image createCheckerboardImage(int width, int height, int squareSize,
+                                      juce::Colour colour1, juce::Colour colour2);
+
     
   TiledImage timage;
   juce::Image checkerboard;
