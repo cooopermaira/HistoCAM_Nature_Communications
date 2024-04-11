@@ -238,6 +238,8 @@ IF(BUILD_PATHCAM_GUI)
         programs/pathCamApp/ImageViewComponent.cpp
         programs/pathCamApp/TiledImage.h
         programs/pathCamApp/TiledImage.cpp
+        programs/pathCamApp/MRTiledImage.cpp
+        programs/pathCamApp/MRTiledImage.h
         programs/pathCamApp/JuceHeader.h
   )
   

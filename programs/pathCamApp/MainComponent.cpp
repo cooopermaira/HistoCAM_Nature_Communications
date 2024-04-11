@@ -12,16 +12,19 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   addAndMakeVisible(imageview);
   addAndMakeVisible(toolbar);
   
-
-  // Make sure you set the size of the component after
-  // you add any child components.
+  setWantsKeyboardFocus(true);
+  addKeyListener(this);
+  
   setSize (1024, 768);
   
 //  std::stringstream ss;
-//  ss <<  PROJECT_SOURCE_DIR << "/resources/screen_texture_test.png";
+//  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
 //
-//  image = imread(ss.str());
-//  std::cout << "Read OpenCV image: " << image.cols << "X" << image.rows << "\n";
+//  cv::Mat cvimage = imread(ss.str());
+//  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
+//
+//  MRimage.build(cvimage);
+
 }
 
 MainComponent::~MainComponent()

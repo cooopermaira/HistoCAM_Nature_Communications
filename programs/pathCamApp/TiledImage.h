@@ -99,15 +99,3 @@ private:
   
 };
 
-class MRTiledImage{
-public:
-  MRTiledImage(){};
-  ~MRTiledImage(){ level.clear(); };
-  
-  std::vector < TiledImage > level;
-  
-  void setLevel(unsigned int l, TiledImage &image){
-    level[l] = image;
-  }
-  
-};

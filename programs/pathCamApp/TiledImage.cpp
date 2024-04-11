@@ -86,8 +86,9 @@ void TiledImage::matToImage(const cv::Mat& mat, juce::Image *image,
           //const cv::Vec3b& bgr = matRowPtr[x];
           jassert(u < (tile_size) and v < (tile_size));
           cv::Vec3b color = ROI.at<cv::Vec3b>(y, x);
+          uint8 alpha = (color[2]==0 &&  color[1]==0 && color[0]==0)? 0:255;
 
-          data.setPixelColour(u, v, juce::Colour(color[2],  color[1] , color[0], (uint8)255));
+          data.setPixelColour(u, v, juce::Colour(color[2],  color[1] , color[0], alpha));
         }
     }
   

@@ -7,7 +7,7 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
-class MainComponent final : public juce::Component
+class MainComponent final : public juce::Component, public juce::KeyListener 
 {
 public:
   //==============================================================================
@@ -19,11 +19,21 @@ public:
   void paint (juce::Graphics& g) override;
   void resized() override;
   
-  void createShaders();
-
+  bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override {
+      if (key == juce::KeyPress::createFromDescription("spacebar")) {
+        std::cout << "space\n" << "\n";
+          // Do something when space bar is pressed
+          return true;  // Key press handled
+      }
+    
+      return false;  // Key press not handled
+  }
+  
 private:
   
   std::shared_ptr< pathCam::StreamCam > bcam;
+  MRTiledImage MRimage;
+  
   
   ToolbarComp * toolbar;
   ImageViewComponent * imageview;

@@ -29,6 +29,7 @@
 using namespace juce;
 
 #include "TiledImage.h"
+#include "MRTiledImage.h"
 #include "ToolBarComponent.h"
 #include "ImageViewComponent.h"
 #include "MainComponent.h"

@@ -8,7 +8,7 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr< pathCam::StreamCam > bca
   
 #ifdef DEBUG
   std::stringstream ss;
-  ss <<  PROJECT_SOURCE_DIR << "/resources/screen_texture_test.png";
+  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
 
   cv::Mat image = imread(ss.str());
   std::cout << "Read OpenCV image: " << image.cols << "X" << image.rows << "\n";
