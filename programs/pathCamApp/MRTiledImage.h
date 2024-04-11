@@ -19,10 +19,25 @@ public:
   MRTiledImage(unsigned int tile_size=512):tile_size(tile_size){};
   ~MRTiledImage(){ level.clear(); };
   
-  std::vector < TiledImage > level;
+  std::vector < std::shared_ptr< TiledImage > > level;
   
   void build(cv::Mat image_in);
   
+  inline pCApp::Rectangle worldToLevel(pCApp::Rectangle r, unsigned int level){
+    return r;
+  }
+  
+  inline pCApp::Rectangle levelToWorld(pCApp::Rectangle r, unsigned int level){
+    return r;
+  }
+  
+  inline pCApp::Point worldToLevel(pCApp::Point p, unsigned int level){
+    return p;
+  }
+  
+  inline pCApp::Point levelToWorld(pCApp::Point p, unsigned int level){
+    return p;
+  }
   
 };
 

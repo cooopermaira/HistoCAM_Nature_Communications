@@ -17,13 +17,13 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   
   setSize (1024, 768);
   
-//  std::stringstream ss;
-//  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
-//
-//  cv::Mat cvimage = imread(ss.str());
-//  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
-//
-//  MRimage.build(cvimage);
+  std::stringstream ss;
+  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
+
+  cv::Mat cvimage = imread(ss.str());
+  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
+
+  MRimage.build(cvimage);
 
 }
 
