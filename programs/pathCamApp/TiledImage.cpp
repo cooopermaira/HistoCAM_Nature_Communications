@@ -17,8 +17,8 @@ std::vector < TileQueryElem >  TiledImage::getTiles(pCApp::Rectangle box){
   bottom_right.y--;
 
   
-  for(int i = getIJ(top_left).getX(); i <=  getIJ(bottom_right).getX(); i++){
-    for(int j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
+  for(pCApp::cType i = getIJ(top_left).getX(); i <=  getIJ(bottom_right).getX(); i++){
+    for(pCApp::cType j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
       box_tiles.push_back(TileQueryElem(tiles(i,j), i, j));
     }
   }
@@ -40,8 +40,8 @@ void TiledImage::insertMat(cv::Mat image_in, pCApp::Rectangle box){
   bottom_right.y -= 1;
     
   
-  for(int64_t i = getIJ(top_left).getX(); i <=  getIJ(bottom_right).getX(); i++){
-    for(int64_t j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
+  for(pCApp::cType i = getIJ(top_left).getX(); i <=  getIJ(bottom_right).getX(); i++){
+    for(pCApp::cType j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
       
       if(tiles(i,j) == NULL){
         tiles(i,j) = new juce::Image(juce::Image::PixelFormat::RGB, tile_size, tile_size, true);
@@ -72,17 +72,17 @@ void TiledImage::matToImage(const cv::Mat& mat, juce::Image *image,
                             pCApp::Rectangle tile_box){
   jassert(mat.type() == CV_8UC3); // Ensure the Mat is of type 8-bit Unsigned with 3 Channels
   
-  cv::Rect ROIrect ((int)(image_box.getX()-offset.getX()), (int)(image_box.getY()-offset.getY()),
-                    (int)image_box.getWidth(), (int)image_box.getHeight());
+  cv::Rect ROIrect ((pCApp::cType)(image_box.getX()-offset.getX()), (pCApp::cType)(image_box.getY()-offset.getY()),
+                    (pCApp::cType)image_box.getWidth(), (pCApp::cType)image_box.getHeight());
 
   cv::Mat ROI = mat(ROIrect);
   
   
   juce::Image::BitmapData data(*image, juce::Image::BitmapData::writeOnly);
     
-  for (int y = 0, v=(int)(image_box.getY()-tile_box.getY())  ; y < ROI.rows; ++y, ++v) {
+  for (pCApp::cType y = 0, v=(pCApp::cType)(image_box.getY()-tile_box.getY())  ; y < ROI.rows; ++y, ++v) {
       //const auto* matRowPtr = ROI.ptr<cv::Vec3b>(y);
-        for (int x = 0, u=(int)(image_box.getX()-tile_box.getX()); x < ROI.cols; ++x, ++u) {
+        for (pCApp::cType x = 0, u=(pCApp::cType)(image_box.getX()-tile_box.getX()); x < ROI.cols; ++x, ++u) {
           //const cv::Vec3b& bgr = matRowPtr[x];
           jassert(u < (tile_size) and v < (tile_size));
           cv::Vec3b color = ROI.at<cv::Vec3b>(y, x);

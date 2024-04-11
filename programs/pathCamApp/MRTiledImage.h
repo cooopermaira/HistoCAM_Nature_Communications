@@ -23,20 +23,25 @@ public:
   
   void build(cv::Mat image_in);
   
+  std::vector < TileQueryElem > getTiles(pCApp::Rectangle box);
+  
+  
+private:
+  
   inline pCApp::Rectangle worldToLevel(pCApp::Rectangle r, unsigned int level){
-    return r;
+    return r/(2*(int)level);
   }
   
   inline pCApp::Rectangle levelToWorld(pCApp::Rectangle r, unsigned int level){
-    return r;
+    return r*(2*(int)level);
   }
   
   inline pCApp::Point worldToLevel(pCApp::Point p, unsigned int level){
-    return p;
+    return p/(2*(int)level);
   }
   
   inline pCApp::Point levelToWorld(pCApp::Point p, unsigned int level){
-    return p;
+    return p*(2*(int)level);
   }
   
 };

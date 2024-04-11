@@ -32,7 +32,7 @@ public:
 private:
   
   std::shared_ptr< pathCam::StreamCam > bcam;
-  MRTiledImage MRimage;
+  std::shared_ptr< MRTiledImage >  MRimage;
   
   
   ToolbarComp * toolbar;

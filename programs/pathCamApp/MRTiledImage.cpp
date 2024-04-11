@@ -7,6 +7,10 @@
 
 #include "JuceHeader.h"
 
+std::vector < TileQueryElem > MRTiledImage::getTiles(pCApp::Rectangle box){
+  return level[0]->getTiles(box);
+}
+
 
 void MRTiledImage::build(cv::Mat image_in){
   //Determine the number of levels
@@ -23,7 +27,6 @@ void MRTiledImage::build(cv::Mat image_in){
     cv::resize(image_in, image_in, cv::Size(image_in.cols/2, image_in.rows/2));
     num_levels += 1;
   }
-  
   
   std::cout << "Image has " << num_levels << " levels.";
   

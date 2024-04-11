@@ -11,7 +11,7 @@ class ImageViewComponent final : public juce::Component
 {
 public:
   //==============================================================================
-  ImageViewComponent(std::shared_ptr< pathCam::StreamCam > bcam);
+  ImageViewComponent(std::shared_ptr< MRTiledImage > MRImage);
   ~ImageViewComponent() override;
   
   //==============================================================================
@@ -22,7 +22,7 @@ public:
 
 private:
   
-  std::shared_ptr< pathCam::StreamCam > bcam;
+  std::shared_ptr< MRTiledImage> MRImage;
   
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
@@ -30,16 +30,14 @@ private:
                                       juce::Colour colour1, juce::Colour colour2);
 
     
-  TiledImage timage;
+  //TiledImage timage;
   juce::Image checkerboard;
   
   
   juce::Point<int> imagePosition;
   juce::Point<int> lastMousePosition;
 
-  juce::Rectangle<int> bounds;
-  float desktopScale;
-  juce::Rectangle<int> pixel_bounds;
+  pCApp::Rectangle bounds;
   
   CriticalSection mutex;
 

@@ -3,20 +3,9 @@
 
 
 //==============================================================================
-ImageViewComponent::ImageViewComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(bcam)
+ImageViewComponent::ImageViewComponent(std::shared_ptr< MRTiledImage > MRImage): MRImage(MRImage)
 {
-  
-#ifdef DEBUG
-  std::stringstream ss;
-  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
 
-  cv::Mat image = imread(ss.str());
-  std::cout << "Read OpenCV image: " << image.cols << "X" << image.rows << "\n";
-  
-  timage.insertMat(image, pCApp::Rectangle(0,0, image.cols, image.rows));
-
-#endif
-  
 }
 
 ImageViewComponent::~ImageViewComponent()
@@ -44,26 +33,26 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
     
-  std::vector < TileQueryElem >  tiles = timage.getTiles(bounds);
+  std::vector < TileQueryElem >  tiles = MRImage->getTiles(bounds);
   
   for(unsigned int i = 0; i < tiles.size(); i++){
-    juce::Image *im = timage.getTile(tiles[i].i,tiles[i].j);
+    juce::Image *im = tiles[i].image;
     
     if(im != NULL){
       g.drawImageAt(*im,
-                    tiles[i].i*timage.getTileSize() - bounds.getX(),
-                    tiles[i].j*timage.getTileSize() - bounds.getY());
+                    tiles[i].i*MRImage->tile_size- bounds.getX(),
+                    tiles[i].j*MRImage->tile_size- bounds.getY());
     }
 
 #ifdef DEBUG
     g.setColour (juce::Colours::greenyellow);
-    int x = (int)(tiles[i].i*timage.getTileSize() - bounds.getX());
-    int y = (int)(tiles[i].j*timage.getTileSize() - bounds.getY());
+    int x = (int)(tiles[i].i*MRImage->tile_size- bounds.getX());
+    int y = (int)(tiles[i].j*MRImage->tile_size- bounds.getY());
     g.drawRect(x, y,
-               (int)timage.getTileSize(), (int)timage.getTileSize(), 3);
+               (int)MRImage->tile_size, (int)MRImage->tile_size, 3);
     std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
     g.setFont (20);
-    g.drawText ( ij,x + timage.getTileSize()/2-50, y + timage.getTileSize()/2-15, 100, 30, Justification::centred);
+    g.drawText ( ij,x + MRImage->tile_size/2-50, y + MRImage->tile_size/2-15, 100, 30, Justification::centred);
 #endif
   }
 }

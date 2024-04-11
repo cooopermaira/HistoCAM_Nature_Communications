@@ -11,14 +11,15 @@
 
 
 namespace pCApp{
-  typedef juce::Rectangle<int> Rectangle;
-  typedef juce::Point<int> Point;
+  typedef int cType;
+  typedef juce::Rectangle<cType> Rectangle;
+  typedef juce::Point<cType> Point;
 };
 
 template <typename T>
 class Dense2DArray {
 public:
-  Dense2DArray(int64_t minX=-4000, int64_t maxX=4000, int64_t minY=-4000, int64_t maxY=4000)
+  Dense2DArray(pCApp::cType minX=-4000, pCApp::cType maxX=4000, pCApp::cType minY=-4000, pCApp::cType maxY=4000)
   : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
     data.resize(width * height, NULL);
   }
@@ -29,19 +30,19 @@ public:
     }
   }
   
-  T& operator()(int64_t x, int64_t y) {
+  T& operator()(pCApp::cType x, pCApp::cType y) {
     return data[getIndex(x, y)];
   }
   
-  const T& operator()(int64_t x, int64_t y) const {
+  const T& operator()(pCApp::cType x, pCApp::cType y) const {
     return data[getIndex(x, y)];
   }
   
 private:
   std::vector<T> data;
-  int64_t minX, minY, width, height;
+  pCApp::cType minX, minY, width, height;
   
-  inline int64_t getIndex(int64_t x, int64_t y) const {
+  inline int64_t getIndex(pCApp::cType x, pCApp::cType y) const {
     assert(x >= minX && x < minX + width);
     assert(y >= minY && y < minY + height);
     return (x - minX) + (y - minY) * width;
@@ -71,7 +72,7 @@ public:
   
   void insertMat(cv::Mat image_in, pCApp::Rectangle i_bounds);
   
-  inline juce::Image * getTile(int i, int j){ return tiles(i,j); }
+  inline juce::Image * getTile(pCApp::cType i, pCApp::cType j){ return tiles(i,j); }
   
   std::vector < TileQueryElem > getTiles(pCApp::Rectangle box);
   
@@ -80,7 +81,7 @@ private:
                   pCApp::Rectangle image_box, pCApp::Rectangle tile_box);
   
   inline pCApp::Point getIJ(pCApp::Point p){
-    pCApp::Point ij = pCApp::Point(p.getX()/(int)tile_size, p.getY()/(int)tile_size);
+    pCApp::Point ij = pCApp::Point(p.getX()/(pCApp::cType)tile_size, p.getY()/(pCApp::cType)tile_size);
     if(p.getX() < 0){ ij.x--;}
     if(p.getY() < 0){ ij.y--;}
     return ij;
