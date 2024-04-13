@@ -12,7 +12,7 @@
 
 class MRTiledImage{
 public:
-  pCApp::Rectangle bounds;
+  fRectangle bounds;
   unsigned int tile_size;
  
   
@@ -23,25 +23,25 @@ public:
   
   void build(cv::Mat image_in);
   
-  std::vector < TileQueryElem > getTiles(pCApp::Rectangle box);
+  std::vector < TileQuery > getTiles(fRectangle bounds);
   
   
 private:
   
-  inline pCApp::Rectangle worldToLevel(pCApp::Rectangle r, unsigned int level){
-    return r/(2*(int)level);
+  inline fRectangle worldToLevel(fRectangle r, unsigned int level){
+    return r/(2*level);
   }
   
-  inline pCApp::Rectangle levelToWorld(pCApp::Rectangle r, unsigned int level){
-    return r*(2*(int)level);
+  inline fRectangle levelToWorld(fRectangle r, unsigned int level){
+    return r*(2*level);
   }
   
-  inline pCApp::Point worldToLevel(pCApp::Point p, unsigned int level){
-    return p/(2*(int)level);
+  inline fPoint worldToLevel(fPoint p, unsigned int level){
+    return p/(2*level);
   }
   
-  inline pCApp::Point levelToWorld(pCApp::Point p, unsigned int level){
-    return p*(2*(int)level);
+  inline fPoint levelToWorld(fPoint p, unsigned int level){
+    return p*(2*level);
   }
   
 };
@@ -52,7 +52,7 @@ class MRTiledImageSet{
 public:
   MRTiledImageSet(){};
 
-  void add(MRTiledImage &image, double scale, pCApp::Point offset){
+  void add(MRTiledImage &image, double scale, fPoint offset){
     images.push_back(image);
     scales.push_back(scale);
     offsets.push_back(offset);
@@ -61,7 +61,7 @@ public:
 private:
   std::vector < MRTiledImage > images;
   std::vector < double > scales;
-  std::vector < pCApp::Point > offsets;
+  std::vector < fPoint > offsets;
 };
 
 

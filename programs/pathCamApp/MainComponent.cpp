@@ -6,6 +6,10 @@
 MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(bcam)
 {
   
+  double progress = 0.0;
+  progressBar = new ProgressBar(progress);
+  
+  
   std::stringstream ss;
   ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
 
@@ -25,12 +29,16 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   setWantsKeyboardFocus(true);
   addKeyListener(this);
   
+  //addAndMakeVisible(progressBar);
+
+  
   setSize (1024, 768);
 
 }
 
 MainComponent::~MainComponent()
 {
+  delete progressBar;
   delete toolbar;
   delete imageview;
 }
@@ -47,5 +55,7 @@ void MainComponent::resized()
   const ScopedLock lock (mutex);
   toolbar->setBounds(0, 0, getWidth(), 60);
   imageview->setBounds(0, 60, getWidth(), getHeight()-60);
+  progressBar->setBounds(50, getHeight()-40, getWidth() - 100, 30);
+
 }
 

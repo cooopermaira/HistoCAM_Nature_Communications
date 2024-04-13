@@ -38,6 +38,8 @@ private:
   ToolbarComp * toolbar;
   ImageViewComponent * imageview;
   
+  juce::ProgressBar * progressBar;
+  
 
   CriticalSection mutex;
 
