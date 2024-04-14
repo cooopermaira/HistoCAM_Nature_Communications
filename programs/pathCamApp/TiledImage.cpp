@@ -19,7 +19,10 @@ std::vector < TileQuery >  TiledImage::getTiles(fRectangle box){
   
   for(int i = getIJ(top_left).getX(); i <=  getIJ(bottom_right).getX(); i++){
     for(int j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
-      box_tiles.push_back(TileQuery(tiles(i,j), i, j, fRectangle()));
+      int x = i*(int)logic_size - box.getX();
+      int y = j*(int)logic_size - box.getY();
+      Rectangle< float > rect = Rectangle< float >(x, y, logic_size, logic_size);
+      box_tiles.push_back(TileQuery(tiles(i,j), i, j, rect));
     }
   }
   

@@ -83,7 +83,7 @@ private:
                   fRectangle image_box, fRectangle tile_box);
   
   inline iPoint getIJ(fPoint p){
-    iPoint ij = iPoint(p.getX()/(int)tile_size, p.getY()/(int)tile_size);
+    iPoint ij = iPoint(p.getX()/(int)logic_size, p.getY()/(int)logic_size);
     if(p.getX() < 0){ ij.x--;}
     if(p.getY() < 0){ ij.y--;}
     return ij;

@@ -38,16 +38,33 @@ void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 {
     juce::Point<int> idelta = event.getPosition() - lastMousePosition;
     fPoint delta = fPoint(idelta.x, idelta.y);
-    bounds = bounds-delta;
+  
+    delta *= view.getVerticalRange().getLength()/getBounds().getVerticalRange().getLength();
+    view = view-delta;
     lastMousePosition = event.getPosition();
     repaint();
 }
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
-  scale += wheel.deltaY;
-  //bounds = bounds - bounds.getX()/2
+  scaleCenter(1.0+wheel.deltaY);
   repaint();
 }
+
+bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
+  if (key == juce::KeyPress::createFromDescription("-")) {
+    scaleCenter(2.0);
+    repaint();
+    return true;  // Key press handled
+  }
+  if (key == juce::KeyPress::createFromDescription("=")) { //Really "+"
+    scaleCenter(0.5);
+    repaint();
+    return true;  // Key press handled
+  }
+  
+  return false;  // Key press not handled
+}
+
 
 void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart)
 {
@@ -72,30 +89,23 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
     
-  std::vector < TileQuery >  tiles = MRImage->getTiles(bounds);
-  
+  std::vector < TileQuery >  tiles = MRImage->getTiles(view);
   
   for(unsigned int i = 0; i < tiles.size(); i++){
     juce::Image *im = tiles[i].image;
-    
-    if(im != NULL){                  
-      int x = tiles[i].i*(int)MRImage->tile_size - bounds.getX();
-      int y = tiles[i].j*(int)MRImage->tile_size - bounds.getY();
-      Rectangle< float > rect = Rectangle< float >(x, y, MRImage->tile_size, MRImage->tile_size);
-      g.drawImage(*im, rect);
+    tiles[i].bounds *= getBounds().getVerticalRange().getLength()/view.getVerticalRange().getLength();
+    if(im != NULL){
+      g.drawImage(*im, tiles[i].bounds);
     }
   }
-  
 #ifdef DEBUG
   for(unsigned int i = 0; i < tiles.size(); i++){
     g.setColour (juce::Colours::greenyellow);
-    int x = tiles[i].i*(int)MRImage->tile_size - bounds.getX();
-    int y = tiles[i].j*(int)MRImage->tile_size- bounds.getY();
-    Rectangle< float > rect = Rectangle< float >(x,y,MRImage->tile_size, MRImage->tile_size);
-    g.drawRect(rect, 3);
+    g.drawRect(tiles[i].bounds, 3);
     std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
     g.setFont (20);
-    g.drawText ( ij, rect.getCentreX()-50, rect.getCentreY()-15, 100, 30, Justification::centred);
+    g.drawText ( ij, tiles[i].bounds.getCentreX()-50,
+                tiles[i].bounds.getCentreY()-15, 100, 30, Justification::centred);
   }
 #endif
   
@@ -111,13 +121,14 @@ void ImageViewComponent::resized()
   
   juce::Rectangle<int> b = getLocalBounds();
   
-//  horizontalScrollBar.setBounds(b.removeFromBottom(18));
-//  verticalScrollBar.setBounds(b.removeFromRight(18));
+  horizontalScrollBar.setBounds(b.removeFromBottom(18));
+  verticalScrollBar.setBounds(b.removeFromRight(18));
   
-  bounds = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
+  view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
+  view += MRImage->bounds.getCentre();
   
   
-  checkerboard = createCheckerboardImage(bounds.getWidth(), bounds.getHeight(),
+  checkerboard = createCheckerboardImage(getBounds().getWidth(), getBounds().getHeight(),
                                          64, juce::Colours::lightgrey,
                                          juce::Colours::white);
    

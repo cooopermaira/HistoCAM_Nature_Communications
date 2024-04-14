@@ -12,6 +12,9 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   
   std::stringstream ss;
   ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
+  //ss <<  PROJECT_SOURCE_DIR << "/resources/screen_texture_test.png";
+
+  
 
   cv::Mat cvimage = imread(ss.str());
   std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
@@ -27,7 +30,8 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   addAndMakeVisible(toolbar);
   
   setWantsKeyboardFocus(true);
-  addKeyListener(this);
+  addKeyListener(imageview);
+
   
   //addAndMakeVisible(progressBar);
 

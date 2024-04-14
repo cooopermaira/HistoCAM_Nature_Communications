@@ -7,7 +7,7 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
-class MainComponent final : public juce::Component, public juce::KeyListener 
+class MainComponent final : public juce::Component
 {
 public:
   //==============================================================================
@@ -18,16 +18,6 @@ public:
   //==============================================================================
   void paint (juce::Graphics& g) override;
   void resized() override;
-  
-  bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override {
-      if (key == juce::KeyPress::createFromDescription("spacebar")) {
-        std::cout << "space\n" << "\n";
-          // Do something when space bar is pressed
-          return true;  // Key press handled
-      }
-    
-      return false;  // Key press not handled
-  }
   
 private:
   
