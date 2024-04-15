@@ -1,7 +1,6 @@
 #include "JuceHeader.h"
 
 
-
 //==============================================================================
 ImageViewComponent::ImageViewComponent(std::shared_ptr< MRTiledImage > MRImage): MRImage(MRImage), scale(1.0)
 {
@@ -45,6 +44,12 @@ void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
   scaleCenter(fPoint(1.0-wheel.deltaY,1.0-wheel.deltaY));
+  repaint();
+}
+
+void ImageViewComponent::mouseMagnify (const MouseEvent&, float magnifyAmmount)
+{
+  scaleCenter(fPoint(1.0/magnifyAmmount,1.0/magnifyAmmount));
   repaint();
 }
 
