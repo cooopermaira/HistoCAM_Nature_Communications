@@ -44,7 +44,7 @@ void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 }
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
-  scaleCenter(fPoint(1.0+wheel.deltaY,1.0+wheel.deltaY));
+  scaleCenter(fPoint(1.0-wheel.deltaY,1.0-wheel.deltaY));
   repaint();
 }
 
@@ -83,7 +83,6 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRa
         // Update the content's vertical position
     }
 }
-
 
 
 //==============================================================================
@@ -137,6 +136,13 @@ void ImageViewComponent::resized()
   }else{
     view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
     view += MRImage->bounds.getCentre();
+    
+    float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
+                      (float)view.getHorizontalRange().getLength(),
+                      (float)MRImage->bounds.getVerticalRange().getLength()/
+                      (float)view.getVerticalRange().getLength());
+    
+    scaleCenter(fPoint(scale,scale));
   }
   
   
