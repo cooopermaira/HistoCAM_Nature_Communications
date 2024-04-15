@@ -7,12 +7,13 @@
 
 #include "JuceHeader.h"
 
-std::vector < TileQuery > MRTiledImage::getTiles(fRectangle bounds){
+std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, Rectangle <int> screen){
   
-  //box = worldToLevel(box, 1);
-  
-  
-  return level[0]->getTiles(bounds);
+  float scale = max(view.getHorizontalRange().getLength()/float(screen.getHorizontalRange().getLength()),
+                    view.getVerticalRange().getLength()/float(screen.getVerticalRange().getLength()));  
+  scale = log2(scale);
+  unsigned int i_scale =  (unsigned int)(scale+0.5);
+  return level[i_scale]->getTiles(view);
 }
 
 
@@ -31,7 +32,7 @@ void MRTiledImage::build(cv::Mat image_in){
   while(image_in.cols > tile_size || image_in.rows > tile_size){
     std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(tile_size, tile_size*pow(2,num_levels));
     cv::resize(image_in, image_in, cv::Size(image_in.cols/2, image_in.rows/2));
-    current->insertMat(image_in, fRectangle(0,0, image_in.cols, image_in.rows));
+    current->insertMat(image_in, fRectangle(0,0, width, height));
     level.push_back(current);
     num_levels += 1;
   }

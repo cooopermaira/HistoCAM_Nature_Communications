@@ -32,8 +32,10 @@ std::vector < TileQuery >  TiledImage::getTiles(fRectangle box){
 void TiledImage::insertMat(cv::Mat image_in, fRectangle box){
   unsigned int width  = image_in.cols;
   unsigned int height = image_in.rows;
+  float scale = ((float)tile_size/(float)logic_size);
   
-  jassert(box.getWidth() == width && box.getHeight() == height);
+  jassert(int(box.getWidth()*scale) == width &&
+          int(box.getHeight()*scale) == height);
   
   bounds = bounds.getUnion(box);
     
@@ -50,17 +52,17 @@ void TiledImage::insertMat(cv::Mat image_in, fRectangle box){
         tiles(i,j) = new juce::Image(juce::Image::PixelFormat::RGB, tile_size, tile_size, true);
       }
       
-      fRectangle tile_box = fRectangle(i*tile_size,
-                                                   j*tile_size,
-                                                   tile_size,
-                                                   tile_size);
+      fRectangle tile_box = fRectangle(i*logic_size,
+                                       j*logic_size,
+                                       logic_size,
+                                       logic_size);
       
       fRectangle image_box = tile_box.getIntersection(box);
 
       
       fPoint offset = box.getTopLeft();
       
-      matToImage(image_in, tiles(i,j), offset, image_box, tile_box);
+      matToImage(image_in, tiles(i,j), offset*scale, image_box*scale, tile_box*scale);
 
       
     }

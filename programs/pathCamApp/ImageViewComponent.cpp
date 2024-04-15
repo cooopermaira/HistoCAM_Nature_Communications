@@ -37,31 +37,32 @@ void ImageViewComponent::mouseDown(const juce::MouseEvent& event)
 void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 {
     juce::Point<int> idelta = event.getPosition() - lastMousePosition;
-    fPoint delta = fPoint(idelta.x, idelta.y);
-  
-    delta *= view.getVerticalRange().getLength()/getBounds().getVerticalRange().getLength();
+    fPoint delta = fPoint(idelta.x, idelta.y)* screen2view();
     view = view-delta;
     lastMousePosition = event.getPosition();
     repaint();
 }
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
-  scaleCenter(1.0+wheel.deltaY);
+  scaleCenter(fPoint(1.0+wheel.deltaY,1.0+wheel.deltaY));
   repaint();
 }
 
 bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
   if (key == juce::KeyPress::createFromDescription("-")) {
-    scaleCenter(2.0);
+    scaleCenter(fPoint(2.0,2.0));
     repaint();
     return true;  // Key press handled
   }
   if (key == juce::KeyPress::createFromDescription("=")) { //Really "+"
-    scaleCenter(0.5);
+    scaleCenter(fPoint(0.5,0.5));
     repaint();
     return true;  // Key press handled
   }
-  
+  if (key.getKeyCode() == KeyPress::escapeKey)
+  {
+      JUCEApplication::getInstance()->systemRequestedQuit();
+  }
   return false;  // Key press not handled
 }
 
@@ -71,10 +72,14 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRa
     // This method is called when the scroll bar is moved
     if (scrollBar == &horizontalScrollBar)
     {
+      std::cout << "Horizontal\n" << "\n";
         // Update the content's horizontal position
     }
     else if (scrollBar == &verticalScrollBar)
     {
+      
+        std::cout << "Vertical\n" << "\n";
+
         // Update the content's vertical position
     }
 }
@@ -89,11 +94,11 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
     
-  std::vector < TileQuery >  tiles = MRImage->getTiles(view);
+  std::vector < TileQuery >  tiles = MRImage->getTiles(view, getBounds());
   
   for(unsigned int i = 0; i < tiles.size(); i++){
     juce::Image *im = tiles[i].image;
-    tiles[i].bounds *= getBounds().getVerticalRange().getLength()/view.getVerticalRange().getLength();
+    tiles[i].bounds *= view2screen();
     if(im != NULL){
       g.drawImage(*im, tiles[i].bounds);
     }
@@ -118,20 +123,31 @@ void ImageViewComponent::resized()
   // update their positions.
   const ScopedLock lock (mutex);
 
-  
   juce::Rectangle<int> b = getLocalBounds();
   
   horizontalScrollBar.setBounds(b.removeFromBottom(18));
   verticalScrollBar.setBounds(b.removeFromRight(18));
   
-  view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
-  view += MRImage->bounds.getCentre();
+  if(!old_bounds.isEmpty()){
+    scaleCenter(fPoint((float)b.getHorizontalRange().getLength()/
+                       (float)old_bounds.getHorizontalRange().getLength(),
+                       (float)b.getVerticalRange().getLength()/
+                       (float)old_bounds.getVerticalRange().getLength()));
+  
+  }else{
+    view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
+    view += MRImage->bounds.getCentre();
+  }
   
   
-  checkerboard = createCheckerboardImage(getBounds().getWidth(), getBounds().getHeight(),
-                                         64, juce::Colours::lightgrey,
+  
+  checkerboard = createCheckerboardImage(getBounds().getWidth(), 
+                                         getBounds().getHeight(),
+                                         64,
+                                         juce::Colours::lightgrey,
                                          juce::Colours::white);
    
+  old_bounds = b;
 }
 
 juce::Image ImageViewComponent::createCheckerboardImage(int width,

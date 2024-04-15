@@ -23,7 +23,7 @@ public:
   
   void build(cv::Mat image_in);
   
-  std::vector < TileQuery > getTiles(fRectangle bounds);
+  std::vector < TileQuery > getTiles(fRectangle bounds, Rectangle < int > screen);
   
   
 private:

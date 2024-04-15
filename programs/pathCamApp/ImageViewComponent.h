@@ -28,11 +28,21 @@ private:
   void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) override;
   void scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart) override;
   
-  inline void scaleCenter(float scale){
+  inline void scaleCenter(fPoint scale){
     fPoint center = view.getCentre();
     view -= center;
     view *= scale;
     view += center;
+  }
+  
+  inline fPoint screen2view(){
+    return fPoint(view.getHorizontalRange().getLength()/getBounds().getHorizontalRange().getLength(),
+                  view.getVerticalRange().getLength()/getBounds().getVerticalRange().getLength());
+  }
+  
+  inline fPoint view2screen(){
+    return fPoint(getBounds().getHorizontalRange().getLength()/view.getHorizontalRange().getLength(),
+                  getBounds().getVerticalRange().getLength()/view.getVerticalRange().getLength());
   }
   
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
@@ -45,6 +55,7 @@ private:
   juce::Point<int> lastMousePosition;
   
   fRectangle view;
+  juce::Rectangle<int> old_bounds;
   
   juce::ScrollBar horizontalScrollBar{ false }; // Horizontal scroll bar
   juce::ScrollBar verticalScrollBar{ true }; // Vertical scroll bar
