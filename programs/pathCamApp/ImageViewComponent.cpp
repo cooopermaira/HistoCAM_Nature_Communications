@@ -40,35 +40,30 @@ void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 {
     juce::Point<int> idelta = event.getPosition() - lastMousePosition;
     fPoint delta = fPoint(idelta.x, idelta.y)* screen2view();
-    view = view-delta;
+    translate(-delta);
     lastMousePosition = event.getPosition();
-    updateScrollbar();
     repaint();
 }
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
   scaleCenter(fPoint(1.0-wheel.deltaY,1.0-wheel.deltaY));
-  updateScrollbar();
   repaint();
 }
 
 void ImageViewComponent::mouseMagnify (const MouseEvent&, float magnifyAmmount)
 {
   scaleCenter(fPoint(1.0/magnifyAmmount,1.0/magnifyAmmount));
-  updateScrollbar();
   repaint();
 }
 
 bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
   if (key == juce::KeyPress::createFromDescription("-")) {
     scaleCenter(fPoint(2.0,2.0));
-    updateScrollbar();
     repaint();
     return true;  // Key press handled
   }
   if (key == juce::KeyPress::createFromDescription("=")) { //Really "+"
     scaleCenter(fPoint(0.5,0.5));
-    updateScrollbar();
     repaint();
     return true;  // Key press handled
   }
@@ -150,7 +145,6 @@ void ImageViewComponent::resized()
                        (float)old_bounds.getHorizontalRange().getLength(),
                        (float)b.getVerticalRange().getLength()/
                        (float)old_bounds.getVerticalRange().getLength()));
-    updateScrollbar();
   
   }else{
     view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
@@ -162,7 +156,6 @@ void ImageViewComponent::resized()
                       (float)view.getVerticalRange().getLength());
     
     scaleCenter(fPoint(scale,scale));
-    updateScrollbar();
   }
   
   

@@ -115,12 +115,17 @@ private:
   
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
   
+  inline void translate(fPoint amount){
+    view += amount;
+    updateScrollbar();
+  }
   
   inline void scaleCenter(fPoint scale){
     fPoint center = view.getCentre();
     view -= center;
     view *= scale;
     view += center;
+    updateScrollbar();
   }
   
   inline fPoint screen2view(){
