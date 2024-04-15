@@ -148,7 +148,7 @@ void ImageViewComponent::resized()
   
   }else{
     view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
-    view += MRImage->bounds.getCentre();
+    view.setCentre(MRImage->bounds.getCentre());
     
     float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
                       (float)view.getHorizontalRange().getLength(),
