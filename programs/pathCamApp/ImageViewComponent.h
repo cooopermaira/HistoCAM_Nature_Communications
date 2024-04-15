@@ -109,8 +109,12 @@ private:
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
   void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) override;
+
   void scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart) override;
+  void updateScrollbar();
+  
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
+  
   
   inline void scaleCenter(fPoint scale){
     fPoint center = view.getCentre();
@@ -143,9 +147,7 @@ private:
   
   juce::ScrollBar horizontalScrollBar{ false }; // Horizontal scroll bar
   juce::ScrollBar verticalScrollBar{ true }; // Vertical scroll bar
-  
-  float scale;
-  
+    
   CriticalSection mutex;
   
   std::unique_ptr<DemoControlsOverlay> controlsOverlay;
