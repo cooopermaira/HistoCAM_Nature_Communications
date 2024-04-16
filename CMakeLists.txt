@@ -253,6 +253,8 @@ IF(BUILD_PATHCAM_GUI)
       juce::juce_opengl
     )
     
+  target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0)
+
   if(MSVC)
     file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.pdb")
     
