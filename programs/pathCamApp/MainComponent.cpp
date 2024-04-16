@@ -57,8 +57,9 @@ void MainComponent::paint (juce::Graphics& g)
 void MainComponent::resized()
 {
   const ScopedLock lock (mutex);
-  toolbar->setBounds(0, 0, getWidth(), 60);
-  imageview->setBounds(0, 60, getWidth(), getHeight()-60);
+  Rectangle < int > b = getLocalBounds();
+  toolbar->setBounds(b.removeFromTop(50));
+  imageview->setBounds(b);
   progressBar->setBounds(50, getHeight()-40, getWidth() - 100, 30);
 
 }

@@ -46,8 +46,8 @@ void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 }
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
-  scaleCenter(fPoint(1.0-wheel.deltaY,1.0-wheel.deltaY));
-  repaint();
+    scaleCenter(fPoint(1.0-wheel.deltaY,1.0-wheel.deltaY));
+    repaint();
 }
 
 void ImageViewComponent::mouseMagnify (const MouseEvent&, float magnifyAmmount)
@@ -97,16 +97,9 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRa
     }
 }
 
-
-//==============================================================================
-void ImageViewComponent::paint (juce::Graphics& g)
-{
-
-  g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+void ImageViewComponent::drawSlide(juce::Graphics& g){
   
-  g.drawImageAt(checkerboard, 0, 0);
-    
-  std::vector < TileQuery >  tiles = MRImage->getTiles(view, getBounds());
+  std::vector < TileQuery >  tiles = MRImage->getTiles(view, getLocalBounds());
   
   for(unsigned int i = 0; i < tiles.size(); i++){
     juce::Image *im = tiles[i].image;
@@ -115,16 +108,45 @@ void ImageViewComponent::paint (juce::Graphics& g)
       g.drawImage(*im, tiles[i].bounds);
     }
   }
+  
+  
+
 #ifdef DEBUG
-  for(unsigned int i = 0; i < tiles.size(); i++){
-    g.setColour (juce::Colours::greenyellow);
-    g.drawRect(tiles[i].bounds, 3);
-    std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
-    g.setFont (20);
-    g.drawText ( ij, tiles[i].bounds.getCentreX()-50,
-                tiles[i].bounds.getCentreY()-15, 100, 30, Justification::centred);
-  }
+for(unsigned int i = 0; i < tiles.size(); i++){
+  g.setColour (juce::Colours::greenyellow);
+  g.drawRect(tiles[i].bounds, 3);
+  std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
+  g.setFont (20);
+  g.drawText ( ij, tiles[i].bounds.getCentreX()-50,
+              tiles[i].bounds.getCentreY()-15, 100, 30, Justification::centred);
+}
 #endif
+}
+
+
+//==============================================================================
+void ImageViewComponent::paint (juce::Graphics& g)
+{
+
+  g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
+  
+  g.drawImageAt(checkerboard, 0, 0);
+  
+  if(false){
+
+    juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth(), getLocalBounds().getHeight(), true);
+    
+    Graphics b(screenBuffer);
+    
+    drawSlide(b);
+    
+    g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
+                                         getLocalBounds().getY(),
+                                         getLocalBounds().getWidth(),
+                                         getLocalBounds().getHeight()));
+  }else{
+    drawSlide(g);
+  }
   
 }
 
@@ -139,6 +161,8 @@ void ImageViewComponent::resized()
   
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
   verticalScrollBar.setBounds(b.removeFromRight(20));
+  
+  b = getLocalBounds();
   
   if(!old_bounds.isEmpty()){
     scaleCenter(fPoint((float)b.getHorizontalRange().getLength()/
@@ -160,8 +184,9 @@ void ImageViewComponent::resized()
   
   
   
-  checkerboard = createCheckerboardImage(getBounds().getWidth(), 
-                                         getBounds().getHeight(),
+  
+  checkerboard = createCheckerboardImage(getLocalBounds().getWidth(),
+                                         getLocalBounds().getHeight(),
                                          64,
                                          juce::Colours::lightgrey,
                                          juce::Colours::white);

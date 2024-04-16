@@ -99,6 +99,7 @@ public:
   
   //==============================================================================
   void paint (juce::Graphics& g) override;
+  void drawSlide(juce::Graphics& g);
   void resized() override;
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
@@ -120,6 +121,7 @@ private:
     updateScrollbar();
   }
   
+  
   inline void scaleCenter(fPoint scale){
     fPoint center = view.getCentre();
     view -= center;
@@ -129,13 +131,13 @@ private:
   }
   
   inline fPoint screen2view(){
-    return fPoint(view.getHorizontalRange().getLength()/getBounds().getHorizontalRange().getLength(),
-                  view.getVerticalRange().getLength()/getBounds().getVerticalRange().getLength());
+    return fPoint(view.getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
+                  view.getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
   inline fPoint view2screen(){
-    return fPoint(getBounds().getHorizontalRange().getLength()/view.getHorizontalRange().getLength(),
-                  getBounds().getVerticalRange().getLength()/view.getVerticalRange().getLength());
+    return fPoint(getLocalBounds().getHorizontalRange().getLength()/view.getHorizontalRange().getLength(),
+                  getLocalBounds().getVerticalRange().getLength()/view.getVerticalRange().getLength());
   }
   
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
