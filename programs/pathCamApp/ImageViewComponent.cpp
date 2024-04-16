@@ -108,9 +108,10 @@ void ImageViewComponent::drawSlide(juce::Graphics& g, float scale){
   
   for(unsigned int i = 0; i < tiles.size(); i++){
     juce::Image *im = tiles[i].image;
-    tiles[i].bounds *= view2screen();
+    tiles[i].bounds *= view2screen()*scale;
+    tiles[i].bounds.expand(0.5, 0.5);
     if(im != NULL){
-      g.drawImage(*im, tiles[i].bounds*scale);
+      g.drawImage(*im, tiles[i].bounds);
     }
   }
   
@@ -138,7 +139,7 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
   
-  if(true){
+  if(false){
     
     auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
 
@@ -147,6 +148,7 @@ void ImageViewComponent::paint (juce::Graphics& g)
     Graphics b(screenBuffer);
     
     drawSlide(b, scale);
+  
     
     g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
                                          getLocalBounds().getY(),
