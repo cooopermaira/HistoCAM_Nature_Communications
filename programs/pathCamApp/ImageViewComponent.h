@@ -24,9 +24,6 @@ public:
 
     void initialise()
     {
-        lookAndFeelChanged();
-
-        showBackgroundToggle.setToggleState (false, sendNotification);
         speedSlider.setValue (0.01);
         sizeSlider .setValue (0.5);
     }
@@ -35,30 +32,11 @@ public:
     {
         auto area = getLocalBounds().reduced (4);
 
-        auto top = area.removeFromTop (75);
+        speedSlider         .setBounds (area.removeFromBottom (25));
+        sizeSlider          .setBounds (area.removeFromBottom (25));
 
-        auto sliders = top.removeFromRight (area.getWidth() / 2);
-        showBackgroundToggle.setBounds (sliders.removeFromBottom (25));
-        speedSlider         .setBounds (sliders.removeFromBottom (25));
-        sizeSlider          .setBounds (sliders.removeFromBottom (25));
-
-        top.removeFromRight (70);
-        statusLabel.setBounds (top);
+        statusLabel.setBounds (area);
     }
-
-//    bool isMouseButtonDownThreadsafe() const { return buttonDown; }
-//
-//
-//    void mouseWheelMove (const MouseEvent&, const MouseWheelDetails& d) override
-//    {
-//        sizeSlider.setValue (sizeSlider.getValue() + d.deltaY);
-//    }
-//
-//    void mouseMagnify (const MouseEvent&, float magnifyAmmount) override
-//    {
-//        sizeSlider.setValue (sizeSlider.getValue() + magnifyAmmount - 1.0f);
-//    }
-
 
     Label statusLabel;
 

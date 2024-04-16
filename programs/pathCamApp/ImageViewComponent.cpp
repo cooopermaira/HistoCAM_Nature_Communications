@@ -5,6 +5,12 @@
 ImageViewComponent::ImageViewComponent(std::shared_ptr< MRTiledImage > MRImage): MRImage(MRImage)
 {
   
+  setOpaque (true);
+  controlsOverlay.reset (new DemoControlsOverlay ());
+  addAndMakeVisible (controlsOverlay.get());
+
+  controlsOverlay->initialise();
+  
   juce::Rectangle<int> b = getLocalBounds();
 
 
@@ -162,6 +168,9 @@ void ImageViewComponent::resized()
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
   verticalScrollBar.setBounds(b.removeFromRight(20));
   
+  controlsOverlay->setBounds(b.removeFromTop(60).removeFromRight(400));
+
+  
   b = getLocalBounds();
   
   if(!old_bounds.isEmpty()){
@@ -183,15 +192,13 @@ void ImageViewComponent::resized()
   }
   
   
-  
-  
   checkerboard = createCheckerboardImage(getLocalBounds().getWidth(),
                                          getLocalBounds().getHeight(),
                                          64,
                                          juce::Colours::lightgrey,
                                          juce::Colours::white);
    
-  old_bounds = b;
+  old_bounds = getLocalBounds();
 }
 
 juce::Image ImageViewComponent::createCheckerboardImage(int width,
