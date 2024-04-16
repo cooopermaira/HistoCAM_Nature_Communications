@@ -23,7 +23,7 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   MRimage->build(cvimage);
   
   
-  toolbar = new ToolbarComp();
+  toolbar = new ToolbarComp(this);
   imageview = new ImageViewComponent(MRimage);
   
   addAndMakeVisible(imageview);
