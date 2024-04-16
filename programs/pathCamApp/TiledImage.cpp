@@ -21,7 +21,7 @@ std::vector < TileQuery >  TiledImage::getTiles(fRectangle box){
     for(int j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
       int x = i*(int)logic_size - box.getX();
       int y = j*(int)logic_size - box.getY();
-      Rectangle< float > rect = Rectangle< float >(x, y, logic_size, logic_size);
+      juce::Rectangle< float > rect = juce::Rectangle< float >(x, y, logic_size, logic_size);
       box_tiles.push_back(TileQuery(tiles(i,j), i, j, rect));
     }
   }
