@@ -21,8 +21,8 @@ using Poco::FileChannel;
 
 
 StreamCam::StreamCam(LayeredConfiguration::Ptr config): BatchCam(config), buffer_mutex(new Poco::FastMutex()),image_mutex(new Poco::FastMutex()),compositeQ_mutex(new Poco::FastMutex()),component_mutex(new Poco::FastMutex()),resize_buffer_mutex(new Poco::FastMutex()){
-    JobQ = new JobQueue(7, 7);
-   reg_results.resize(1,RegInfo(false, Vec2(0,0),true,0));
+    JobQ = new JobQueue(14, 14);
+   reg_results.resize(1,RegInfo(true, Vec2(0,0),true,0));
    reg_results[0].index = 0;
 }
 
@@ -53,7 +53,9 @@ bool StreamCam::run(){
   
   DiskStreamer *ds = new DiskStreamer(this);
   stream_thread.start(ds);
-  
+  //ds->run();
+  auto start = std::chrono::high_resolution_clock::now();
+
   QManager *qm = new QManager(this);
   Q_thread.start(qm);
   
@@ -63,7 +65,9 @@ bool StreamCam::run(){
   stream_thread.join();
   Q_thread.join();
   composite_thread.join();
-
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+  std::cout << duration.count() << std::endl;
   return true;
 }
 
@@ -73,14 +77,13 @@ unsigned long int StreamCam::add_image(Image * image){
   image_mutex->lock();
   images.push_back(image);
   index = images.size() - 1;
-  image_mutex->unlock();
+
   if (index % 100 == 0) {
-      resize_buffer_mutex->lock();
       matchM.resize(index + 100);
       reg_results.resize(index + 100, RegInfo());
       visited.resize(index + 100, false);
-      resize_buffer_mutex->unlock();
   }
+  image_mutex->unlock();
   return index;
 }
 
@@ -106,7 +109,7 @@ Image* StreamCam::get_image_ref(unsigned long int index){
 }
 
 void StreamCam::add_new_component(unsigned long image_index){
-  reg_results[image_index] = RegInfo(false,Vec2(0.0,0.0),true,increment_and_get_components());
+  reg_results[image_index] = RegInfo(true,Vec2(0.0,0.0),true,increment_and_get_components());
   reg_results[image_index].index = image_index;
   reg_results[image_index].resolved = true;
   reg_results[image_index].matchedTo = image_index;
@@ -120,11 +123,11 @@ void StreamCam::add_new_component(unsigned long image_index){
 }
 
 std::vector < RegInfo > StreamCam::get_Q_front(){
-  compositeQ_mutex->lock();
-  std::vector < RegInfo > temp = compositeBatch;
-  compositeBatch.clear();
-  compositeQ_mutex->unlock();
-  return temp;
+    compositeQ_mutex->lock();
+    std::vector < RegInfo > temp = compositeBatch.front();
+    compositeBatch.pop();
+    compositeQ_mutex->unlock();
+    return temp;
 }
 
 Image* StreamCam::get_Q_front_Spin() {
@@ -148,7 +151,10 @@ void StreamCam::pass_image(Image* image){
 
 void StreamCam::push_compositeQ(RegInfo index){
   compositeQ_mutex->lock();
-  compositeBatch.push_back(index);
+  if (compositeBatch.empty() || compositeBatch.back().size() >= 10) {
+      compositeBatch.push(std::vector<RegInfo>());
+  }
+  compositeBatch.back().push_back(index);
   compositeQ_mutex->unlock();
 }
 

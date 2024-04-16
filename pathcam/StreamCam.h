@@ -37,7 +37,7 @@ class StreamCam: public BatchCam{
   friend class RegistrationRunnable;
   
 private:
-std::vector < RegInfo > compositeBatch;
+std::queue < std::vector < RegInfo > > compositeBatch;
 
   
 public:

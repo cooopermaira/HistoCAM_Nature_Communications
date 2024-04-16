@@ -31,7 +31,7 @@ public:
     image_file = _image_file;
   }
   
-  void load_raw_from_disk(bool compositing=false){
+  void load_raw_from_disk(){
       buffer_mutex.lock();
       if (raw_buffer == 0) {
           /*

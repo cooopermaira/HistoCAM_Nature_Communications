@@ -101,10 +101,11 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
         if (countNonZero(use_locations) <= 2190*2190*3.14*0.20) {
             //contributing less than x% of its pixels, revert and don't bother loading from disk
             subdiv = tempSubdiv;
+            images[i]->free_memory_RAW();
             continue;
         }
 
-        images[i]->load_raw_from_disk(true);
+        images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         //cv::imwrite(images[i]->get_ImageFile().getBaseName() + ".png", image_Mat);
         cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
@@ -255,7 +256,7 @@ void Composite::add_images(std::vector < RegInfo > new_info){
 
   for (int i = 0; i < images.size(); i++){
     //calculate where the new image will be copied to in the composite
-    Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x, new_info[i].absoluteCoords.y - root_offset.y,                                                     images[i]->width, images[i]->height);
+    Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x, new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
     
     //calculate which pixels of the new image will be copied into the composite
     Mat use_locations = local_quality_score > composite_z_buffer(copyzone);
@@ -265,7 +266,7 @@ void Composite::add_images(std::vector < RegInfo > new_info){
       continue; //not contributing, don't bother loading from disk
     }
     
-    images[i]->load_raw_from_disk(true);
+    images[i]->load_raw_from_disk();
     Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
     cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
     cv::divide(image_Mat,flat_field,image_Mat,1.0,CV_8U);

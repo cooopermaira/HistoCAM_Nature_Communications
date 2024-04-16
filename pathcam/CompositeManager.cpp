@@ -13,12 +13,14 @@ namespace pathCam{
 CompositeManager::CompositeManager(StreamCam *parent):parent(parent),successful(false){};
 
 void CompositeManager::run(){
-    /*
-    std::ofstream outputfile("imageRegistration.txt");
+    int i = 0;
+    std::ofstream outputfile("composite_offsets.txt");
     if (!outputfile.is_open()) {
         std::cerr << "couldn't open file" << std::endl;
     }
-    */
+    auto start = std::chrono::high_resolution_clock::now();
+    std::vector<Mat> temp_composites;
+    std::vector<Vec2> offsets;
   while(parent->microscope_input || parent->regCount > 0 || parent->loaderCount > 0 || parent-> matchableCount > 0 || !parent->compositeQ_empty()){
     
     //if nothing in the Q but termination condition not met, wait
@@ -40,8 +42,6 @@ void CompositeManager::run(){
       
       //sort the new frames by component and pass them to their respective components for compositing.
       for (int i = 0; i < indexes.size(); i++){
-          //outputfile << parent->images[indexes[i].index]->get_ImageFile().getBaseName()+".Raw ";
-          //outputfile << indexes[i].absoluteCoords.toString() << std::endl;
 
         if (current_component == indexes[i].component_membership){
           new_info.push_back(indexes[i]);
@@ -52,11 +52,30 @@ void CompositeManager::run(){
         }
       }
       parent->composites[current_component]->update(new_info);
+      temp_composites.push_back(parent->composites[0]->get_composite().clone());
+      offsets.push_back(parent->composites[0]->root_offset);
+
+      auto stop = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+      //outputfile <<duration.count()<< std::endl;
+      outputfile << std::to_string(i)+" "<< parent->composites[current_component]->root_offset.toString() + " " << parent->composites[current_component]->max_offset.toString() << std::endl;
+      //imwrite(std::to_string(i) + ".png", parent->composites[current_component]->get_composite());
+      i++;
     }
   }
 
-  //outputfile.close();
-
+  outputfile.close();
+  
+  
+  Vec2 final_offset = offsets.back();
+  for (int i = 0; i < temp_composites.size();i++) {
+      Mat canvas = cv::Mat::zeros(temp_composites.back().size(), CV_8U);
+      Rect zone = Rect(-final_offset.x + offsets[i].x, -final_offset.y + offsets[i].y, temp_composites[i].cols, temp_composites[i].rows);
+      std::cout << temp_composites[i].size() << std::endl;
+      temp_composites[i].copyTo(canvas(zone));
+      imwrite(std::to_string(i) + ".png", canvas);
+  }
+  
   for (int i = 0; i < parent->composites.size(); i++){
     std::cout << "Writing image of size: " << parent->composites[i]->get_composite().size() << "\n";
     imwrite("finish" + std::to_string(i) + ".png", parent->composites[i]->get_composite());

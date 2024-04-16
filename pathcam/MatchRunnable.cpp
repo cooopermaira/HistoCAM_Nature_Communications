@@ -40,12 +40,16 @@ void MatchRunnable::run(){
     if(result == 1){
       parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
       auto tempReg = RegInfo(true, Vec2(0.0, 0.0), false, 0);
+      tempReg.index = image_idx;
       tempReg.resolved = false;
       tempReg.matchedTo = prev_idx;
       tempReg.relativeCoords.x = parent->matchM.match[image_idx][prev_idx]->t_x;
       tempReg.relativeCoords.y = parent->matchM.match[image_idx][prev_idx]->t_y;
       parent->reg_results[image_idx] = tempReg;
       successful = true;
+      auto rj = new RegistrationRunnable(parent, image_idx);
+      parent->regCount++;
+      parent->JobQ->add_runnable(rj);
       break;
     }
     else if(result == -1 || result == -2){
@@ -57,9 +61,6 @@ void MatchRunnable::run(){
   if(!successful){
     parent->add_new_component(image_idx);
   }
-  auto rj = new RegistrationRunnable(parent, image_idx);
-  parent->regCount++;
-  parent->JobQ->add_runnable(rj);
   //parent->RegistrationConsecQ.add_index(image_idx);
   
   delete matcher;

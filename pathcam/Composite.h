@@ -14,6 +14,7 @@
 namespace pathCam{
 
 class Composite{
+	friend class CompositeManager;
 protected:
   StreamCam *parent;
   Mat local_quality_score, composite_z_buffer, flat_field;

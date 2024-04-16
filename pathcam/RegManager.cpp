@@ -28,7 +28,10 @@ void RegistrationRunnable::run() {
 
 
 std::pair<bool, Vec2> RegistrationRunnable::trace_to_root(unsigned long index) {
-    if (parent->reg_results[index].resolved) {
+    if (!parent->reg_results[index].successful) {
+        return std::pair<bool, Vec2>(false, Vec2(0.0, 0.0));
+    }
+    else if (parent->reg_results[index].resolved) {
         return std::pair<bool, Vec2>(true, parent->reg_results[index].absoluteCoords);
     }
     else {
