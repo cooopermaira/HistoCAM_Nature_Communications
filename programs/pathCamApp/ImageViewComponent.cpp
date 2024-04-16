@@ -6,10 +6,9 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr< MRTiledImage > MRImage):
 {
   
   setOpaque (true);
-  controlsOverlay.reset (new DemoControlsOverlay ());
+  controlsOverlay.reset (new ImageViewOverlay ());
   addAndMakeVisible (controlsOverlay.get());
 
-  controlsOverlay->initialise();
   
   juce::Rectangle<int> b = getLocalBounds();
 
@@ -103,7 +102,7 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRa
     }
 }
 
-void ImageViewComponent::drawSlide(juce::Graphics& g){
+void ImageViewComponent::drawSlide(juce::Graphics& g, float scale){
   
   std::vector < TileQuery >  tiles = MRImage->getTiles(view, getLocalBounds());
   
@@ -111,7 +110,7 @@ void ImageViewComponent::drawSlide(juce::Graphics& g){
     juce::Image *im = tiles[i].image;
     tiles[i].bounds *= view2screen();
     if(im != NULL){
-      g.drawImage(*im, tiles[i].bounds);
+      g.drawImage(*im, tiles[i].bounds*scale);
     }
   }
   
@@ -119,12 +118,13 @@ void ImageViewComponent::drawSlide(juce::Graphics& g){
 
 #ifdef DEBUG
 for(unsigned int i = 0; i < tiles.size(); i++){
+  auto bounds = tiles[i].bounds*scale;
   g.setColour (juce::Colours::greenyellow);
-  g.drawRect(tiles[i].bounds, 3);
+  g.drawRect(bounds, 3);
   std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
   g.setFont (20);
-  g.drawText ( ij, tiles[i].bounds.getCentreX()-50,
-              tiles[i].bounds.getCentreY()-15, 100, 30, Justification::centred);
+  g.drawText ( ij, bounds.getCentreX()-50,
+              bounds.getCentreY()-15, 100, 30, Justification::centred);
 }
 #endif
 }
@@ -138,20 +138,22 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
   
-  if(false){
+  if(true){
+    
+    auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
 
-    juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth(), getLocalBounds().getHeight(), true);
+    juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth()*scale, getLocalBounds().getHeight()*scale, true);
     
     Graphics b(screenBuffer);
     
-    drawSlide(b);
+    drawSlide(b, scale);
     
     g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
                                          getLocalBounds().getY(),
                                          getLocalBounds().getWidth(),
                                          getLocalBounds().getHeight()));
   }else{
-    drawSlide(g);
+    drawSlide(g, 1.0);
   }
   
 }
@@ -168,7 +170,7 @@ void ImageViewComponent::resized()
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
   verticalScrollBar.setBounds(b.removeFromRight(20));
   
-  controlsOverlay->setBounds(b.removeFromTop(60).removeFromRight(400));
+  controlsOverlay->setBounds(juce::Rectangle<int>(40,40, 60, 120));
 
   
   b = getLocalBounds();

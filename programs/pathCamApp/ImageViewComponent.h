@@ -3,66 +3,6 @@
 #include "JuceHeader.h"
 
 
-class DemoControlsOverlay final : public Component,
-                                  private Slider::Listener
-{
-public:
-  DemoControlsOverlay ()
-    {
-        addAndMakeVisible (statusLabel);
-        statusLabel.setJustificationType (Justification::topLeft);
-        statusLabel.setFont (Font (14.0f));
-
-        addAndMakeVisible (sizeSlider);
-        sizeSlider.setRange (0.0, 1.0, 0.001);
-        sizeSlider.addListener (this);
-
-        addAndMakeVisible (zoomLabel);
-        zoomLabel.attachToComponent (&sizeSlider, true);
-
-    }
-
-    void initialise()
-    {
-        speedSlider.setValue (0.01);
-        sizeSlider .setValue (0.5);
-    }
-
-    void resized() override
-    {
-        auto area = getLocalBounds().reduced (4);
-
-        speedSlider         .setBounds (area.removeFromBottom (25));
-        sizeSlider          .setBounds (area.removeFromBottom (25));
-
-        statusLabel.setBounds (area);
-    }
-
-    Label statusLabel;
-
-private:
-    void sliderValueChanged (Slider*) override
-    {
-//        const ScopedLock lock (demo.mutex);
-//
-//        demo.scale         = (float) sizeSlider .getValue();
-//        demo.rotationSpeed = (float) speedSlider.getValue();
-    }
-
-
-
-    Label speedLabel  { {}, "Speed:" },
-          zoomLabel   { {}, "Zoom:" };
-
-    Slider speedSlider, sizeSlider;
-
-    ToggleButton showBackgroundToggle  { "Draw 2D graphics in background" };
-
-    std::atomic<bool> buttonDown { false };
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DemoControlsOverlay)
-};
-
 //==============================================================================
 /*
  This component lives inside our window, and this is where you should put all
@@ -77,7 +17,7 @@ public:
   
   //==============================================================================
   void paint (juce::Graphics& g) override;
-  void drawSlide(juce::Graphics& g);
+  void drawSlide(juce::Graphics& g, float scale);
   void resized() override;
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
@@ -135,7 +75,7 @@ private:
     
   CriticalSection mutex;
   
-  std::unique_ptr<DemoControlsOverlay> controlsOverlay;
+  std::unique_ptr<ImageViewOverlay> controlsOverlay;
 
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageViewComponent)
