@@ -10,6 +10,9 @@
  */
 class ImageViewComponent final : public juce::Component, public juce::ScrollBar::Listener, public juce::KeyListener
 {
+  
+  friend class ImageViewOverlay;
+  
 public:
   //==============================================================================
   ImageViewComponent(MainComponent *parent);
@@ -36,11 +39,26 @@ private:
   
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
   
+  void zoomAndCenter(){
+    if(MRImage){
+      juce::Rectangle<int> b = getLocalBounds();
+      
+      view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
+      view.setCentre(MRImage->bounds.getCentre());
+      
+      float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
+                        (float)view.getHorizontalRange().getLength(),
+                        (float)MRImage->bounds.getVerticalRange().getLength()/
+                        (float)view.getVerticalRange().getLength());
+      
+      scaleCenter(fPoint(scale,scale));
+    }
+  }
+  
   inline void translate(fPoint amount){
     view += amount;
     updateScrollbar();
   }
-  
   
   inline void scaleCenter(fPoint scale){
     fPoint center = view.getCentre();
@@ -63,6 +81,10 @@ private:
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
                                       juce::Colour colour1, juce::Colour colour2);
   
+  
+  StringArray iconNames;
+  OwnedArray<Drawable> iconsFromZipFile;
+
   
   juce::Image checkerboard;
   

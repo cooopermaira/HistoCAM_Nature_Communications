@@ -28,6 +28,7 @@
 
 using namespace juce;
 
+#include "SvgButton.h"
 #include "TiledImage.h"
 #include "MRTiledImage.h"
 #include "ToolBarComponent.h"

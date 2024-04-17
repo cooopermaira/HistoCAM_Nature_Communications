@@ -61,26 +61,11 @@ void MainComponent::resized()
 }
 
 
-class LoadImageRunnable : public Poco::Runnable {
-public:
-  MainComponent * comp;
-  File *result;
-  
-  LoadImageRunnable(MainComponent * comp, File *result): comp(comp), result(result) {};
-  void run() override {
-    comp->loadImage(result->getFullPathName().toStdString());
-  }
-};
-
 void MainComponent::loadImageDialog(const FileChooser& fc){
 
   File result = fc.getResult();
   if (result.exists()){
-    // Create an instance of the runnable task
-    Poco::Thread thread;
-    LoadImageRunnable runnable(this, &result);
-    thread.start(runnable);
-    thread.join();
+    loadImage(result.getFullPathName().toStdString());
     imageview->setImage(MRimage);
   }
 }

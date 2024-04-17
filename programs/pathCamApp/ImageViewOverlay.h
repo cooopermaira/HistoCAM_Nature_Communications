@@ -10,38 +10,48 @@
 
 #include "JuceHeader.h"
 
+class ImageViewComponent;
 
 class ImageViewOverlay final : public Component,
                                public Button::Listener
 {
 public:
-  ImageViewOverlay ()
+  ImageViewOverlay (ImageViewComponent* parent,
+                    StringArray &iconNames,
+                    OwnedArray<Drawable> &iconsFromZipFile) : parent(parent)
     {
-      addAndMakeVisible(myButton);
-      myButton.addListener(this);
+
+    
+    for (int i = 0; i < iconNames.size(); i++) {
+
+      if(iconNames[i] == "center.svg"){
+        centerButton.reset( new SvgButton ("center", iconsFromZipFile[i]) );
+        centerButton->addListener(this);
+        break;
+      }
+    }
+        
+    addAndMakeVisible(*centerButton);
       
 
     }
 
+  ~ImageViewOverlay(){
+
+  }
     void resized() override
     {
         auto area = getLocalBounds().reduced (4);
-        myButton.setBounds(area);
+      centerButton->setBounds(area);
     }
 
 private:
   
-  void buttonClicked(juce::Button* button) override
-  {
-      if (button == &myButton)
-      {
-          juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::InfoIcon,
-                                                 "Button Clicked",
-                                                 "You clicked the button!");
-      }
-  }
+  void buttonClicked(juce::Button* button);
+  
+  std::unique_ptr < SvgButton > centerButton;
+  ImageViewComponent* parent;
 
-  TextButton myButton { "Click Me" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageViewOverlay)
 };

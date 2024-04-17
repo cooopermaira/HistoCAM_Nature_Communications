@@ -7,7 +7,25 @@ ImageViewComponent::ImageViewComponent(MainComponent *parent): parent(parent), M
   
   setOpaque (true); //telling juce that there is nothingi to render underneath
   
-  controlsOverlay.reset (new ImageViewOverlay ());
+  //Won't work for deployment, but ok for now
+  std::stringstream ss;
+  ss <<  PROJECT_SOURCE_DIR << "/resources/hud_icons.zip";
+  
+  ZipFile icons (File(ss.str().c_str()));
+
+  for (int i = 0; i < icons.getNumEntries(); ++i)
+  {
+    std::unique_ptr<InputStream> svgFileStream (icons.createStreamForEntry (i));
+    
+    if (svgFileStream.get() != nullptr)
+    {
+      iconNames.add (icons.getEntry (i)->filename);
+      iconsFromZipFile.add (Drawable::createFromImageDataStream (*svgFileStream));
+    }
+  }
+
+  
+  controlsOverlay.reset (new ImageViewOverlay (this, iconNames, iconsFromZipFile));
   addAndMakeVisible (controlsOverlay.get());
   
   juce::Rectangle<int> b = getLocalBounds();
@@ -26,6 +44,7 @@ ImageViewComponent::ImageViewComponent(MainComponent *parent): parent(parent), M
     
   addChildComponent(horizontalScrollBar);
   addChildComponent(verticalScrollBar);
+  
     
   
 }
@@ -45,17 +64,7 @@ void ImageViewComponent::setImage(std::shared_ptr< MRTiledImage > image){
   horizontalScrollBar.setVisible(true);
   verticalScrollBar.setVisible(true);
   
-  juce::Rectangle<int> b = getLocalBounds();
-
-  view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
-  view.setCentre(MRImage->bounds.getCentre());
-  
-  float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
-                    (float)view.getHorizontalRange().getLength(),
-                    (float)MRImage->bounds.getVerticalRange().getLength()/
-                    (float)view.getVerticalRange().getLength());
-  
-  scaleCenter(fPoint(scale,scale));
+  zoomAndCenter();
 
 }
 
@@ -188,6 +197,7 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
 }
 
+
 void ImageViewComponent::resized()
 {
   // This is called when the ImageViewComponent is resized.
@@ -200,7 +210,7 @@ void ImageViewComponent::resized()
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
   verticalScrollBar.setBounds(b.removeFromRight(20));
   
-  controlsOverlay->setBounds(juce::Rectangle<int>(40,40, 60, 120));
+  controlsOverlay->setBounds(juce::Rectangle<int>(20, 20, 60, 60));
   
   
   b = getLocalBounds();

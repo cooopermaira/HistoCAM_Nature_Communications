@@ -242,6 +242,8 @@ IF(BUILD_PATHCAM_GUI)
         programs/pathCamApp/TiledImage.cpp
         programs/pathCamApp/MRTiledImage.cpp
         programs/pathCamApp/MRTiledImage.h
+        programs/pathCamApp/SvgButton.h
+        programs/pathCamApp/SvgButton.cpp
         programs/pathCamApp/JuceHeader.h
   )
   
