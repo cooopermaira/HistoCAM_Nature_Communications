@@ -15,11 +15,11 @@ using namespace juce;
 class MainComponent;
 
 //==============================================================================
-class ToolbarComp final : public Component, public Button::Listener
+class ToolbarComponent final : public Component, public Button::Listener
 
 {
 public:
-  ToolbarComp(MainComponent *parent): parent(parent)
+  ToolbarComponent(MainComponent *parent): parent(parent)
   {
     // Create and add the toolbar...
     addAndMakeVisible (toolbar);
@@ -40,39 +40,7 @@ public:
     toolbar.setBounds (getLocalBounds().removeFromTop  (50));
   }
   
-  void buttonClicked(juce::Button* button) override
-  {
-    ToolbarItemComponent *tButton = dynamic_cast<juce::ToolbarItemComponent*>(button);
-    switch(tButton->getItemId()){
-      case PCamToolbarItemFactory::home:
-        std::cout << "home\n" << "\n";
-        break;
-      case PCamToolbarItemFactory::open:
-        std::cout << "open\n" << "\n";
-        break;
-      case PCamToolbarItemFactory::save:
-        std::cout << "save\n" << "\n";
-        break;
-      case PCamToolbarItemFactory::reload_config:
-        std::cout << "reload_config\n" << "\n";
-        break;
-      case PCamToolbarItemFactory::settings:
-        std::cout << "settings\n" << "\n";
-        break;
-      case PCamToolbarItemFactory::capture:
-        std::cout << "capture\n" << "\n";
-        break;
-      case PCamToolbarItemFactory::annotate:
-        std::cout << "annotate\n" << "\n";
-        break;
-      case PCamToolbarItemFactory::pathCamIcon:
-        std::cout << "pathCamIcon\n" << "\n";
-        break;
-      default:              
-        break;
-    }
-  }
-  
+  void buttonClicked(juce::Button* button) override;
   
 private:
   Toolbar toolbar;
@@ -120,6 +88,7 @@ private:
       // toolbar's default set. Not all items need to be on this list, and
       // items can appear multiple times (e.g. the separators used here).
       ids.add (home);
+      ids.add (spacerId);
       ids.add (open);
       ids.add (save);
       ids.add (reload_config);

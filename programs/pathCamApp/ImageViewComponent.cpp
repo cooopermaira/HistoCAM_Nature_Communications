@@ -2,57 +2,80 @@
 
 
 //==============================================================================
-ImageViewComponent::ImageViewComponent(std::shared_ptr< MRTiledImage > MRImage): MRImage(MRImage)
+ImageViewComponent::ImageViewComponent(MainComponent *parent): parent(parent), MRImage(NULL)
 {
   
-  setOpaque (true);
+  setOpaque (true); //telling juce that there is nothingi to render underneath
+  
   controlsOverlay.reset (new ImageViewOverlay ());
   addAndMakeVisible (controlsOverlay.get());
-
   
   juce::Rectangle<int> b = getLocalBounds();
-
-
-  horizontalScrollBar.setRangeLimits(0, MRImage->bounds.getWidth());
-  verticalScrollBar.setRangeLimits(0, MRImage->bounds.getHeight());
-
+  
+  MRImage = NULL;
+      
   horizontalScrollBar.addListener(this);
   verticalScrollBar.addListener(this);
-
+    
   // Set the initial positions and visibility of the scroll bars
   horizontalScrollBar.setCurrentRange(0, 400);
   verticalScrollBar.setCurrentRange(0, 400);
-
+    
   horizontalScrollBar.setSingleStepSize(10);
   verticalScrollBar.setSingleStepSize(10);
+    
+  addChildComponent(horizontalScrollBar);
+  addChildComponent(verticalScrollBar);
+    
   
-  addAndMakeVisible(horizontalScrollBar);
-  addAndMakeVisible(verticalScrollBar);
-
-
 }
 
 ImageViewComponent::~ImageViewComponent()
 {
 }
 
+void ImageViewComponent::setImage(std::shared_ptr< MRTiledImage > image){
+  const ScopedLock lock (mutex);
+
+  MRImage = image;
+  
+  horizontalScrollBar.setRangeLimits(0, MRImage->bounds.getWidth());
+  verticalScrollBar.setRangeLimits(0, MRImage->bounds.getHeight());
+  
+  horizontalScrollBar.setVisible(true);
+  verticalScrollBar.setVisible(true);
+  
+  juce::Rectangle<int> b = getLocalBounds();
+
+  view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
+  view.setCentre(MRImage->bounds.getCentre());
+  
+  float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
+                    (float)view.getHorizontalRange().getLength(),
+                    (float)MRImage->bounds.getVerticalRange().getLength()/
+                    (float)view.getVerticalRange().getLength());
+  
+  scaleCenter(fPoint(scale,scale));
+
+}
+
 void ImageViewComponent::mouseDown(const juce::MouseEvent& event)
 {
-    lastMousePosition = event.getPosition();
+  lastMousePosition = event.getPosition();
 }
 
 void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 {
-    juce::Point<int> idelta = event.getPosition() - lastMousePosition;
-    fPoint delta = fPoint(idelta.x, idelta.y)* screen2view();
-    translate(-delta);
-    lastMousePosition = event.getPosition();
-    repaint();
+  juce::Point<int> idelta = event.getPosition() - lastMousePosition;
+  fPoint delta = fPoint(idelta.x, idelta.y)* screen2view();
+  translate(-delta);
+  lastMousePosition = event.getPosition();
+  repaint();
 }
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {
-    scaleCenter(fPoint(1.0-wheel.deltaY,1.0-wheel.deltaY));
-    repaint();
+  scaleCenter(fPoint(1.0-wheel.deltaY,1.0-wheel.deltaY));
+  repaint();
 }
 
 void ImageViewComponent::mouseMagnify (const MouseEvent&, float magnifyAmmount)
@@ -74,32 +97,34 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* 
   }
   if (key.getKeyCode() == KeyPress::escapeKey)
   {
-      JUCEApplication::getInstance()->systemRequestedQuit();
+    JUCEApplication::getInstance()->systemRequestedQuit();
   }
   return false;  // Key press not handled
 }
 
 void ImageViewComponent::updateScrollbar(){
-
-  horizontalScrollBar.setCurrentRangeStart(view.getCentreX());
-  verticalScrollBar.setCurrentRangeStart(view.getCentreY());
+  
+  if(!view.isEmpty()){
+    horizontalScrollBar.setCurrentRangeStart(view.getCentreX());
+    verticalScrollBar.setCurrentRangeStart(view.getCentreY());
+  }
   
 }
 
 
 void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart)
 {
-    // This method is called when the scroll bar is moved
-    if (scrollBar == &horizontalScrollBar)
-    {
-      view.setCentre(newRangeStart, view.getCentreY());
-      repaint();
-    }
-    else if (scrollBar == &verticalScrollBar)
-    {
-      view.setCentre(view.getCentreX(), newRangeStart);
-      repaint();
-    }
+  // This method is called when the scroll bar is moved
+  if (scrollBar == &horizontalScrollBar)
+  {
+    view.setCentre(newRangeStart, view.getCentreY());
+    repaint();
+  }
+  else if (scrollBar == &verticalScrollBar)
+  {
+    view.setCentre(view.getCentreX(), newRangeStart);
+    repaint();
+  }
 }
 
 void ImageViewComponent::drawSlide(juce::Graphics& g, float scale){
@@ -116,17 +141,17 @@ void ImageViewComponent::drawSlide(juce::Graphics& g, float scale){
   }
   
   
-
+  
 #ifdef DEBUG
-for(unsigned int i = 0; i < tiles.size(); i++){
-  auto bounds = tiles[i].bounds*scale;
-  g.setColour (juce::Colours::greenyellow);
-  g.drawRect(bounds, 3);
-  std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
-  g.setFont (20);
-  g.drawText ( ij, bounds.getCentreX()-50,
-              bounds.getCentreY()-15, 100, 30, Justification::centred);
-}
+  for(unsigned int i = 0; i < tiles.size(); i++){
+    auto bounds = tiles[i].bounds*scale;
+    g.setColour (juce::Colours::greenyellow);
+    g.drawRect(bounds, 3);
+    std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
+    g.setFont (20);
+    g.drawText ( ij, bounds.getCentreX()-50,
+                bounds.getCentreY()-15, 100, 30, Justification::centred);
+  }
 #endif
 }
 
@@ -134,28 +159,31 @@ for(unsigned int i = 0; i < tiles.size(); i++){
 //==============================================================================
 void ImageViewComponent::paint (juce::Graphics& g)
 {
-
+  
   g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
   
   g.drawImageAt(checkerboard, 0, 0);
   
-  if(false){
+  if(MRImage){
+    if(false){
+      
+      auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
+      
+      juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth()*scale, getLocalBounds().getHeight()*scale, true);
+      
+      Graphics b(screenBuffer);
+      
+      drawSlide(b, scale);
+      
+      
+      g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
+                                           getLocalBounds().getY(),
+                                           getLocalBounds().getWidth(),
+                                           getLocalBounds().getHeight()));
+    }else{
+      drawSlide(g, 1.0);
+    }
     
-    auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
-
-    juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth()*scale, getLocalBounds().getHeight()*scale, true);
-    
-    Graphics b(screenBuffer);
-    
-    drawSlide(b, scale);
-  
-    
-    g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
-                                         getLocalBounds().getY(),
-                                         getLocalBounds().getWidth(),
-                                         getLocalBounds().getHeight()));
-  }else{
-    drawSlide(g, 1.0);
   }
   
 }
@@ -166,43 +194,33 @@ void ImageViewComponent::resized()
   // If you add any child components, this is where you should
   // update their positions.
   const ScopedLock lock (mutex);
-
+  
   juce::Rectangle<int> b = getLocalBounds();
   
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
   verticalScrollBar.setBounds(b.removeFromRight(20));
   
   controlsOverlay->setBounds(juce::Rectangle<int>(40,40, 60, 120));
-
+  
   
   b = getLocalBounds();
   
-  if(!old_bounds.isEmpty()){
+  if(MRImage){
     scaleCenter(fPoint((float)b.getHorizontalRange().getLength()/
                        (float)old_bounds.getHorizontalRange().getLength(),
                        (float)b.getVerticalRange().getLength()/
                        (float)old_bounds.getVerticalRange().getLength()));
-  
-  }else{
-    view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
-    view.setCentre(MRImage->bounds.getCentre());
-    
-    float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
-                      (float)view.getHorizontalRange().getLength(),
-                      (float)MRImage->bounds.getVerticalRange().getLength()/
-                      (float)view.getVerticalRange().getLength());
-    
-    scaleCenter(fPoint(scale,scale));
   }
   
+  old_bounds = getLocalBounds();
+
   
   checkerboard = createCheckerboardImage(getLocalBounds().getWidth(),
                                          getLocalBounds().getHeight(),
                                          64,
                                          juce::Colours::lightgrey,
                                          juce::Colours::white);
-   
-  old_bounds = getLocalBounds();
+  
 }
 
 juce::Image ImageViewComponent::createCheckerboardImage(int width,
@@ -210,20 +228,20 @@ juce::Image ImageViewComponent::createCheckerboardImage(int width,
                                                         int squareSize,
                                                         juce::Colour colour1,
                                                         juce::Colour colour2) {
-    juce::Image checkerboard(juce::Image::PixelFormat::RGB, width, height, true);
-
-    juce::Graphics g(checkerboard);
-
-    for (int y = 0; y < height; y += squareSize) {
-        for (int x = 0; x < width; x += squareSize) {
-            // Determine the color based on the position
-            bool isColour1 = ((x / squareSize) % 2 == 0) ^ ((y / squareSize) % 2 == 0);
-            g.setColour(isColour1 ? colour1 : colour2);
-
-            // Draw the square
-            g.fillRect(x, y, squareSize, squareSize);
-        }
+  juce::Image checkerboard(juce::Image::PixelFormat::RGB, width, height, true);
+  
+  juce::Graphics g(checkerboard);
+  
+  for (int y = 0; y < height; y += squareSize) {
+    for (int x = 0; x < width; x += squareSize) {
+      // Determine the color based on the position
+      bool isColour1 = ((x / squareSize) % 2 == 0) ^ ((y / squareSize) % 2 == 0);
+      g.setColour(isColour1 ? colour1 : colour2);
+      
+      // Draw the square
+      g.fillRect(x, y, squareSize, squareSize);
     }
-
-    return checkerboard;
+  }
+  
+  return checkerboard;
 }

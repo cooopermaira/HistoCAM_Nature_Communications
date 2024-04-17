@@ -6,35 +6,16 @@
 MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(bcam)
 {
   
-  double progress = 0.0;
-  progressBar = new ProgressBar(progress);
   
-  
-  std::stringstream ss;
-  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
-  //ss <<  PROJECT_SOURCE_DIR << "/resources/screen_texture_test.png";
-
-  
-
-  cv::Mat cvimage = imread(ss.str());
-  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
-
-  MRimage = std::make_shared< MRTiledImage >();
-  MRimage->build(cvimage);
-  
-  
-  toolbar = new ToolbarComp(this);
-  imageview = new ImageViewComponent(MRimage);
+  toolbar = new ToolbarComponent(this);
+  imageview = new ImageViewComponent(this);
   
   addAndMakeVisible(imageview);
   addAndMakeVisible(toolbar);
   
   setWantsKeyboardFocus(true);
   addKeyListener(imageview);
-
   
-  //addAndMakeVisible(progressBar);
-
   
   setSize (1024, 768);
 
@@ -45,6 +26,14 @@ MainComponent::~MainComponent()
   delete progressBar;
   delete toolbar;
   delete imageview;
+}
+
+void MainComponent::loadImage(std::string path){
+  
+  cv::Mat cvimage = imread(path);
+  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
+  MRimage.reset(new MRTiledImage());
+  MRimage->build(cvimage);
 }
 
 
@@ -60,7 +49,55 @@ void MainComponent::resized()
   Rectangle < int > b = getLocalBounds();
   toolbar->setBounds(b.removeFromTop(50));
   imageview->setBounds(b);
-  progressBar->setBounds(50, getHeight()-40, getWidth() - 100, 30);
+  
+  
+//#if DEBUG
+//  std::stringstream ss;
+//  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
+//  loadImage(ss.str());
+//  imageview->setImage(MRimage);
+//#endif
 
 }
 
+
+class LoadImageRunnable : public Poco::Runnable {
+public:
+  MainComponent * comp;
+  File *result;
+  
+  LoadImageRunnable(MainComponent * comp, File *result): comp(comp), result(result) {};
+  void run() override {
+    comp->loadImage(result->getFullPathName().toStdString());
+  }
+};
+
+void MainComponent::loadImageDialog(const FileChooser& fc){
+
+  File result = fc.getResult();
+  if (result.exists()){
+    // Create an instance of the runnable task
+    Poco::Thread thread;
+    LoadImageRunnable runnable(this, &result);
+    thread.start(runnable);
+    thread.join();
+    imageview->setImage(MRimage);
+  }
+}
+
+
+
+
+void MainComponent::GuiEventHandler(std::string event){
+  if(event == "open"){
+    fc.reset (new FileChooser ("Choose an image to open...", File::getCurrentWorkingDirectory(), "*.png,*.jpeg,*.tiff"));
+
+    fc->launchAsync (FileBrowserComponent::openMode
+                     | FileBrowserComponent::canSelectFiles,
+                     std::bind(&MainComponent::loadImageDialog, this, std::placeholders::_1));
+
+    return;
+  }
+  
+  
+}

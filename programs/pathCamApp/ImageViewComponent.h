@@ -12,7 +12,7 @@ class ImageViewComponent final : public juce::Component, public juce::ScrollBar:
 {
 public:
   //==============================================================================
-  ImageViewComponent(std::shared_ptr< MRTiledImage > MRImage);
+  ImageViewComponent(MainComponent *parent);
   ~ImageViewComponent() override;
   
   //==============================================================================
@@ -21,6 +21,8 @@ public:
   void resized() override;
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
+  
+  void setImage(std::shared_ptr< MRTiledImage > image);
   
 private:
   std::shared_ptr< MRTiledImage> MRImage;
@@ -75,6 +77,7 @@ private:
     
   CriticalSection mutex;
   
+  MainComponent *parent;
   std::unique_ptr<ImageViewOverlay> controlsOverlay;
 
   

@@ -9,6 +9,9 @@
  */
 class MainComponent final : public juce::Component
 {
+  
+  friend class LoadImageRunnable;
+  
 public:
   //==============================================================================
   MainComponent(std::shared_ptr< pathCam::StreamCam > bcam);
@@ -18,14 +21,22 @@ public:
   //==============================================================================
   void paint (juce::Graphics& g) override;
   void resized() override;
+    
+  void GuiEventHandler(std::string event);
   
 private:
+  
+  void loadImage(std::string path);
+  void loadImageDialog(const FileChooser& fc);
+
   
   std::shared_ptr< pathCam::StreamCam > bcam;
   std::shared_ptr< MRTiledImage >  MRimage;
   
+  std::unique_ptr<FileChooser> fc;
+
   
-  ToolbarComp * toolbar;
+  ToolbarComponent * toolbar;
   ImageViewComponent * imageview;
   
   juce::ProgressBar * progressBar;
