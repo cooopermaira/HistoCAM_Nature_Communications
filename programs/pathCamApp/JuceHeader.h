@@ -40,6 +40,10 @@ using namespace juce;
 #include "CaptureOverlay.h"
 #include "CaptureComponent.h"
 
+#include "AnnotateOverlay.h"
+#include "AnnotateComponent.h"
+
+
 #include "MainComponent.h"
 
 

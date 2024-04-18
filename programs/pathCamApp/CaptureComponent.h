@@ -13,8 +13,10 @@
 
 class CaptureComponent: public ImageViewComponent{
 public:
-  CaptureComponent(MainComponent *parent, StringArray &iconNames,
-                   OwnedArray<Drawable> &iconsFromZipFile) : ImageViewComponent(parent,iconNames,iconsFromZipFile), recording(false){
+  CaptureComponent(MainComponent *parent, 
+                   std::shared_ptr < fRectangle > view,
+                   StringArray &iconNames,
+                   OwnedArray<Drawable> &iconsFromZipFile) : ImageViewComponent(parent,view,iconNames,iconsFromZipFile), recording(false){
 
     captureOverlay.reset (new CaptureOverlay (this, iconNames, iconsFromZipFile));
     addAndMakeVisible (captureOverlay.get());
@@ -68,7 +70,8 @@ private:
   std::unique_ptr<CaptureOverlay> captureOverlay;
   
   bool recording;
-
+  
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CaptureComponent)
 };
 
 #endif /* CaptureComponent_h */

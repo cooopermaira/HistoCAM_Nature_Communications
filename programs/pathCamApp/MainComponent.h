@@ -36,15 +36,20 @@ private:
   ToolbarComponent * toolbar;
   ImageViewComponent * imageview;
   CaptureComponent * capture;
+  AnnotateComponent * annotate;
+  
+  //Shared view
 
   
   juce::ProgressBar * progressBar;
-  
 
   CriticalSection mutex;
   
   StringArray iconNames;
   OwnedArray<Drawable> iconsFromZipFile;
+  
+public:
+  std::shared_ptr < fRectangle > view;
 
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)

@@ -24,17 +24,21 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   
   
   toolbar = new ToolbarComponent(this);
-  imageview = new ImageViewComponent(this, iconNames, iconsFromZipFile);
-  capture = new CaptureComponent(this, iconNames, iconsFromZipFile);
-  
+  imageview = new ImageViewComponent(this, view, iconNames, iconsFromZipFile);
+  capture = new CaptureComponent(this, view, iconNames, iconsFromZipFile);
+  annotate = new AnnotateComponent(this, view, iconNames, iconsFromZipFile);
+
   addAndMakeVisible(imageview);
   addAndMakeVisible(toolbar);
   
   addChildComponent(capture);
+  addChildComponent(annotate);
+
   
   setWantsKeyboardFocus(true);
   addKeyListener(imageview);
   addKeyListener(capture);
+  addKeyListener(annotate);
 
   
   setSize (1024, 768);
@@ -47,6 +51,7 @@ MainComponent::~MainComponent()
   delete toolbar;
   delete imageview;
   delete capture;
+  delete annotate;
 }
 
 void MainComponent::loadImage(std::string path){
@@ -71,6 +76,7 @@ void MainComponent::resized()
   toolbar->setBounds(b.removeFromTop(50));
   imageview->setBounds(b);
   capture->setBounds(b);
+  annotate->setBounds(b);
   
   
 //#if DEBUG
@@ -90,10 +96,10 @@ void MainComponent::loadImageDialog(const FileChooser& fc){
     loadImage(result.getFullPathName().toStdString());
     imageview->setImage(MRimage);
     capture->setImage(MRimage);
+    annotate->setImage(MRimage);
+
   }
 }
-
-
 
 
 void MainComponent::GuiEventHandler(std::string event){
@@ -110,11 +116,19 @@ void MainComponent::GuiEventHandler(std::string event){
   if(event == "home"){
     imageview->setVisible(true);
     capture->setVisible(false);
+    annotate->setVisible(false);
   }
   
   if(event == "capture"){
     imageview->setVisible(false);
     capture->setVisible(true);
+    annotate->setVisible(false);
+  }
+  
+  if(event == "annotate"){
+    imageview->setVisible(false);
+    capture->setVisible(false);
+    annotate->setVisible(true);
   }
   
   

@@ -49,8 +49,9 @@ public:
   }
   
   ~CaptureOverlay(){
-    
+
   }
+  
   void resized() override
   {
     auto area = getLocalBounds().reduced (4);

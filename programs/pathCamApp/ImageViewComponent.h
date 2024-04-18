@@ -16,7 +16,9 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
   
 public:
   //==============================================================================
-  ImageViewComponent(MainComponent *parent,StringArray &iconNames,
+  ImageViewComponent(MainComponent *parent, 
+                     std::shared_ptr < fRectangle > view,
+                     StringArray &iconNames,
                      OwnedArray<Drawable> &iconsFromZipFile);
   ~ImageViewComponent() override;
   
@@ -45,39 +47,39 @@ private:
     if(MRImage){
       juce::Rectangle<int> b = getLocalBounds();
       
-      view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
-      view.setCentre(MRImage->bounds.getCentre());
+      view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
+      view->setCentre(MRImage->bounds.getCentre());
       
       float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
-                        (float)view.getHorizontalRange().getLength(),
+                        (float)view->getHorizontalRange().getLength(),
                         (float)MRImage->bounds.getVerticalRange().getLength()/
-                        (float)view.getVerticalRange().getLength());
+                        (float)view->getVerticalRange().getLength());
       
       scaleCenter(fPoint(scale,scale));
     }
   }
   
   inline void translate(fPoint amount){
-    view += amount;
+    *view += amount;
     updateScrollbar();
   }
   
   inline void scaleCenter(fPoint scale){
-    fPoint center = view.getCentre();
-    view -= center;
-    view *= scale;
-    view += center;
+    fPoint center = view->getCentre();
+    *view -= center;
+    *view *= scale;
+    *view += center;
     updateScrollbar();
   }
   
   inline fPoint screen2view(){
-    return fPoint(view.getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
-                  view.getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
+    return fPoint(view->getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
+                  view->getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
   inline fPoint view2screen(){
-    return fPoint(getLocalBounds().getHorizontalRange().getLength()/view.getHorizontalRange().getLength(),
-                  getLocalBounds().getVerticalRange().getLength()/view.getVerticalRange().getLength());
+    return fPoint(getLocalBounds().getHorizontalRange().getLength()/view->getHorizontalRange().getLength(),
+                  getLocalBounds().getVerticalRange().getLength()/view->getVerticalRange().getLength());
   }
   
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
@@ -89,7 +91,6 @@ private:
   juce::Point<int> imagePosition;
   juce::Point<int> lastMousePosition;
   
-  fRectangle view;
   juce::Rectangle<int> old_bounds;
   
   juce::ScrollBar horizontalScrollBar{ false }; // Horizontal scroll bar
@@ -97,6 +98,9 @@ private:
     
   
   MainComponent *parent;
+  
+  std::shared_ptr < fRectangle > view;
+  
   std::unique_ptr<ImageViewOverlay> controlsOverlay;
 
 protected:

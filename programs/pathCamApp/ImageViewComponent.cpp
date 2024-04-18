@@ -2,9 +2,10 @@
 
 
 //==============================================================================
-ImageViewComponent::ImageViewComponent(MainComponent *parent, 
+ImageViewComponent::ImageViewComponent(MainComponent *parent,
+                                       std::shared_ptr < fRectangle > view,
                                        StringArray &iconNames,
-                                       OwnedArray<Drawable> &iconsFromZipFile): parent(parent), MRImage(NULL)
+                                       OwnedArray<Drawable> &iconsFromZipFile): parent(parent), MRImage(NULL), view(view)
 {
   
   setOpaque (true); //telling juce that there is nothingi to render underneath
@@ -97,9 +98,9 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* 
 
 void ImageViewComponent::updateScrollbar(){
   
-  if(!view.isEmpty()){
-    horizontalScrollBar.setCurrentRangeStart(view.getCentreX());
-    verticalScrollBar.setCurrentRangeStart(view.getCentreY());
+  if(!view->isEmpty()){
+    horizontalScrollBar.setCurrentRangeStart(view->getCentreX());
+    verticalScrollBar.setCurrentRangeStart(view->getCentreY());
   }
   
 }
@@ -110,19 +111,19 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRa
   // This method is called when the scroll bar is moved
   if (scrollBar == &horizontalScrollBar)
   {
-    view.setCentre(newRangeStart, view.getCentreY());
+    view->setCentre(newRangeStart, view->getCentreY());
     repaint();
   }
   else if (scrollBar == &verticalScrollBar)
   {
-    view.setCentre(view.getCentreX(), newRangeStart);
+    view->setCentre(view->getCentreX(), newRangeStart);
     repaint();
   }
 }
 
 void ImageViewComponent::drawSlide(juce::Graphics& g, float scale){
   
-  std::vector < TileQuery >  tiles = MRImage->getTiles(view, getLocalBounds());
+  std::vector < TileQuery >  tiles = MRImage->getTiles(*view, getLocalBounds());
   
   for(unsigned int i = 0; i < tiles.size(); i++){
     juce::Image *im = tiles[i].image;
