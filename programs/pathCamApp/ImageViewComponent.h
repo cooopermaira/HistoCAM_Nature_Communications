@@ -8,14 +8,16 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
-class ImageViewComponent final : public juce::Component, public juce::ScrollBar::Listener, public juce::KeyListener
+class ImageViewComponent : public juce::Component, public juce::ScrollBar::Listener, public juce::KeyListener
 {
   
   friend class ImageViewOverlay;
   
+  
 public:
   //==============================================================================
-  ImageViewComponent(MainComponent *parent);
+  ImageViewComponent(MainComponent *parent,StringArray &iconNames,
+                     OwnedArray<Drawable> &iconsFromZipFile);
   ~ImageViewComponent() override;
   
   //==============================================================================
@@ -82,10 +84,6 @@ private:
                                       juce::Colour colour1, juce::Colour colour2);
   
   
-  StringArray iconNames;
-  OwnedArray<Drawable> iconsFromZipFile;
-
-  
   juce::Image checkerboard;
   
   juce::Point<int> imagePosition;
@@ -97,11 +95,12 @@ private:
   juce::ScrollBar horizontalScrollBar{ false }; // Horizontal scroll bar
   juce::ScrollBar verticalScrollBar{ true }; // Vertical scroll bar
     
-  CriticalSection mutex;
   
   MainComponent *parent;
   std::unique_ptr<ImageViewOverlay> controlsOverlay;
 
+protected:
+  CriticalSection mutex;
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageViewComponent)
 };

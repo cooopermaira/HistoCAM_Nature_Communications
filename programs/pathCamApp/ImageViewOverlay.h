@@ -41,13 +41,13 @@ public:
   }
     void resized() override
     {
-        auto area = getLocalBounds().reduced (4);
+      auto area = getLocalBounds().reduced (4);
       centerButton->setBounds(area);
     }
 
 private:
   
-  void buttonClicked(juce::Button* button);
+  void buttonClicked(juce::Button* button) override;
   
   std::unique_ptr < SvgButton > centerButton;
   ImageViewComponent* parent;

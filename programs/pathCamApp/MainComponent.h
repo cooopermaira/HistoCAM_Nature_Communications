@@ -9,9 +9,7 @@
  */
 class MainComponent final : public juce::Component
 {
-  
-  friend class LoadImageRunnable;
-  
+    
 public:
   //==============================================================================
   MainComponent(std::shared_ptr< pathCam::StreamCam > bcam);
@@ -34,15 +32,19 @@ private:
   std::shared_ptr< MRTiledImage >  MRimage;
   
   std::unique_ptr<FileChooser> fc;
-
   
   ToolbarComponent * toolbar;
   ImageViewComponent * imageview;
+  CaptureComponent * capture;
+
   
   juce::ProgressBar * progressBar;
   
 
   CriticalSection mutex;
+  
+  StringArray iconNames;
+  OwnedArray<Drawable> iconsFromZipFile;
 
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)

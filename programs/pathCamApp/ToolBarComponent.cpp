@@ -13,7 +13,7 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
   ToolbarItemComponent *tButton = dynamic_cast<juce::ToolbarItemComponent*>(button);
   switch(tButton->getItemId()){
     case PCamToolbarItemFactory::home:
-      std::cout << "home\n" << "\n";
+      parent->GuiEventHandler("home");
       break;
     case PCamToolbarItemFactory::open:
       parent->GuiEventHandler("open");
@@ -28,7 +28,7 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
       std::cout << "settings\n" << "\n";
       break;
     case PCamToolbarItemFactory::capture:
-      std::cout << "capture\n" << "\n";
+      parent->GuiEventHandler("capture");
       break;
     case PCamToolbarItemFactory::annotate:
       std::cout << "annotate\n" << "\n";

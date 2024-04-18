@@ -31,10 +31,15 @@ using namespace juce;
 #include "SvgButton.h"
 #include "TiledImage.h"
 #include "MRTiledImage.h"
-#include "ToolBarComponent.h"
-#include "ImageViewOverlay.h"
 
+#include "ToolBarComponent.h"
+
+#include "ImageViewOverlay.h"
 #include "ImageViewComponent.h"
+
+#include "CaptureOverlay.h"
+#include "CaptureComponent.h"
+
 #include "MainComponent.h"
 
 

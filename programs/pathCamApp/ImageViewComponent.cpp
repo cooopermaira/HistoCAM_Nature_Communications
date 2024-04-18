@@ -2,28 +2,12 @@
 
 
 //==============================================================================
-ImageViewComponent::ImageViewComponent(MainComponent *parent): parent(parent), MRImage(NULL)
+ImageViewComponent::ImageViewComponent(MainComponent *parent, 
+                                       StringArray &iconNames,
+                                       OwnedArray<Drawable> &iconsFromZipFile): parent(parent), MRImage(NULL)
 {
   
   setOpaque (true); //telling juce that there is nothingi to render underneath
-  
-  //Won't work for deployment, but ok for now
-  std::stringstream ss;
-  ss <<  PROJECT_SOURCE_DIR << "/resources/hud_icons.zip";
-  
-  ZipFile icons (File(ss.str().c_str()));
-
-  for (int i = 0; i < icons.getNumEntries(); ++i)
-  {
-    std::unique_ptr<InputStream> svgFileStream (icons.createStreamForEntry (i));
-    
-    if (svgFileStream.get() != nullptr)
-    {
-      iconNames.add (icons.getEntry (i)->filename);
-      iconsFromZipFile.add (Drawable::createFromImageDataStream (*svgFileStream));
-    }
-  }
-
   
   controlsOverlay.reset (new ImageViewOverlay (this, iconNames, iconsFromZipFile));
   addAndMakeVisible (controlsOverlay.get());

@@ -70,7 +70,7 @@ add_subdirectory(JUCE)
 
 
 IF(APPLE)
-    SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
+    SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
  ELSEIF(WIN32)
     SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install")
 ELSEIF(LINUX)
@@ -86,13 +86,17 @@ IF(NOT OVERRRIDE_SPINNAKER)
 
   IF(APPLE)
     IF(EXISTS "/Applications/Spinnaker")
-      MESSAGE(STATUS "Spinnaker directory found")
-      SET(BUILD_SPINNAKER "" ON)
-      add_compile_definitions(WITH_SPINNAKER)
-      include_directories( "/Applications/Spinnaker/include" )
-      SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
-                      "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
-                      "/Applications/Spinnaker/lib/libSpinVideo.dylib")
+#      MESSAGE(STATUS "Spinnaker directory found")
+#      SET(BUILD_SPINNAKER "" OFF)
+#      add_compile_definitions(WITH_SPINNAKER)
+#      include_directories( "/Applications/Spinnaker/include" )
+#      SET(SPINNAKER_LIBRARIES
+#      "/Applications/Spinnaker/lib/libSpinVideo.dylib"
+#      "/Applications/Spinnaker/lib/libSpinnaker_C.dylib"
+#      "/Applications/Spinnaker/lib/libSpinnaker.dylib"
+#      "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
+#      "/Applications/Spinnaker/lib/libSpinVideo_C.dylib")
+      
   ENDIF()
   ELSEIF(WIN32)
     IF(EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
@@ -226,25 +230,12 @@ IF(BUILD_PATHCAM_GUI)
                    PRODUCT_NAME "PathCam"
                    ICON_BIG "${PROJECT_SOURCE_DIR}/resources/pathCam.png"
                    )
-  message(STATUS "${PROJECT_SOURCE_DIR}/resources/pathCam.icns")
+
+  FILE(GLOB APP_FILES  programs/pathCamApp/*.h programs/pathCamApp/*.cpp)
+  message(STATUS ${APP_FILES})
   target_sources(pathCamApp
     PRIVATE
-        programs/pathCamApp/Main.cpp
-        programs/pathCamApp/MainComponent.h
-        programs/pathCamApp/MainComponent.cpp
-        programs/pathCamApp/ToolBarComponent.h
-        programs/pathCamApp/ToolBarComponent.cpp
-        programs/pathCamApp/ImageViewComponent.h
-        programs/pathCamApp/ImageViewComponent.cpp
-        programs/pathCamApp/ImageViewOverlay.h
-        programs/pathCamApp/ImageViewOverlay.cpp
-        programs/pathCamApp/TiledImage.h
-        programs/pathCamApp/TiledImage.cpp
-        programs/pathCamApp/MRTiledImage.cpp
-        programs/pathCamApp/MRTiledImage.h
-        programs/pathCamApp/SvgButton.h
-        programs/pathCamApp/SvgButton.cpp
-        programs/pathCamApp/JuceHeader.h
+          ${APP_FILES}
   )
   
   target_link_libraries(pathCamApp PRIVATE
