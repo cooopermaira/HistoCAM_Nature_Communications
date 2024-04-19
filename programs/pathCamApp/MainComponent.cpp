@@ -96,7 +96,7 @@ void MainComponent::loadImageDialog(const FileChooser& fc){
     loadImage(result.getFullPathName().toStdString());
     imageview->setImage(MRimage);
     capture->setImage(MRimage);
-    //annotate->setImage(MRimage);
+    annotate->setImage(MRimage);
 
   }
 }
