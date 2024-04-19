@@ -11,8 +11,9 @@
 #include "JuceHeader.h"
 
 class AnnotateComponent  : public juce::Component {
+  
 public:
-  AnnotateComponent(MainComponent *parent, 
+  AnnotateComponent(MainComponent *parent,
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile) {
@@ -46,6 +47,8 @@ public:
     layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
 
   }
+  
+  AnnoViewComponent * getViewComp(){ return rightComponent.get(); }
 
 
 private:

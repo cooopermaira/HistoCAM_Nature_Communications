@@ -38,7 +38,7 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   setWantsKeyboardFocus(true);
   addKeyListener(imageview);
   addKeyListener(capture);
-  //addKeyListener(annotate);
+  addKeyListener(annotate->getViewComp());
 
   
   setSize (1024, 768);
@@ -77,14 +77,6 @@ void MainComponent::resized()
   imageview->setBounds(b);
   capture->setBounds(b);
   annotate->setBounds(b);
-  
-  
-//#if DEBUG
-//  std::stringstream ss;
-//  ss <<  PROJECT_SOURCE_DIR << "/resources/stream_working.png";
-//  loadImage(ss.str());
-//  imageview->setImage(MRimage);
-//#endif
 
 }
 

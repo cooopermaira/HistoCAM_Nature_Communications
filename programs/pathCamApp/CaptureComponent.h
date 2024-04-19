@@ -39,6 +39,18 @@ public:
     
   }
   
+  bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
+    ImageViewComponent::keyPressed(key, originatingComponent);
+    
+    if(!isVisible()){ return false; }
+
+    if (key.getKeyCode() == KeyPress::spaceKey)
+    {
+      if(recording){ stopRecording(); }else{ startRecording(); }
+    }
+    return false;  // Key press not handled
+  }
+    
   void startRecording(){
     recording = true;
     repaint();
@@ -48,7 +60,6 @@ public:
     recording = false;
     repaint();
   }
-
 
   void paint (juce::Graphics& g)
   {

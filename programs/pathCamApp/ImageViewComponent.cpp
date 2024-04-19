@@ -78,6 +78,7 @@ void ImageViewComponent::mouseMagnify (const MouseEvent&, float magnifyAmmount)
   repaint();
 }
 
+
 bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
   if (key == juce::KeyPress::createFromDescription("-")) {
     scaleCenter(fPoint(2.0,2.0));

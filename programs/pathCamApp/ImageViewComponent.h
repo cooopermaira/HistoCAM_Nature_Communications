@@ -41,6 +41,7 @@ private:
   void scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart) override;
   void updateScrollbar();
   
+  
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
   
   void zoomAndCenter(){

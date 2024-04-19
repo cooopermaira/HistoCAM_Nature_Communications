@@ -45,8 +45,30 @@ public:
     
   }
   
+  bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
+    ImageViewComponent::keyPressed(key, originatingComponent);
+    
+    return false;  // Key press not handled
+  }
+
+  
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
+  
+  
+  double calculatePolygonArea(const std::vector<juce::Point<float>>& vertices) {
+      unsigned int n = (unsigned int)vertices.size();
+      double area = 0.0;
+
+      // Calculate the area using the shoelace formula
+      for (unsigned int i = 0; i < n; i++) {
+        unsigned int j = (i + 1) % n; // Wrap around using modulo for the last point
+          area += vertices[i].x * vertices[j].y;
+          area -= vertices[j].x * vertices[i].y;
+      }
+
+      return std::abs(area / 2.0); // Return the absolute value of the area divided by 2
+  }
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnnoViewComponent)
   
