@@ -10,13 +10,13 @@
 
 #include "JuceHeader.h"
 
-class AnnotateComponent;
+class AnnoViewComponent;
 
 class AnnotateOverlay final : public Component,
 public Button::Listener
 {
 public:
-  AnnotateOverlay (AnnotateComponent* parent,
+  AnnotateOverlay (AnnoViewComponent* parent,
                   StringArray &iconNames,
                   OwnedArray<Drawable> &iconsFromZipFile) : parent(parent)
   {
@@ -67,7 +67,7 @@ private:
   std::unique_ptr < SvgButton > segmentButton;
   std::unique_ptr < SvgButton > dictateButton;
   
-  AnnotateComponent* parent;
+  AnnoViewComponent* parent;
     
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnnotateOverlay)

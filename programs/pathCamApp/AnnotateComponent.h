@@ -10,46 +10,50 @@
 
 #include "JuceHeader.h"
 
-class AnnotateComponent: public ImageViewComponent{
+class AnnotateComponent  : public juce::Component {
 public:
   AnnotateComponent(MainComponent *parent, 
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
-                    OwnedArray<Drawable> &iconsFromZipFile) : ImageViewComponent(parent,view,iconNames,iconsFromZipFile), recording(false){
+                    OwnedArray<Drawable> &iconsFromZipFile) {
 
-    annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
-    addAndMakeVisible (annotateOverlay.get());
+    // Add the child components to the main component.
+    addAndMakeVisible(leftComponent);
+    
+    //Annoview will bipass this and point directly to maincomponent.  Might have issues later.
+    rightComponent.reset( new AnnoViewComponent(parent, view, iconNames, iconsFromZipFile ));
+    
+    addAndMakeVisible(rightComponent.get());
 
-                     
+    layout.setItemLayout(0, 100, -1, 0.5);  // left component takes half the space initially
+    layout.setItemLayout(1, 10, 10, 10);    // resizer bar with a fixed size
+    layout.setItemLayout(2, 100, -1, 0.5);  // right component also takes half the space initially
+
+    resizerBar.reset(new juce::StretchableLayoutResizerBar(&layout, 1, true));
+    addAndMakeVisible(resizerBar.get());
+  
   }
   
   void resized()
   {
     
-    ImageViewComponent::resized();
+    auto area = getLocalBounds();
+    juce::Component* components[] = { &leftComponent, resizerBar.get(), rightComponent.get() };
 
-    {
-      const ScopedLock lock (mutex);
-      juce::Rectangle<int> b = getLocalBounds();
-      int width = 300;
-      annotateOverlay->setBounds(juce::Rectangle<int>(b.getWidth()-width-20, 20, width, 60));
-      
-    }
-    
+    // This will position and resize the components according to the layout
+    layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+
   }
 
-
-  void paint (juce::Graphics& g)
-  {
-    ImageViewComponent::paint(g);
-    
-  }
 
 private:
-  std::unique_ptr<AnnotateOverlay> annotateOverlay;
+  //std::unique_ptr<AnnotateOverlay> annotateOverlay;
   
-  bool recording;
-  
+  juce::Component leftComponent;
+  std::unique_ptr< AnnoViewComponent > rightComponent;
+  std::unique_ptr<juce::StretchableLayoutResizerBar> resizerBar;
+  juce::StretchableLayoutManager layout;
+
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnnotateComponent)
 
 };

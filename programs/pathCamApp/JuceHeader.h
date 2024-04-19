@@ -41,6 +41,7 @@ using namespace juce;
 #include "CaptureComponent.h"
 
 #include "AnnotateOverlay.h"
+#include "AnnoViewComponent.h"
 #include "AnnotateComponent.h"
 
 

@@ -38,7 +38,7 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   setWantsKeyboardFocus(true);
   addKeyListener(imageview);
   addKeyListener(capture);
-  addKeyListener(annotate);
+  //addKeyListener(annotate);
 
   
   setSize (1024, 768);
@@ -96,7 +96,7 @@ void MainComponent::loadImageDialog(const FileChooser& fc){
     loadImage(result.getFullPathName().toStdString());
     imageview->setImage(MRimage);
     capture->setImage(MRimage);
-    annotate->setImage(MRimage);
+    //annotate->setImage(MRimage);
 
   }
 }
