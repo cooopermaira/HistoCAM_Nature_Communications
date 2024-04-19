@@ -21,7 +21,7 @@ public:
   
   std::vector < std::shared_ptr< TiledImage > > level;
   
-  void build(cv::Mat image_in);
+  void build(cv::Mat &image_in);
   
   std::vector < TileQuery > getTiles(fRectangle bounds, juce::Rectangle < int > screen);
   

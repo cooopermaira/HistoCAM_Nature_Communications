@@ -10,12 +10,16 @@
 
 #include "JuceHeader.h"
 
+class AnnotateComponent;
+
 class AnnoViewComponent  : public ImageViewComponent {
 public:
-  AnnoViewComponent(MainComponent *parent,
+  AnnoViewComponent(MainComponent *grandparent,
+                    AnnotateComponent *parent,
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
-                    OwnedArray<Drawable> &iconsFromZipFile): ImageViewComponent(parent,view,iconNames,iconsFromZipFile)
+                    OwnedArray<Drawable> &iconsFromZipFile,
+                    std::shared_ptr< std::vector < Annotation > > annotations): ImageViewComponent(grandparent,view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
   {
                       
       annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
@@ -43,6 +47,10 @@ public:
   {
     ImageViewComponent::paint(g);
     
+    for(unsigned int i=0; i < annotations->size(); i++){
+      (*annotations)[i].paint(g);
+    }
+    
   }
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
@@ -54,21 +62,10 @@ public:
   
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
+  std::shared_ptr< std::vector < Annotation > > annotations;
   
+  AnnotateComponent *parent;
   
-  double calculatePolygonArea(const std::vector<juce::Point<float>>& vertices) {
-      unsigned int n = (unsigned int)vertices.size();
-      double area = 0.0;
-
-      // Calculate the area using the shoelace formula
-      for (unsigned int i = 0; i < n; i++) {
-        unsigned int j = (i + 1) % n; // Wrap around using modulo for the last point
-          area += vertices[i].x * vertices[j].y;
-          area -= vertices[j].x * vertices[i].y;
-      }
-
-      return std::abs(area / 2.0); // Return the absolute value of the area divided by 2
-  }
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnnoViewComponent)
   

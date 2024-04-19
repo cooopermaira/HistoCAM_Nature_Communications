@@ -18,13 +18,13 @@ public:
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile) {
 
-
-    leftComponent.reset( new AnnoListComponent() );
+    annotations.reset( new std::vector < Annotation >());
+    
+    leftComponent.reset( new AnnoListComponent(annotations) );
 
     addAndMakeVisible(leftComponent.get());
     
-    //Annoview will bypass this and point directly to maincomponent.  Might have issues later.
-    rightComponent.reset( new AnnoViewComponent(parent, view, iconNames, iconsFromZipFile ));
+    rightComponent.reset( new AnnoViewComponent(parent, this, view, iconNames, iconsFromZipFile, annotations));
     
     addAndMakeVisible(rightComponent.get());
 
@@ -34,7 +34,12 @@ public:
 
     resizerBar.reset(new juce::StretchableLayoutResizerBar(&layout, 1, true));
     addAndMakeVisible(resizerBar.get());
-  
+    
+#if DEBUG
+    (*annotations).push_back( PolygonAnnotation("Poly 1") );
+
+
+#endif
   }
   
   void setImage(std::shared_ptr<MRTiledImage> image){  rightComponent->setImage(image); }
@@ -54,7 +59,7 @@ public:
 
 
 private:
-  //std::unique_ptr<AnnotateOverlay> annotateOverlay;
+  std::shared_ptr< std::vector < Annotation > > annotations;
   
   std::unique_ptr< AnnoListComponent > leftComponent;
   std::unique_ptr< AnnoViewComponent > rightComponent;

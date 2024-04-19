@@ -23,7 +23,7 @@ public:
     if (rowIsSelected)
       g.fillAll(Colours::lightblue);
     g.setColour(Colours::black);
-    g.drawText(items[rowNumber], Rectangle<int>(width, height), Justification::centredLeft, true);
+    g.drawText(items[rowNumber], Rectangle<int>(width, height).reduced(4, 0), Justification::centredLeft, true);
   }
   
   var getDragSourceDescription(const SparseSet<int>& selectedRows) override {
@@ -44,12 +44,8 @@ public:
 
 
 class AnnoListComponent : public DragAndDropContainer, public Component {
-private:
-  ListBox listBox;
-  DraggableListBoxModel model;
-  
 public:
-  AnnoListComponent() {
+  AnnoListComponent(std::shared_ptr< std::vector < Annotation > > annotations) : annotations(annotations) {
     model.items = { "Annotation 1", "Annotation 2", "Annotation 3", "Annotation 4", "Annotation 5" };
     listBox.setModel(&model);
     listBox.setMultipleSelectionEnabled(false);
@@ -66,5 +62,11 @@ public:
     auto b = getLocalBounds().reduced(10);
     listBox.setBounds(b);
   }
+  
+private:
+  ListBox listBox;
+  DraggableListBoxModel model;
+  std::shared_ptr< std::vector < Annotation > > annotations;
+
 };
 #endif /* AnnoListComponent_hpp */

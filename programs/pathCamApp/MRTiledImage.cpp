@@ -19,7 +19,7 @@ std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, juce::Rectangl
 }
 
 
-void MRTiledImage::build(cv::Mat image_in){
+void MRTiledImage::build(cv::Mat &image_in){
   //Determine the number of levels
   unsigned int height = image_in.rows;
   unsigned int width = image_in.cols;

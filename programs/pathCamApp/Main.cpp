@@ -90,7 +90,7 @@ public:
     {
       
       
-      bcam = std::make_shared< pathCam::StreamCam >(config);
+      bcam.reset( new pathCam::StreamCam(config) );
       
       setUsingNativeTitleBar (true);
       setContentOwned (new MainComponent(bcam), true);
