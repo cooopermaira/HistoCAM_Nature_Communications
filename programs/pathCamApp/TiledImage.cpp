@@ -49,7 +49,7 @@ void TiledImage::insertMat(cv::Mat image_in, fRectangle box){
     for(int j = getIJ(top_left).getY(); j <=  getIJ(bottom_right).getY(); j++){
       
       if(tiles(i,j) == NULL){
-        tiles(i,j) = new juce::Image(juce::Image::PixelFormat::RGB, tile_size, tile_size, true);
+        tiles(i,j) = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
       }
       
       fRectangle tile_box = fRectangle(i*logic_size,
