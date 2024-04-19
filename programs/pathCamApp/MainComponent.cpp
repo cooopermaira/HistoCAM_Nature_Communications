@@ -72,7 +72,7 @@ void MainComponent::paint (juce::Graphics& g)
 void MainComponent::resized()
 {
   const ScopedLock lock (mutex);
-  Rectangle < int > b = getLocalBounds();
+  juce::Rectangle < int > b = getLocalBounds();
   toolbar->setBounds(b.removeFromTop(50));
   imageview->setBounds(b);
   capture->setBounds(b);

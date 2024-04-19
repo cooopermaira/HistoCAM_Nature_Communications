@@ -7,7 +7,7 @@
 
 #include "JuceHeader.h"
 
-std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, Rectangle <int> screen){
+std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, juce::Rectangle <int> screen){
   
   float scale = max(view.getHorizontalRange().getLength()/float(screen.getHorizontalRange().getLength()),
                     view.getVerticalRange().getLength()/float(screen.getVerticalRange().getLength()));  
