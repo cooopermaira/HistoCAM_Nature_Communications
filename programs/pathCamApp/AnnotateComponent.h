@@ -18,10 +18,12 @@ public:
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile) {
 
-    // Add the child components to the main component.
-    addAndMakeVisible(leftComponent);
+
+    leftComponent.reset( new AnnoListComponent() );
+
+    addAndMakeVisible(leftComponent.get());
     
-    //Annoview will bipass this and point directly to maincomponent.  Might have issues later.
+    //Annoview will bypass this and point directly to maincomponent.  Might have issues later.
     rightComponent.reset( new AnnoViewComponent(parent, view, iconNames, iconsFromZipFile ));
     
     addAndMakeVisible(rightComponent.get());
@@ -41,7 +43,7 @@ public:
   {
     
     auto area = getLocalBounds();
-    juce::Component* components[] = { &leftComponent, resizerBar.get(), rightComponent.get() };
+    juce::Component* components[] = { leftComponent.get(), resizerBar.get(), rightComponent.get() };
 
     // This will position and resize the components according to the layout
     layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
@@ -54,7 +56,7 @@ public:
 private:
   //std::unique_ptr<AnnotateOverlay> annotateOverlay;
   
-  juce::Component leftComponent;
+  std::unique_ptr< AnnoListComponent > leftComponent;
   std::unique_ptr< AnnoViewComponent > rightComponent;
   std::unique_ptr<juce::StretchableLayoutResizerBar> resizerBar;
   juce::StretchableLayoutManager layout;

@@ -45,7 +45,7 @@ private:
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
   
   void zoomAndCenter(){
-    if(MRImage){
+    if(!MRImage){ return; }
       juce::Rectangle<int> b = getLocalBounds();
       
       view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
@@ -57,15 +57,17 @@ private:
                         (float)view->getVerticalRange().getLength());
       
       scaleCenter(fPoint(scale,scale));
-    }
+
   }
   
   inline void translate(fPoint amount){
+    if(!MRImage){ return; }
     *view += amount;
     updateScrollbar();
   }
   
   inline void scaleCenter(fPoint scale){
+    if(!MRImage){ return; }
     fPoint center = view->getCentre();
     *view -= center;
     *view *= scale;
@@ -74,11 +76,13 @@ private:
   }
   
   inline fPoint screen2view(){
+    if(!MRImage){ return fPoint(); }
     return fPoint(view->getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
                   view->getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
   inline fPoint view2screen(){
+    if(!MRImage){ return fPoint(); }
     return fPoint(getLocalBounds().getHorizontalRange().getLength()/view->getHorizontalRange().getLength(),
                   getLocalBounds().getVerticalRange().getLength()/view->getVerticalRange().getLength());
   }
