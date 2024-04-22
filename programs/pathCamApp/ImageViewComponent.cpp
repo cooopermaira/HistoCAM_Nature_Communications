@@ -99,7 +99,7 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* 
 
 void ImageViewComponent::updateScrollbar(){
   
-  if(!view->isEmpty()){
+  if(!view->isEmpty() && isVisible()){
     horizontalScrollBar.setCurrentRangeStart(view->getCentreX());
     verticalScrollBar.setCurrentRangeStart(view->getCentreY());
   }
@@ -112,12 +112,12 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar* scrollBar, double newRa
   // This method is called when the scroll bar is moved
   if (scrollBar == &horizontalScrollBar)
   {
-    view->setCentre(newRangeStart, view->getCentreY());
+    if(isVisible()){ view->setCentre(newRangeStart, view->getCentreY()); }
     repaint();
   }
   else if (scrollBar == &verticalScrollBar)
   {
-    view->setCentre(view->getCentreX(), newRangeStart);
+    if(isVisible()){ view->setCentre(view->getCentreX(), newRangeStart); }
     repaint();
   }
 }
@@ -154,30 +154,29 @@ void ImageViewComponent::drawSlide(juce::Graphics& g, float scale){
 //==============================================================================
 void ImageViewComponent::paint (juce::Graphics& g)
 {
-  
   g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
   
   g.drawImageAt(checkerboard, 0, 0);
   
   if(MRImage){
-    if(false){
-      
-      auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
-      
-      juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth()*scale, getLocalBounds().getHeight()*scale, true);
-      
-      Graphics b(screenBuffer);
-      
-      drawSlide(b, scale);
-      
-      
-      g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
-                                           getLocalBounds().getY(),
-                                           getLocalBounds().getWidth(),
-                                           getLocalBounds().getHeight()));
-    }else{
+//    if(false){
+//      
+//      auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
+//      
+//      juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth()*scale, getLocalBounds().getHeight()*scale, true);
+//      
+//      Graphics b(screenBuffer);
+//      
+//      drawSlide(b, scale);
+//      
+//      
+//      g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
+//                                           getLocalBounds().getY(),
+//                                           getLocalBounds().getWidth(),
+//                                           getLocalBounds().getHeight()));
+//    }else{
       drawSlide(g, 1.0);
-    }
+//    }
     
   }
   
@@ -190,7 +189,7 @@ void ImageViewComponent::resized()
   // If you add any child components, this is where you should
   // update their positions.
   const ScopedLock lock (mutex);
-  
+    
   juce::Rectangle<int> b = getLocalBounds();
   
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
@@ -201,7 +200,7 @@ void ImageViewComponent::resized()
   
   b = getLocalBounds();
   
-  if(MRImage){
+  if(MRImage && isVisible()){
     scaleCenter(fPoint((float)b.getHorizontalRange().getLength()/
                        (float)old_bounds.getHorizontalRange().getLength(),
                        (float)b.getVerticalRange().getLength()/

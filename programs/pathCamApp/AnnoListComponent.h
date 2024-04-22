@@ -45,7 +45,7 @@ public:
 
 class AnnoListComponent : public DragAndDropContainer, public Component {
 public:
-  AnnoListComponent(std::shared_ptr< std::vector < Annotation > > annotations) : annotations(annotations) {
+  AnnoListComponent(std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations) : annotations(annotations) {
     model.items = { "Annotation 1", "Annotation 2", "Annotation 3", "Annotation 4", "Annotation 5" };
     listBox.setModel(&model);
     listBox.setMultipleSelectionEnabled(false);
@@ -59,6 +59,7 @@ public:
   
   
   void resized() override {
+    if(!isVisible()){ return; }
     auto b = getLocalBounds().reduced(10);
     listBox.setBounds(b);
   }
@@ -66,7 +67,7 @@ public:
 private:
   ListBox listBox;
   DraggableListBoxModel model;
-  std::shared_ptr< std::vector < Annotation > > annotations;
+  std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
 
 };
 #endif /* AnnoListComponent_hpp */

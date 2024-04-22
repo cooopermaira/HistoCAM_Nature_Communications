@@ -16,7 +16,7 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
   
 public:
   //==============================================================================
-  ImageViewComponent(MainComponent *parent, 
+  ImageViewComponent(MainComponent *parent,
                      std::shared_ptr < fRectangle > view,
                      StringArray &iconNames,
                      OwnedArray<Drawable> &iconsFromZipFile);
@@ -37,7 +37,7 @@ private:
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
   void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) override;
-
+  
   void scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart) override;
   void updateScrollbar();
   
@@ -45,29 +45,29 @@ private:
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
   
   void zoomAndCenter(){
-    if(!MRImage){ return; }
-      juce::Rectangle<int> b = getLocalBounds();
-      
-      view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
-      view->setCentre(MRImage->bounds.getCentre());
-      
-      float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
-                        (float)view->getHorizontalRange().getLength(),
-                        (float)MRImage->bounds.getVerticalRange().getLength()/
-                        (float)view->getVerticalRange().getLength());
-      
-      scaleCenter(fPoint(scale,scale));
-
+    if(!MRImage || !isVisible()){ return; }
+    juce::Rectangle<int> b = getLocalBounds();
+    *view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
+    //view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
+    view->setCentre(MRImage->bounds.getCentre());
+    
+    float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
+                      (float)view->getHorizontalRange().getLength(),
+                      (float)MRImage->bounds.getVerticalRange().getLength()/
+                      (float)view->getVerticalRange().getLength());
+    
+    scaleCenter(fPoint(scale,scale));
+    
   }
   
   inline void translate(fPoint amount){
-    if(!MRImage){ return; }
+    if(!MRImage || !isVisible()){ return; }
     *view += amount;
     updateScrollbar();
   }
   
   inline void scaleCenter(fPoint scale){
-    if(!MRImage){ return; }
+    if(!MRImage || !isVisible()){ return; }
     fPoint center = view->getCentre();
     *view -= center;
     *view *= scale;
@@ -76,13 +76,13 @@ private:
   }
   
   inline fPoint screen2view(){
-    if(!MRImage){ return fPoint(); }
+    if(!MRImage || !isVisible()){ return fPoint(); }
     return fPoint(view->getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
                   view->getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
   inline fPoint view2screen(){
-    if(!MRImage){ return fPoint(); }
+    if(!MRImage || !isVisible()){ return fPoint(); }
     return fPoint(getLocalBounds().getHorizontalRange().getLength()/view->getHorizontalRange().getLength(),
                   getLocalBounds().getVerticalRange().getLength()/view->getVerticalRange().getLength());
   }
@@ -100,14 +100,14 @@ private:
   
   juce::ScrollBar horizontalScrollBar{ false }; // Horizontal scroll bar
   juce::ScrollBar verticalScrollBar{ true }; // Vertical scroll bar
-    
+  
   
   MainComponent *parent;
   
   std::shared_ptr < fRectangle > view;
   
   std::unique_ptr<ImageViewOverlay> controlsOverlay;
-
+  
 protected:
   CriticalSection mutex;
   

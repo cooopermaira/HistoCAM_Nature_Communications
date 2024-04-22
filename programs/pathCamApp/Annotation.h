@@ -14,10 +14,11 @@ class Annotation {
 public:
   Annotation(juce::String name): name(name){};
   
-  virtual void paint(juce::Graphics& g) {};
+  virtual void paint(juce::Graphics& g, float scale=1.0) {};
   
   bool selected;
   juce::String name;
+  fRectangle bounds;
 };
 
 
@@ -25,14 +26,30 @@ class PolygonAnnotation : public Annotation{
 public:
   PolygonAnnotation(juce::String name): Annotation(name) {};
   
-  std::vector < fPoint > vertices;
+  juce::Path path;
   
-  void paint(juce::Graphics& g) override {
+  void paint(juce::Graphics& g, float scale=1.0) override {
+    juce::Path::Iterator it(path);
     
+    g.setColour(juce::Colours::lightblue);
+
+    while (it.next())
+    {
+        if (it.elementType == juce::Path::Iterator::lineTo ||
+            it.elementType == juce::Path::Iterator::startNewSubPath)
+        {
+            g.fillEllipse(it.x1 - 10*scale, it.y1 - 10*scale, 2 * 10*scale, 2 * 10*scale);
+        }
+    }
+    
+    g.setColour(juce::Colours::lightblue.withAlpha(0.5f));
+    g.fillPath(path);
     
   }
   
-  double getArea(){ return calculatePolygonArea(vertices); }
+  double getArea(){
+    return 0.0; //calculatePolygonArea(vertices);
+  }
   
 private:
   double calculatePolygonArea(const std::vector<juce::Point<float>>& vertices) {
@@ -55,7 +72,7 @@ class AudioAnnotation : public Annotation{
 public:
   AudioAnnotation(juce::String name): Annotation(name) {};
   
- void paint(juce::Graphics& g) override {
+ void paint(juce::Graphics& g, float scale=1.0) override {
     
     
   }
@@ -66,7 +83,7 @@ class SegmentAnnotation : public Annotation{
 public:
   SegmentAnnotation(juce::String name): Annotation(name) {};
   
- void paint(juce::Graphics& g) override {
+ void paint(juce::Graphics& g, float scale=1.0) override {
     
     
   }

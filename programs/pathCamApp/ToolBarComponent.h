@@ -58,18 +58,20 @@ private:
     enum PCamToolbarItemIds
     {
       home            = 1,
-      open            = 2,
-      save            = 3,
-      reload_config   = 4,
-      settings        = 5,
-      capture         = 6,
-      annotate        = 7,
-      pathCamIcon     = 8,
+      new_image       = 2,
+      open            = 3,
+      save            = 4,
+      reload_config   = 5,
+      settings        = 6,
+      capture         = 7,
+      annotate        = 8,
+      pathCamIcon     = 9,
     };
     
     void getAllToolbarItemIds (Array<int>& ids) override
     {
       ids.add (home);
+      ids.add (new_image);
       ids.add (open);
       ids.add (save);
       ids.add (reload_config);
@@ -86,8 +88,13 @@ private:
     {
       // This returns an ordered list of the set of items that make up a
       // toolbar's default set. Not all items need to be on this list, and
+     
       // items can appear multiple times (e.g. the separators used here).
       ids.add (home);
+      ids.add (spacerId);
+      ids.add (separatorBarId);
+      ids.add (spacerId);
+      ids.add (new_image);
       ids.add (spacerId);
       ids.add (open);
       ids.add (save);
@@ -111,6 +118,7 @@ private:
       switch (itemId)
       {
         case home:            return createButtonFromZipFileSVG (itemId, "home",     "home.svg");
+        case new_image:       return createButtonFromZipFileSVG (itemId, "new_image",    "new_image.svg");
         case open:            return createButtonFromZipFileSVG (itemId, "open",    "open.svg");
         case save:            return createButtonFromZipFileSVG (itemId, "save",    "save.svg");
         case reload_config:   return createButtonFromZipFileSVG (itemId, "reload_config", "reload_config.svg");
@@ -136,7 +144,7 @@ private:
       {
         //Won't work for deployment, but ok for now
         std::stringstream ss;
-        ss <<  PROJECT_SOURCE_DIR << "/resources/icons.zip";
+        ss <<  PROJECT_SOURCE_DIR << "/resources/toolbar_icons.zip";
         
         // If we've not already done so, load all the images from the zip file..
         ZipFile icons (File(ss.str().c_str()));

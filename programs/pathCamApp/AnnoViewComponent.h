@@ -19,7 +19,7 @@ public:
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile,
-                    std::shared_ptr< std::vector < Annotation > > annotations): ImageViewComponent(grandparent,view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
+                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(grandparent,view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
   {
                       
       annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
@@ -34,11 +34,14 @@ public:
     
     {
       const ScopedLock lock (mutex);
+      if(!isVisible()){ return; }
       juce::Rectangle<int> b = getLocalBounds();
       int width = 300;
       annotateOverlay->setBounds(juce::Rectangle<int>(b.getWidth()-width-20, 20, width, 60));
       
     }
+    
+  
     
   }
   
@@ -48,7 +51,7 @@ public:
     ImageViewComponent::paint(g);
     
     for(unsigned int i=0; i < annotations->size(); i++){
-      (*annotations)[i].paint(g);
+      (*annotations)[i]->paint(g);
     }
     
   }
@@ -62,7 +65,7 @@ public:
   
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
-  std::shared_ptr< std::vector < Annotation > > annotations;
+  std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   
   AnnotateComponent *parent;
   

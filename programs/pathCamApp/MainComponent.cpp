@@ -24,6 +24,7 @@ MainComponent::MainComponent(std::shared_ptr< pathCam::StreamCam > bcam): bcam(b
   
   
   toolbar = new ToolbarComponent(this);
+  view.reset( new fRectangle() );
   imageview = new ImageViewComponent(this, view, iconNames, iconsFromZipFile);
   capture = new CaptureComponent(this, view, iconNames, iconsFromZipFile);
   annotate = new AnnotateComponent(this, view, iconNames, iconsFromZipFile);
