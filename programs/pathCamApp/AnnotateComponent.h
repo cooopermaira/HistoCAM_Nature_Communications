@@ -17,21 +17,21 @@ public:
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile) {
-
+    
     annotations.reset( new std::vector < std::shared_ptr<  Annotation > >());
     
     leftComponent.reset( new AnnoListComponent(annotations) );
-
+    
     addChildComponent(leftComponent.get());
     
     rightComponent.reset( new AnnoViewComponent(parent, this, view, iconNames, iconsFromZipFile, annotations));
     
     addChildComponent(rightComponent.get());
-
+    
     layout.setItemLayout(0, 100, -1, 0.5);  // left component takes half the space initially
     layout.setItemLayout(1, 10, 10, 10);    // resizer bar with a fixed size
     layout.setItemLayout(2, 100, -1, 0.5);  // right component also takes half the space initially
-
+    
     resizerBar.reset(new juce::StretchableLayoutResizerBar(&layout, 1, true));
     addChildComponent(resizerBar.get());
     
@@ -40,32 +40,42 @@ public:
     std::shared_ptr< PolygonAnnotation > temp = std::make_shared < PolygonAnnotation >("Poly 1");
     
     temp->path.startNewSubPath(50, 50);
-    temp->path.lineTo(200, 50);          // Add second point
-    temp->path.lineTo(150, 150);         // Add third point
-    temp->path.lineTo(50, 100);          // Add fourth point
+    temp->path.lineTo(1200, 150);          // Add second point
+    temp->path.lineTo(1150, 1150);         // Add third point
+    temp->path.lineTo(150, 1100);          // Add fourth point
     temp->path.closeSubPath();           // Close the path
-  
+    
     annotations->push_back(temp);
     
-        
 #endif
+
   }
   
   void setImage(std::shared_ptr<MRTiledImage> image){  rightComponent->setImage(image); }
   
-  void resized()
-  {
-    if(!isVisible()){ return; }
+  void resized() override  {
     auto area = getLocalBounds();
     juce::Component* components[] = { leftComponent.get(), resizerBar.get(), rightComponent.get() };
 
-//    // This will position and resize the components according to the layout
     layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+    rightComponent->resized();
+  }
+  
+  void setVisible (bool shouldBeVisible) override {
+    Component::setVisible(shouldBeVisible);
+    
+    leftComponent->setVisible(shouldBeVisible);
+    rightComponent->setVisible(shouldBeVisible);
+    resizerBar->setVisible(shouldBeVisible);
 
   }
   
+  void fixAspectRatio(){
+    rightComponent->fixAspectRatio();
+  }
+  
   AnnoViewComponent * getViewComp(){ return rightComponent.get(); }
-
+  AnnoListComponent * getListComp(){ return leftComponent.get(); }
 
 private:
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;

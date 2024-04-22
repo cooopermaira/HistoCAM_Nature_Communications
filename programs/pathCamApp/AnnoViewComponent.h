@@ -27,14 +27,13 @@ public:
                                        
   }
   
-  void resized()
+  void resized() override
   {
     
     ImageViewComponent::resized();
     
     {
       const ScopedLock lock (mutex);
-      if(!isVisible()){ return; }
       juce::Rectangle<int> b = getLocalBounds();
       int width = 300;
       annotateOverlay->setBounds(juce::Rectangle<int>(b.getWidth()-width-20, 20, width, 60));
@@ -46,17 +45,17 @@ public:
   }
   
   
-  void paint (juce::Graphics& g)
+  void paint (juce::Graphics& g) override
   {
     ImageViewComponent::paint(g);
     
     for(unsigned int i=0; i < annotations->size(); i++){
-      (*annotations)[i]->paint(g);
+      (*annotations)[i]->paint(g, view->getPosition(), view2screen());
     }
     
   }
   
-  bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) {
+  bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override {
     ImageViewComponent::keyPressed(key, originatingComponent);
     
     return false;  // Key press not handled

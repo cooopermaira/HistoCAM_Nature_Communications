@@ -99,7 +99,7 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* 
 
 void ImageViewComponent::updateScrollbar(){
   
-  if(!view->isEmpty() && isVisible()){
+  if(!view->isEmpty()){
     horizontalScrollBar.setCurrentRangeStart(view->getCentreX());
     verticalScrollBar.setCurrentRangeStart(view->getCentreY());
   }
@@ -158,27 +158,7 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
   
-  if(MRImage){
-//    if(false){
-//      
-//      auto scale = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay()->scale;
-//      
-//      juce::Image screenBuffer(juce::Image::PixelFormat::ARGB, getLocalBounds().getWidth()*scale, getLocalBounds().getHeight()*scale, true);
-//      
-//      Graphics b(screenBuffer);
-//      
-//      drawSlide(b, scale);
-//      
-//      
-//      g.drawImage(screenBuffer, fRectangle(getLocalBounds().getX(),
-//                                           getLocalBounds().getY(),
-//                                           getLocalBounds().getWidth(),
-//                                           getLocalBounds().getHeight()));
-//    }else{
-      drawSlide(g, 1.0);
-//    }
-    
-  }
+  if(MRImage){ drawSlide(g, 1.0); }
   
 }
 

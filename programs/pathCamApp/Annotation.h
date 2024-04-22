@@ -14,7 +14,7 @@ class Annotation {
 public:
   Annotation(juce::String name): name(name){};
   
-  virtual void paint(juce::Graphics& g, float scale=1.0) {};
+  virtual void paint(juce::Graphics& g, fPoint offset, fPoint scale=fPoint(1.0,1.0)) {};
   
   bool selected;
   juce::String name;
@@ -28,8 +28,13 @@ public:
   
   juce::Path path;
   
-  void paint(juce::Graphics& g, float scale=1.0) override {
-    juce::Path::Iterator it(path);
+  void paint(juce::Graphics& g, fPoint offset, fPoint scale=fPoint(1.0,1.0)) override {
+    juce::Path temp = path;
+
+    temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
+    temp.applyTransform(juce::AffineTransform::scale(scale.getX(), scale.getY()));
+    
+    juce::Path::Iterator it(temp);
     
     g.setColour(juce::Colours::lightblue);
 
@@ -38,12 +43,12 @@ public:
         if (it.elementType == juce::Path::Iterator::lineTo ||
             it.elementType == juce::Path::Iterator::startNewSubPath)
         {
-            g.fillEllipse(it.x1 - 10*scale, it.y1 - 10*scale, 2 * 10*scale, 2 * 10*scale);
+            g.fillEllipse(it.x1 - 10, it.y1 - 10, 2 * 10, 2 * 10);
         }
     }
     
     g.setColour(juce::Colours::lightblue.withAlpha(0.5f));
-    g.fillPath(path);
+    g.fillPath(temp);
     
   }
   
@@ -72,7 +77,7 @@ class AudioAnnotation : public Annotation{
 public:
   AudioAnnotation(juce::String name): Annotation(name) {};
   
- void paint(juce::Graphics& g, float scale=1.0) override {
+ void paint(juce::Graphics& g, fPoint offset, fPoint scale=fPoint(1.0,1.0)) override {
     
     
   }
@@ -83,7 +88,7 @@ class SegmentAnnotation : public Annotation{
 public:
   SegmentAnnotation(juce::String name): Annotation(name) {};
   
- void paint(juce::Graphics& g, float scale=1.0) override {
+ void paint(juce::Graphics& g, fPoint offset,  fPoint scale=fPoint(1.0,1.0)) override {
     
     
   }

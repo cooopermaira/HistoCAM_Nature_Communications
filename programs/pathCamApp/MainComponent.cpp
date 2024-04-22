@@ -107,21 +107,27 @@ void MainComponent::GuiEventHandler(std::string event){
   }
   
   if(event == "home"){
+    const ScopedLock lock (mutex);
     imageview->setVisible(true);
+    imageview->fixAspectRatio();
     capture->setVisible(false);
     annotate->setVisible(false);
   }
   
   if(event == "capture"){
-    imageview->setVisible(false);
+    const ScopedLock lock (mutex);
     capture->setVisible(true);
+    capture->fixAspectRatio();
+    imageview->setVisible(false);
     annotate->setVisible(false);
   }
   
   if(event == "annotate"){
+    const ScopedLock lock (mutex);
+    annotate->setVisible(true);
+    annotate->fixAspectRatio();
     imageview->setVisible(false);
     capture->setVisible(false);
-    annotate->setVisible(true);
   }
   
   

@@ -59,7 +59,6 @@ public:
   
   
   void resized() override {
-    if(!isVisible()){ return; }
     auto b = getLocalBounds().reduced(10);
     listBox.setBounds(b);
   }

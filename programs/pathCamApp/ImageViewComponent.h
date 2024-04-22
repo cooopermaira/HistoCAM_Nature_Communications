@@ -31,6 +31,28 @@ public:
   
   void setImage(std::shared_ptr< MRTiledImage > image);
   
+  void fixAspectRatio(){
+    if(!MRImage || !isVisible()){ return; }
+    
+    fRectangle b = fRectangle(getLocalBounds().getX(), getLocalBounds().getY(), getLocalBounds().getWidth(), getLocalBounds().getHeight());
+    fPoint center = view->getCentre();
+    
+    if(b.getAspectRatio() != view->getAspectRatio()){
+      
+      int newWidthView, newHeightView;
+      if (view->getWidth() / view->getHeight() < b.getAspectRatio()) {
+        newWidthView   =   view->getHeight() * b.getAspectRatio();
+        newHeightView  =   view->getHeight();
+      } else {
+        newWidthView = view->getWidth();
+        newHeightView = view->getWidth() / b.getAspectRatio();
+      }
+      
+      view->setSize( newWidthView, newHeightView);
+      view->setCentre(center);
+    }
+  }
+  
 private:
   std::shared_ptr< MRTiledImage> MRImage;
   
@@ -43,6 +65,8 @@ private:
   
   
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
+  
+
   
   void zoomAndCenter(){
     if(!MRImage || !isVisible()){ return; }
@@ -61,32 +85,37 @@ private:
   }
   
   inline void translate(fPoint amount){
-    if(!MRImage || !isVisible()){ return; }
-    *view += amount;
+    if(!MRImage){ return; }
+    if(isVisible()){ *view += amount; }
     updateScrollbar();
   }
   
   inline void scaleCenter(fPoint scale){
-    if(!MRImage || !isVisible()){ return; }
+    if(!MRImage){ return; }
     fPoint center = view->getCentre();
-    *view -= center;
-    *view *= scale;
-    *view += center;
+    if(isVisible()){
+      *view -= center;
+      *view *= scale;
+      *view += center;
+    }
     updateScrollbar();
   }
   
+protected:
   inline fPoint screen2view(){
-    if(!MRImage || !isVisible()){ return fPoint(); }
+    if(!MRImage){ return fPoint(); }
     return fPoint(view->getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
                   view->getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
   inline fPoint view2screen(){
-    if(!MRImage || !isVisible()){ return fPoint(); }
+    if(!MRImage){ return fPoint(); }
     return fPoint(getLocalBounds().getHorizontalRange().getLength()/view->getHorizontalRange().getLength(),
                   getLocalBounds().getVerticalRange().getLength()/view->getVerticalRange().getLength());
   }
   
+  
+private:
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
                                       juce::Colour colour1, juce::Colour colour2);
   
@@ -104,11 +133,11 @@ private:
   
   MainComponent *parent;
   
-  std::shared_ptr < fRectangle > view;
-  
   std::unique_ptr<ImageViewOverlay> controlsOverlay;
   
 protected:
+  std::shared_ptr < fRectangle > view;
+
   CriticalSection mutex;
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageViewComponent)
