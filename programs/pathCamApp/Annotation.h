@@ -69,7 +69,7 @@ public:
     g.setColour(color.withAlpha(0.5f));
     g.fillPath(temp);
     
-    g.setColour (juce::Colours::black.withAlpha(0.6f));
+    g.setColour (juce::Colours::black.withAlpha(0.4f));
     
     iRectangle textbox = iRectangle (temp.getBounds().getCentreX()-50,
                                      temp.getBounds().getCentreY()-10,

@@ -44,6 +44,7 @@ public:
       if(iconNames[i] == "measure.svg"){
         measureButton.reset( new SvgButton ("measure", iconsFromZipFile[i]) );
         measureButton->addListener(this);
+        measureButton->addShortcut(juce::KeyPress::createFromDescription("m"));
         addAndMakeVisible(*measureButton);
       }
       

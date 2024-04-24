@@ -24,12 +24,6 @@ public:
     
     for (int i = 0; i < iconNames.size(); i++) {
       
-      if(iconNames[i] == "new_set.svg"){
-        captureSetButton.reset( new SvgButton ("new_set", iconsFromZipFile[i]) );
-        captureSetButton->addListener(this);
-        addAndMakeVisible(*captureSetButton);
-      }
-      
       if(iconNames[i] == "record.svg"){
         recordButton.reset( new SvgButton ("record", iconsFromZipFile[i]) );
         recordButton->addListener(this);
@@ -57,14 +51,12 @@ public:
     auto area = getLocalBounds().reduced (4);
     stopButton->setBounds(area.removeFromRight(100).reduced(20,0));
     recordButton->setBounds(area.removeFromRight(100).reduced(20,0));
-    captureSetButton->setBounds(area.removeFromRight(100).reduced(20,0));
   }
   
 private:
   
   void buttonClicked(juce::Button* button) override;
   
-  std::unique_ptr < SvgButton > captureSetButton;
   std::unique_ptr < SvgButton > recordButton;
   std::unique_ptr < SvgButton > stopButton;
   

@@ -10,12 +10,21 @@
 
 void AnnotateOverlay::buttonClicked(juce::Button* button)
 {
-//  if (button == recordButton.get())
-//  {
-//    parent->startRecording();
-//  }
-//  if (button == stopButton.get())
-//  {
-//    parent->stopRecording();
-//  }
+
+  if (button == polygonButton.get())
+  {
+    parent->changeMode( AnnotateComponent::_POLY);
+  }
+  if (button == segmentButton.get())
+  {
+    parent->changeMode( AnnotateComponent::_SEG);
+  }
+  if (button == dictateButton.get())
+  {
+    parent->changeMode( AnnotateComponent::_DICT);
+  }
+  if (button == measureButton.get())
+  {
+    parent->changeMode( AnnotateComponent::_MEAS);
+  }
 }

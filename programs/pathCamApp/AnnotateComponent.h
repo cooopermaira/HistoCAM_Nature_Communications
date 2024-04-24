@@ -11,12 +11,11 @@
 #include "JuceHeader.h"
 
 class AnnotateComponent  : public juce::Component {
-  
+    
 public:
-  AnnotateComponent(MainComponent *parent,
-                    std::shared_ptr < fRectangle > view,
+  AnnotateComponent(std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
-                    OwnedArray<Drawable> &iconsFromZipFile) {
+                    OwnedArray<Drawable> &iconsFromZipFile): mode(_NONE) {
     
     annotations.reset( new std::vector < std::shared_ptr<  Annotation > >());
     
@@ -24,7 +23,7 @@ public:
     
     addChildComponent(leftComponent.get());
     
-    rightComponent.reset( new AnnoViewComponent(parent, this, view, iconNames, iconsFromZipFile, annotations));
+    rightComponent.reset( new AnnoViewComponent(this, view, iconNames, iconsFromZipFile, annotations));
     
     addChildComponent(rightComponent.get());
     
@@ -88,6 +87,17 @@ public:
   
   AnnoViewComponent * getViewComp(){ return rightComponent.get(); }
   AnnoListComponent * getListComp(){ return leftComponent.get(); }
+  
+  void changeMode(int mode_in){
+    if(mode_in == mode){
+      mode=_NONE;
+    }else{
+      mode=mode_in;
+    }
+  }
+
+  enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
+
 
 private:
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
@@ -96,6 +106,8 @@ private:
   std::unique_ptr< AnnoViewComponent > rightComponent;
   std::unique_ptr<juce::StretchableLayoutResizerBar> resizerBar;
   juce::StretchableLayoutManager layout;
+  
+  int mode;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnnotateComponent)
 

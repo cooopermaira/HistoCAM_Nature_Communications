@@ -14,12 +14,11 @@ class AnnotateComponent;
 
 class AnnoViewComponent  : public ImageViewComponent {
 public:
-  AnnoViewComponent(MainComponent *grandparent,
-                    AnnotateComponent *parent,
+  AnnoViewComponent(AnnotateComponent *parent,
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile,
-                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(grandparent,view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
+                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
   {
                       
       annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
@@ -61,13 +60,14 @@ public:
     return false;  // Key press not handled
   }
 
+  void changeMode(int mode);
   
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   
   AnnotateComponent *parent;
-  
+
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnnoViewComponent)
   

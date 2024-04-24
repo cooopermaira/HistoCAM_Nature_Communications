@@ -6,3 +6,6 @@
 //
 
 #include "JuceHeader.h"
+
+
+void AnnoViewComponent::changeMode(int mode){ parent->changeMode(mode); }

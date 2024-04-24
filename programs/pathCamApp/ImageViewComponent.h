@@ -16,8 +16,7 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
   
 public:
   //==============================================================================
-  ImageViewComponent(MainComponent *parent,
-                     std::shared_ptr < fRectangle > view,
+  ImageViewComponent(std::shared_ptr < fRectangle > view,
                      StringArray &iconNames,
                      OwnedArray<Drawable> &iconsFromZipFile);
   ~ImageViewComponent() override;
@@ -128,9 +127,6 @@ private:
   
   juce::ScrollBar horizontalScrollBar{ false }; // Horizontal scroll bar
   juce::ScrollBar verticalScrollBar{ true }; // Vertical scroll bar
-  
-  
-  MainComponent *parent;
   
   std::unique_ptr<ImageViewOverlay> controlsOverlay;
   

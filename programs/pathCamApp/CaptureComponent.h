@@ -13,10 +13,9 @@
 
 class CaptureComponent: public ImageViewComponent{
 public:
-  CaptureComponent(MainComponent *parent, 
-                   std::shared_ptr < fRectangle > view,
+  CaptureComponent(std::shared_ptr < fRectangle > view,
                    StringArray &iconNames,
-                   OwnedArray<Drawable> &iconsFromZipFile) : ImageViewComponent(parent,view,iconNames,iconsFromZipFile), recording(false){
+                   OwnedArray<Drawable> &iconsFromZipFile) : ImageViewComponent(view,iconNames,iconsFromZipFile), recording(false){
 
     captureOverlay.reset (new CaptureOverlay (this, iconNames, iconsFromZipFile));
     addAndMakeVisible (captureOverlay.get());

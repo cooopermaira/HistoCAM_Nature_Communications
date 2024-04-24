@@ -2,10 +2,9 @@
 
 
 //==============================================================================
-ImageViewComponent::ImageViewComponent(MainComponent *parent,
-                                       std::shared_ptr < fRectangle > view,
+ImageViewComponent::ImageViewComponent(std::shared_ptr < fRectangle > view,
                                        StringArray &iconNames,
-                                       OwnedArray<Drawable> &iconsFromZipFile): parent(parent), MRImage(NULL), view(view)
+                                       OwnedArray<Drawable> &iconsFromZipFile): MRImage(NULL), view(view)
 {
   
   setOpaque (true); //telling juce that there is nothingi to render underneath
