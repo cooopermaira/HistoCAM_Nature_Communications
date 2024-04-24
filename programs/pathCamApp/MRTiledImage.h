@@ -18,8 +18,8 @@ public:
   
   MRTiledImage(unsigned int tile_size=512):tile_size(tile_size){};
   ~MRTiledImage(){ level.clear(); };
-  
-  std::vector < std::shared_ptr< TiledImage > > level;
+    
+  void insertMat(cv::Mat &image_in, fRectangle box);
   
   void build(cv::Mat &image_in);
   
@@ -27,6 +27,8 @@ public:
   
   
 private:
+  
+  std::vector < std::shared_ptr< TiledImage > > level;
   
   inline fRectangle worldToLevel(fRectangle r, unsigned int level){
     return r/(2*level);

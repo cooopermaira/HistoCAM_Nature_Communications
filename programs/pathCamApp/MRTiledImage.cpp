@@ -44,3 +44,17 @@ void MRTiledImage::build(cv::Mat &image_in){
   std::cout << "Image has " << num_levels << " levels.";
   
 }
+
+
+void MRTiledImage::insertMat(cv::Mat &image_in, fRectangle box){
+    
+  bounds = bounds.getUnion(box);
+
+  //This assumes that the # of levels won't change after adding a new image,
+  //which isn't going to be necessarily true.
+  for(unsigned int i=0; i < level.size(); i++){
+    level[i]->insertMat(image_in, box);
+    cv::resize(image_in, image_in, cv::Size(image_in.cols/2, image_in.rows/2));
+  }
+  
+}

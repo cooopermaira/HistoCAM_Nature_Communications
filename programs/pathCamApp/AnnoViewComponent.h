@@ -35,7 +35,7 @@ public:
     {
       const ScopedLock lock (mutex);
       juce::Rectangle<int> b = getLocalBounds();
-      int width = 300;
+      int width = 400;
       annotateOverlay->setBounds(juce::Rectangle<int>(b.getWidth()-width-20, 20, width, 60));
       
     }

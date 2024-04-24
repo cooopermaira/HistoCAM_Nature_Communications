@@ -41,6 +41,12 @@ public:
         addAndMakeVisible(*dictateButton);
       }
       
+      if(iconNames[i] == "measure.svg"){
+        measureButton.reset( new SvgButton ("measure", iconsFromZipFile[i]) );
+        measureButton->addListener(this);
+        addAndMakeVisible(*measureButton);
+      }
+      
     }
   
 
@@ -57,6 +63,7 @@ public:
     dictateButton->setBounds(area.removeFromRight(100).reduced(20,0));
     segmentButton->setBounds(area.removeFromRight(100).reduced(20,0));
     polygonButton->setBounds(area.removeFromRight(100).reduced(20,0));
+    measureButton->setBounds(area.removeFromRight(100).reduced(20,0));
   }
   
 private:
@@ -66,7 +73,8 @@ private:
   std::unique_ptr < SvgButton > polygonButton;
   std::unique_ptr < SvgButton > segmentButton;
   std::unique_ptr < SvgButton > dictateButton;
-  
+  std::unique_ptr < SvgButton > measureButton;
+
   AnnoViewComponent* parent;
     
   

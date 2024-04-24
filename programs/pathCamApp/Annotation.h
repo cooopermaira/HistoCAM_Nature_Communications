@@ -121,9 +121,9 @@ private:
   
 };
 
-class AudioAnnotation : public Annotation{
+class DictateAnnotation : public Annotation{
 public:
-  AudioAnnotation(juce::String name): Annotation(name) {};
+  DictateAnnotation(juce::String name): Annotation(name) {};
   
   void paint(juce::Graphics& g, fPoint offset, fPoint scale=fPoint(1.0,1.0)) override {
     

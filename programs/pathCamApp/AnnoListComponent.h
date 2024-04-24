@@ -22,7 +22,7 @@ public:
   void mouseDown(const juce::MouseEvent& event) override
   {
     deselectAllRows();
-      ListBox::mouseDown(event);
+    ListBox::mouseDown(event);
   }
 };
 
@@ -33,7 +33,7 @@ public:
   std::vector < int >  items;  // This array holds the list of items
   
   int getNumRows() override {
-    return items.size();
+    return (int)items.size();
   }
 
 
@@ -45,10 +45,24 @@ public:
     }
       
     auto bounds = Rectangle<int>(width, height).reduced(4,4);
-
-    polygonIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                            juce::RectanglePlacement::centred, 1.0f);
     
+    auto anno = (*annotations)[items[rowNumber]];
+    
+    if( dynamic_cast < PolygonAnnotation * > (anno.get()) != NULL){
+      polygonIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
+                              juce::RectanglePlacement::centred, 1.0f);
+    }
+
+    if( dynamic_cast < SegmentAnnotation * > (anno.get()) != NULL){
+      segmentIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
+                              juce::RectanglePlacement::centred, 1.0f);
+    }
+
+    if( dynamic_cast < DictateAnnotation * > (anno.get()) != NULL){
+      dictateIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
+                              juce::RectanglePlacement::centred, 1.0f);
+    }
+
 
     if (rowIsSelected){
       trashIcon->drawWithin(g, bounds.removeFromRight(height-10).toFloat(),
