@@ -13,7 +13,6 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
   
   friend class ImageViewOverlay;
   
-  
 public:
   //==============================================================================
   ImageViewComponent(std::shared_ptr < fRectangle > view,
@@ -52,7 +51,7 @@ public:
     }
   }
   
-private:
+protected:
   std::shared_ptr< MRTiledImage> MRImage;
   
   void mouseDown(const juce::MouseEvent& event) override;

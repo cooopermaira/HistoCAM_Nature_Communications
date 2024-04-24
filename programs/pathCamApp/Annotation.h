@@ -55,6 +55,9 @@ public:
     
     juce::Path::Iterator it(temp);
     
+    g.setColour(color.withAlpha(0.5f));
+    g.fillPath(temp);
+
     g.setColour(juce::Colours::greenyellow);
     
     while (it.next())
@@ -65,22 +68,21 @@ public:
         g.fillEllipse(it.x1 - 10, it.y1 - 10, 2 * 10, 2 * 10);
       }
     }
-    
-    g.setColour(color.withAlpha(0.5f));
-    g.fillPath(temp);
-    
+        
     g.setColour (juce::Colours::black.withAlpha(0.4f));
     
-    iRectangle textbox = iRectangle (temp.getBounds().getCentreX()-50,
-                                     temp.getBounds().getCentreY()-10,
-                                     100,
-                                     20);
-    
-    g.fillRect(textbox);
-    
-    g.setColour (juce::Colours::white);
-    std::string area = Poco::format("%.0f mm^2", getArea()*1.73*0.001);
-    g.drawFittedText(area, textbox, Justification::centred, 1);
+    if(points.size() > 2){
+      iRectangle textbox = iRectangle (temp.getBounds().getCentreX()-50,
+                                       temp.getBounds().getCentreY()-10,
+                                       100,
+                                       20);
+      
+      g.fillRect(textbox);
+      
+      g.setColour (juce::Colours::white);
+      std::string area = Poco::format("%.0f mm^2", getArea()*1.73*0.001);
+      g.drawFittedText(area, textbox, Justification::centred, 1);
+    }
   }
   
   double getArea(){

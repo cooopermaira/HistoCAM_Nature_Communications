@@ -18,7 +18,8 @@ public:
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile,
-                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
+                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations),
+                      selected(NULL)
   {
                       
       annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
@@ -48,10 +49,12 @@ public:
   {
     ImageViewComponent::paint(g);
     
-    for(unsigned int i=0; i < annotations->size(); i++){
-      (*annotations)[i]->paint(g, view->getPosition(), view2screen());
+    {
+      const ScopedLock lock (mutex);
+      for(unsigned int i=0; i < annotations->size(); i++){
+        (*annotations)[i]->paint(g, view->getPosition(), view2screen());
+      }
     }
-    
   }
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override {
@@ -59,12 +62,17 @@ public:
     
     return false;  // Key press not handled
   }
-
+  
+  void mouseDown(const juce::MouseEvent& event) override;
+  
   void changeMode(int mode);
+  int getMode();
   
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
+  
+  Annotation * selected;
   
   AnnotateComponent *parent;
 

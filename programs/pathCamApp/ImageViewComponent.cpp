@@ -54,16 +54,20 @@ void ImageViewComponent::setImage(std::shared_ptr< MRTiledImage > image){
 
 void ImageViewComponent::mouseDown(const juce::MouseEvent& event)
 {
-  lastMousePosition = event.getPosition();
+  if(event.mods.isLeftButtonDown()){
+    lastMousePosition = event.getPosition();
+  }
 }
 
 void ImageViewComponent::mouseDrag(const juce::MouseEvent& event)
 {
-  juce::Point<int> idelta = event.getPosition() - lastMousePosition;
-  fPoint delta = fPoint(idelta.x, idelta.y)* screen2view();
-  translate(-delta);
-  lastMousePosition = event.getPosition();
-  repaint();
+  if(event.mods.isLeftButtonDown()){
+    juce::Point<int> idelta = event.getPosition() - lastMousePosition;
+    fPoint delta = fPoint(idelta.x, idelta.y)* screen2view();
+    translate(-delta);
+    lastMousePosition = event.getPosition();
+    repaint();
+  }
 }
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) {

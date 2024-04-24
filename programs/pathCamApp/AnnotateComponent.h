@@ -95,6 +95,9 @@ public:
       mode=mode_in;
     }
   }
+  
+  int getMode(){ return mode; }
+
 
   enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
 

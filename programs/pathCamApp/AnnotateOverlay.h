@@ -58,6 +58,9 @@ public:
 
   }
   
+  void paint (juce::Graphics& g) override;
+  
+  
   void resized() override
   {
     auto area = getLocalBounds().reduced (4);
