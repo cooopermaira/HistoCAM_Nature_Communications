@@ -10,52 +10,124 @@
 
 #include "JuceHeader.h"
 
-class DraggableListBoxModel : public ListBoxModel {
+
+class MyListBox : public juce::ListBox
+{
 public:
-  StringArray items;  // This array holds the list of items
+    MyListBox()
+    {
+        
+    }
+
+  void mouseDown(const juce::MouseEvent& event) override
+  {
+    deselectAllRows();
+      ListBox::mouseDown(event);
+  }
+};
+
+
+class MyListBoxModel : public ListBoxModel {
+  friend class AnnoListComponent;
+public:
+  std::vector < int >  items;  // This array holds the list of items
   
   int getNumRows() override {
     return items.size();
   }
 
+
   void paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) override {
-    g.fillAll(Colours::white);
-    if (rowIsSelected)
-      g.fillAll(Colours::lightblue);
+    if (rowIsSelected){
+      g.fillAll(Colours::lightyellow);
+    }else{
+      g.fillAll(Colours::white);
+    }
+      
+    auto bounds = Rectangle<int>(width, height).reduced(4,4);
+
+    polygonIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
+                            juce::RectanglePlacement::centred, 1.0f);
+    
+
+    if (rowIsSelected){
+      trashIcon->drawWithin(g, bounds.removeFromRight(height-10).toFloat(),
+                            juce::RectanglePlacement::centred, 1.0f);
+      editIcon->drawWithin(g, bounds.removeFromRight(height).toFloat(),
+                           juce::RectanglePlacement::centred, 1.0f);
+    }
+    
+    g.setColour((*annotations)[items[rowNumber]]->getColor());
+    auto color_rectangle = bounds.removeFromRight(height);
+    g.fillRect(color_rectangle);
+    
     g.setColour(Colours::black);
-    g.drawText(items[rowNumber], Rectangle<int>(width, height).reduced(4, 0), Justification::centredLeft, true);
+    g.drawRect(color_rectangle);
+
+    g.setColour(Colours::black);
+    g.drawText((*annotations)[items[rowNumber]]->getName(), bounds, Justification::centredLeft, true);
+
   }
   
-  var getDragSourceDescription(const SparseSet<int>& selectedRows) override {
-    // This tag is used for the drag-and-drop description
-    return "DraggableItem";
-  }
+private:
+  juce::Drawable * polygonIcon;
+  juce::Drawable * segmentIcon;
+  juce::Drawable * dictateIcon;
+  juce::Drawable * editIcon;
+  juce::Drawable * trashIcon;
+
+  std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
+
   
-  //    void listBoxItemDropped(int row, const DragAndDropTarget::SourceDetails& dragSourceDetails, int insertIndex) override {
-  //        auto dragDescription = dragSourceDetails.description.toString();
-  //        if (dragDescription == "DraggableItem" && row != insertIndex) {
-  //            juce::String item = items[row];
-  //            items.remove(row);
-  //            items.insert(insertIndex, item);
-  //            updateContent();
-  //        }
-  //    }
 };
 
 
-class AnnoListComponent : public DragAndDropContainer, public Component {
+class AnnoListComponent : public Component {
 public:
-  AnnoListComponent(std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations) : annotations(annotations) {
-    model.items = { "Annotation 1", "Annotation 2", "Annotation 3", "Annotation 4", "Annotation 5" };
+  AnnoListComponent(std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations,
+                    StringArray &iconNames,
+                    OwnedArray<Drawable> &iconsFromZipFile) : annotations(annotations) {
+    
     listBox.setModel(&model);
     listBox.setMultipleSelectionEnabled(false);
     addAndMakeVisible(listBox);
+    
+    model.annotations = annotations;
+    
+    for (int i = 0; i < iconNames.size(); i++) {
+      if(iconNames[i] == "polygon.svg"){
+        model.polygonIcon = iconsFromZipFile[i];
+      }
+      
+      if(iconNames[i] == "segment.svg"){
+        model.segmentIcon = iconsFromZipFile[i];
+      }
+      
+      if(iconNames[i] == "dictate.svg"){
+        model.dictateIcon = iconsFromZipFile[i];
+      }
+      
+      if(iconNames[i] == "trash.svg"){
+        model.trashIcon = iconsFromZipFile[i];
+      }
+      
+      if(iconNames[i] == "edit.svg"){
+        model.editIcon = iconsFromZipFile[i];
+      }
+      
+    }
+      
   }
   
-  
-  void paint(Graphics &g) override {
-    g.fillAll(juce::Colours::white);  // Set the background color here
+  void updatelist(){
+    model.items.clear();
+    for(unsigned int i=0; i < annotations->size(); i++){
+      model.items.push_back(i);
+    }
+    listBox.updateContent();
   }
+  
+  void paint(Graphics &g) override {  }
   
   
   void resized() override {
@@ -64,9 +136,10 @@ public:
   }
   
 private:
-  ListBox listBox;
-  DraggableListBoxModel model;
+  MyListBox listBox;
+  MyListBoxModel model;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
+
 
 };
 #endif /* AnnoListComponent_hpp */

@@ -20,7 +20,7 @@ public:
     
     annotations.reset( new std::vector < std::shared_ptr<  Annotation > >());
     
-    leftComponent.reset( new AnnoListComponent(annotations) );
+    leftComponent.reset( new AnnoListComponent(annotations, iconNames, iconsFromZipFile) );
     
     addChildComponent(leftComponent.get());
     
@@ -28,25 +28,37 @@ public:
     
     addChildComponent(rightComponent.get());
     
-    layout.setItemLayout(0, 100, -1, 0.5);  // left component takes half the space initially
+    layout.setItemLayout(0, 100, -1, -0.20);  // left component takes half the space initially
     layout.setItemLayout(1, 10, 10, 10);    // resizer bar with a fixed size
-    layout.setItemLayout(2, 100, -1, 0.5);  // right component also takes half the space initially
+    layout.setItemLayout(2, 100, -1, -0.80);  // right component also takes half the space initially
     
     resizerBar.reset(new juce::StretchableLayoutResizerBar(&layout, 1, true));
     addChildComponent(resizerBar.get());
     
 #if DEBUG
+    {
+      std::shared_ptr< PolygonAnnotation > temp = std::make_shared < PolygonAnnotation >("Poly 1");
+      
+      temp->add(fPoint(50, 50));
+      temp->add(fPoint(1200, 150));          // Add second point
+      temp->add(fPoint(1150, 1150));         // Add third point
+      temp->add(fPoint(150, 1100));          // Add fourth point
+      temp->add(fPoint(-150, 500));          // Add fifth point
+      
+      annotations->push_back(temp);
+    }
+    {
+      std::shared_ptr< PolygonAnnotation > temp = std::make_shared < PolygonAnnotation >("Poly 2");
+      
+      temp->add(fPoint(2050, 2050));
+      temp->add(fPoint(2050, 3050));          // Add second point
+      temp->add(fPoint(3050, 3050));         // Add third point
+      temp->add(fPoint(3050, 2050));          // Add fourth point
+      
+      annotations->push_back(temp);
+    }
     
-    std::shared_ptr< PolygonAnnotation > temp = std::make_shared < PolygonAnnotation >("Poly 1");
-    
-    temp->path.startNewSubPath(50, 50);
-    temp->path.lineTo(1200, 150);          // Add second point
-    temp->path.lineTo(1150, 1150);         // Add third point
-    temp->path.lineTo(150, 1100);          // Add fourth point
-    temp->path.closeSubPath();           // Close the path
-    
-    annotations->push_back(temp);
-    
+    leftComponent->updatelist();
 #endif
 
   }

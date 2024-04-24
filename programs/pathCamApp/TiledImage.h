@@ -10,6 +10,7 @@
 #include "JuceHeader.h"
 
 typedef juce::Rectangle< float > fRectangle;
+typedef juce::Rectangle< int > iRectangle;
 typedef juce::Point< int > iPoint;
 typedef juce::Point< float > fPoint;
 

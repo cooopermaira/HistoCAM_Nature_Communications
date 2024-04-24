@@ -65,7 +65,6 @@ private:
   
   
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
-  
 
   
   void zoomAndCenter(){
