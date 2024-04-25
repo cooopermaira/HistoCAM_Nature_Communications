@@ -85,10 +85,7 @@ public:
     }
   }
   
-  double getArea(){
-    return area;
-  }
-  
+  double getArea(){ return area; }
   
   void add(fPoint p){
     if(points.size() == 0){

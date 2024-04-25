@@ -81,9 +81,7 @@ public:
 
   }
   
-  void fixAspectRatio(){
-    rightComponent->fixAspectRatio();
-  }
+  void fixAspectRatio(){ rightComponent->fixAspectRatio(); }
   
   AnnoViewComponent * getViewComp(){ return rightComponent.get(); }
   AnnoListComponent * getListComp(){ return leftComponent.get(); }
@@ -100,6 +98,8 @@ public:
 
 
   enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
+  
+  void annotationsUpdated(){ leftComponent->updatelist(); }
 
 
 private:

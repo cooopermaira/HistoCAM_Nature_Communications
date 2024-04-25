@@ -68,6 +68,7 @@ public:
   void changeMode(int mode);
   int getMode();
   
+  
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;

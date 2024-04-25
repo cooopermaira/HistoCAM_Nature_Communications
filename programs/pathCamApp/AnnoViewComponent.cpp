@@ -24,6 +24,7 @@ void AnnoViewComponent::mouseDown(const juce::MouseEvent& event)
         new_annotation.reset(new PolygonAnnotation("Polygon"));
         selected = new_annotation.get();
         annotations->push_back(new_annotation);
+        parent->annotationsUpdated();
       }
       PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(selected);
       if(cast == NULL){
@@ -32,6 +33,7 @@ void AnnoViewComponent::mouseDown(const juce::MouseEvent& event)
         annotations->push_back(new_annotation);
         selected = new_annotation.get();
         PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(selected);
+        parent->annotationsUpdated();
       }
       
       cast->add( fPoint(event.x, event.y)*screen2view()+view->getPosition() );
