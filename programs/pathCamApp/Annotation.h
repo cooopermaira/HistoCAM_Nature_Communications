@@ -20,7 +20,7 @@ public:
   
   juce::Colour getColor(){ return color;}
   
-  virtual void paint(juce::Graphics& g, fPoint offset, fPoint scale=fPoint(1.0,1.0)) {};
+  virtual void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) {};
   
 protected:
   juce::String name;
@@ -47,7 +47,7 @@ public:
   PolygonAnnotation(juce::String name): Annotation(name), area(0.0) {};
   
   
-  void paint(juce::Graphics& g, fPoint offset, fPoint scale=fPoint(1.0,1.0)) override {
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
     juce::Path temp = path;
     
     temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
@@ -58,20 +58,21 @@ public:
     g.setColour(color.withAlpha(0.5f));
     g.fillPath(temp);
 
-    g.setColour(juce::Colours::greenyellow);
-    
-    while (it.next())
-    {
-      if (it.elementType == juce::Path::Iterator::lineTo ||
-          it.elementType == juce::Path::Iterator::startNewSubPath)
+    if(selected){
+      g.setColour(juce::Colours::greenyellow);
+      
+      while (it.next())
       {
-        g.fillEllipse(it.x1 - 10, it.y1 - 10, 2 * 10, 2 * 10);
+        if (it.elementType == juce::Path::Iterator::lineTo ||
+            it.elementType == juce::Path::Iterator::startNewSubPath)
+        {
+          g.fillEllipse(it.x1 - 10, it.y1 - 10, 2 * 10, 2 * 10);
+        }
       }
     }
         
-    g.setColour (juce::Colours::black.withAlpha(0.4f));
-    
     if(points.size() > 2){
+      g.setColour (juce::Colours::black.withAlpha(0.4f));
       iRectangle textbox = iRectangle (temp.getBounds().getCentreX()-50,
                                        temp.getBounds().getCentreY()-10,
                                        100,
@@ -124,7 +125,7 @@ class DictateAnnotation : public Annotation{
 public:
   DictateAnnotation(juce::String name): Annotation(name) {};
   
-  void paint(juce::Graphics& g, fPoint offset, fPoint scale=fPoint(1.0,1.0)) override {
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
     
     
   }
@@ -135,7 +136,7 @@ class SegmentAnnotation : public Annotation{
 public:
   SegmentAnnotation(juce::String name): Annotation(name) {};
   
-  void paint(juce::Graphics& g, fPoint offset,  fPoint scale=fPoint(1.0,1.0)) override {
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
     
     
   }

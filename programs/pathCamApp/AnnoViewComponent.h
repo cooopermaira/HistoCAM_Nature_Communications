@@ -18,10 +18,9 @@ public:
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile,
-                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations),
-                      selected(NULL)
+                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
   {
-                      
+      
       annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
       addAndMakeVisible (annotateOverlay.get());
                                        
@@ -45,17 +44,7 @@ public:
   }
   
   
-  void paint (juce::Graphics& g) override
-  {
-    ImageViewComponent::paint(g);
-    
-    {
-      const ScopedLock lock (mutex);
-      for(unsigned int i=0; i < annotations->size(); i++){
-        (*annotations)[i]->paint(g, view->getPosition(), view2screen());
-      }
-    }
-  }
+  void paint (juce::Graphics& g);
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override {
     ImageViewComponent::keyPressed(key, originatingComponent);
@@ -72,9 +61,7 @@ public:
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
-  
-  Annotation * selected;
-  
+    
   AnnotateComponent *parent;
 
   

@@ -19,7 +19,7 @@ public:
     
     annotations.reset( new std::vector < std::shared_ptr<  Annotation > >());
     
-    leftComponent.reset( new AnnoListComponent(annotations, iconNames, iconsFromZipFile) );
+    leftComponent.reset( new AnnoListComponent(this, annotations, iconNames, iconsFromZipFile) );
     
     addChildComponent(leftComponent.get());
     
@@ -100,10 +100,14 @@ public:
   enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
   
   void annotationsUpdated(){ leftComponent->updatelist(); }
-
+  
+  std::shared_ptr< Annotation > getSelected(){ return selected; }
+  
+  void setSelected(std::shared_ptr< Annotation > annotation){ selected = annotation; }
 
 private:
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
+  std::shared_ptr< Annotation > selected;
   
   std::unique_ptr< AnnoListComponent > leftComponent;
   std::unique_ptr< AnnoViewComponent > rightComponent;

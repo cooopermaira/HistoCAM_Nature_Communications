@@ -10,78 +10,39 @@
 
 #include "JuceHeader.h"
 
+class AnnotateComponent;
 
-class MyListBox : public juce::ListBox
+
+class AnnoListBox : public juce::ListBox
 {
 public:
-    MyListBox()
+    AnnoListBox(AnnotateComponent* parent): parent(parent)
     {
         
     }
 
-  void mouseDown(const juce::MouseEvent& event) override
-  {
-    deselectAllRows();
-    ListBox::mouseDown(event);
-  }
+  void mouseDown(const juce::MouseEvent& event) override;
+  
+private:
+  AnnotateComponent *parent;
 };
 
 
-class MyListBoxModel : public ListBoxModel {
+class AnnoListBoxModel : public ListBoxModel {
   friend class AnnoListComponent;
 public:
-  std::vector < int >  items;  // This array holds the list of items
+  //std::vector < int >  items;  // This array holds the list of items
   
   int getNumRows() override {
-    return (int)items.size();
+    return (int)(*annotations).size();
   }
 
+  
+  void listBoxItemClicked (int row, const MouseEvent&) override;
+  
+  void backgroundClicked (const MouseEvent&) override;
 
-  void paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) override {
-    if (rowIsSelected){
-      g.fillAll(Colours::lightyellow);
-    }else{
-      g.fillAll(Colours::white);
-    }
-      
-    auto bounds = Rectangle<int>(width, height).reduced(4,4);
-    
-    auto anno = (*annotations)[items[rowNumber]];
-    
-    if( dynamic_cast < PolygonAnnotation * > (anno.get()) != NULL){
-      polygonIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                              juce::RectanglePlacement::centred, 1.0f);
-    }
-
-    if( dynamic_cast < SegmentAnnotation * > (anno.get()) != NULL){
-      segmentIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                              juce::RectanglePlacement::centred, 1.0f);
-    }
-
-    if( dynamic_cast < DictateAnnotation * > (anno.get()) != NULL){
-      dictateIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                              juce::RectanglePlacement::centred, 1.0f);
-    }
-
-
-    if (rowIsSelected){
-      trashIcon->drawWithin(g, bounds.removeFromRight(height-10).toFloat(),
-                            juce::RectanglePlacement::centred, 1.0f);
-      editIcon->drawWithin(g, bounds.removeFromRight(height).toFloat(),
-                           juce::RectanglePlacement::centred, 1.0f);
-    }
-    
-    g.setColour((*annotations)[items[rowNumber]]->getColor());
-    auto color_rectangle = bounds.removeFromRight(height);
-    g.fillRect(color_rectangle);
-    
-    g.setColour(Colours::black);
-    g.drawRect(color_rectangle);
-
-    g.setColour(Colours::black);
-    g.drawText((*annotations)[items[rowNumber]]->getName(), bounds, Justification::centredLeft, true);
-
-  }
+  void paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) override;
   
 private:
   juce::Drawable * polygonIcon;
@@ -91,22 +52,24 @@ private:
   juce::Drawable * trashIcon;
 
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
-
+  AnnotateComponent *parent;
   
 };
 
-
 class AnnoListComponent : public Component {
 public:
-  AnnoListComponent(std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations,
+  AnnoListComponent(AnnotateComponent *parent,
+                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations,
                     StringArray &iconNames,
-                    OwnedArray<Drawable> &iconsFromZipFile) : annotations(annotations) {
+                    OwnedArray<Drawable> &iconsFromZipFile) : listBox(AnnoListBox(parent)), parent(parent), annotations(annotations) {
+    
+    model.annotations = annotations;
+    model.parent = parent;
     
     listBox.setModel(&model);
     listBox.setMultipleSelectionEnabled(false);
     addAndMakeVisible(listBox);
     
-    model.annotations = annotations;
     
     for (int i = 0; i < iconNames.size(); i++) {
       if(iconNames[i] == "polygon.svg"){
@@ -133,14 +96,12 @@ public:
       
   }
   
+  
   void updatelist(){
-    model.items.clear();
-    for(unsigned int i=0; i < annotations->size(); i++){
-      model.items.push_back(i);
-    }
     listBox.updateContent();
   }
   
+  void newSelection();
   
   void paint(Graphics &g) override {  }
   
@@ -151,10 +112,11 @@ public:
   }
   
 private:
-  MyListBox listBox;
-  MyListBoxModel model;
+  AnnoListBox listBox;
+  AnnoListBoxModel model;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
 
+  AnnotateComponent * parent;
 
 };
 #endif /* AnnoListComponent_hpp */
