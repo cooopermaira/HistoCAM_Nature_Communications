@@ -141,6 +141,13 @@ public:
     calculatePolygonArea();
   }
   
+  void splitClosestEdge(fPoint p){
+    for(unsigned int i=0; i < points.size(); i++){
+//      const Line<float> line (i.x1, i.y1, i.x2, i.y2);
+//      auto distance = line.getDistanceFromPoint (targetPoint, pointOnLine);
+    }
+  }
+  
   bool isPointSelected(){ return (selected != -1); }
   
   void unSelect(){ selected = -1; }
