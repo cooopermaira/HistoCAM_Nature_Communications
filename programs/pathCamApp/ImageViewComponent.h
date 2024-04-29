@@ -99,16 +99,26 @@ protected:
   }
   
 protected:
-  inline fPoint screen2view(){
+  inline fPoint screen2viewScale(){
     if(!MRImage){ return fPoint(); }
     return fPoint(view->getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
                   view->getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
-  inline fPoint view2screen(){
+  inline fPoint view2screenScale(){
     if(!MRImage){ return fPoint(); }
     return fPoint(getLocalBounds().getHorizontalRange().getLength()/view->getHorizontalRange().getLength(),
                   getLocalBounds().getVerticalRange().getLength()/view->getVerticalRange().getLength());
+  }
+  
+  inline fPoint screen2view(fPoint p){
+    if(!MRImage){ return p; }
+    return p*screen2viewScale()+view->getPosition();
+  }
+  
+  inline fPoint view2screen(fPoint p){
+    if(!MRImage){ return p; }
+    return (p-view->getPosition())*view2screenScale();
   }
   
   

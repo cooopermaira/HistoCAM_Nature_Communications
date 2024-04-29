@@ -15,7 +15,7 @@ class AnnotateComponent  : public juce::Component {
 public:
   AnnotateComponent(std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
-                    OwnedArray<Drawable> &iconsFromZipFile): mode(_NONE) {
+                    OwnedArray<Drawable> &iconsFromZipFile): mode(Annotation::_NONE) {
     
     annotations.reset( new std::vector < std::shared_ptr<  Annotation > >());
     
@@ -86,17 +86,15 @@ public:
   AnnoViewComponent * getViewComp(){ return rightComponent.get(); }
   AnnoListComponent * getListComp(){ return leftComponent.get(); }
   
-  enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
-
   void toggleMode(int mode_in){
     if(mode_in == mode){
-      mode=_NONE;
+      mode=Annotation::_NONE;
     }else{
       mode=mode_in;
     }
   }
   
-  void changeMode(int mode_in){ mode = mode_in; }
+  void setMode(int mode_in){ mode = mode_in; }
 
   
   int getMode(){ return mode; }

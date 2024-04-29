@@ -13,22 +13,22 @@ void AnnotateOverlay::buttonClicked(juce::Button* button)
 
   if (button == polygonButton.get())
   {
-    parent->toggleMode( AnnotateComponent::_POLY);
+    parent->toggleMode( Annotation::_POLY);
     repaint();
   }
   if (button == segmentButton.get())
   {
-    parent->toggleMode( AnnotateComponent::_SEG);
+    parent->toggleMode( Annotation::_SEG);
     repaint();
   }
   if (button == dictateButton.get())
   {
-    parent->toggleMode( AnnotateComponent::_DICT);
+    parent->toggleMode( Annotation::_DICT);
     repaint();
   }
   if (button == measureButton.get())
   {
-    parent->toggleMode( AnnotateComponent::_MEAS);
+    parent->toggleMode( Annotation::_MEAS);
     repaint();
   }
 }
@@ -38,16 +38,16 @@ void AnnotateOverlay::paint (juce::Graphics& g)
   Component::paint(g);
   g.setColour(juce::Colours::red);
   
-  if(parent->getMode() == AnnotateComponent::_POLY){
+  if(parent->getMode() == Annotation::_POLY){
     g.drawRect(polygonButton->getBounds());
   }
-  if(parent->getMode() == AnnotateComponent::_SEG){
+  if(parent->getMode() == Annotation::_SEG){
     g.drawRect(segmentButton->getBounds());
   }
-  if(parent->getMode() == AnnotateComponent::_MEAS){
+  if(parent->getMode() == Annotation::_MEAS){
     g.drawRect(measureButton->getBounds());
   }
-  if(parent->getMode() == AnnotateComponent::_DICT){
+  if(parent->getMode() == Annotation::_DICT){
     g.drawRect(dictateButton->getBounds());
   }
 }

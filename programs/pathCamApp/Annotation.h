@@ -12,6 +12,8 @@
 
 class Annotation {
 public:
+  enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
+
   Annotation(juce::String name): name(name){
     color = colorbrewer[rand()%colorbrewer.size()];
   };
@@ -21,9 +23,8 @@ public:
   juce::Colour getColor(){ return color;}
   
   virtual void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) {};
-  
-  virtual bool mouseDown(const juce::MouseEvent& event, fPoint screen2view) {};
-  virtual void mouseDrag(const juce::MouseEvent& event, fPoint screen2view) {};
+    
+  int getType();
   
 protected:
   juce::String name;
@@ -90,18 +91,36 @@ public:
     }
   }
   
-  
-  bool mouseDown(const juce::MouseEvent& event, fPoint screen2view) override { return false; }
-      
-  void mouseDrag(const juce::MouseEvent& event, fPoint screen2view) override {
-    fPoint view2screen = fPoint(1.0,1.0)/screen2view;
-    fPoint click = fPoint(event.x, event.y);
-    
+  void rebuildPath(){
+    juce::Path newPath;
+
     for(unsigned int i=0; i < points.size(); i++){
-      if(click.getDistanceFrom(points[i]*view2screen) < 20.0){
-        points[i] = click*screen2view;
+      if(i==0){
+        newPath.startNewSubPath(points[i].getX(), points[i].getY());
+      }else{
+        newPath.lineTo(points[i].getX(), points[i].getY());
       }
     }
+    path.swapWithPath(newPath);
+    calculatePolygonArea();
+  }
+  
+        
+  bool testAndMove(fPoint clickInview, fPoint distance) {
+    fPoint click_distance = fPoint(20.0, 20.0)*distance;
+    
+    juce::Path::Iterator it(path);
+    
+    for(unsigned int i=0; i < points.size(); i++){
+      fPoint p = points[i];
+      float d = p.getDistanceFrom(clickInview);
+      if(d < click_distance.getX() || d < click_distance.getY()){
+        points[i] = clickInview;
+        rebuildPath();
+        return true;
+      }
+    }
+    return false;
   }
 
   
@@ -148,8 +167,6 @@ public:
   DictateAnnotation(juce::String name): Annotation(name) {};
   
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {}
-  bool mouseDown(const juce::MouseEvent& event, fPoint screen2view) override { return false; }
-  void mouseDrag(const juce::MouseEvent& event, fPoint screen2view) override {}
 
   
 };
@@ -159,11 +176,17 @@ public:
   SegmentAnnotation(juce::String name): Annotation(name) {};
   
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {}
-  bool mouseDown(const juce::MouseEvent& event, fPoint screen2view) override { return false; }
-  void mouseDrag(const juce::MouseEvent& event, fPoint screen2view) override {}
 
   
 };
 
+class MeasureAnnotation : public Annotation{
+public:
+  MeasureAnnotation(juce::String name): Annotation(name) {};
+  
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {}
+
+  
+};
 
 #endif /* Annotation_hpp */
