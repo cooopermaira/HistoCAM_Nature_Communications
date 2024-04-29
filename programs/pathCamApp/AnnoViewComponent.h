@@ -44,7 +44,7 @@ public:
   }
   
   
-  void paint (juce::Graphics& g);
+  void paint (juce::Graphics& g) override;
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override {
     ImageViewComponent::keyPressed(key, originatingComponent);
@@ -53,9 +53,11 @@ public:
   }
   
   void mouseDown(const juce::MouseEvent& event) override;
+  void mouseUp(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
   
-  void polyMouseDown(const juce::MouseEvent& event);
+  bool polyMouseDown(const juce::MouseEvent& event);
+  bool polyMouseUp(const juce::MouseEvent& event);
   bool polyMouseDrag(const juce::MouseEvent& event);
 
 

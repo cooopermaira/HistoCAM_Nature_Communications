@@ -48,7 +48,7 @@ protected:
 
 class PolygonAnnotation : public Annotation{
 public:
-  PolygonAnnotation(juce::String name): Annotation(name), area(0.0) {};
+  PolygonAnnotation(juce::String name): Annotation(name), area(0.0), selected(-1) {};
   
   
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
@@ -105,22 +105,27 @@ public:
     calculatePolygonArea();
   }
   
-        
-  bool testAndMove(fPoint clickInview, fPoint distance) {
+  bool test(fPoint clickInview, fPoint distance){
     fPoint click_distance = fPoint(20.0, 20.0)*distance;
-    
-    juce::Path::Iterator it(path);
-    
+        
     for(unsigned int i=0; i < points.size(); i++){
       fPoint p = points[i];
       float d = p.getDistanceFrom(clickInview);
       if(d < click_distance.getX() || d < click_distance.getY()){
-        points[i] = clickInview;
-        rebuildPath();
+        selected = i;
         return true;
       }
     }
+    unSelect();
     return false;
+  }
+  
+        
+  void move(fPoint new_position) {
+    if(selected != -1){
+      points[selected] = new_position;
+      rebuildPath();
+    }
   }
 
   
@@ -136,7 +141,9 @@ public:
     calculatePolygonArea();
   }
   
+  bool isPointSelected(){ return (selected != -1); }
   
+  void unSelect(){ selected = -1; }
   
 private:
   
