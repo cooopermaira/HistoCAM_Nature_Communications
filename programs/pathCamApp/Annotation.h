@@ -134,18 +134,41 @@ public:
   void add(fPoint p){
     if(points.size() == 0){
       path.startNewSubPath(p.getX(), p.getY());
-    }else{
+      points.push_back(p);
+    }else if (points.size() < 3){
       path.lineTo(p.getX(), p.getY());
+      points.push_back(p);
+    }else{
+      splitClosestEdge(p);
+      rebuildPath();
     }
-    points.push_back(p);
     calculatePolygonArea();
   }
   
   void splitClosestEdge(fPoint p){
+    float min_distance = std::numeric_limits< float >::infinity();
+    int min_index = 0;
+    fPoint minPoint;
+    
     for(unsigned int i=0; i < points.size(); i++){
-//      const Line<float> line (i.x1, i.y1, i.x2, i.y2);
-//      auto distance = line.getDistanceFromPoint (targetPoint, pointOnLine);
+      int n = (i+1)%points.size();
+      Line<float> line (points[i].getX(), points[i].getY(), points[n].getX(), points[n].getY());
+      fPoint pointOnLine;
+      float distance = line.getDistanceFromPoint (p, pointOnLine);
+      if(distance < min_distance){
+        min_distance = distance;
+        min_index = i;
+      }
     }
+    
+    std::vector < fPoint > new_points;
+    for(unsigned int i=0; i < points.size(); i++){
+      new_points.push_back(points[i]);
+      if(i==min_index){ new_points.push_back(p); }
+    }
+    
+    points = new_points;
+    
   }
   
   bool isPointSelected(){ return (selected != -1); }
