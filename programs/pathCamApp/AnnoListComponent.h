@@ -33,12 +33,19 @@ class AnnoListBoxModel : public ListBoxModel {
 public:
   //std::vector < int >  items;  // This array holds the list of items
   
+  AnnoListBoxModel(): edit_name(false) {
+     // Set the text editor to single-line mode
+     textEditor.setMultiLine(false);
+     textEditor.setReturnKeyStartsNewLine(false);
+  };
+  
   int getNumRows() override {
     return (int)(*annotations).size();
   }
-
   
   void listBoxItemClicked (int row, const MouseEvent&) override;
+  
+  void listBoxItemDoubleClicked (int row, const MouseEvent&) override;
   
   void backgroundClicked (const MouseEvent&) override;
 
@@ -53,6 +60,10 @@ private:
 
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   AnnotateComponent *parent;
+  
+  bool edit_name;
+  
+  juce::TextEditor textEditor;
   
 };
 
@@ -117,6 +128,6 @@ private:
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
 
   AnnotateComponent * parent;
-
+  
 };
 #endif /* AnnoListComponent_hpp */

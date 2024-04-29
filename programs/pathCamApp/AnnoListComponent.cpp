@@ -16,20 +16,33 @@ void AnnoListBox::mouseDown(const juce::MouseEvent& event)
 }
 
 
-void AnnoListBoxModel::listBoxItemClicked (int row, const MouseEvent& e){
+void AnnoListBoxModel::listBoxItemClicked (int row, const MouseEvent& e)
+{
   parent->setSelected((*annotations)[row]);
   ListBoxModel::listBoxItemClicked(row, e);
+  edit_name = false;
   parent->repaint();
 }
 
-void AnnoListBoxModel::backgroundClicked (const MouseEvent& e){
+void AnnoListBoxModel::listBoxItemDoubleClicked (int row, const MouseEvent& e)
+{
+  parent->setSelected((*annotations)[row]);
+  ListBoxModel::listBoxItemDoubleClicked(row, e);
+  edit_name = true;
+  parent->repaint();
+}
+
+void AnnoListBoxModel::backgroundClicked (const MouseEvent& e)
+{
   parent->setSelected(NULL);
   ListBoxModel::backgroundClicked(e);
+  edit_name = false;
   parent->repaint();
 }
 
 
-void AnnoListBoxModel::paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) {
+void AnnoListBoxModel::paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) 
+{
   
   auto anno = (*annotations)[rowNumber];
   
@@ -71,15 +84,21 @@ void AnnoListBoxModel::paintListBoxItem(int rowNumber, Graphics& g, int width, i
   
   g.setColour(Colours::black);
   g.drawRect(color_rectangle);
-
+  
   g.setColour(Colours::black);
-  g.drawText((*annotations)[rowNumber]->getName(), bounds, Justification::centredLeft, true);
+  if(parent->getSelected() == anno && edit_name){
+    textEditor.setTextToShowWhenEmpty("Enter text here...", juce::Colours::grey);
+    textEditor.setBounds(bounds);
+  }else{
+    g.drawText((*annotations)[rowNumber]->getName(), bounds, Justification::centredLeft, true);
+  }
 
 }
 
 
 
-void AnnoListComponent::newSelection(){
+void AnnoListComponent::newSelection()
+{
   for(unsigned int i=0; i < annotations->size(); i ++){
     if((*annotations)[i] == parent->getSelected())
       listBox.selectRow(i);

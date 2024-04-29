@@ -86,7 +86,9 @@ public:
   AnnoViewComponent * getViewComp(){ return rightComponent.get(); }
   AnnoListComponent * getListComp(){ return leftComponent.get(); }
   
-  void changeMode(int mode_in){
+  enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
+
+  void toggleMode(int mode_in){
     if(mode_in == mode){
       mode=_NONE;
     }else{
@@ -94,15 +96,14 @@ public:
     }
   }
   
+  void changeMode(int mode_in){ mode = mode_in; }
+
+  
   int getMode(){ return mode; }
-
-
-  enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
   
   void annotationsUpdated(){ leftComponent->updatelist(); }
   
   std::shared_ptr< Annotation > getSelected(){ return selected; }
-  
   void setSelected(std::shared_ptr< Annotation > annotation){ selected = annotation; }
 
 private:

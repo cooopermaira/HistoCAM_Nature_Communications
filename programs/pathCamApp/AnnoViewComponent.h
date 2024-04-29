@@ -53,7 +53,13 @@ public:
   }
   
   void mouseDown(const juce::MouseEvent& event) override;
+  void mouseDrag(const juce::MouseEvent& event) override;
   
+  void polyMouseDown(const juce::MouseEvent& event);
+  void polyMouseDrag(const juce::MouseEvent& event);
+
+
+  void toggleMode(int mode);
   void changeMode(int mode);
   int getMode();
   

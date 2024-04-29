@@ -8,8 +8,40 @@
 #include "JuceHeader.h"
 
 
+void AnnoViewComponent::toggleMode(int mode){ parent->toggleMode(mode); }
 void AnnoViewComponent::changeMode(int mode){ parent->changeMode(mode); }
+
 int AnnoViewComponent::getMode(){ return parent->getMode(); }
+
+void AnnoViewComponent::polyMouseDown(const juce::MouseEvent& event)
+{
+  
+  if(parent->getSelected() == NULL){
+    std::shared_ptr < Annotation > new_annotation;
+    new_annotation.reset(new PolygonAnnotation("Polygon"));
+    parent->setSelected(new_annotation);
+    annotations->push_back(new_annotation);
+    parent->annotationsUpdated();
+  }
+  PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
+  if(cast == NULL){
+    std::shared_ptr < Annotation > new_annotation;
+    new_annotation.reset(new PolygonAnnotation("Polygon"));
+    annotations->push_back(new_annotation);
+    parent->setSelected(new_annotation);
+    PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
+    parent->annotationsUpdated();
+  }
+  
+  cast->add( fPoint(event.x, event.y)*screen2view()+view->getPosition() );
+  
+  repaint();
+}
+
+void AnnoViewComponent::polyMouseDrag(const juce::MouseEvent& event)
+{
+  
+}
 
 void AnnoViewComponent::mouseDown(const juce::MouseEvent& event)
 {
@@ -17,28 +49,24 @@ void AnnoViewComponent::mouseDown(const juce::MouseEvent& event)
   
   {
     const ScopedLock lock (mutex);
-    if(parent->getMode() == AnnotateComponent::_POLY && event.mods.isRightButtonDown()){
-      if(parent->getSelected() == NULL){
-        std::shared_ptr < Annotation > new_annotation;
-        new_annotation.reset(new PolygonAnnotation("Polygon"));
-        parent->setSelected(new_annotation);
-        annotations->push_back(new_annotation);
-        parent->annotationsUpdated();
-      }
-      PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
-      if(cast == NULL){
-        std::shared_ptr < Annotation > new_annotation;
-        new_annotation.reset(new PolygonAnnotation("Polygon"));
-        annotations->push_back(new_annotation);
-        parent->setSelected(new_annotation);
-        PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
-        parent->annotationsUpdated();
-      }
-      
-      cast->add( fPoint(event.x, event.y)*screen2view()+view->getPosition() );
+    if(parent->getMode() != AnnotateComponent::_POLY && event.mods.isRightButtonDown()){
+      polyMouseDown(event);
     }
-    repaint();
+    
   }
+}
+
+void AnnoViewComponent::mouseDrag(const juce::MouseEvent& event){
+  ImageViewComponent::mouseDrag(event);
+
+  {
+    const ScopedLock lock (mutex);
+    if(parent->getMode() != AnnotateComponent::_POLY && event.mods.isRightButtonDown()){
+      polyMouseDrag(event);
+    }
+    
+  }
+  
 }
 
 

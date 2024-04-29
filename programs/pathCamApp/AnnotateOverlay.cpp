@@ -13,22 +13,22 @@ void AnnotateOverlay::buttonClicked(juce::Button* button)
 
   if (button == polygonButton.get())
   {
-    parent->changeMode( AnnotateComponent::_POLY);
+    parent->toggleMode( AnnotateComponent::_POLY);
     repaint();
   }
   if (button == segmentButton.get())
   {
-    parent->changeMode( AnnotateComponent::_SEG);
+    parent->toggleMode( AnnotateComponent::_SEG);
     repaint();
   }
   if (button == dictateButton.get())
   {
-    parent->changeMode( AnnotateComponent::_DICT);
+    parent->toggleMode( AnnotateComponent::_DICT);
     repaint();
   }
   if (button == measureButton.get())
   {
-    parent->changeMode( AnnotateComponent::_MEAS);
+    parent->toggleMode( AnnotateComponent::_MEAS);
     repaint();
   }
 }
