@@ -14,21 +14,25 @@ void AnnotateOverlay::buttonClicked(juce::Button* button)
   if (button == polygonButton.get())
   {
     parent->toggleMode( Annotation::_POLY);
+    parent->setSelected(NULL);
     repaint();
   }
   if (button == segmentButton.get())
   {
     parent->toggleMode( Annotation::_SEG);
+    parent->setSelected(NULL);
     repaint();
   }
   if (button == dictateButton.get())
   {
     parent->toggleMode( Annotation::_DICT);
+    parent->setSelected(NULL);
     repaint();
   }
   if (button == measureButton.get())
   {
     parent->toggleMode( Annotation::_MEAS);
+    parent->setSelected(NULL);
     repaint();
   }
 }

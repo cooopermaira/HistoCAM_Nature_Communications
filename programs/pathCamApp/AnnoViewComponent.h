@@ -68,7 +68,8 @@ public:
   void toggleMode(int mode);
   void setMode(int mode);
   int getMode();
-  
+  void setSelected(std::shared_ptr< Annotation > annotation);
+
   
 private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;

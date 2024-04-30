@@ -12,6 +12,8 @@ void AnnoViewComponent::toggleMode(int mode){ parent->toggleMode(mode); }
 void AnnoViewComponent::setMode(int mode){ parent->setMode(mode); }
 
 int AnnoViewComponent::getMode(){ return parent->getMode(); }
+void AnnoViewComponent::setSelected(std::shared_ptr< Annotation > annotation){ parent->setSelected(annotation); }
+
 
 bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent& event)
 {
