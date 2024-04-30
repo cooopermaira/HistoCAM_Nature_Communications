@@ -53,6 +53,7 @@ public:
   
 private:
   juce::Drawable * polygonIcon;
+  juce::Drawable * measureIcon;
   juce::Drawable * segmentIcon;
   juce::Drawable * dictateIcon;
   juce::Drawable * editIcon;
@@ -85,6 +86,10 @@ public:
     for (int i = 0; i < iconNames.size(); i++) {
       if(iconNames[i] == "polygon.svg"){
         model.polygonIcon = iconsFromZipFile[i];
+      }
+      
+      if(iconNames[i] == "measure.svg"){
+        model.measureIcon = iconsFromZipFile[i];
       }
       
       if(iconNames[i] == "segment.svg"){

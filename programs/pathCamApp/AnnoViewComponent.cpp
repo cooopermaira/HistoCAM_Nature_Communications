@@ -28,8 +28,8 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent& event)
     if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_POLY){
       PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
       cast->add(screen2view(fPoint(event.x, event.y)));
+      return true;
     }
-    return true;
   }
   
   
@@ -67,6 +67,43 @@ bool AnnoViewComponent::polyMouseUp(const juce::MouseEvent& event){
   return false;
 }
 
+bool AnnoViewComponent::measureMouseDown(const juce::MouseEvent& event){
+  if(event.mods.isRightButtonDown()){
+    if(parent->getMode() == Annotation::_MEAS){
+      std::shared_ptr < Annotation > new_annotation;
+      new_annotation.reset(new MeasureAnnotation("Measure"));
+      parent->setSelected(new_annotation);
+      annotations->push_back(new_annotation);
+      parent->annotationsUpdated();
+      parent->setMode( Annotation::_NONE );
+    }
+    
+    if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_MEAS){
+      MeasureAnnotation *cast = dynamic_cast < MeasureAnnotation * >(parent->getSelected().get());
+      if(cast->isMeasuring()){
+        cast->stopMeasuring(screen2view(fPoint(event.x, event.y)));
+      }else{
+        cast->startMeasuring(screen2view(fPoint(event.x, event.y)));
+      }
+      return true;
+    }
+  }
+return false;
+}
+
+bool AnnoViewComponent::measureMouseMove(const juce::MouseEvent& event){
+  if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_MEAS){
+    MeasureAnnotation *cast = dynamic_cast < MeasureAnnotation * >(parent->getSelected().get());
+    if(cast->isMeasuring()){
+      cast->continueMeasuring(screen2view(fPoint(event.x, event.y)));
+      return true;
+    }
+  }
+    
+  return false;
+}
+
+
 void AnnoViewComponent::mouseDown(const juce::MouseEvent& event) {
   
   bool handled;
@@ -74,6 +111,7 @@ void AnnoViewComponent::mouseDown(const juce::MouseEvent& event) {
   {
     const ScopedLock lock (mutex);
     handled = polyMouseDown(event);
+    if(!handled){ measureMouseDown(event); }
     if(handled){ repaint(); }
   }
   
@@ -101,7 +139,6 @@ void AnnoViewComponent::mouseUp(const juce::MouseEvent& event) {
   
 }
 
-
 void AnnoViewComponent::mouseDrag(const juce::MouseEvent& event){
 
   bool handled;
@@ -119,6 +156,20 @@ void AnnoViewComponent::mouseDrag(const juce::MouseEvent& event){
   
 }
 
+void AnnoViewComponent::mouseMove(const juce::MouseEvent& event){
+  
+  bool handled;
+  
+  {
+    const ScopedLock lock (mutex);
+    handled = measureMouseMove(event);
+    if(handled){ repaint();}
+  }
+  
+  if(!handled){
+    ImageViewComponent::mouseMove(event);
+  }
+}
 
 void AnnoViewComponent::paint (juce::Graphics& g)
 {

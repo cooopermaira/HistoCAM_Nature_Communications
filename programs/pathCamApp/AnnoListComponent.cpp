@@ -59,6 +59,11 @@ void AnnoListBoxModel::paintListBoxItem(int rowNumber, Graphics& g, int width, i
     polygonIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
                             juce::RectanglePlacement::centred, 1.0f);
   }
+  
+  if( dynamic_cast < MeasureAnnotation * > (anno.get()) != NULL){
+    measureIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
+                            juce::RectanglePlacement::centred, 1.0f);
+  }
 
   if( dynamic_cast < SegmentAnnotation * > (anno.get()) != NULL){
     segmentIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),

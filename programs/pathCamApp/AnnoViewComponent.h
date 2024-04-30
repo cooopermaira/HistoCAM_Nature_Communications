@@ -55,10 +55,14 @@ public:
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseUp(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
+  void mouseMove(const juce::MouseEvent& event) override;
   
   bool polyMouseDown(const juce::MouseEvent& event);
   bool polyMouseUp(const juce::MouseEvent& event);
   bool polyMouseDrag(const juce::MouseEvent& event);
+
+  bool measureMouseDown(const juce::MouseEvent& event);
+  bool measureMouseMove(const juce::MouseEvent& event);
 
 
   void toggleMode(int mode);

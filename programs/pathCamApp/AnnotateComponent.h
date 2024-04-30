@@ -57,6 +57,20 @@ public:
       annotations->push_back(temp);
     }
     
+    {
+      std::shared_ptr< MeasureAnnotation > temp = std::make_shared < MeasureAnnotation >("Measure 1");
+      temp->setPoints(fPoint(1000, 1000), fPoint(2000,1000));
+      annotations->push_back(temp);
+    }
+    
+    {
+      std::shared_ptr< MeasureAnnotation > temp = std::make_shared < MeasureAnnotation >("Measure 2");
+      temp->setPoints(fPoint(4000, 4000), fPoint(5000,5000));
+      annotations->push_back(temp);
+    }
+    
+    
+    
     leftComponent->updatelist();
 #endif
 
