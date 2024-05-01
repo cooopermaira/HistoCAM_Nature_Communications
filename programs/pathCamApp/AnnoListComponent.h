@@ -11,16 +11,13 @@
 #include "JuceHeader.h"
 
 class AnnotateComponent;
-
+class AnnoListBoxModel;
 
 class AnnoListBox : public juce::ListBox
 {
 public:
-    AnnoListBox(AnnotateComponent* parent): parent(parent)
-    {
-        
-    }
-
+  AnnoListBox(AnnotateComponent* parent): parent(parent) {}
+  
   void mouseDown(const juce::MouseEvent& event) override;
   
 private:
@@ -28,15 +25,40 @@ private:
 };
 
 
+class ListComponent : public juce::Component {
+public:
+  ListComponent(AnnoListBoxModel *parent) : parent(parent), label("", "") {
+    addAndMakeVisible(label);
+    label.setJustificationType(juce::Justification::centredLeft);
+  }
+  
+  void resized() override {
+    label.setBounds(getLocalBounds());
+  }
+  
+  void setData(const juce::String& text, bool selected) {
+    label.setText(text, juce::dontSendNotification);
+    label.setColour(juce::Label::textColourId, selected ? juce::Colours::white : juce::Colours::black);
+    label.setColour(juce::Label::backgroundColourId, selected ? juce::Colours::blue : juce::Colours::white);
+  }
+  
+private:
+  juce::Label label;
+  AnnoListBoxModel *parent;
+  
+};
+
+
+
 class AnnoListBoxModel : public ListBoxModel {
   friend class AnnoListComponent;
+  
 public:
   //std::vector < int >  items;  // This array holds the list of items
   
   AnnoListBoxModel(): edit_name(false) {
-     // Set the text editor to single-line mode
-     textEditor.setMultiLine(false);
-     textEditor.setReturnKeyStartsNewLine(false);
+//    textEditor.setMultiLine(false);
+//    textEditor.setReturnKeyStartsNewLine(false);
   };
   
   int getNumRows() override {
@@ -48,23 +70,25 @@ public:
   void listBoxItemDoubleClicked (int row, const MouseEvent&) override;
   
   void backgroundClicked (const MouseEvent&) override;
-
+  
   void paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) override;
+  
+  Component* refreshComponentForRow (int rowNumber,
+                                     bool isRowSelected,
+                                     Component* existingComponentToUpdate) override;
   
 private:
   juce::Drawable * polygonIcon;
   juce::Drawable * measureIcon;
   juce::Drawable * segmentIcon;
   juce::Drawable * dictateIcon;
-  juce::Drawable * editIcon;
   juce::Drawable * trashIcon;
-
+  
+  
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   AnnotateComponent *parent;
   
   bool edit_name;
-  
-  juce::TextEditor textEditor;
   
 };
 
@@ -104,13 +128,14 @@ public:
         model.trashIcon = iconsFromZipFile[i];
       }
       
-      if(iconNames[i] == "edit.svg"){
-        model.editIcon = iconsFromZipFile[i];
-      }
-      
+      //      if(iconNames[i] == "edit.svg"){
+      //        model.editIcon = iconsFromZipFile[i];
+      //      }
+      //
     }
-      
+    
   }
+  
   
   
   void updatelist(){
@@ -131,8 +156,10 @@ private:
   AnnoListBox listBox;
   AnnoListBoxModel model;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
-
+  
   AnnotateComponent * parent;
   
 };
+
+
 #endif /* AnnoListComponent_hpp */

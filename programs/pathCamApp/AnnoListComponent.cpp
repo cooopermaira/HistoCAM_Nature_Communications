@@ -79,8 +79,6 @@ void AnnoListBoxModel::paintListBoxItem(int rowNumber, Graphics& g, int width, i
   if (parent->getSelected() == anno){
     trashIcon->drawWithin(g, bounds.removeFromRight(height-10).toFloat(),
                           juce::RectanglePlacement::centred, 1.0f);
-    editIcon->drawWithin(g, bounds.removeFromRight(height).toFloat(),
-                         juce::RectanglePlacement::centred, 1.0f);
   }
   
   g.setColour((*annotations)[rowNumber]->getColor());
@@ -91,15 +89,29 @@ void AnnoListBoxModel::paintListBoxItem(int rowNumber, Graphics& g, int width, i
   g.drawRect(color_rectangle);
   
   g.setColour(Colours::black);
-  if(parent->getSelected() == anno && edit_name){
-    textEditor.setTextToShowWhenEmpty("Enter text here...", juce::Colours::grey);
-    textEditor.setBounds(bounds);
-  }else{
+//  if(parent->getSelected() == anno && edit_name){
+//    textEditor.setTextToShowWhenEmpty("Enter text here...", juce::Colours::grey);
+//    textEditor.setBounds(bounds);
+//  }else{
     g.drawText((*annotations)[rowNumber]->getName(), bounds, Justification::centredLeft, true);
-  }
+//  }
 
 }
 
+Component* AnnoListBoxModel::refreshComponentForRow (int rowNumber,
+                                                     bool isRowSelected,
+                                                     Component* existingComponentToUpdate){
+  
+  ListComponent* component = static_cast<ListComponent*>(existingComponentToUpdate);
+
+  if (component == nullptr)
+      component = new ListComponent(this);
+
+  component->setData(items[rowNumber], isRowSelected);
+  return component;
+  
+  
+}
 
 
 void AnnoListComponent::newSelection()
