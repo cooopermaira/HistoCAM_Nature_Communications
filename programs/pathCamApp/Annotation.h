@@ -27,6 +27,8 @@ public:
   int getType();
   
   void setName(juce::String _name){ name = _name;}
+  void setColor(juce::Colour _color){ color = _color;}
+
   
 protected:
   juce::String name;

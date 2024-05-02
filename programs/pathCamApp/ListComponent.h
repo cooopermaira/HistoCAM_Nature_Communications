@@ -12,7 +12,7 @@
 
 class AnnoListBoxModel;
 
-class ListComponent : public juce::Component, juce::TextEditor::Listener {
+class ListComponent : public juce::Component, juce::TextEditor::Listener, juce::Button::Listener, juce::ChangeListener {
 public:
   ListComponent(AnnoListBoxModel *parent);
   
@@ -25,6 +25,11 @@ public:
   void setData(int _row_number);
   
   void textEditorTextChanged(juce::TextEditor& editor) override;
+  
+  void buttonClicked(juce::Button* button) override;
+
+  void changeListenerCallback (ChangeBroadcaster* source) override;
+
   
 private:
   juce::Label label;

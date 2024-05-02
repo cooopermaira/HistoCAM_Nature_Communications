@@ -9,10 +9,11 @@
 
 ListComponent::ListComponent(AnnoListBoxModel *parent) : parent(parent){
   trashButton.reset( new SvgButton ("Trash", parent->trashIcon) );
-//      polygonButton->addListener(this);
+  trashButton->addListener(this);
   addChildComponent(*trashButton);
   
   colorButton.reset(new ColorButton("Color"));
+  colorButton->addListener(this);
   addChildComponent(*colorButton);
   
   textEditor.reset(new TextEditor());
@@ -113,3 +114,40 @@ void ListComponent::mouseDown(const juce::MouseEvent& event){
   parent->listBoxItemClicked(row_number, event);
   resized();
 }
+
+void ListComponent::buttonClicked(juce::Button* button){
+  if(button == colorButton.get()){
+    auto colourSelector = std::make_unique<ColourSelector> (ColourSelector::showAlphaChannel
+                                                            | ColourSelector::showColourAtTop
+                                                            | ColourSelector::editableColour
+                                                            | ColourSelector::showSliders
+                                                            | ColourSelector::showColourspace);
+
+    auto anno = (*parent->annotations)[row_number];
+
+    colourSelector->setName ("Annotation Color");
+    colourSelector->setCurrentColour (anno->getColor());
+    colourSelector->addChangeListener (this);
+    colourSelector->setColour (ColourSelector::backgroundColourId, Colours::transparentBlack);
+    colourSelector->setSize (300, 400);
+
+    CallOutBox::launchAsynchronously (std::move (colourSelector), getScreenBounds(), nullptr);
+    
+  }
+  
+  
+  
+}
+
+
+void ListComponent::changeListenerCallback (ChangeBroadcaster* source)
+{
+  if (auto* cs = dynamic_cast<ColourSelector*> (source)){
+    auto anno = (*parent->annotations)[row_number];
+    anno->setColor(cs->getCurrentColour());
+    parent->parent->repaint();
+    resized();
+  }
+
+}
+
