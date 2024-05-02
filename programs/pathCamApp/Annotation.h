@@ -26,6 +26,8 @@ public:
   
   int getType();
   
+  void setName(juce::String _name){ name = _name;}
+  
 protected:
   juce::String name;
   juce::Colour color;
@@ -297,7 +299,10 @@ private:
     
     double dx = p2.x - p1.x;
     double dy = p2.y - p1.y;
-    L = L/scale.getX();
+    double s = scale.getX();
+    if(s > 0.0){
+      L = L/s;
+    }
     
     juce::Line < float > end1, end2;
     

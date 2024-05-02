@@ -20,7 +20,6 @@ void AnnoListBoxModel::listBoxItemClicked (int row, const MouseEvent& e)
 {
   parent->setSelected((*annotations)[row]);
   ListBoxModel::listBoxItemClicked(row, e);
-  edit_name = false;
   parent->repaint();
 }
 
@@ -28,7 +27,6 @@ void AnnoListBoxModel::listBoxItemDoubleClicked (int row, const MouseEvent& e)
 {
   parent->setSelected((*annotations)[row]);
   ListBoxModel::listBoxItemDoubleClicked(row, e);
-  edit_name = true;
   parent->repaint();
 }
 
@@ -36,7 +34,6 @@ void AnnoListBoxModel::backgroundClicked (const MouseEvent& e)
 {
   parent->setSelected(NULL);
   ListBoxModel::backgroundClicked(e);
-  edit_name = false;
   parent->repaint();
 }
 
@@ -44,70 +41,21 @@ void AnnoListBoxModel::backgroundClicked (const MouseEvent& e)
 void AnnoListBoxModel::paintListBoxItem(int rowNumber, Graphics& g, int width, int height, bool rowIsSelected) 
 {
   
-  auto anno = (*annotations)[rowNumber];
-  
-  if (parent->getSelected() == anno){
-    g.fillAll(Colours::yellow);
-  }else{
-    g.fillAll(Colours::white);
-  }
-    
-  auto bounds = Rectangle<int>(width, height).reduced(4,4);
-  
-  
-  if( dynamic_cast < PolygonAnnotation * > (anno.get()) != NULL){
-    polygonIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                            juce::RectanglePlacement::centred, 1.0f);
-  }
-  
-  if( dynamic_cast < MeasureAnnotation * > (anno.get()) != NULL){
-    measureIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                            juce::RectanglePlacement::centred, 1.0f);
-  }
-
-  if( dynamic_cast < SegmentAnnotation * > (anno.get()) != NULL){
-    segmentIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                            juce::RectanglePlacement::centred, 1.0f);
-  }
-
-  if( dynamic_cast < DictateAnnotation * > (anno.get()) != NULL){
-    dictateIcon->drawWithin(g, bounds.removeFromLeft(height).toFloat(),
-                            juce::RectanglePlacement::centred, 1.0f);
-  }
-
-
-  if (parent->getSelected() == anno){
-    trashIcon->drawWithin(g, bounds.removeFromRight(height-10).toFloat(),
-                          juce::RectanglePlacement::centred, 1.0f);
-  }
-  
-  g.setColour((*annotations)[rowNumber]->getColor());
-  auto color_rectangle = bounds.removeFromRight(height);
-  g.fillRect(color_rectangle);
-  
-  g.setColour(Colours::black);
-  g.drawRect(color_rectangle);
-  
-  g.setColour(Colours::black);
-//  if(parent->getSelected() == anno && edit_name){
-//    textEditor.setTextToShowWhenEmpty("Enter text here...", juce::Colours::grey);
-//    textEditor.setBounds(bounds);
-//  }else{
-    g.drawText((*annotations)[rowNumber]->getName(), bounds, Justification::centredLeft, true);
-//  }
 
 }
 
 Component* AnnoListBoxModel::refreshComponentForRow (int rowNumber,
                                                      bool isRowSelected,
                                                      Component* existingComponentToUpdate){
-  
+
+  if(getNumRows() == 0 ){ return  nullptr; }
   ListComponent* component = static_cast<ListComponent*>(existingComponentToUpdate);
 
   if (component == nullptr)
       component = new ListComponent(this);
 
-  component->setData(items[rowNumber], isRowSelected);
+  component->setData(rowNumber);
+  component->resized();
   return component;
   
   

@@ -25,41 +25,15 @@ private:
 };
 
 
-class ListComponent : public juce::Component {
-public:
-  ListComponent(AnnoListBoxModel *parent) : parent(parent), label("", "") {
-    addAndMakeVisible(label);
-    label.setJustificationType(juce::Justification::centredLeft);
-  }
-  
-  void resized() override {
-    label.setBounds(getLocalBounds());
-  }
-  
-  void setData(const juce::String& text, bool selected) {
-    label.setText(text, juce::dontSendNotification);
-    label.setColour(juce::Label::textColourId, selected ? juce::Colours::white : juce::Colours::black);
-    label.setColour(juce::Label::backgroundColourId, selected ? juce::Colours::blue : juce::Colours::white);
-  }
-  
-private:
-  juce::Label label;
-  AnnoListBoxModel *parent;
-  
-};
-
 
 
 class AnnoListBoxModel : public ListBoxModel {
   friend class AnnoListComponent;
+  friend class ListComponent;
   
 public:
-  //std::vector < int >  items;  // This array holds the list of items
   
-  AnnoListBoxModel(): edit_name(false) {
-//    textEditor.setMultiLine(false);
-//    textEditor.setReturnKeyStartsNewLine(false);
-  };
+  AnnoListBoxModel() {  }
   
   int getNumRows() override {
     return (int)(*annotations).size();
@@ -87,9 +61,7 @@ private:
   
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   AnnotateComponent *parent;
-  
-  bool edit_name;
-  
+    
 };
 
 class AnnoListComponent : public Component {
@@ -99,39 +71,36 @@ public:
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile) : listBox(AnnoListBox(parent)), parent(parent), annotations(annotations) {
     
-    model.annotations = annotations;
-    model.parent = parent;
+    model.reset(new AnnoListBoxModel());
+    model->annotations = annotations;
+    model->parent = parent;
     
-    listBox.setModel(&model);
+    listBox.setModel(model.get());
     listBox.setMultipleSelectionEnabled(false);
     addAndMakeVisible(listBox);
     
     
     for (int i = 0; i < iconNames.size(); i++) {
       if(iconNames[i] == "polygon.svg"){
-        model.polygonIcon = iconsFromZipFile[i];
+        model->polygonIcon = iconsFromZipFile[i];
       }
       
       if(iconNames[i] == "measure.svg"){
-        model.measureIcon = iconsFromZipFile[i];
+        model->measureIcon = iconsFromZipFile[i];
       }
       
       if(iconNames[i] == "segment.svg"){
-        model.segmentIcon = iconsFromZipFile[i];
+        model->segmentIcon = iconsFromZipFile[i];
       }
       
       if(iconNames[i] == "dictate.svg"){
-        model.dictateIcon = iconsFromZipFile[i];
+        model->dictateIcon = iconsFromZipFile[i];
       }
       
       if(iconNames[i] == "trash.svg"){
-        model.trashIcon = iconsFromZipFile[i];
+        model->trashIcon = iconsFromZipFile[i];
       }
       
-      //      if(iconNames[i] == "edit.svg"){
-      //        model.editIcon = iconsFromZipFile[i];
-      //      }
-      //
     }
     
   }
@@ -154,7 +123,7 @@ public:
   
 private:
   AnnoListBox listBox;
-  AnnoListBoxModel model;
+  std::unique_ptr < AnnoListBoxModel >  model;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   
   AnnotateComponent * parent;

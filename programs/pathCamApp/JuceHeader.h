@@ -29,6 +29,7 @@
 using namespace juce;
 
 #include "SvgButton.h"
+#include "ColorButton.h"
 #include "TiledImage.h"
 #include "MRTiledImage.h"
 
@@ -41,6 +42,7 @@ using namespace juce;
 #include "CaptureComponent.h"
 
 #include "Annotation.h"
+#include "ListComponent.h"
 #include "AnnoListComponent.h"
 #include "AnnotateOverlay.h"
 #include "AnnoViewComponent.h"
