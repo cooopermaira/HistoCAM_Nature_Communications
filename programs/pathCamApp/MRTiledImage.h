@@ -11,6 +11,9 @@
 #include "JuceHeader.h"
 
 class MRTiledImage{
+  
+  friend class DemoBackgroundThread;
+  
 public:
   fRectangle bounds;
   unsigned int tile_size;

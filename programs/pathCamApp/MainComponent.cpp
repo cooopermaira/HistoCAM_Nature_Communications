@@ -59,69 +59,89 @@ MainComponent::~MainComponent()
 class DemoBackgroundThread final : public juce::ThreadWithProgressWindow
 {
 public:
-    explicit DemoBackgroundThread ()
-        : juce::ThreadWithProgressWindow ("busy doing some important things...", true, true)
+  explicit DemoBackgroundThread (MainComponent *parent, std::string path)
+        : juce::ThreadWithProgressWindow ("busy doing some important things...", true, true), parent(parent), path(path)
     {
       setStatusMessage("Getting ready ...");
     }
 
     void run() override
     {
-        setProgress (-1.0); // setting a value beyond the range 0 -> 1 will show a spinning bar..
-        setStatusMessage ("Preparing to do some stuff...");
-        wait (2000);
+      
+      setProgress (-1.0); // setting a value beyond the range 0 -> 1 will show a spinning bar..
+      setStatusMessage ("Reading Image");
 
-        int thingsToDo = 10;
+      cv::Mat image_in = imread(path);
+      std::cout << "Read OpenCV image: " << image_in.cols << "X" << image_in.rows << "\n";
+      parent->MRimage.reset(new MRTiledImage());
 
-        for (int i = 0; i < thingsToDo; ++i)
-        {
-            // must check this as often as possible, because this is
-            // how we know if the user's pressed 'cancel'
-            if (threadShouldExit())
-                return;
+      setStatusMessage ("Building Hierarchy");
 
-            // this will update the progress bar on the dialog box
-            setProgress (i / (double) thingsToDo);
+      unsigned int height = image_in.rows;
+      unsigned int width = image_in.cols;
+      
+      parent->MRimage->bounds = fRectangle(0,0,width,height);
+      
+      unsigned int tile_size = parent->MRimage->tile_size;
+      
+      double total_levels = ceil(max(log2(width),log2(height)) - log2(tile_size) + 1);
+      double total_pixels = 0.0;
+      for(unsigned int i=0; i < total_levels; i++){
+        total_pixels += (width/(pow(2,i))) * (height/(pow(2,i)));
+      }
+      
+      std::cout << "total_pixels: " << total_pixels <<"\n";
+      
+      unsigned int num_levels = 1;
+      std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(tile_size, tile_size);
+      setStatusMessage ("Computing level 1");
+      current->insertMat(image_in, fRectangle(0,0, width, height));
+      double pixels_processed = image_in.cols*image_in.rows;
+      setProgress (pixels_processed / total_pixels);
+      parent->MRimage->level.push_back(current);
+      
+      while(image_in.cols > tile_size || image_in.rows > tile_size){
+        std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(tile_size, tile_size*pow(2,num_levels));
+        setStatusMessage ("Computing level " + juce::String(num_levels));
+        cv::resize(image_in, image_in, cv::Size(image_in.cols/2, image_in.rows/2));
+        pixels_processed += image_in.cols*image_in.rows;
+        num_levels += 1;
+        current->insertMat(image_in, fRectangle(0,0, width, height));
+        setProgress (pixels_processed / total_pixels);
+        parent->MRimage->level.push_back(current);
 
-            setStatusMessage (juce::String (thingsToDo - i) + " things left to do...");
+       
+        if (threadShouldExit())
+            return;
 
-            wait (500);
-        }
+      }
 
-        setProgress (-1.0); // setting a value beyond the range 0 -> 1 will show a spinning bar..
-        setStatusMessage ("Finishing off the last few bits and pieces!");
-        wait (2000);
     }
 
-    // This method gets called on the message thread once our thread has finished..
     void threadComplete (bool userPressedCancel) override
     {
-//        const juce::String messageString (userPressedCancel ? "You pressed cancel!" : "Thread finished ok!");
-//
-//        if (owner != nullptr)
-//        {
-//            owner->messageBox = AlertWindow::showScopedAsync (MessageBoxOptions()
-//                                                                  .withIconType (MessageBoxIconType::InfoIcon)
-//                                                                  .withTitle ("Progress window")
-//                                                                  .withMessage (messageString)
-//                                                                  .withButton ("OK"),
-//                                                              nullptr);
-//        }
-//
-//        // ..and clean up by deleting our thread object..
-        delete this;
+      if(userPressedCancel){parent->MRimage.reset(new MRTiledImage()); }
+      else{
+        parent->imageview->setImage(parent->MRimage);
+        parent->capture->setImage(parent->MRimage);
+        parent->annotate->setImage(parent->MRimage);
+      }
+      delete this;
     }
 
-   // Component::SafePointer<MessageBoxOwnerComponent> owner;
+  MainComponent *parent;
+  std::string path;
 };
 
 
 void MainComponent::loadImage(std::string path){
   
-  cv::Mat cvimage = imread(path);
-  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
-  MRimage.reset(new MRTiledImage());
-  MRimage->build(cvimage);
+  (new DemoBackgroundThread (this, path))->launchThread();
+
+//  cv::Mat cvimage = imread(path);
+//  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
+//  MRimage.reset(new MRTiledImage());
+//  MRimage->build(cvimage);
 }
 
 
@@ -147,9 +167,6 @@ void MainComponent::loadImageDialog(const FileChooser& fc){
   File result = fc.getResult();
   if (result.exists()){
     loadImage(result.getFullPathName().toStdString());
-    imageview->setImage(MRimage);
-    capture->setImage(MRimage);
-    annotate->setImage(MRimage);
   }
 }
 
