@@ -60,9 +60,9 @@ class DemoBackgroundThread final : public juce::ThreadWithProgressWindow
 {
 public:
   explicit DemoBackgroundThread (MainComponent *parent, std::string path)
-        : juce::ThreadWithProgressWindow ("busy doing some important things...", true, true), parent(parent), path(path)
+        : juce::ThreadWithProgressWindow ("Opening Image", true, true), parent(parent), path(path)
     {
-      setStatusMessage("Getting ready ...");
+      setStatusMessage("Opening image ...");
     }
 
     void run() override
@@ -89,9 +89,7 @@ public:
       for(unsigned int i=0; i < total_levels; i++){
         total_pixels += (width/(pow(2,i))) * (height/(pow(2,i)));
       }
-      
-      std::cout << "total_pixels: " << total_pixels <<"\n";
-      
+            
       unsigned int num_levels = 1;
       std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(tile_size, tile_size);
       setStatusMessage ("Computing level 1");
