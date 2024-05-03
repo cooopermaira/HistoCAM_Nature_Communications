@@ -55,6 +55,67 @@ MainComponent::~MainComponent()
   delete annotate;
 }
 
+//==============================================================================
+class DemoBackgroundThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    explicit DemoBackgroundThread ()
+        : juce::ThreadWithProgressWindow ("busy doing some important things...", true, true)
+    {
+      setStatusMessage("Getting ready ...");
+    }
+
+    void run() override
+    {
+        setProgress (-1.0); // setting a value beyond the range 0 -> 1 will show a spinning bar..
+        setStatusMessage ("Preparing to do some stuff...");
+        wait (2000);
+
+        int thingsToDo = 10;
+
+        for (int i = 0; i < thingsToDo; ++i)
+        {
+            // must check this as often as possible, because this is
+            // how we know if the user's pressed 'cancel'
+            if (threadShouldExit())
+                return;
+
+            // this will update the progress bar on the dialog box
+            setProgress (i / (double) thingsToDo);
+
+            setStatusMessage (juce::String (thingsToDo - i) + " things left to do...");
+
+            wait (500);
+        }
+
+        setProgress (-1.0); // setting a value beyond the range 0 -> 1 will show a spinning bar..
+        setStatusMessage ("Finishing off the last few bits and pieces!");
+        wait (2000);
+    }
+
+    // This method gets called on the message thread once our thread has finished..
+    void threadComplete (bool userPressedCancel) override
+    {
+//        const juce::String messageString (userPressedCancel ? "You pressed cancel!" : "Thread finished ok!");
+//
+//        if (owner != nullptr)
+//        {
+//            owner->messageBox = AlertWindow::showScopedAsync (MessageBoxOptions()
+//                                                                  .withIconType (MessageBoxIconType::InfoIcon)
+//                                                                  .withTitle ("Progress window")
+//                                                                  .withMessage (messageString)
+//                                                                  .withButton ("OK"),
+//                                                              nullptr);
+//        }
+//
+//        // ..and clean up by deleting our thread object..
+        delete this;
+    }
+
+   // Component::SafePointer<MessageBoxOwnerComponent> owner;
+};
+
+
 void MainComponent::loadImage(std::string path){
   
   cv::Mat cvimage = imread(path);
@@ -81,7 +142,6 @@ void MainComponent::resized()
 
 }
 
-
 void MainComponent::loadImageDialog(const FileChooser& fc){
 
   File result = fc.getResult();
@@ -90,9 +150,10 @@ void MainComponent::loadImageDialog(const FileChooser& fc){
     imageview->setImage(MRimage);
     capture->setImage(MRimage);
     annotate->setImage(MRimage);
-
   }
 }
+
+
 
 
 void MainComponent::GuiEventHandler(std::string event){
