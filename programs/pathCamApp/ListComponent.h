@@ -29,6 +29,8 @@ public:
   void buttonClicked(juce::Button* button) override;
 
   void changeListenerCallback (ChangeBroadcaster* source) override;
+  
+  static void messageBoxCallback(int result, ListComponent* caller);
 
   
 private:

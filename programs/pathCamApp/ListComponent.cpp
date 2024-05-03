@@ -115,6 +115,21 @@ void ListComponent::mouseDown(const juce::MouseEvent& event){
   resized();
 }
 
+
+void ListComponent::messageBoxCallback(int result, ListComponent* caller)
+{
+  switch (result)
+  {
+    case 1:
+      juce::Logger::writeToLog("User pressed Yes");
+      caller->parent->removeSelected();
+      break;
+    default:
+      break;
+  }
+}
+
+
 void ListComponent::buttonClicked(juce::Button* button){
   if(button == colorButton.get()){
     auto colourSelector = std::make_unique<ColourSelector> (ColourSelector::showAlphaChannel
@@ -132,6 +147,19 @@ void ListComponent::buttonClicked(juce::Button* button){
     colourSelector->setSize (300, 400);
 
     CallOutBox::launchAsynchronously (std::move (colourSelector), getScreenBounds(), nullptr);
+    
+  }
+  
+  if(button == trashButton.get()){
+    
+    juce::AlertWindow::showOkCancelBox(juce::AlertWindow::WarningIcon,
+                                          "Confirmation",
+                                          "Are you sure you want to delete the annotation?",
+                                          "Yes",
+                                          "No",
+                                          nullptr,
+                                          juce::ModalCallbackFunction::create(messageBoxCallback, this));
+    
     
   }
   

@@ -8,6 +8,11 @@
 #include "JuceHeader.h"
 
 
+void AnnoListBoxModel::removeSelected(){
+  parent->removeSelected();
+}
+
+
 void AnnoListBox::mouseDown(const juce::MouseEvent& event)
 {
   deselectAllRows();

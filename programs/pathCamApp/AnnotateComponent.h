@@ -117,6 +117,14 @@ public:
   
   std::shared_ptr< Annotation > getSelected(){ return selected; }
   void setSelected(std::shared_ptr< Annotation > annotation){ selected = annotation; }
+  
+  void removeSelected(){
+    auto it = std::find(annotations->begin(), annotations->end(), selected);
+    annotations->erase(it);
+    selected = NULL;
+    leftComponent->updatelist();
+    repaint();
+  }
 
 private:
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;

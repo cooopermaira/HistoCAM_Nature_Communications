@@ -51,6 +51,8 @@ public:
                                      bool isRowSelected,
                                      Component* existingComponentToUpdate) override;
   
+  void removeSelected();
+  
 private:
   juce::Drawable * polygonIcon;
   juce::Drawable * measureIcon;
@@ -104,7 +106,6 @@ public:
     }
     
   }
-  
   
   
   void updatelist(){
