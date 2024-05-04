@@ -9,7 +9,7 @@
  */
 class MainComponent final : public juce::Component
 {
-  friend class DemoBackgroundThread;
+  friend class LoadingThread;
     
 public:
   //==============================================================================

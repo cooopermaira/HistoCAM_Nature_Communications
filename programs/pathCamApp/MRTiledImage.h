@@ -12,7 +12,7 @@
 
 class MRTiledImage{
   
-  friend class DemoBackgroundThread;
+  friend class LoadingThread;
   
 public:
   fRectangle bounds;

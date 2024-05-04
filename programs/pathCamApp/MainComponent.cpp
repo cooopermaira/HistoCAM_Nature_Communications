@@ -56,10 +56,10 @@ MainComponent::~MainComponent()
 }
 
 //==============================================================================
-class DemoBackgroundThread final : public juce::ThreadWithProgressWindow
+class LoadingThread final : public juce::ThreadWithProgressWindow
 {
 public:
-  explicit DemoBackgroundThread (MainComponent *parent, std::string path)
+  explicit LoadingThread (MainComponent *parent, std::string path)
         : juce::ThreadWithProgressWindow ("Opening Image", true, true), parent(parent), path(path)
     {
       setStatusMessage("Opening image ...");
@@ -134,7 +134,7 @@ public:
 
 void MainComponent::loadImage(std::string path){
   
-  (new DemoBackgroundThread (this, path))->launchThread();
+  (new LoadingThread (this, path))->launchThread();
 
 //  cv::Mat cvimage = imread(path);
 //  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
