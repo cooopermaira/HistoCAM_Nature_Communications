@@ -16,6 +16,7 @@ OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
 OPTION(BUILD_THREAD_TEST "" OFF)
 OPTION(BUILD_PATHCAM_GUI "" OFF)
 OPTION(OVERRRIDE_SPINNAKER "" OFF)
+OPTION(BUILD_SPINNAKER "" OFF)
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -65,29 +66,14 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 add_subdirectory(poco)
 
 
-#OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
-#OPTION(NANOGUI_BUILD_EXAMPLES "" OFF)
-#OPTION(NANOGUI_BUILD_PYTHON "" OFF)
-#OPTION(NANOGUI_INSTALL "" OFF)
-
-#add_subdirectory(nanogui)
-
 add_subdirectory(JUCE)
 
-#IF(BUILD_PATHCAM_GUI)
-# OPTION(SFML_BUILD_AUDIO "" ON)
-#  OPTION(SFML_BUILD_EXAMPLES "" OFF)
-#  OPTION(SFML_BUILD_GRAPHICS "" OFF)
-#  OPTION(SFML_BUILD_NETWORK "" OFF)
-#  OPTION(SFML_BUILD_WINDOW "" OFF)
-#  add_subdirectory(SFML)
-  
-#  message(STATUS ${SFML_INCLUDE_DIRS})
-#  message(STATUS ${SFML_LIBRARIES})
-# ENDIF()
 
 IF(APPLE)
-    SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
+    SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
+    IF(NOT OpenCV_DIR)
+        SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
+    ENDIF()
  ELSEIF(WIN32)
     SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install")
 ELSEIF(LINUX)
@@ -103,13 +89,17 @@ IF(NOT OVERRRIDE_SPINNAKER)
 
   IF(APPLE)
     IF(EXISTS "/Applications/Spinnaker")
-      MESSAGE(STATUS "Spinnaker directory found")
-      SET(BUILD_SPINNAKER "" ON)
-      add_compile_definitions(WITH_SPINNAKER)
-      include_directories( "/Applications/Spinnaker/include" )
-      SET(SPINNAKER_LIBRARIES "/Applications/Spinnaker/lib/libSpinnaker.dylib"
-                      "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
-                      "/Applications/Spinnaker/lib/libSpinVideo.dylib")
+#      MESSAGE(STATUS "Spinnaker directory found")
+#      SET(BUILD_SPINNAKER "" OFF)
+#      add_compile_definitions(WITH_SPINNAKER)
+#      include_directories( "/Applications/Spinnaker/include" )
+#      SET(SPINNAKER_LIBRARIES
+#      "/Applications/Spinnaker/lib/libSpinVideo.dylib"
+#      "/Applications/Spinnaker/lib/libSpinnaker_C.dylib"
+#      "/Applications/Spinnaker/lib/libSpinnaker.dylib"
+#      "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
+#      "/Applications/Spinnaker/lib/libSpinVideo_C.dylib")
+      
   ENDIF()
   ELSEIF(WIN32)
     IF(EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
@@ -181,11 +171,13 @@ IF(BUILD_TEST)
 	target_link_libraries(test pathCamLib)
 ENDIF()
 
+IF(BUILD_OLD_LIST)
+  add_executable( old_process_list_xml programs/old_process_list_xml.cpp)
+  target_link_libraries(old_process_list_xml pathCamLib)
+ENDIF()
+
 add_executable( process_list_xml programs/process_list_xml.cpp)
 target_link_libraries(process_list_xml pathCamLib)
-
-add_executable( new_process_list_xml programs/new_process_list_xml.cpp)
-target_link_libraries(new_process_list_xml pathCamLib)
 
 
 IF(BUILD_DEBAYER)
@@ -237,16 +229,19 @@ ENDIF()
 
 IF(BUILD_PATHCAM_GUI)
 	include_directories("${PROJECT_SOURCE_DIR}/JUCE/modules")
-  juce_add_gui_app(pathCam VERSION "0.1")
-  target_sources(${PROJECT_NAME}
+  juce_add_gui_app(pathCamApp VERSION "0.1"
+                   PRODUCT_NAME "PathCam"
+                   ICON_BIG "${PROJECT_SOURCE_DIR}/resources/pathCam.png"
+                   )
+
+  FILE(GLOB APP_FILES  programs/pathCamApp/*.h programs/pathCamApp/*.cpp)
+  message(STATUS ${APP_FILES})
+  target_sources(pathCamApp
     PRIVATE
-        programs/JUCE/Main.cpp
-        programs/JUCE/MainComponent.h
-        programs/JUCE/MainComponent.cpp
-        programs/JUCE/JuceHeader.h
+          ${APP_FILES}
   )
   
-  target_link_libraries(pathCam PRIVATE
+  target_link_libraries(pathCamApp PRIVATE
       pathCamLib
       juce::juce_core
       juce::juce_gui_extra
@@ -256,14 +251,17 @@ IF(BUILD_PATHCAM_GUI)
       juce::juce_opengl
     )
     
+  target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0)
+
   if(MSVC)
     file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.pdb")
     
-    add_custom_command(TARGET pathCam
+    add_custom_command(TARGET pathCamApp
       POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
-        "${CMAKE_BINARY_DIR}/pathCam_artefacts/RelWithDebInfo/")
+        "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/RelWithDebInfo/")
   endif()
+  
 
 ENDIF()
 

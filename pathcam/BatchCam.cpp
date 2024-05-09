@@ -38,10 +38,14 @@ BatchCam::BatchCam(LayeredConfiguration::Ptr config){
   threads = 1;
   results_logger = NULL;
 
-  
-  if(!parseConfig(config)){
-    logger->fatal("Problem parsing XML. Exiting...");
-    exit(-1);
+  if(config.isNull()){
+    //This should only ever be the case for pathCamApp
+    logger->warning("No config file. Using defaults");
+  }else{
+    if(!parseConfig(config)){
+      logger->fatal("Problem parsing XML. Exiting...");
+      exit(-1);
+    }
   }
 
   

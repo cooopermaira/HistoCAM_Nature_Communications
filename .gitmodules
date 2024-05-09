@@ -1,6 +1,3 @@
-[submodule "nanogui"]
-	path = nanogui
-	url = https://github.com/mitsuba-renderer/nanogui.git
 [submodule "poco"]
 	path = poco
 	url = https://github.com/bsumma/poco.git
@@ -11,3 +8,6 @@
 [submodule "JUCE"]
 	path = JUCE
 	url = https://github.com/juce-framework/JUCE.git
+[submodule "StreamDeck-CPPSDK"]
+	path = StreamDeck-CPPSDK
+	url = https://github.com/fredemmott/StreamDeck-CPPSDK.git
