@@ -25,6 +25,7 @@ class StreamCam: public BatchCam{
   
   friend class FeaturesRunnable;
   friend class MatchRunnable;
+  friend class DiskReader;
   friend class DiskStreamer;
   friend class Loader;
   friend class SpinLoader;
@@ -45,6 +46,7 @@ public:
   
   ~StreamCam(){delete buffer_mutex, delete image_mutex;}
 
+  Poco::FastMutex *resize_mmatch_mutex;
   Poco::FastMutex *resize_buffer_mutex;
   Poco::FastMutex *buffer_mutex;
   Poco::FastMutex *image_mutex;
@@ -53,7 +55,8 @@ public:
   
   bool run();
   bool spin_run();
-  void pass_image(Image*);
+  void pass_image(Image*, unsigned long sort_order = 0);
+  void set_match(unsigned long image_idx, unsigned long prev_idx);
   bool microscope_input;
   //d::atomic < bool > microscope_input = false;
 protected:
@@ -87,6 +90,7 @@ protected:
   std::atomic < bool > disk_empty = false;
   std::atomic < bool > jobs_queued = false;
   std::atomic < unsigned int > components = 0;
+  std::atomic < unsigned int > diskCount = 0;
   std::atomic < unsigned int > loaderCount = 0;
   std::atomic < unsigned int > matchableCount = 0;
   std::atomic < unsigned int > regCount = 0;

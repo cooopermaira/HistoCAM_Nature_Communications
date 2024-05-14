@@ -47,10 +47,20 @@ float Image::debayer(int x, int y){
 
 bool Image::is_2x(){
   buffer_mutex.lock();
-  float center = debayer(width/2, height/2);
+  float center = 0.f;
+  int steps = 20;
+  int radius_of_test = 1000; //pixels
+  for (int i = 0;i < steps; i++) {
+    int j = 2*i*radius_of_test/(steps - 1) - radius_of_test;
+    center += debayer(width/2 + j, height/2 + j);
+    center += debayer(width/2 + j, height/2 - j);
+  }
+  center/=(2*steps);
   float center_bottom = debayer(width/2, height-3);
   buffer_mutex.unlock();
-  
+  if(image_file.toString()=="frame-10282021160818-570.Raw") {
+    int k = 0;
+  }
   return (center - center_bottom) >= 180;
   
 }

@@ -138,7 +138,7 @@ Composite::Composite(StreamCam *parent): parent(parent), root_offset(0.0,0.0),ma
   flat_field = cv::imread(parent->flat_field_file.toString());
   flat_field.convertTo(flat_field, CV_32F);
   flat_field *= 1/170.0;
-  local_quality_score = score_image_2X(4852,6464,2190);
+  //local_quality_score = score_image_2X(4852,6464,2190);
 }
 
 cv::Mat Composite::score_image_2X(int rows, int cols, int radius){
@@ -213,6 +213,7 @@ void Composite::update_Bbox(std::vector < RegInfo > new_info){
       update_box = true;
       max_offset.y = new_info[i].absoluteCoords.y + 4852;
     }
+
   }
   
   if (update_box){

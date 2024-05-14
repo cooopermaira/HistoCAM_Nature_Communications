@@ -14,7 +14,7 @@ OPTION(BUILD_SFML_TEST "" ON)
 OPTION(BUILD_TEST "" OFF)
 OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
 OPTION(BUILD_THREAD_TEST "" OFF)
-OPTION(BUILD_PATHCAM_GUI "" OFF)
+OPTION(BUILD_PATHCAM_GUI "" ON)
 OPTION(OVERRRIDE_SPINNAKER "" OFF)
 OPTION(BUILD_SPINNAKER "" OFF)
 
@@ -38,7 +38,7 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/poco/CMakeLists.txt")
 endif()
 
 
-set(CMAKE_SKIP_INSTALL_RULES YES)
+set(CMAKE_SKIP_INSTALL_RULES NO)
 
     
 OPTION(ENABLE_UTIL "" ON)
@@ -77,7 +77,7 @@ IF(APPLE)
  ELSEIF(WIN32)
     SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install")
 ELSEIF(LINUX)
-    SET(OpenCV_DIR "/usr/local/cmake/opencv4")
+    SET(OpenCV_DIR "home/opencv/cmake/templates")
 ENDIF()
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
@@ -222,13 +222,8 @@ IF(BUILD_XML_TEST)
   target_link_libraries(simple_xml pathCamLib)
 ENDIF()
 
-IF(BUILD_NANOGUI_EXAMPLE)
-  add_executable( nanogui_example nanogui/src/example1.cpp)
-  target_link_libraries(nanogui_example nanogui pathCamLib)
-ENDIF()
-
 IF(BUILD_PATHCAM_GUI)
-	include_directories("${PROJECT_SOURCE_DIR}/JUCE/modules")
+	include_directories("${PROJECT_SOURCE_DIR}/JUCE/modules" "${PROJECT_SOURCE_DIR}/programs/pathCamApp")
   juce_add_gui_app(pathCamApp VERSION "0.1"
                    PRODUCT_NAME "PathCam"
                    ICON_BIG "${PROJECT_SOURCE_DIR}/resources/pathCam.png"
@@ -251,7 +246,7 @@ IF(BUILD_PATHCAM_GUI)
       juce::juce_opengl
     )
     
-  target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0)
+  target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 
   if(MSVC)
     file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.pdb")

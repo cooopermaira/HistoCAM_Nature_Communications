@@ -12,107 +12,112 @@
 #include "pathCam.h"
 #include "Poco/Runnable.h"
 
-namespace pathCam{
-class JobQueue;
+namespace pathCam {
+    class JobQueue;
+
+    class RunnableIntermediate : public Poco::Runnable {
+    public:
+        RunnableIntermediate(unsigned long sort_order) : sort_order(sort_order) {
+        }
+
+        bool operator < (const RunnableIntermediate& other) const {
+            return sort_order > other.sort_order;
+        }
+
+        unsigned long sort_order = 0;
+    };
+
+    class CompositeManager : public Poco::Runnable {
+    private:
+        StreamCam *parent;
+
+    public:
+        bool successful;
+
+        CompositeManager(StreamCam *parent);
+
+        virtual void run();
+    };
+
+    class RegistrationRunnable : public RunnableIntermediate {
+    private:
+        StreamCam *parent;
+        unsigned long index;
+    public:
+        RegistrationRunnable(StreamCam *parent, unsigned long index, unsigned long sort_order) : parent(parent),
+            index(index), RunnableIntermediate(sort_order) {
+        };
+
+        virtual void run();
+
+        std::pair<bool, Vec2> trace_to_root(unsigned long index);
+    };
+
+    //loader class takes data from disk streamer/microscope and prepares matchable jobs
+    class LoaderLogicRunnable : public RunnableIntermediate {
+    private:
+        StreamCam *parent;
+        Image *image;
+
+    public:
+        bool successful;
+
+        LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long sort_order) : image(image), parent(parent),
+            successful(true), RunnableIntermediate(sort_order) {
+        };
+
+        virtual void run();
+    };
 
 
-class CompositeManager: public Poco::Runnable{
-private:
-  StreamCam *parent;
-  
-public:
-  bool successful;
-  
-  CompositeManager(StreamCam *parent);
-  
-  virtual void run();
-  
-};
+    class QManager : public Poco::Runnable {
+    private:
+        StreamCam *parent;
 
-class RegistrationRunnable : public Poco::Runnable {
-private:
-    StreamCam* parent;
-    unsigned long index;
-public:
-    RegistrationRunnable(StreamCam* parent,unsigned long index) : parent(parent), index(index) {};
-    
-    virtual void run();
-    std::pair<bool, Vec2> trace_to_root(unsigned long index);
-};
+    public:
+        QManager(StreamCam *parent);
 
-//loader class takes data from disk streamer/microscope and prepares matchable jobs
-class LoaderLogicRunnable : public Poco::Runnable {
-private:
-    StreamCam* parent;
-    Image* image;
+        virtual void run();
+    };
 
-public:
-    bool successful;
-    LoaderLogicRunnable(StreamCam* parent, Image* image) : image(image), parent(parent), successful(true) {};
+    class DiskReader : public Poco::Runnable {
+    private:
+        StreamCam *parent;
 
-    virtual void run();
-};
+    public:
+        bool successful;
 
-/*
-//takes matchable pairs and computes final registration locations
-class RegManager: public Poco::Runnable{
-private:
-  pathCam::StreamCam *parent;
-  pathCam::JobQueue *queue;
-  unsigned int current_index = 0;
-  
-public:
-  bool successful;
-  
-  RegManager(pathCam::StreamCam *parent, pathCam::JobQueue *queue);
-  
-  virtual void run();
-  
-};
-*/
+        DiskReader(StreamCam *parent);
+
+        virtual void run();
+    };
+
+    class DiskStreamer : public RunnableIntermediate {
+    private:
+        StreamCam *parent;
+        std::string imageFile;
+
+    public:
+        bool successful;
+
+        DiskStreamer(StreamCam *parent, std::string file, unsigned long sort_order);
+
+        //DiskStreamer(StreamCam *parent);
+        virtual void run();
+    };
 
 
+    class MatchRunnable : public RunnableIntermediate {
+    private:
+        StreamCam *parent;
+        unsigned long image_idx;
 
-class QManager: public Poco::Runnable{
-private:
-  StreamCam *parent;
-  
-public:
-  QManager(StreamCam *parent);
-  
-  virtual void run();
-  
-};
+    public:
+        bool successful;
 
+        MatchRunnable(StreamCam *parent, unsigned long image_idx, unsigned long sort_order);
 
-
-class DiskStreamer: public Poco::Runnable{
-private:
-  StreamCam *parent;
-  
-public:
-  bool successful;
-  
-  DiskStreamer(StreamCam *parent);
-  
-  virtual void run();
-  
-};
-
-
-
-class MatchRunnable: public Poco::Runnable{
-private:
-  StreamCam *parent;
-  unsigned long int image_idx;
-  
-public:
-  bool successful;
-  
-  MatchRunnable(StreamCam *parent, unsigned long int image_idx);
-  
-  virtual void run();
-  
-};
+        virtual void run();
+    };
 }
 #endif /* Runnables_h */
