@@ -29,6 +29,9 @@ namespace pathCam {
 
         for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
             pathCam::Image *previous = parent->get_image_ref(prev_idx);
+            if(previous == nullptr) {
+                continue;
+            }
 
             if (!previous->is_good()) { continue; }
             parent->matchM.match[prev_idx][image_idx] = new Match(previous, image);
@@ -47,7 +50,7 @@ namespace pathCam {
                 tempReg.relativeCoords.y = parent->matchM.match[image_idx][prev_idx]->t_y;
                 parent->reg_results[image_idx] = tempReg;
                 successful = true;
-                auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 10);
+                auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
                 parent->regCount++;
                 parent->JobQ->add_runnable(rj);
                 break;

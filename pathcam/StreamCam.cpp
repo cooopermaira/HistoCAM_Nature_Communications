@@ -82,6 +82,20 @@ namespace pathCam {
         return true;
     }
 
+    void StreamCam::add_image(Image* image, unsigned long index) {
+        image_mutex->lock();
+        unsigned long size = images.size();
+        if (index >= size) {
+            images.resize(index + 100);
+            resize_mmatch_mutex->lock();
+            matchM.resize(index + 100);
+            reg_results.resize(index + 100, RegInfo());
+            visited.resize(index + 100, false);
+            resize_mmatch_mutex->unlock();
+        }
+        images[index] = image;
+        image_mutex->unlock();
+    }
 
     unsigned long int StreamCam::add_image(Image *image) {
         unsigned long int index;

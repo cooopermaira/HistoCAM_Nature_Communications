@@ -8,7 +8,6 @@
 #include "pathCam.h"
 
 namespace pathCam {
-
     void LoaderLogicRunnable::run() {
         if (!image->in_memory()) {
             successful = false;
@@ -20,27 +19,28 @@ namespace pathCam {
         image->find_label();
 
         if (image->is_good()) {
-            image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation, parent->real);
+            image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
+                                    parent->real);
             image->free_memory_RAW();
 
-            pathCam::FeatureDetector* detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
+            pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
             switch (parent->feature_type) {
-            case _SIFT:
-                detector->set_SIFT_params(parent->SIFT_params);
-                break;
-            case _SURF:
-                detector->set_SURF_params(parent->SURF_params);
-                break;
-            case _AKAZE:
-                detector->set_AKAZE_params(parent->AKAZE_params);
-                break;
-            case _BRISK:
-                detector->set_BRISK_params(parent->BRISK_params);
-                break;
-            case _ORB:
-                detector->set_ORB_params(parent->ORB_params);
-                break;
+                case _SIFT:
+                    detector->set_SIFT_params(parent->SIFT_params);
+                    break;
+                case _SURF:
+                    detector->set_SURF_params(parent->SURF_params);
+                    break;
+                case _AKAZE:
+                    detector->set_AKAZE_params(parent->AKAZE_params);
+                    break;
+                case _BRISK:
+                    detector->set_BRISK_params(parent->BRISK_params);
+                    break;
+                case _ORB:
+                    detector->set_ORB_params(parent->ORB_params);
+                    break;
             }
 
             detector->detect_and_compute(image);
@@ -58,14 +58,13 @@ namespace pathCam {
                 return;
             }
 
-            unsigned long int image_index = parent->add_image(image);
-
-            auto matchjob = new MatchRunnable(parent, image_index, sort_order + 10);
+            //unsigned long image_index = parent->add_image(image);
+            unsigned long image_index = (sort_order - 1) / 10;
+            parent->add_image(image, image_index);
+            auto matchjob = new MatchRunnable(parent, image_index, sort_order + 20);
             parent->matchableCount++;
             parent->JobQ->add_runnable(matchjob);
-
-        }
-        else {
+        } else {
             image->free_memory_RAW();
         }
         parent->loaderCount--;

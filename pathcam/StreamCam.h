@@ -62,7 +62,8 @@ public:
 protected:
 
   unsigned int increment_and_get_components(){return components++;}
-  unsigned long int add_image(Image*);
+  unsigned long add_image(Image* image);
+  void add_image(Image* image, unsigned long index);
   JobQueue* JobQ;
 
   Image* get_image_ref(unsigned long int);
