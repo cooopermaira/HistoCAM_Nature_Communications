@@ -15,29 +15,35 @@ namespace pathCam {
 
     void JobQueue::add_runnable(RunnableIntermediate *job) {
         queue_mutex->lock();
-        jobQueue.push_back(job);
+        jobQueue.push(job);
         queue_mutex->unlock();
     };
 
     bool JobQueue::run_jobs(bool join_all, bool order_before_run) {
-        int batchSize = 10;
+        queue_mutex->lock();
+        int batchSize = std::max(20,jobQueue.size());
+        queue_mutex->unlock();
+        /*
         if( jobQueue.size() >= batchSize) {
+
             if (order_before_run) {
 
                 std::partial_sort(jobQueue.begin(), jobQueue.begin() + batchSize, jobQueue.end(), comp_sort_order);
                 queue_mutex->unlock();
                 //std::sort(jobQueue.begin(),jobQueue.end(),comp_sort_order);
-            }
+            }*/
             for (int i = 0; i < batchSize; i++) {
+                
                 if (pool->available() > 0) {
                     queue_mutex->lock();
-                    pool->start(*jobQueue.front());
-                    jobQueue.pop_front();
+                    pool->start(*jobQueue.top());
+                    jobQueue.pop();
                     queue_mutex->unlock();
                 } else {
                     Poco::Thread::sleep(100);
                 }
             }
+        /*
         }else {
             while(!jobQueue.empty()) {
                 if (pool->available() > 0) {
@@ -50,7 +56,7 @@ namespace pathCam {
                 }
             }
         }
-
+*/
         if (join_all) {
             pool->joinAll();
         }
@@ -62,5 +68,13 @@ namespace pathCam {
         unsigned long b1 = b->sort_order;
         bool res = a1 < b1;
         return res;
+    }
+
+    bool JobQueue::CompareRunnable::operator()(const RunnableIntermediate *a, const RunnableIntermediate *b){
+        unsigned long as,bs;
+        as =a->sort_order;
+        bs = b->sort_order;
+        bool temp =a->sort_order > b->sort_order;
+        return a->sort_order > b->sort_order;
     }
 }

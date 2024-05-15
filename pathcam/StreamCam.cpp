@@ -24,7 +24,7 @@ namespace pathCam {
                                                             compositeQ_mutex(new Poco::FastMutex()),
                                                             component_mutex(new Poco::FastMutex()),
                                                             resize_buffer_mutex(new Poco::FastMutex()) {
-        JobQ = new JobQueue(14, 14);
+        JobQ = new JobQueue(25, 25);
         reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
         reg_results[0].index = 0;
     }
