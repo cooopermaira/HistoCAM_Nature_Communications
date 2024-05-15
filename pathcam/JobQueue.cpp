@@ -71,10 +71,6 @@ namespace pathCam {
     }
 
     bool JobQueue::CompareRunnable::operator()(const RunnableIntermediate *a, const RunnableIntermediate *b){
-        unsigned long as,bs;
-        as =a->sort_order;
-        bs = b->sort_order;
-        bool temp =a->sort_order > b->sort_order;
         return a->sort_order > b->sort_order;
     }
 }
