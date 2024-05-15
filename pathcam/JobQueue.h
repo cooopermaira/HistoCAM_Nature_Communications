@@ -18,9 +18,13 @@ public:
   static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
 private:
 
+    struct CompareRunnable {
+        bool operator()(const RunnableIntermediate *a, const RunnableIntermediate *b); 
+    };
   Poco::FastMutex *queue_mutex;
   Poco::ThreadPool *pool;
-  std::deque < RunnableIntermediate *> jobQueue;
+  //std::deque < RunnableIntermediate *> jobQueue;
+std::priority_queue<RunnableIntermediate*,std::deque<RunnableIntermediate*>,CompareRunnable> jobQueue;
   
   
 public:

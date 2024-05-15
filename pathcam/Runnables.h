@@ -19,11 +19,11 @@ namespace pathCam {
     public:
         RunnableIntermediate(unsigned long sort_order) : sort_order(sort_order) {
         }
-
-        bool operator < (const RunnableIntermediate& other) const {
+/*
+        bool operator > (const RunnableIntermediate& other) const {
             return sort_order > other.sort_order;
         }
-
+*/
         unsigned long sort_order = 0;
     };
 
