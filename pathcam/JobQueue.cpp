@@ -21,7 +21,7 @@ namespace pathCam {
 
     bool JobQueue::run_jobs(bool join_all, bool order_before_run) {
         queue_mutex->lock();
-        int batchSize = std::max(20,jobQueue.size());
+        int batchSize = std::min(20,(int)jobQueue.size());
         queue_mutex->unlock();
         /*
         if( jobQueue.size() >= batchSize) {
