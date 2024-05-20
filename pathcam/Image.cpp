@@ -12,18 +12,14 @@ namespace pathCam {
     }
 
     bool Image::is_mostly_black() {
-
-        //image_file.getFileName() == "frame-10282021160820-604.Raw"
-
-
         float threshold_value = 20.f;
         int checkPoints = 40;
         float countBlack = 0;
         float radius = 2190;
-        float tooBlack = 0.3 * float(checkPoints);
+        float tooBlack = 0.2 * float(checkPoints);
         for (int i = 0; i < checkPoints; i++) {
-            int x = width / 2 + (radius - 400.f) * cos(float(i) / float(checkPoints) * 2.f * 3.14f);
-            int y = height / 2 + (radius - 400.f) * sin(float(i) / float(checkPoints) * 2.f * 3.14f);
+            int x = width / 2 + (radius - 200.f) * cos(float(i) / float(checkPoints) * 2.f * 3.14f);
+            int y = height / 2 + (radius - 200.f) * sin(float(i) / float(checkPoints) * 2.f * 3.14f);
             float val = debayer(x, y);
             if (val < threshold_value) { countBlack++; }
             if (countBlack > tooBlack) {
@@ -69,15 +65,27 @@ namespace pathCam {
             center += debayer(width / 2 + j, height / 2 - j);
         }
         center /= (2 * steps);
-        float center_bottom = debayer(width / 2, height - 3);
+        float outside2X = debayer(width * 0.9, height * 0.9);
         buffer_mutex.unlock();
-        if (image_file.toString() == "frame-10282021160818-570.Raw") {
-            int k = 0;
-        }
-        return (center - center_bottom) >= 180;
+        return (center - outside2X) >= 150;
 
     }
 
+    bool Image::is_good() {
+        if (label == _UNDEREXP) {
+            return false;
+        }
+        return true;
+    }
+
+    double Image::check_blur() {
+        Mat laplacian;
+        cv::Laplacian(reg_image, laplacian, CV_64F);
+        cv::Scalar mean, stddev;
+        cv::meanStdDev(laplacian, mean, stddev);
+        double variance = std::pow(stddev[0], 2);
+        return variance;
+    }
 
     void Image::find_label() {
         /*
@@ -114,7 +122,6 @@ namespace pathCam {
 
             return;
         }
-
 
         label = _UNKNOWN;
         return;

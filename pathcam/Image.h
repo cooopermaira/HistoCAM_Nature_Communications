@@ -34,11 +34,6 @@ public:
   void load_raw_from_disk(){
       buffer_mutex.lock();
       if (raw_buffer == 0) {
-          /*
-          if (compositing) {
-              std::cout << "loaded from disk while compositing " << std::endl;
-          }
-          */
           if (image_file.toString() != "") {
               std::ifstream stream;
               stream.open(image_file.toString(), std::ios::binary);
@@ -73,10 +68,9 @@ public:
   void extract_features();
   void find_label();
   
-  bool is_good(){
-      //return label == _2X; // label == _NOLABEL ||
-      return label != _UNDEREXP;
-  }
+  bool is_good();
+
+  double check_blur();
   
   float debayer(int x, int y);
   
@@ -124,8 +118,7 @@ public:
   inline Poco::Path get_ImageFile(){ return image_file;}
   
   void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR, bool real=false);
-  
-  //This does not copy the buffer
+
   inline cv::Mat get_reg_image(){ return reg_image; }
   
   inline bool in_memory(){ return (raw_buffer != 0); }

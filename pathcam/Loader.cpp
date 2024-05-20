@@ -13,6 +13,7 @@ namespace pathCam {
             successful = false;
             image->label = Image::_BAD_FILE;
             std::cout << "Image failed to load" << std::endl;
+            parent->loaderCount--;
             return;
         }
 
@@ -22,6 +23,10 @@ namespace pathCam {
             image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                                     parent->real);
             image->free_memory_RAW();
+            if(image->check_blur() < 60.0){
+                parent->loaderCount--;
+                return;
+            }
 
             pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
@@ -55,6 +60,7 @@ namespace pathCam {
             if (image->keypoints.size() < 200) {
                 successful = false;
                 image->label = Image::_LOWFEAT;
+                parent->loaderCount--;
                 return;
             }
 
@@ -67,6 +73,7 @@ namespace pathCam {
         } else {
             image->free_memory_RAW();
         }
+
         parent->loaderCount--;
     }
 }

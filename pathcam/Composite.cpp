@@ -90,13 +90,16 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
         Mat polyMask = cv::Mat::zeros(image_size, CV_8U);
         cv::fillConvexPoly(polyMask, face, cv::Scalar(1));
 
-        //calculate which pixels of the new image will be copied into the composite
-        if(images[i]->label == Image::_2X) {
+        //test for exclusion of frame via rollback
+        int nonzeroMin;
+        if (images[i]->label == Image::_2X){
             polyMask = polyMask.mul(circleMask);
+            nonzeroMin = 2190*2190*3.14*0.20;
+        }else{
+            nonzeroMin = images[i]->width * images[i]->height *0.1;
         }
 
-        //test for exclusion of frame via rollback
-        if (countNonZero(polyMask) <= 2190*2190*3.14*0.20) {
+        if (countNonZero(polyMask) <= nonzeroMin) {
             //contributing less than x% of its pixels, revert and don't bother loading from disk
             subdiv = tempSubdiv;
             images[i]->free_memory_RAW();
@@ -110,7 +113,7 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
 
-        if(images[i]->is_2x()) {
+        if(images[i]->label == Image::_2X) {
             cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
         }
 

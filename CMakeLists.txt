@@ -117,7 +117,7 @@ ENDIF()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-SET(PATCAM_FILES pathcam/pathCam.h
+SET(PATHCAM_FILES pathcam/pathCam.h
                 pathcam/Image.cpp
                 pathcam/Image.h
                 pathcam/MotionEstimator.cpp
@@ -152,10 +152,10 @@ SET(PATCAM_FILES pathcam/pathCam.h
                 pathcam/util.h)
                 
 IF(BUILD_SPINNAKER)
-  set(PATCAM_FILES ${PATCAM_FILES} pathcam/SpinPath.h pathcam/SpinPath.cpp)
+  set(PATHCAM_FILES ${PATHCAM_FILES} pathcam/SpinPath.h pathcam/SpinPath.cpp)
 ENDIF()
 
-add_library(pathCamLib STATIC ${PATCAM_FILES})
+add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
 
