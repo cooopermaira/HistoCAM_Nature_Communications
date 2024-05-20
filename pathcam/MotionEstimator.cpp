@@ -24,7 +24,7 @@ int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type,
     image_2_pts.push_back( m->image_2->keypoints[ m->good_matches[i].trainIdx ].pt );
   }
   
-  if(image_1_pts.size() < 4 || image_2_pts.size() < 4){
+  if(image_1_pts.size() < 50 || image_2_pts.size() < 50){
     return -1;
   }
   

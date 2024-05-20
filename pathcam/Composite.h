@@ -39,9 +39,12 @@ public:
 class CompositeVoronoi : public Composite {
 private:
 	cv::Subdiv2D subdiv;
+    std::vector<std::pair<std::string,bool>> memberImages;
+    Mat circleMask;
+    cv::Size image_size;
 
 public:
-	CompositeVoronoi(StreamCam* parent);
+	CompositeVoronoi(StreamCam* parent,cv::Size image_size);
 	void update(std::vector < RegInfo > new_info);
 	void add_images(std::vector < RegInfo > new_info);
 	void expand_subdiv(std::vector < RegInfo > new_info);

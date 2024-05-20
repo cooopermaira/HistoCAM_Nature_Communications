@@ -35,12 +35,13 @@ int main( int argc, char* argv[] )
     
     DirectoryIterator it(inFile);
     DirectoryIterator end;
+    int i = 0;
     while (it != end){
       
       Path p(it.path());
       
       if(p.getExtension() == "Raw"){
-        std::cout << "read:" << p.toString() << "\n";
+        //std::cout << "read:" << p.toString() << "\n";
         
         pathCam::Image * image = new pathCam::Image();
         
@@ -52,15 +53,21 @@ int main( int argc, char* argv[] )
           return -1;
         }
         
-        image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
-        
+        //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
+          cv::Size image_size(image->width, image->height);
+          Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+          cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+
         Path o = outFile;
         o.append(p.getFileName());
         o.setExtension("png");
         
-        std::cout << "write:" << o.toString() << "\n";
-
-        imwrite(o.toString(), image->get_reg_image());
+        //std::cout << "write:" << o.toString() << "\n";
+        if(i%100==0) {
+            std::cout << std::to_string(i) << std::endl;
+        }
+        i++;
+        imwrite(o.toString(), image_Mat);
         
         delete image;
       }
