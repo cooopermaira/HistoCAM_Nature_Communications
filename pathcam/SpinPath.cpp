@@ -77,7 +77,7 @@ void CameraStream::run(){
       
       interrupt = false;
       
-      unsigned int i = 0;
+      unsigned long i = 1;
       
       //Will run until killed
       while (!interrupt){
@@ -99,8 +99,8 @@ void CameraStream::run(){
             pathCam::Image *image = new pathCam::Image();
             image->copy_in(pResultImage->GetData());
             image->increment_smart_pointer();
-            parent->sCam->pass_image(image);
-
+            parent->sCam->pass_image(image,i);
+            i+=10;
             Poco::DateTime time = Poco::DateTime();
             std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i");
 
@@ -188,10 +188,11 @@ void FileStream::run(){
         std::cout << strerror(errno);
     }
     myfile.write(image->get_Raw(), image_bytes);
+    image->free_memory_RAW();
     image->set_disk_file(image_path.toString());
     parent->IOlogger.information(Poco::format("Wrote: %s", image_path.toString()));
     
-    image->free_memory_RAW();
+
   }
 
 

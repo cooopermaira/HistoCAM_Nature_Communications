@@ -46,6 +46,7 @@ float Image::debayer(int x, int y){
 }
 
 bool Image::is_2x(){
+    return true;
   buffer_mutex.lock();
   float center = 0.f;
   int steps = 20;
@@ -58,9 +59,6 @@ bool Image::is_2x(){
   center/=(2*steps);
   float center_bottom = debayer(width/2, height-3);
   buffer_mutex.unlock();
-  if(image_file.toString()=="frame-10282021160818-570.Raw") {
-    int k = 0;
-  }
   return (center - center_bottom) >= 180;
   
 }
