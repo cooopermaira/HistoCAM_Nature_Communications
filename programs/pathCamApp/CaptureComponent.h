@@ -15,14 +15,14 @@ class CaptureComponent: public ImageViewComponent{
 public:
   CaptureComponent(std::shared_ptr < fRectangle > view,
                    StringArray &iconNames,
-                   OwnedArray<Drawable> &iconsFromZipFile) : ImageViewComponent(view,iconNames,iconsFromZipFile), recording(false){
+                   OwnedArray<Drawable> &iconsFromZipFile,std::shared_ptr< pathCam::StreamCam > bcam) : bcam(bcam), ImageViewComponent(view,iconNames,iconsFromZipFile), recording(false){
 
     captureOverlay.reset (new CaptureOverlay (this, iconNames, iconsFromZipFile));
     addAndMakeVisible (captureOverlay.get());
 
                      
   }
-  
+    std::shared_ptr< pathCam::StreamCam > bcam;
   void resized()
   {
     
@@ -52,7 +52,8 @@ public:
     
   void startRecording(){
     recording = true;
-    repaint();
+    repaint(); //run streamcam from here
+    bcam->run();
   }
   
   void stopRecording(){

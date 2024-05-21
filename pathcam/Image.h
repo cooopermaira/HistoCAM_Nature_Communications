@@ -34,11 +34,6 @@ public:
   void load_raw_from_disk(){
       buffer_mutex.lock();
       if (raw_buffer == 0) {
-          /*
-          if (compositing) {
-              std::cout << "loaded from disk while compositing " << std::endl;
-          }
-          */
           if (image_file.toString() != "") {
               std::ifstream stream;
               stream.open(image_file.toString(), std::ios::binary);
@@ -55,28 +50,7 @@ public:
       reference_count++;
       buffer_mutex.unlock();
   }
-  /*
-  void selective_read(cv::Rect region){
-    if(image_file.toString() != ""){
-      buffer_mutex.lock();
-      if(raw_buffer == 0){
-        std::ifstream stream;
-        stream.open(image_file.toString(), std::ios::binary);
-        allocate_memory_RAW();
-        unsigned int read_location = region.x + (region.y - 1) * width;
-        for(unsigned int i = 0; i < region.height; i++){
-          stream.seekg(read_location);
-          stream.read(&raw_buffer[i * region.width],region.width);
-          //stream.read(raw_buffer + (i*region.width), region.width);
-          read_location += width;
-        }
-        stream.close();
-      }
-      reference_count++;
-      buffer_mutex.unlock();
-    }
-  }
-  */
+
   void increment_smart_pointer() { reference_count++; }
 
   void copy_in(void *buffer){
@@ -87,16 +61,16 @@ public:
       buffer_mutex.unlock();
   }
   
-  bool is_mostly_black(cv::Mat ROI);
+  bool is_mostly_black();
   bool is_mostly_white(cv::Mat ROI);
   bool is_2x();
   
   void extract_features();
   void find_label();
   
-  bool is_good(){
-      return label == _2X; // label == _NOLABEL ||
-  }
+  bool is_good();
+
+  double check_blur();
   
   float debayer(int x, int y);
   
@@ -144,8 +118,7 @@ public:
   inline Poco::Path get_ImageFile(){ return image_file;}
   
   void create_reg_image(double reg_scale, double reg_crop, bool convert=true, int interpolation=cv::INTER_LINEAR, bool real=false);
-  
-  //This does not copy the buffer
+
   inline cv::Mat get_reg_image(){ return reg_image; }
   
   inline bool in_memory(){ return (raw_buffer != 0); }
@@ -167,12 +140,12 @@ public:
     }
     buffer_mutex.unlock();
   }
-  
-  
+
+
+    Poco::Path image_file;
 private:
-  
-  Poco::Path image_file;
-  MemoryPool *mempool;
+
+    MemoryPool *mempool;
   
   //already protected by mutex in calling function
   inline void allocate_memory_RAW(){

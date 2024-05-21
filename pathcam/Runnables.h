@@ -19,12 +19,23 @@ namespace pathCam {
     public:
         RunnableIntermediate(unsigned long sort_order) : sort_order(sort_order) {
         }
+
 /*
         bool operator > (const RunnableIntermediate& other) const {
             return sort_order > other.sort_order;
         }
 */
         unsigned long sort_order = 0;
+    };
+
+    class DebayerRunnable : public pathCam::RunnableIntermediate {
+    public:
+        explicit DebayerRunnable(pathCam::Image *image, Path outfile) : image(image), outfile(outfile),
+                                                                                      RunnableIntermediate(0) {}
+        Path outfile;
+        pathCam::Image *image;
+
+        virtual void run();
     };
 
     class CompositeManager : public Poco::Runnable {
@@ -45,7 +56,9 @@ namespace pathCam {
         unsigned long index;
     public:
         RegistrationRunnable(StreamCam *parent, unsigned long index, unsigned long sort_order) : parent(parent),
-            index(index), RunnableIntermediate(sort_order) {
+                                                                                                 index(index),
+                                                                                                 RunnableIntermediate(
+                                                                                                         sort_order) {
         };
 
         virtual void run();
@@ -63,7 +76,9 @@ namespace pathCam {
         bool successful;
 
         LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long sort_order) : image(image), parent(parent),
-            successful(true), RunnableIntermediate(sort_order) {
+                                                                                         successful(true),
+                                                                                         RunnableIntermediate(
+                                                                                                 sort_order) {
         };
 
         virtual void run();

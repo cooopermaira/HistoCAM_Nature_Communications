@@ -10,9 +10,11 @@
 
 namespace pathCam{
 
-CompositeVoronoi::CompositeVoronoi(StreamCam* parent) : Composite(parent) {        
+CompositeVoronoi::CompositeVoronoi(StreamCam* parent, cv::Size image_size) : Composite(parent), image_size(image_size) {
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
+    circleMask = cv::Mat::zeros(image_size, CV_8U);
+    cv::circle(circleMask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(1), -1);
 
 }
 
@@ -38,7 +40,7 @@ void CompositeVoronoi::expand_subdiv(std::vector < RegInfo > new_info) {
         std::vector<std::vector<Point2f>> facets;
         std::vector<Point2f> centers;
 
-        subdiv.getVoronoiFacetList(std::vector<int>(), facets, centers);
+        subdiv.getVoronoiFacetList({}, facets, centers);
         subdiv = Subdiv2D(subdiv_Bbox.as_cvRect());
         subdiv.insert(centers);
     }
@@ -59,13 +61,6 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
     }
     std::vector<Image*> images = parent->get_image_refs(indexes);
 
-    //this may need to be placed inside the below for loop if frames ever vary in size. For now it is here so the mask only needs to be built once
-    cv::Size image_size(images[0]->width, images[0]->height);
-
-    //build circle mask for 2X objective
-    Mat circleMask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
-    cv::circle(circleMask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(1), -1);
-
     for (int i = 0; i < images.size(); i++) {
         //calculate where the new image will be copied to in the composite
         Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x, new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
@@ -79,7 +74,7 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
         //get voronoi facets for only this face
         std::vector<std::vector<Point2f>> facets;
         std::vector<Point2f> centers;
-        subdiv.getVoronoiFacetList(std::vector<int>{id}, facets, centers);
+        subdiv.getVoronoiFacetList({id}, facets, centers);
 
         //shift and recast
         std::vector<Point2i> face;
@@ -95,42 +90,37 @@ void CompositeVoronoi::add_images(std::vector < RegInfo > new_info) {
         Mat polyMask = cv::Mat::zeros(image_size, CV_8U);
         cv::fillConvexPoly(polyMask, face, cv::Scalar(1));
 
-        //calculate which pixels of the new image will be copied into the composite
-        Mat use_locations = polyMask.mul(circleMask);
+        //test for exclusion of frame via rollback
+        int nonzeroMin;
+        if (images[i]->label == Image::_2X){
+            polyMask = polyMask.mul(circleMask);
+            nonzeroMin = 2190*2190*3.14*0.20;
+        }else{
+            nonzeroMin = images[i]->width * images[i]->height *0.1;
+        }
 
-        if (countNonZero(use_locations) <= 2190*2190*3.14*0.20) {
+        if (countNonZero(polyMask) <= nonzeroMin) {
             //contributing less than x% of its pixels, revert and don't bother loading from disk
             subdiv = tempSubdiv;
             images[i]->free_memory_RAW();
+            memberImages.push_back({images[i]->image_file.getFileName(),false});
             continue;
         }
+        memberImages.push_back({images[i]->image_file.getFileName(),true});
 
+        //proceed with addition to composite
         images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-        //cv::imwrite(images[i]->get_ImageFile().getBaseName() + ".png", image_Mat);
         cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-        cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
 
-        //imwrite(images[i]->get_ImageFile().getBaseName()+".png", image_Mat);
-        /*
-        Mat temp;
-        composite_z_buffer.copyTo(temp, copyzone);
-            */
+        if(images[i]->label == Image::_2X) {
+            cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
+        }
 
-        /*
-        Mat temp = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
-        image_Mat.copyTo(temp,use_locations);
-        imwrite(images[i]->get_ImageFile().getBaseName() + ".png", temp);
-        */  
-
-        image_Mat.copyTo(composite(copyzone), use_locations);
+        image_Mat.copyTo(composite(copyzone), polyMask);
         
         images[i]->free_memory_RAW();
     }
-    /*
-    imshow("display",composite);
-    waitKey(10);
-    */
 
 }
 

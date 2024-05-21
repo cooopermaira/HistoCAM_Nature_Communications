@@ -63,7 +63,7 @@ public:
   void resize(unsigned long size=0){
     match.resize(size);
     for(unsigned int i=0; i < size; i++){
-      match[i].resize(size, NULL);
+      match[i].resize(size, nullptr);
     }
   };
   
@@ -72,7 +72,10 @@ public:
   ~MatchMatrix(){
     for(unsigned int i=0; i < match.size(); i++){
       for(unsigned int j=0; j < match[i].size(); j++){
-        if(match[i][j] != NULL){ delete match[i][j];}
+        if(match[i][j] != nullptr){
+            delete match[i][j];
+            match[i][j] = nullptr;
+        }
       }
       match[i].clear();
     }

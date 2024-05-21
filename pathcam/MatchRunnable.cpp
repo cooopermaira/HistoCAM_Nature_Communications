@@ -10,14 +10,22 @@
 
 namespace pathCam {
     MatchRunnable::MatchRunnable(StreamCam *parent, unsigned long image_idx,
-                                 unsigned long sort_order): RunnableIntermediate(sort_order), parent(parent),
-                                                            image_idx(image_idx),
-                                                            successful(false) {
+                                 unsigned long sort_order) : RunnableIntermediate(sort_order), parent(parent),
+                                                             image_idx(image_idx),
+                                                             successful(false) {
     };
 
 
     void MatchRunnable::run() {
         pathCam::Image *image = parent->get_image_ref(image_idx);
+        /*
+        if (image->image_file.getFileName() == "frame-10282021160841-919.Raw" ||
+            image->image_file.getFileName() == "frame-10282021160841-918.Raw" ||
+            image->image_file.getFileName() == "frame-10282021160839-893.Raw" ||
+            image->image_file.getFileName() == "frame-10282021160839-892.Raw") {
+            int k = 0;
+        }
+        */
 
         if (!image->is_good()) {
             return;
@@ -29,7 +37,7 @@ namespace pathCam {
 
         for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
             pathCam::Image *previous = parent->get_image_ref(prev_idx);
-            if(previous == nullptr) {
+            if (previous == nullptr) {
                 continue;
             }
 
@@ -38,31 +46,35 @@ namespace pathCam {
             Match *m = parent->matchM.match[prev_idx][image_idx];
             matcher->match(m);
             int result = motion_est->findHomography(m, parent->estimator_type);
-            if (result == 1 && std::abs(parent->matchM.match[prev_idx][image_idx]->t_x) < image->width / 2 && std::abs(
-                    parent->matchM.match[prev_idx][image_idx]->t_y) < image->height / 2) {
-                //parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
-                parent->set_match(image_idx, prev_idx);
-                auto tempReg = RegInfo(true, Vec2(0.0, 0.0), false, 0);
-                tempReg.index = image_idx;
-                tempReg.resolved = false;
-                tempReg.matchedTo = prev_idx;
-                tempReg.relativeCoords.x = parent->matchM.match[image_idx][prev_idx]->t_x;
-                tempReg.relativeCoords.y = parent->matchM.match[image_idx][prev_idx]->t_y;
-                parent->reg_results[image_idx] = tempReg;
-                successful = true;
-                auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
-                parent->regCount++;
-                parent->JobQ->add_runnable(rj);
-                break;
+            if (result == 1) {
+                if (std::abs(parent->matchM.match[prev_idx][image_idx]->t_x) < image->width / 2 && std::abs(
+                        parent->matchM.match[prev_idx][image_idx]->t_y) < image->height / 2) {
+                    //parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
+                    parent->set_match(image_idx, prev_idx);
+                    auto tempReg = RegInfo(true, Vec2(0.0, 0.0), false, 0);
+                    tempReg.index = image_idx;
+                    tempReg.resolved = false;
+                    tempReg.matchedTo = prev_idx;
+                    tempReg.relativeCoords.x = parent->matchM.match[image_idx][prev_idx]->t_x;
+                    tempReg.relativeCoords.y = parent->matchM.match[image_idx][prev_idx]->t_y;
+                    parent->reg_results[image_idx] = tempReg;
+                    successful = true;
+                    auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
+                    parent->regCount++;
+                    parent->JobQ->add_runnable(rj);
+                    break;
+                } else {
+                    parent->matchM.match[prev_idx][image_idx] = nullptr;
+                }
             } else {
                 // if(result == -1 || result == -2){
-                parent->matchM.match[prev_idx][image_idx] = NULL;
+                parent->matchM.match[prev_idx][image_idx] = nullptr;
             }
             delete m;
         }
 
         if (!successful) {
-            parent->add_new_component(image_idx);
+            parent->add_new_component(image_idx, cv::Size(image->width, image->height));
         }
         //parent->RegistrationConsecQ.add_index(image_idx);
 
