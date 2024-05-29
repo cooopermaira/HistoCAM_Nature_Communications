@@ -27,6 +27,8 @@ namespace pathCam {
         JobQ = new JobQueue(15, 15);
         reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
         reg_results[0].index = 0;
+        //variancesForDebug.resize(2266);
+
     }
 
 

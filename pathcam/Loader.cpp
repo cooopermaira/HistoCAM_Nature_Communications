@@ -9,6 +9,13 @@
 
 namespace pathCam {
     void LoaderLogicRunnable::run() {
+        if (image->image_file.getFileName() == "frame-10282021161917-1410.Raw"){
+            int k = 0;
+        }
+        if(!image->in_memory()){
+            image->load_raw_from_disk();
+        }
+
         if (!image->in_memory()) {
             successful = false;
             image->label = Image::_BAD_FILE;
@@ -22,12 +29,15 @@ namespace pathCam {
         if (image->is_good()) {
             image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                                     parent->real);
-            image->free_memory_RAW();
-            if(image->check_blur() < 60.0){
+            /*
+            double blurVal = image->check_blur();
+            parent->variancesForDebug[sort_order] = blurVal;
+            if(blurVal < 5000.0){
                 parent->loaderCount--;
                 return;
             }
-
+             */
+            image->free_memory_RAW();
             pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
             switch (parent->feature_type) {
@@ -65,7 +75,7 @@ namespace pathCam {
             }
 
             //unsigned long image_index = parent->add_image(image);
-            unsigned long image_index = (sort_order - 1) / 10;
+            unsigned long image_index = sort_order;
             parent->add_image(image, image_index);
             auto matchjob = new MatchRunnable(parent, image_index, sort_order + 20);
             parent->matchableCount++;

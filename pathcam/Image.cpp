@@ -5,7 +5,7 @@ using namespace cv;
 namespace pathCam {
 
     Image::Image(MemoryPool *mempool) : width(6464), height(4852), label(_NOLABEL), mempool(mempool), raw_buffer(0),
-                                        reference_count(0), image_file(Poco::Path()) {};
+                                        reference_count(0), image_file(Poco::Path()),variance(0) {};
 
     Image::~Image() {
         free_memory_RAW(true);
@@ -28,6 +28,31 @@ namespace pathCam {
         }
         return false;
     }
+
+    double Image::check_blur() {
+        cv::Mat temp = cv::Mat(Size(width,height), CV_8UC1, raw_buffer, Mat::AUTO_STEP);
+        int steps = 4;
+        int radius = 2190;
+        double tempVariance = 0;
+        for (int i = 0; i < steps; i++){
+            int xloc = width / 2 + (radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
+            int yloc = height / 2 + (radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
+            cv::Rect rectROI(xloc-64,yloc-164,128,128);
+            Mat ROI = temp(rectROI).clone();
+            Mat laplacian;
+            cv::Laplacian(ROI, laplacian, CV_64F);
+            cv::Scalar mean, stddev;
+            cv::meanStdDev(laplacian, mean, stddev);
+            double tempVariance = std::pow(stddev[0], 2);
+            if (variance < tempVariance){
+                variance = tempVariance;
+            }
+
+        }
+
+        return variance;
+    }
+
 
     bool Image::is_mostly_white(Mat ROI) {
         unsigned int threshold_value = 225;
@@ -60,6 +85,7 @@ namespace pathCam {
         int steps = 20;
         int radius_of_test = 1000; //pixels
         for (int i = 0; i < steps; i++) {
+            //creates an X of samples across 2x image viewport
             int j = 2 * i * radius_of_test / (steps - 1) - radius_of_test;
             center += debayer(width / 2 + j, height / 2 + j);
             center += debayer(width / 2 + j, height / 2 - j);
@@ -76,15 +102,6 @@ namespace pathCam {
             return false;
         }
         return true;
-    }
-
-    double Image::check_blur() {
-        Mat laplacian;
-        cv::Laplacian(reg_image, laplacian, CV_64F);
-        cv::Scalar mean, stddev;
-        cv::meanStdDev(laplacian, mean, stddev);
-        double variance = std::pow(stddev[0], 2);
-        return variance;
     }
 
     void Image::find_label() {
@@ -119,7 +136,6 @@ namespace pathCam {
         }
         if (is_2x()) {
             label = _2X;
-
             return;
         }
 

@@ -22,14 +22,19 @@ namespace pathCam {
         std::string imageFile;
         unsigned long sort_order = 0;
         while (infile >> imageFile) {
+            /*
             auto ds = new DiskStreamer(parent, imageFile, sort_order);
             parent->diskCount++;
             parent->JobQ->add_runnable(ds);
             sort_order += 10;
+             */
+            Image* image = new Image();
+            image->set_disk_file(imageFile);
+            parent->pass_image(image, sort_order);
+            sort_order++;
         }
         parent->microscope_input = false;
-        parent->microscope_input = false;
-        std::cout << "disk images loaded " << std::endl;
+        std::cout << "disk images set " << std::endl;
     }
 
 

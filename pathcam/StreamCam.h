@@ -78,7 +78,7 @@ protected:
   void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
   void add_new_component(unsigned long image_index, cv::Size image_size);
 
-
+  //std::vector < double > variancesForDebug;
   std::vector < CompositeVoronoi* > composites;
   std::vector < bool > visited;
   
