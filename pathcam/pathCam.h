@@ -43,6 +43,7 @@
 #include "Poco/ThreadPool.h"
 #include "Poco/DateTimeFormatter.h"
 
+//#include "JuceHeader.h"
 #include "util.h"
 #include "Image.h"
 #include "ImageList.h"
@@ -52,7 +53,6 @@
 #include "MotionEstimator.h"
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
-//#include "FastCam.h"
 #include "ConsecQ.h"
 #include "StreamCam.h"
 #include "Runnables.h"

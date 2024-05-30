@@ -24,7 +24,8 @@ namespace pathCam {
                                                             compositeQ_mutex(new Poco::FastMutex()),
                                                             component_mutex(new Poco::FastMutex()),
                                                             resize_buffer_mutex(new Poco::FastMutex()) {
-        JobQ = new JobQueue(15, 15);
+
+        JobQ = new JobQueue(10, 10);
         reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
         reg_results[0].index = 0;
         //variancesForDebug.resize(2266);
@@ -186,5 +187,10 @@ namespace pathCam {
         bool isEmpty = compositeBatch.size() == 0;
         compositeQ_mutex->unlock();
         return isEmpty;
+    }
+
+    void StreamCam::set_MRImage_reference(std::shared_ptr<MRTiledImage> MRTiledImage) {
+        MRimage = MRTiledImage;
+        withFrontEnd = true;
     }
 }

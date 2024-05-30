@@ -15,11 +15,14 @@ using Poco::MemoryPool;
 using Poco::Path;
 using Poco::Logger;
 
+class MRTiledImage;
+
 namespace pathCam{
 class Composite;
 class CompositeVoronoi;
 class CompositeManager;
 class JobQueue;
+
 
 class StreamCam: public BatchCam{
   
@@ -52,13 +55,19 @@ public:
   Poco::FastMutex *image_mutex;
   Poco::FastMutex *compositeQ_mutex;
   Poco::FastMutex *component_mutex;
-  
+
+  std::shared_ptr< MRTiledImage >  MRimage;
+
   bool run();
   bool spin_run();
   void pass_image(Image*, unsigned long sort_order = 0);
   void set_match(unsigned long image_idx, unsigned long prev_idx);
-  bool microscope_input;
-  //d::atomic < bool > microscope_input = false;
+
+  bool microscopeInput;
+  bool withFrontEnd = false;
+
+  void set_MRImage_reference(std::shared_ptr< MRTiledImage >  MRimage);
+
 protected:
 
   unsigned int increment_and_get_components(){return components++;}
@@ -73,9 +82,9 @@ protected:
   Image* get_Q_front_Spin();
   
   bool compositeQ_empty();
-  
+
   void push_compositeQ(RegInfo index);
-  void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
+  //void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
   void add_new_component(unsigned long image_index, cv::Size image_size);
 
   //std::vector < double > variancesForDebug;

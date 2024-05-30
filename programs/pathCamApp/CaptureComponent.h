@@ -15,7 +15,8 @@ class CaptureComponent: public ImageViewComponent{
 public:
   CaptureComponent(std::shared_ptr < fRectangle > view,
                    StringArray &iconNames,
-                   OwnedArray<Drawable> &iconsFromZipFile,std::shared_ptr< pathCam::StreamCam > bcam) : bcam(bcam), ImageViewComponent(view,iconNames,iconsFromZipFile), recording(false){
+                   OwnedArray<Drawable> &iconsFromZipFile,std::shared_ptr< pathCam::StreamCam > bcam,
+                   MainComponent *parent) : bcam(bcam), parent(parent), ImageViewComponent(view,iconNames,iconsFromZipFile), recording(false){
 
     captureOverlay.reset (new CaptureOverlay (this, iconNames, iconsFromZipFile));
     addAndMakeVisible (captureOverlay.get());
@@ -23,6 +24,7 @@ public:
                      
   }
     std::shared_ptr< pathCam::StreamCam > bcam;
+    MainComponent *parent;
   void resized()
   {
     
@@ -49,12 +51,8 @@ public:
     }
     return false;  // Key press not handled
   }
-    
-  void startRecording(){
-    recording = true;
-    repaint(); //run streamcam from here
-    bcam->run();
-  }
+
+  void startRecording();
   
   void stopRecording(){
     recording = false;

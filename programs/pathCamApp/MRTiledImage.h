@@ -27,13 +27,12 @@ public:
   void build(cv::Mat &image_in);
   
   std::vector < TileQuery > getTiles(fRectangle bounds, juce::Rectangle < int > screen);
-  
-  
+
+
+    std::vector < std::shared_ptr< TiledImage > > level;
 private:
-  
-  std::vector < std::shared_ptr< TiledImage > > level;
-  
-  inline fRectangle worldToLevel(fRectangle r, unsigned int level){
+
+    inline fRectangle worldToLevel(fRectangle r, unsigned int level){
     return r/(2*level);
   }
   

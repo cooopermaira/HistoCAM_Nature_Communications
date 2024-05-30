@@ -14,7 +14,7 @@ using Poco::DirectoryIterator;
 
 namespace pathCam {
     DiskReader::DiskReader(StreamCam *parent): parent(parent), successful(false) {
-        parent->microscope_input = true;
+        parent->microscopeInput = true;
     }
 
     void DiskReader::run() {
@@ -33,7 +33,7 @@ namespace pathCam {
             parent->pass_image(image, sort_order);
             sort_order++;
         }
-        parent->microscope_input = false;
+        parent->microscopeInput = false;
         std::cout << "disk images set " << std::endl;
     }
 

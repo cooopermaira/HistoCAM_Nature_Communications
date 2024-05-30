@@ -22,7 +22,9 @@ MainComponent::MainComponent(std::shared_ptr<pathCam::StreamCam> bcam) : bcam(bc
     toolbar = new ToolbarComponent(this);
     view.reset(new fRectangle());
     imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile);
-    capture = new CaptureComponent(view, iconNames, iconsFromZipFile, bcam); //pass reference to bcam
+    capture = new CaptureComponent(view, iconNames, iconsFromZipFile, bcam, this); //pass reference to bcam
+    MRimage.reset(new MRTiledImage);
+    bcam->set_MRImage_reference(MRimage);
     annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile);
 
     addAndMakeVisible(imageview);
@@ -94,6 +96,7 @@ public:
             std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(tile_size,
                                                                                tile_size * pow(2, num_levels));
             setStatusMessage("Computing level " + juce::String(num_levels));
+            //cv::resize causes a reallocation and is possibly better done with cv::pyrDown()
             cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
             pixels_processed += image_in.cols * image_in.rows;
             num_levels += 1;

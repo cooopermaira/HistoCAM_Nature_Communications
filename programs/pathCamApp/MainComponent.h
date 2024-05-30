@@ -1,7 +1,6 @@
 #pragma once
 
 #include "JuceHeader.h"
-
 //==============================================================================
 /*
  This component lives inside our window, and this is where you should put all
@@ -22,7 +21,11 @@ public:
   void resized() override;
     
   void GuiEventHandler(std::string event);
-  
+
+    ImageViewComponent * imageview;
+    std::shared_ptr< MRTiledImage >  MRimage;
+    CaptureComponent * capture;
+    AnnotateComponent * annotate;
 private:
   
   void loadImage(std::string path);
@@ -30,16 +33,12 @@ private:
 
   
   std::shared_ptr< pathCam::StreamCam > bcam;
-  std::shared_ptr< MRTiledImage >  MRimage;
-  
-  std::unique_ptr<FileChooser> fc;
+
+    std::unique_ptr<FileChooser> fc;
   
   ToolbarComponent * toolbar;
-  ImageViewComponent * imageview;
-  CaptureComponent * capture;
-  AnnotateComponent * annotate;
-  
-  //Shared view
+
+    //Shared view
 
   
   juce::ProgressBar * progressBar;

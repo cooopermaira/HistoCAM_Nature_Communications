@@ -30,9 +30,9 @@ namespace pathCam {
 
     class DebayerRunnable : public pathCam::RunnableIntermediate {
     public:
-        explicit DebayerRunnable(pathCam::Image *image, Path outfile) : image(image), outfile(outfile),
+        explicit DebayerRunnable(pathCam::Image *image, Poco::Path outfile) : image(image), outfile(outfile),
                                                                                       RunnableIntermediate(0) {}
-        Path outfile;
+        Poco::Path outfile;
         pathCam::Image *image;
 
         virtual void run();
