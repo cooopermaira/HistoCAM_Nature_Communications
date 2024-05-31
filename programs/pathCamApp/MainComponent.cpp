@@ -24,7 +24,7 @@ MainComponent::MainComponent(std::shared_ptr<pathCam::StreamCam> bcam) : bcam(bc
     imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile);
     capture = new CaptureComponent(view, iconNames, iconsFromZipFile, bcam, this); //pass reference to bcam
     MRimage.reset(new MRTiledImage);
-    bcam->set_MRImage_reference(MRimage);
+    bcam->set_MainComponent_reference(this);
     annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile);
 
     addAndMakeVisible(imageview);
@@ -133,8 +133,8 @@ void MainComponent::loadImage(std::string path) {
 
 //  cv::Mat cvimage = imread(path);
 //  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
-//  MRimage.reset(new MRTiledImage());
-//  MRimage->build(cvimage);
+//  imagePyramid.reset(new MRTiledImage());
+//  imagePyramid->build(cvimage);
 }
 
 

@@ -8,7 +8,7 @@
 #define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
 
 #include "pathCam.h"
-#include "JuceHeader.h"
+
 //class MRTiledImage;
 //class TiledImage;
 
@@ -61,32 +61,31 @@ namespace pathCam {
             unsigned int height = image_in.rows;
             unsigned int width = image_in.cols;
 
-            parent->MRimage->bounds = fRectangle(0, 0, width, height);
+            //parent->imagePyramid->bounds = fRectangle(0, 0, width, height);
 
-            unsigned int tile_size = parent->MRimage->tile_size;
-
+            unsigned int tile_size = parent->imagePyramid->tile_size;
+/*
             double total_levels = ceil(max(log2(width), log2(height)) - log2(tile_size) + 1);
             double total_pixels = 0.0;
             for (unsigned int i = 0; i < total_levels; i++) {
                 total_pixels += (width / (pow(2, i))) * (height / (pow(2, i)));
             }
 
-            unsigned int num_levels = 1;
+
             std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(tile_size, tile_size);
             current->insertMat(image_in, fRectangle(0, 0, width, height));
 
-            double pixels_processed = image_in.cols * image_in.rows;
-            parent->MRimage->level.push_back(current);
-
+            parent->imagePyramid->level.push_back(current);
+            */
+            unsigned int num_levels = 1;
             while (image_in.cols > tile_size || image_in.rows > tile_size) {
                 std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(tile_size,
                                                                                    tile_size * pow(2, num_levels));
                 //cv::resize causes a reallocation and is possibly better done with cv::pyrDown()
                 cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
-                pixels_processed += image_in.cols * image_in.rows;
                 num_levels += 1;
                 current->insertMat(image_in, fRectangle(0, 0, width, height));
-                parent->MRimage->level.push_back(current);
+                parent->imagePyramid->level.push_back(current);
 
 
             }

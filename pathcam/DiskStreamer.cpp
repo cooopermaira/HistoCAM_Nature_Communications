@@ -76,7 +76,7 @@ namespace pathCam {
         Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
 
-        Path o = outfile;
+        Poco::Path o = outfile;
         o.append(image->image_file.getFileName());
         o.setExtension("png");
 

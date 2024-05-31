@@ -6,7 +6,7 @@
 
 #ifndef pathCam_h
 #define pathCam_h
-
+#define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
 #include <iostream>
 #include <chrono>
 #include <fstream>

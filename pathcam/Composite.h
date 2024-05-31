@@ -10,6 +10,8 @@
 
 #include <stdio.h>
 #include "pathCam.h"
+#include "JuceHeader.h"
+#include "TiledImage.h"
 
 namespace pathCam{
 
@@ -21,7 +23,8 @@ protected:
   Mat3f flat_field_composite;
   Mat3b composite;
   Vec2 root_offset,max_offset;
-  Bbox composite_Bbox,subdiv_Bbox;
+  Bbox subdiv_Bbox;
+  fRectangle tiledImageBounds;
   
   
 public:
@@ -42,6 +45,7 @@ private:
     std::vector<std::pair<std::string,bool>> memberImages;
     Mat circleMask;
     cv::Size image_size;
+
 
 public:
 	CompositeVoronoi(StreamCam* parent,cv::Size image_size);

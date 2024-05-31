@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include "pathCam.h"
+#include "JuceHeader.h"
 #include "Poco/Runnable.h"
 
 namespace pathCam {
