@@ -19,6 +19,10 @@ namespace pathCam {
         cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), 2190, cv::Scalar(1), -1);
         std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>();
         parent->imagePyramid->level.push_back(current);
+
+        imageBoundsAsPolygon.resize(4);
+        reset_image_as_polygon();
+
     }
 
     void CompositeVoronoi::expand_subdiv(std::vector<RegInfo> new_info) {
@@ -63,7 +67,7 @@ namespace pathCam {
             indexes.push_back(new_info[i].index);
         }
         std::vector<Image *> images = parent->get_image_refs(indexes);
-
+        std::vector<iPoint> effectedTiles;
         for (int i = 0; i < images.size(); i++) {
             //calculate where the new image will be copied to in the composite
             Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x,
@@ -73,7 +77,8 @@ namespace pathCam {
             Subdiv2D tempSubdiv(subdiv);
 
             //add new point
-            int id = subdiv.insert(cv::Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y));
+            auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
+            int id = subdiv.insert(fShift);
 
             //get voronoi facets for only this face
             std::vector<std::vector<Point2f>> facets;
@@ -82,28 +87,28 @@ namespace pathCam {
 
             //shift and recast
             std::vector<Point2i> face;
-            for (auto &i: facets[0]) {//we have pulled only one face so facets has only 1 element
-                i.x -= centers[0].x;
-                i.x += 6464 / 2;
-                i.y -= centers[0].y;
-                i.y += 4852 / 2;
-                face.push_back((Point2i) i);
+            for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
+                ii.x -= centers[0].x;
+                ii.x += 6464 / 2;
+                ii.y -= centers[0].y;
+                ii.y += 4852 / 2;
+                face.push_back((Point2i) ii);
             }
 
             //build polygon mask for new point
-            Mat polyMask = cv::Mat::zeros(image_size, CV_8U);
-            cv::fillConvexPoly(polyMask, face, cv::Scalar(1));
+            Mat polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
+            cv::fillConvexPoly(polyMaskOutput, face, cv::Scalar(1));
 
             //test for exclusion of frame via rollback
             int nonzeroMin;
             if (images[i]->label == Image::_2X) {
-                polyMask = polyMask.mul(circleMask);
+                polyMaskOutput = polyMaskOutput.mul(circleMask);
                 nonzeroMin = 2190 * 2190 * 3.14 * 0.20;
             } else {
                 nonzeroMin = images[i]->width * images[i]->height * 0.1;
             }
 
-            if (countNonZero(polyMask) <= nonzeroMin) {
+            if (countNonZero(polyMaskOutput) <= nonzeroMin) {
                 //contributing less than x% of its pixels, revert and don't bother loading from disk
                 subdiv = tempSubdiv;
                 images[i]->free_memory_RAW();
@@ -121,14 +126,18 @@ namespace pathCam {
                 cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
             }
 
-            image_Mat.copyTo(composite(copyzone), polyMask);
+            image_Mat.copyTo(composite(copyzone), polyMaskOutput);
 
             images[i]->free_memory_RAW();
 
+            //calculate effected tiles
+            calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
         }
+        std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<iPoint>());
+        effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<iPoint>()),effectedTiles.end());
 
         tiledImageBounds = fRectangle(root_offset.x, root_offset.y, composite.cols, composite.rows);
-        parent->imagePyramid->level[0]->insertMat(composite, tiledImageBounds);
+        parent->imagePyramid->level[0]->insertMat(composite, tiledImageBounds,effectedTiles);
         parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
         /*
         parent->parent->imageview->setImage(parent->parent->MRimage);
@@ -143,7 +152,6 @@ namespace pathCam {
         flat_field *= 1 / 170.0;
         //local_quality_score = score_image_2X(4852,6464,2190);
     }
-
 
 
     void Composite::update_Bbox(std::vector<RegInfo> new_info) {
@@ -263,6 +271,116 @@ namespace pathCam {
 
     Mat Composite::get_composite() {
         return composite;
+    }
+
+    void CompositeVoronoi::reset_image_as_polygon() {
+        imageBoundsAsPolygon[0] = Point2i(0, 0);
+        imageBoundsAsPolygon[1] = Point2i(image_size.width, 0);
+        imageBoundsAsPolygon[2] = Point2i(image_size.width, image_size.height);
+        imageBoundsAsPolygon[3] = Point2i(0, image_size.height);
+    }
+
+
+    float CompositeVoronoi::segment_yval_at_point(float xloc, fPoint p1, fPoint p2) {
+        if (p1.x == p2.x) {
+            return max(p1.y, p2.y);
+        }
+        return (p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y;
+    }
+
+
+    void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<iPoint> &result, Vec2 absCoord) {
+        std::vector<iPoint> tileIndices;
+        std::map<int, std::vector<float>> tilesByColumn;
+
+        //for each edge of the voronoi mask
+        for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
+            //if we are at the last point, make the next point the first point (this makes the last edge)
+            int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
+
+            //create an fPoint from the cv::Point2i
+            auto p1 = fPoint(maskAsPolygon[ii].x, maskAsPolygon[ii].y);
+            auto p2 = fPoint(maskAsPolygon[ii2].x, maskAsPolygon[ii2].y);
+
+            //test for duplicate points that result from the voronoi calculation
+            if (p1.x == p2.x && p1.y == p2.y){
+                continue;
+            }
+
+            //retreive the tiles these points fall within
+            auto tile1 = parent->imagePyramid->level[0]->getIJ(p1);
+            auto tile2 = parent->imagePyramid->level[0]->getIJ(p2);
+
+            //get the column of these tiles
+            int column1 = tile1.getX();
+            int column2 = tile2.getX();
+
+            //determine which column is on the right and which is on the left
+            int xlow = min(column1, column2);
+            int xhigh = max(column1, column2);
+
+            //get the tile column the left and right edges of the image frame
+            int columnBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x,absCoord.y)).x;
+            int columnBoundHigh = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x + image_size.width,absCoord.y)).x;
+
+            //take the column range bounds to be the most inward of the frame edges and the voronoi cell vertices
+            //this accomplishes the same thing as taking the polygon intersection of the voronoi face and the image frame
+            xlow = max(xlow,columnBoundLow);
+            xhigh = min(xhigh,columnBoundHigh);
+
+            //get the tile row the top and bottom edges of the image frame
+            int rowBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x,absCoord.y)).y;
+            int rowBoundHigh = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x,absCoord.y + image_size.height)).y;
+
+
+            auto plow = p1.x < p2.x ? p1 : p2;
+            auto phigh = p1.x >= p2.x ? p1 : p2;
+
+            for (int j = xlow; j <= xhigh; j++) {
+
+                float xloclow = max(float(j * parent->imagePyramid->level[0]->getTileSize()), plow.x);
+                float enterColumn = min(segment_yval_at_point(xloclow, p1, p2), (float) rowBoundHigh);
+                enterColumn = max(enterColumn,(float) rowBoundLow);
+                tilesByColumn[j].push_back(enterColumn);
+
+                float xlochigh = min(float((j + 1) * parent->imagePyramid->level[0]->getTileSize()), phigh.x);
+                float exitColumn = min(segment_yval_at_point(xlochigh, p1, p2), (float) rowBoundHigh);
+                exitColumn = max(exitColumn, (float) rowBoundLow);
+                tilesByColumn[j].push_back(exitColumn);
+            }
+
+        }
+        for (auto &[key, value]: tilesByColumn) {
+            float firstPoint_y = *std::min_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
+            int firstTile = parent->imagePyramid->level[0]->getIJ(
+                    fPoint(key * parent->imagePyramid->level[0]->getTileSize(), firstPoint_y)).getY();
+
+            float lastPoint_y = *std::max_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
+            int lastTile = parent->imagePyramid->level[0]->getIJ(
+                    fPoint(key * parent->imagePyramid->level[0]->getTileSize(), lastPoint_y)).getY();
+
+            for (int ii = firstTile; ii <= lastTile; ii++) {
+                result.push_back(iPoint(key, ii));
+            }
+        }
+    }
+
+    void CompositeVoronoi::remove_duplicates_without_sort( std::vector<Point2i>& vec)
+    {
+        auto new_last = vec.end()-1;
+
+        for ( auto current = vec.begin(); current != new_last; ++current )
+        {
+            for (auto consider = current + 1; consider != new_last && consider != vec.end();){
+                if (consider->x == current->x && consider->y == current->y){
+                    std::iter_swap(consider,new_last);
+                    new_last--;
+                }else{
+                    consider++;
+                }
+            }
+        }
+        vec.erase(new_last+1,vec.end());
     }
 
     cv::Mat Composite::score_image_2X(int rows, int cols, int radius) {

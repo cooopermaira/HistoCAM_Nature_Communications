@@ -29,6 +29,44 @@ std::vector < TileQuery >  TiledImage::getTiles(fRectangle box){
   return box_tiles;
 }
 
+void TiledImage::insertMat(cv::Mat image_in, fRectangle box, std::vector<iPoint> retileIndices) {
+    unsigned int width  = image_in.cols;
+    unsigned int height = image_in.rows;
+    float scale = ((float)tile_size/(float)logic_size);
+
+    jassert(int(box.getWidth()*scale) == width &&
+                    int(box.getHeight()*scale) == height);
+
+    bounds = bounds.getUnion(box);
+
+    fPoint top_left = box.getTopLeft();
+    fPoint bottom_right = box.getBottomRight();
+    bottom_right.x -= 1;
+    bottom_right.y -= 1;
+
+    for (auto &tile : retileIndices){
+        int i = tile.getX();
+        int j = tile.getY();
+        if(tiles(i,j) == NULL){
+            tiles(i,j) = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
+        }
+
+        fRectangle tile_box = fRectangle(i*logic_size,
+                                         j*logic_size,
+                                         logic_size,
+                                         logic_size);
+
+        fRectangle image_box = tile_box.getIntersection(box);
+
+
+        fPoint offset = box.getTopLeft();
+
+        matToImage(image_in, tiles(i,j), offset*scale, image_box*scale, tile_box*scale);
+
+
+    }
+}
+
 void TiledImage::insertMat(cv::Mat image_in, fRectangle box){
   unsigned int width  = image_in.cols;
   unsigned int height = image_in.rows;

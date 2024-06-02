@@ -77,14 +77,9 @@ public:
     unsigned int getTileSize() { return tile_size; }
 
     void insertMat(cv::Mat image_in, fRectangle i_bounds);
+    void insertMat(cv::Mat image_in, fRectangle box, std::vector<iPoint> retileIndices);
 
     inline juce::Image *getTile(int i, int j) { return tiles(i, j); }
-
-    std::vector<TileQuery> getTiles(fRectangle box);
-
-private:
-    void matToImage(const cv::Mat &mat, juce::Image *image, fPoint offset,
-                    fRectangle image_box, fRectangle tile_box);
 
     inline iPoint getIJ(fPoint p) {
         iPoint ij = iPoint(p.getX() / (int) logic_size, p.getY() / (int) logic_size);
@@ -92,6 +87,13 @@ private:
         if (p.getY() < 0) { ij.y--; }
         return ij;
     }
+
+    std::vector<TileQuery> getTiles(fRectangle box);
+
+private:
+    void matToImage(const cv::Mat &mat, juce::Image *image, fPoint offset,
+                    fRectangle image_box, fRectangle tile_box);
+
 
     bool tileToDisk(const juce::Image *image, const juce::String &filePath) {
         juce::File file(filePath);
