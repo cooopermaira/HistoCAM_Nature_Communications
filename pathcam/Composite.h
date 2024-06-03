@@ -38,7 +38,7 @@ namespace pathCam {
         StreamCam *parent;
         Mat local_quality_score, composite_z_buffer, flat_field;
         Mat3f flat_field_composite;
-        Mat3b composite;
+        Mat4b composite;
         Vec2 root_offset, max_offset;
         Bbox subdiv_Bbox;
         fRectangle tiledImageBounds;
@@ -61,12 +61,14 @@ namespace pathCam {
 
     class CompositeVoronoi : public Composite {
     private:
+        Mat3b threeChannelPreallocated;
+        Mat4b fourChannelPreallocated;
         cv::Subdiv2D subdiv;
         std::vector<std::pair<std::string, bool>> memberImages;
         std::vector<Point2i> imageBoundsAsPolygon;
+        std::vector<Mat> channels;
         Mat circleMask;
         cv::Size image_size;
-        int m = 0;
 
         long segment_yval_at_point(float xloc, fPoint p1, fPoint p2);
 

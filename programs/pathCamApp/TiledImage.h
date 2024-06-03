@@ -94,6 +94,12 @@ private:
     void matToImage(const cv::Mat &mat, juce::Image *image, fPoint offset,
                     fRectangle image_box, fRectangle tile_box);
 
+    void matToImage2(const cv::Mat &mat, juce::Image *image, fPoint offset,
+                    fRectangle image_box, fRectangle tile_box);
+
+    void matToImage4Channel(const cv::Mat &mat, juce::Image *image, fPoint offset,
+                    fRectangle image_box, fRectangle tile_box);
+
 
     bool tileToDisk(const juce::Image *image, const juce::String &filePath) {
         juce::File file(filePath);

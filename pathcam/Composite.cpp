@@ -19,7 +19,7 @@ namespace pathCam {
         cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), 2190, cv::Scalar(1), -1);
         std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>();
         parent->imagePyramid->level.push_back(current);
-
+        channels.resize(2);
         imageBoundsAsPolygon.resize(4);
         reset_image_as_polygon();
 
@@ -120,13 +120,16 @@ namespace pathCam {
             //proceed with addition to composite
             images[i]->load_raw_from_disk();
             Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-            cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+            cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
 
             if (images[i]->label == Image::_2X) {
-                cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
+                cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
             }
+            channels[0] = threeChannelPreallocated;
+            channels[1] = polyMaskOutput;
+            merge(channels,fourChannelPreallocated);
 
-            image_Mat.copyTo(composite(copyzone), polyMaskOutput);
+            fourChannelPreallocated.copyTo(composite(copyzone), polyMaskOutput);
 
             images[i]->free_memory_RAW();
 
@@ -137,7 +140,7 @@ namespace pathCam {
         effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<iPoint>()),
                             effectedTiles.end());
 
-        tiledImageBounds = fRectangle(root_offset.x, root_offset.y, composite.cols, composite.rows);
+        tiledImageBounds = fRectangle((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
         parent->imagePyramid->level[0]->insertMat(composite, tiledImageBounds, effectedTiles);
         parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
         /*
@@ -146,6 +149,8 @@ namespace pathCam {
         parent->parent->annotate->setImage(parent->parent->MRimage);
         */
     }
+
+
 
     Composite::Composite(StreamCam *parent) : parent(parent), root_offset(0.0, 0.0), max_offset(0.0, 0.0) {
         flat_field = cv::imread(parent->flat_field_file.toString());
@@ -186,7 +191,7 @@ namespace pathCam {
 
         if (update_box) {
             //if we are updating the bounding box, create a new combined image and copy old image into the correct location
-            Mat3b new_combined(int(max_offset.y - root_offset.y), int(max_offset.x - root_offset.x), Vec3b(0, 0, 0));
+            Mat4b new_combined(int(max_offset.y - root_offset.y), int(max_offset.x - root_offset.x), Vec4b(0,0, 0, 0));
             //Mat new_combined_z_buffer = cv::Mat::zeros(cv::Size(new_combined.cols, new_combined.rows), CV_16U);
 
             if (composite.data) {
