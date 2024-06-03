@@ -68,7 +68,7 @@ namespace pathCam {
         cv::Size image_size;
         int m = 0;
 
-        float segment_yval_at_point(float xloc, fPoint p1, fPoint p2);
+        long segment_yval_at_point(float xloc, fPoint p1, fPoint p2);
 
         void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<iPoint>& result, Vec2 absCoord);
         static void remove_duplicates_without_sort( std::vector<Point2i>& vec);

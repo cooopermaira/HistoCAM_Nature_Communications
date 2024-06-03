@@ -84,7 +84,8 @@ namespace pathCam {
                 //cv::resize causes a reallocation and is possibly better done with cv::pyrDown()
                 cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
                 num_levels += 1;
-                current->insertMat(image_in, fRectangle(0, 0, width, height));
+                //current->insertMat(image_in, fRectangle(0, 0, width, height));
+                current->insertMat(image_in,parent->imagePyramid->bounds);
                 parent->imagePyramid->level.push_back(current);
 
 

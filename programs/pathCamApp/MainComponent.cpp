@@ -74,7 +74,8 @@ public:
         unsigned int height = image_in.rows;
         unsigned int width = image_in.cols;
 
-        parent->MRimage->bounds = fRectangle(0, 0, width, height);
+        parent->MRimage->bounds = fRectangle(-5000, -5000, width, height);
+
 
         unsigned int tile_size = parent->MRimage->tile_size;
 
@@ -87,7 +88,7 @@ public:
         unsigned int num_levels = 1;
         std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(tile_size, tile_size);
         setStatusMessage("Computing level 1");
-        current->insertMat(image_in, fRectangle(0, 0, width, height));
+        current->insertMat(image_in, fRectangle(-5000, -5000, width, height));
         double pixels_processed = image_in.cols * image_in.rows;
         setProgress(pixels_processed / total_pixels);
         parent->MRimage->level.push_back(current);
@@ -100,7 +101,7 @@ public:
             cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
             pixels_processed += image_in.cols * image_in.rows;
             num_levels += 1;
-            current->insertMat(image_in, fRectangle(0, 0, width, height));
+            current->insertMat(image_in, fRectangle(-5000, -5000, width, height));
             setProgress(pixels_processed / total_pixels);
             parent->MRimage->level.push_back(current);
 

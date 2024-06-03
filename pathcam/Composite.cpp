@@ -134,10 +134,11 @@ namespace pathCam {
             calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
         }
         std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<iPoint>());
-        effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<iPoint>()),effectedTiles.end());
+        effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<iPoint>()),
+                            effectedTiles.end());
 
         tiledImageBounds = fRectangle(root_offset.x, root_offset.y, composite.cols, composite.rows);
-        parent->imagePyramid->level[0]->insertMat(composite, tiledImageBounds,effectedTiles);
+        parent->imagePyramid->level[0]->insertMat(composite, tiledImageBounds, effectedTiles);
         parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
         /*
         parent->parent->imageview->setImage(parent->parent->MRimage);
@@ -281,17 +282,26 @@ namespace pathCam {
     }
 
 
-    float CompositeVoronoi::segment_yval_at_point(float xloc, fPoint p1, fPoint p2) {
+    long CompositeVoronoi::segment_yval_at_point(float xloc, fPoint p1, fPoint p2) {
         if (p1.x == p2.x) {
             return max(p1.y, p2.y);
         }
-        return (p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y;
+        return long((p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y);
     }
 
 
-    void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<iPoint> &result, Vec2 absCoord) {
+    void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<iPoint> &result,
+                                                    Vec2 absCoord) {
         std::vector<iPoint> tileIndices;
         std::map<int, std::vector<float>> tilesByColumn;
+
+        //get the tile row the top and bottom edges of the image frame
+        long rowBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x, absCoord.y)).y;
+        long rowBoundHigh = parent->imagePyramid->level[0]->getIJ(
+                fPoint(absCoord.x, absCoord.y + image_size.height)).y;
+
+        long yPixelBoundLow = rowBoundLow * long(parent->imagePyramid->tile_size);
+        long yPixelBoundHigh = rowBoundHigh * long(parent->imagePyramid->tile_size);
 
         //for each edge of the voronoi mask
         for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
@@ -303,7 +313,7 @@ namespace pathCam {
             auto p2 = fPoint(maskAsPolygon[ii2].x, maskAsPolygon[ii2].y);
 
             //test for duplicate points that result from the voronoi calculation
-            if (p1.x == p2.x && p1.y == p2.y){
+            if (p1.x == p2.x && p1.y == p2.y) {
                 continue;
             }
 
@@ -319,19 +329,15 @@ namespace pathCam {
             int xlow = min(column1, column2);
             int xhigh = max(column1, column2);
 
-            //get the tile column the left and right edges of the image frame
-            int columnBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x,absCoord.y)).x;
-            int columnBoundHigh = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x + image_size.width,absCoord.y)).x;
+            //get the tile column of the left and right edges of the image frame
+            int columnBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x, absCoord.y)).x;
+            int columnBoundHigh = parent->imagePyramid->level[0]->getIJ(
+                    fPoint(absCoord.x + image_size.width, absCoord.y)).x;
 
             //take the column range bounds to be the most inward of the frame edges and the voronoi cell vertices
             //this accomplishes the same thing as taking the polygon intersection of the voronoi face and the image frame
-            xlow = max(xlow,columnBoundLow);
-            xhigh = min(xhigh,columnBoundHigh);
-
-            //get the tile row the top and bottom edges of the image frame
-            int rowBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x,absCoord.y)).y;
-            int rowBoundHigh = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x,absCoord.y + image_size.height)).y;
-
+            xlow = max(xlow, columnBoundLow);
+            xhigh = min(xhigh, columnBoundHigh);
 
             auto plow = p1.x < p2.x ? p1 : p2;
             auto phigh = p1.x >= p2.x ? p1 : p2;
@@ -339,14 +345,20 @@ namespace pathCam {
             for (int j = xlow; j <= xhigh; j++) {
 
                 float xloclow = max(float(j * parent->imagePyramid->level[0]->getTileSize()), plow.x);
-                float enterColumn = min(segment_yval_at_point(xloclow, p1, p2), (float) rowBoundHigh);
-                enterColumn = max(enterColumn,(float) rowBoundLow);
-                tilesByColumn[j].push_back(enterColumn);
-
                 float xlochigh = min(float((j + 1) * parent->imagePyramid->level[0]->getTileSize()), phigh.x);
-                float exitColumn = min(segment_yval_at_point(xlochigh, p1, p2), (float) rowBoundHigh);
-                exitColumn = max(exitColumn, (float) rowBoundLow);
-                tilesByColumn[j].push_back(exitColumn);
+
+                long enterColumn = segment_yval_at_point(xloclow, p1, p2);
+                long exitColumn = segment_yval_at_point(xlochigh, p1, p2);
+
+                //if((enterColumn >= yPixelBoundLow || exitColumn >= yPixelBoundLow) && (enterColumn <= yPixelBoundHigh || exitColumn <= yPixelBoundHigh)) {
+                enterColumn = max(enterColumn, yPixelBoundLow);
+                enterColumn = min(enterColumn, yPixelBoundHigh);
+                tilesByColumn[j].push_back((float) enterColumn);
+
+                exitColumn = max(exitColumn, yPixelBoundLow);
+                exitColumn = min(exitColumn, yPixelBoundHigh);
+                tilesByColumn[j].push_back((float) exitColumn);
+                //}
             }
 
         }
@@ -360,27 +372,27 @@ namespace pathCam {
                     fPoint(key * parent->imagePyramid->level[0]->getTileSize(), lastPoint_y)).getY();
 
             for (int ii = firstTile; ii <= lastTile; ii++) {
-                result.push_back(iPoint(key, ii));
+                if(ii <= rowBoundHigh && ii >= rowBoundLow) {
+                    result.push_back(iPoint(key, ii));
+                }
             }
         }
     }
 
-    void CompositeVoronoi::remove_duplicates_without_sort( std::vector<Point2i>& vec)
-    {
-        auto new_last = vec.end()-1;
+    void CompositeVoronoi::remove_duplicates_without_sort(std::vector<Point2i> &vec) {
+        auto new_last = vec.end() - 1;
 
-        for ( auto current = vec.begin(); current != new_last; ++current )
-        {
-            for (auto consider = current + 1; consider != new_last && consider != vec.end();){
-                if (consider->x == current->x && consider->y == current->y){
-                    std::iter_swap(consider,new_last);
+        for (auto current = vec.begin(); current != new_last; ++current) {
+            for (auto consider = current + 1; consider != new_last && consider != vec.end();) {
+                if (consider->x == current->x && consider->y == current->y) {
+                    std::iter_swap(consider, new_last);
                     new_last--;
-                }else{
+                } else {
                     consider++;
                 }
             }
         }
-        vec.erase(new_last+1,vec.end());
+        vec.erase(new_last + 1, vec.end());
     }
 
     cv::Mat Composite::score_image_2X(int rows, int cols, int radius) {

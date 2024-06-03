@@ -42,8 +42,8 @@ void ImageViewComponent::setImage(std::shared_ptr< MRTiledImage > image){
 
   MRImage = image;
   
-  horizontalScrollBar.setRangeLimits(0, MRImage->bounds.getWidth());
-  verticalScrollBar.setRangeLimits(0, MRImage->bounds.getHeight());
+  horizontalScrollBar.setRangeLimits(MRImage->bounds.getX(), MRImage->bounds.getWidth());
+  verticalScrollBar.setRangeLimits(MRImage->bounds.getY(), MRImage->bounds.getHeight());
   
   horizontalScrollBar.setVisible(true);
   verticalScrollBar.setVisible(true);
@@ -161,7 +161,9 @@ void ImageViewComponent::paint (juce::Graphics& g)
   
   g.drawImageAt(checkerboard, 0, 0);
   
-  if(MRImage){ drawSlide(g, 1.0); }
+  if(MRImage){
+      drawSlide(g, 1.0);
+  }
   
 }
 
