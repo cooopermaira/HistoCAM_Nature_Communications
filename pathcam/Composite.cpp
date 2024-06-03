@@ -97,7 +97,7 @@ namespace pathCam {
 
             //build polygon mask for new point
             Mat polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
-            cv::fillConvexPoly(polyMaskOutput, face, cv::Scalar(1));
+            cv::fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
 
             //test for exclusion of frame via rollback
             int nonzeroMin;

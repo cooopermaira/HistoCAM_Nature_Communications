@@ -152,6 +152,11 @@ void TiledImage::matToImage2(const cv::Mat &mat, juce::Image *image,
             jassert(u < (tile_size) and v < (tile_size));
             uint8 alpha = (bgr[2] == 0 && bgr[1] == 0 && bgr[0] == 0) ? 0 : 255;
             juce::Colour orig = data.getPixelColour(u, v);
+            juce::Colour newColor = juce::Colour(bgr[2], bgr[1], bgr[0], alpha);
+            auto test = newColor.getARGB();
+            if(test > 0){
+                int k = 0;
+            }
             if (alpha == 0) {
                 data.setPixelColour(u, v, orig);
             } else {
