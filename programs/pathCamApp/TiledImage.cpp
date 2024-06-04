@@ -48,13 +48,11 @@ void TiledImage::insertMat(cv::Mat image_in, fRectangle box, std::vector<iPoint>
         int i = tile.getX();
         int j = tile.getY();
 
-        if(i == -1 && j ==0){
-            int k = 0;
-        }
+
         if (tiles(i, j) == NULL) {
             tiles(i, j) = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
         }
-        auto test = tiles(i, j);
+
         fRectangle tile_box = fRectangle(i * float(logic_size),
                                          j * float(logic_size),
                                          logic_size,
@@ -62,10 +60,10 @@ void TiledImage::insertMat(cv::Mat image_in, fRectangle box, std::vector<iPoint>
 
         fRectangle image_box = tile_box.getIntersection(box);
 
-
         fPoint offset = box.getTopLeft();
 
         matToImage4Channel(image_in, tiles(i, j), offset * scale, image_box * scale, tile_box * scale);
+
     }
 }
 
@@ -125,9 +123,10 @@ void TiledImage::matToImage4Channel(const cv::Mat &mat, juce::Image *image, fPoi
 
         for (int row_index = 0; row_index < ROI.rows; row_index++) {
             auto *src_ptr = ROI.ptr(row_index);
-            auto *dst_ptr = bitmap_data.getLinePointer(row_index);
+            auto *dst_ptr = bitmap_data.getLinePointer(row_index + image_box.getY() - tile_box.getY());
             std::memcpy(dst_ptr, src_ptr, numberOfBytesToCopy);
         }
+
     }
 }
 

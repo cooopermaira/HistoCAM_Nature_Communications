@@ -125,6 +125,8 @@ namespace pathCam {
             if (images[i]->label == Image::_2X) {
                 cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
             }
+
+            //add alpha channel now so cvMat can be turned into juce image via memcpy
             channels[0] = threeChannelPreallocated;
             channels[1] = polyMaskOutput;
             merge(channels,fourChannelPreallocated);
