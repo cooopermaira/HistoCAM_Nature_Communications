@@ -18,7 +18,7 @@ std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, juce::Rectangl
   return level[i_scale]->getTiles(view);
 }
 
-
+/*
 void MRTiledImage::build(cv::Mat &image_in){
   //Determine the number of levels
   unsigned int height = image_in.rows;
@@ -29,7 +29,7 @@ void MRTiledImage::build(cv::Mat &image_in){
   std::cout << (unsigned int)(max(log2(width),log2(height)) - log2(tile_size) + 2) << "\n";
 
   unsigned int num_levels = 1;
-  std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(tile_size, tile_size);
+  std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(this,tile_size, tile_size,0);
   current->insertMat(image_in, fRectangle(0,0, width, height));
   level.push_back(current);
   
@@ -44,7 +44,7 @@ void MRTiledImage::build(cv::Mat &image_in){
   std::cout << "Image has " << num_levels << " levels.";
   
 }
-
+*/
 
 void MRTiledImage::insertMat(cv::Mat &image_in, fRectangle box){
     

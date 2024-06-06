@@ -60,14 +60,11 @@ namespace pathCam {
     }
 
     bool StreamCam::run() {
-        //cv::namedWindow("display");
-        //cv::namedWindow("display2");
         Poco::Thread stream_thread, Q_thread, composite_thread;
 
         auto ds = new DiskReader(this);
-        //auto ds = new DiskStreamer(this);
         stream_thread.start(ds);
-        //ds->run();
+
         auto start = std::chrono::high_resolution_clock::now();
 
         QManager *qm = new QManager(this);
@@ -79,6 +76,7 @@ namespace pathCam {
         stream_thread.join();
         Q_thread.join();
         composite_thread.join();
+
         auto stop = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
         std::cout << duration.count() << std::endl;

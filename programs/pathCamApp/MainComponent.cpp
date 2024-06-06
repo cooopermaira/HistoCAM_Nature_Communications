@@ -86,7 +86,7 @@ public:
         }
 
         unsigned int num_levels = 1;
-        std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(tile_size, tile_size);
+        std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->MRimage,tile_size, tile_size,0);
         setStatusMessage("Computing level 1");
         current->insertMat(image_in, fRectangle(-5000, -5000, width, height));
         double pixels_processed = image_in.cols * image_in.rows;
@@ -94,8 +94,8 @@ public:
         parent->MRimage->level.push_back(current);
 
         while (image_in.cols > tile_size || image_in.rows > tile_size) {
-            std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(tile_size,
-                                                                               tile_size * pow(2, num_levels));
+            std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->MRimage,tile_size,
+                                                                               tile_size * pow(2, num_levels),num_levels);
             setStatusMessage("Computing level " + juce::String(num_levels));
             //cv::resize causes a reallocation and is possibly better done with cv::pyrDown()
             cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));

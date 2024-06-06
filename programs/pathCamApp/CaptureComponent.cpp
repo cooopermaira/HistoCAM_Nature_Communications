@@ -6,20 +6,46 @@
 //
 
 #include "JuceHeader.h"
-/*
-class FileProcessThread final : public juce::Thread{
-    explicit FileProcessThread
+
+class bcamThread final : public juce::Thread {
+public:
+    explicit bcamThread(const juce::String &threadName, MainComponent *parent,
+                        std::shared_ptr<pathCam::StreamCam> bcam) : Thread(threadName), parent(parent),
+                                                                    bcam(bcam) {};
+    void run() override{
+        bcam->run();
+
+    }
+
+    MainComponent *parent;
+    std::shared_ptr<pathCam::StreamCam> bcam;
 };
-*/
-void CaptureComponent::startRecording(){
+
+class bcamPocoRunnable: public Poco::Runnable{
+public:
+    bcamPocoRunnable(std::shared_ptr<pathCam::StreamCam> bcam):bcam(bcam){};
+    std::shared_ptr<pathCam::StreamCam> bcam;
+
+    virtual void run(){
+        bcam->run();
+    }
+
+};
+
+
+void CaptureComponent::startRecording() {
     recording = true;
     //run streamcam from here
     bcam->run();
-    
     parent->imageview->setImage(parent->MRimage);
     parent->capture->setImage(parent->MRimage);
     parent->annotate->setImage(parent->MRimage);
-
+    //(new bcamThread("bcam Thread", parent, bcam))->run();
+/*
+    Poco::Thread bcamThread;
+    auto bcamRunnable = new bcamPocoRunnable(bcam);
+    bcamThread.start(bcamRunnable);
+*/
     repaint();
 }
 

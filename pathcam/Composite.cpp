@@ -17,7 +17,7 @@ namespace pathCam {
         subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
         circleMask = cv::Mat::zeros(image_size, CV_8U);
         cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), 2190, cv::Scalar(1), -1);
-        std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>();
+        std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid);
         parent->imagePyramid->level.push_back(current);
         channels.resize(2);
         imageBoundsAsPolygon.resize(4);
@@ -143,13 +143,13 @@ namespace pathCam {
                             effectedTiles.end());
 
         tiledImageBounds = fRectangle((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
-        parent->imagePyramid->level[0]->insertMat(composite, tiledImageBounds, effectedTiles);
+        parent->imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
         parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
-        /*
+/*
         parent->parent->imageview->setImage(parent->parent->MRimage);
         parent->parent->capture->setImage(parent->parent->MRimage);
         parent->parent->annotate->setImage(parent->parent->MRimage);
-        */
+*/
     }
 
 
@@ -208,7 +208,14 @@ namespace pathCam {
 
             composite = new_combined;
             //composite_z_buffer = new_combined_z_buffer;
-
+            unsigned int topLogicSize = parent->imagePyramid->level.back()->getLogicSize();
+            while (topLogicSize < composite.rows || topLogicSize < composite.cols ){
+                unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
+                unsigned int logic_size = 2 * parent->imagePyramid->level.back()->getLogicSize();
+                std::shared_ptr<TiledImage> next_level = std::make_shared<TiledImage>(parent->imagePyramid,tile_size,logic_size,parent->imagePyramid->level.size());
+                parent->imagePyramid->level.push_back(next_level);
+                topLogicSize = logic_size;
+            }
         }
     };
 
