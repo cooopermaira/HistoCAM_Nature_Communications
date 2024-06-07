@@ -9,6 +9,8 @@
 
 std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, juce::Rectangle <int> screen){
   
+  if(level.size() == 0){ return std::vector<TileQuery>(); }
+  
   float scale = max(view.getHorizontalRange().getLength()/float(screen.getHorizontalRange().getLength()),
                     view.getVerticalRange().getLength()/float(screen.getVerticalRange().getLength()));  
   scale = log2(scale);
