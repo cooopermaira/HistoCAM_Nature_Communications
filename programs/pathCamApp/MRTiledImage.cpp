@@ -14,7 +14,9 @@ std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, juce::Rectangl
   scale = log2(scale);
   unsigned int i_scale =  (unsigned int)(scale+0.5);
   i_scale = min((unsigned int)(level.size()-1), i_scale);
-  
+  while(level.size() == 0){
+      sleep(1);
+  }
   return level[i_scale]->getTiles(view);
 }
 

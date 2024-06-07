@@ -35,17 +35,18 @@ public:
 
 void CaptureComponent::startRecording() {
     recording = true;
-    //run streamcam from here
-    bcam->run();
+
+    //bcam->run();
     parent->imageview->setImage(parent->MRimage);
     parent->capture->setImage(parent->MRimage);
     parent->annotate->setImage(parent->MRimage);
-    //(new bcamThread("bcam Thread", parent, bcam))->run();
-/*
-    Poco::Thread bcamThread;
+
+
+
     auto bcamRunnable = new bcamPocoRunnable(bcam);
     bcamThread.start(bcamRunnable);
-*/
+
+    //(new bcamThread("bcam Thread", parent, bcam))->run();
     repaint();
 }
 

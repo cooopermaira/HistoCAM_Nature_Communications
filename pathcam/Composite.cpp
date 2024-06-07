@@ -127,8 +127,8 @@ namespace pathCam {
             }
 
             //add alpha channel now so cvMat can be turned into juce image via memcpy
-            channels[0] = threeChannelPreallocated;
-            channels[1] = polyMaskOutput;
+            channels[0] = threeChannelPreallocated; //3 channel
+            channels[1] = polyMaskOutput;              //1 channel
             merge(channels,fourChannelPreallocated);
 
             fourChannelPreallocated.copyTo(composite(copyzone), polyMaskOutput);
@@ -212,7 +212,14 @@ namespace pathCam {
             while (topLogicSize < composite.rows || topLogicSize < composite.cols ){
                 unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
                 unsigned int logic_size = 2 * parent->imagePyramid->level.back()->getLogicSize();
-                std::shared_ptr<TiledImage> next_level = std::make_shared<TiledImage>(parent->imagePyramid,tile_size,logic_size,parent->imagePyramid->level.size());
+                int levelWithinPyramid = parent->imagePyramid->level.size();
+                std::shared_ptr<TiledImage> next_level = std::make_shared<TiledImage>(parent->imagePyramid,tile_size,logic_size,levelWithinPyramid);
+                if(composite.data){
+                    Mat temp;
+                    resize(composite,temp,Size(composite.cols / pow(2, levelWithinPyramid), composite.rows / pow(2, levelWithinPyramid)));
+                    tiledImageBounds = fRectangle((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
+                    next_level->insertMat(temp,tiledImageBounds);
+                }
                 parent->imagePyramid->level.push_back(next_level);
                 topLogicSize = logic_size;
             }

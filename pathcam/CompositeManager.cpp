@@ -91,20 +91,25 @@ namespace pathCam {
 
             }
             */
-
+/*
             for (int i = 1; i < parent->imagePyramid->level.size(); i++){
                 cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
                 parent->imagePyramid->level[i]->insertMat(image_in,parent->imagePyramid->bounds);
             }
+*/
         }
 
 
-        /*
+/*
         for (int i = 0; i < parent->composites.size(); i++){
           std::cout << "Writing image of size: " << parent->composites[i]->get_composite().size() << "\n";
           imwrite("finish" + std::to_string(i) + ".png", parent->composites[i]->get_composite());
         }
-      */
+
+        for(int i = 0; i < parent->imagePyramid->level.size(); i++) {
+            cv::imwrite("test"+std::to_string(i)+".png", *parent->imagePyramid->level[i]->cvTiles(0, 0));
+        }
+        */
     }
 
 }

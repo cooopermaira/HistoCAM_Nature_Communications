@@ -58,6 +58,20 @@ public:
             image(image), i(i), j(j), bounds(bounds) {};
 };
 
+class Tile {
+public:
+    Tile(int x, int y, unsigned int tile_size, unsigned int logic_size) : x(x), y(y), tile_size(tile_size), logic_size(logic_size) {
+        cvImage = Mat(tile_size,tile_size,CV_8UC4);
+        juceImage = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
+    }
+    unsigned int tile_size;
+    unsigned int logic_size;
+    int x;
+    int y;
+    juce::Image *juceImage;
+    cv::Mat cvImage;
+
+};
 
 class TiledImage {
 private:
@@ -65,9 +79,9 @@ private:
     unsigned int tile_size;
     unsigned int logic_size;
 
+public:
     Dense2DArray<juce::Image *> tiles;
     Dense2DArray<cv::Mat*> cvTiles;
-public:
     fRectangle bounds;
 
     TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 512,
@@ -82,11 +96,13 @@ public:
 
     unsigned int getLogicSize() { return logic_size; }
 
+    void makeTile(int x, int y);
+
     void insertMat(cv::Mat image_in, fRectangle i_bounds);
 
     void insertMatAtBase(cv::Mat image_in, fRectangle box, std::vector<iPoint> retileIndices);
 
-    void tileUpwards(fRectangle region);
+    void tileUpwards(fRectangle myLevelRegion, cv::Rect myROI, const cv::Mat &mat);
 
     inline juce::Image *getTile(int i, int j) { return tiles(i, j); }
 
@@ -106,7 +122,7 @@ private:
     void matToImage2(const cv::Mat &mat, juce::Image *image, fPoint offset,
                      fRectangle image_box, fRectangle tile_box);
 
-    void matToImage4Channel(const cv::Mat &mat, juce::Image *image, fPoint offset,
+    void matToImage4Channel(const cv::Mat &mat, int x, int y, fPoint rootOffset,
                             fRectangle image_box, fRectangle tile_box);
 
 

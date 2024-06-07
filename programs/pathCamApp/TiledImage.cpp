@@ -18,91 +18,142 @@ void TiledImage::insertMatAtBase(cv::Mat image_in, fRectangle box, std::vector<i
 
     bounds = bounds.getUnion(box);
 
-    fPoint top_left = box.getTopLeft();
-    fPoint bottom_right = box.getBottomRight();
-    bottom_right.x -= 1;
-    bottom_right.y -= 1;
-
     for (auto &tile: retileIndices) {
-        int i = tile.getX();
-        int j = tile.getY();
+        int x = tile.getX();
+        int y = tile.getY();
 
+        makeTile(x, y);
 
-        if (tiles(i, j) == NULL) {
-            cvTiles(i,j) = new Mat(tile_size,tile_size,CV_8UC4); //cvMat is already heap allocated
-            tiles(i, j) = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
-        }
-
-        fRectangle tile_box = fRectangle(i * float(logic_size),
-                                         j * float(logic_size),
+        fRectangle tile_box = fRectangle(x * float(logic_size),
+                                         y * float(logic_size),
                                          logic_size,
                                          logic_size);
 
         fRectangle image_box = tile_box.getIntersection(box);
 
-        fPoint offset = box.getTopLeft();
+        fPoint offset = box.getTopLeft(); //equivalent of root offset
 
-        matToImage4Channel(image_in, tiles(i, j), offset * scale, image_box * scale, tile_box * scale);
+        matToImage4Channel(image_in, x, y, offset * scale, image_box * scale, tile_box * scale);
 
     }
 }
 
 
+void TiledImage::matToImage4Channel(const cv::Mat &mat, int x, int y, fPoint rootOffset, fRectangle image_box,
+                                    fRectangle tile_box) {
+    cv::Rect ROIrect((int) (image_box.getX() - rootOffset.getX()),
+                     (int) (image_box.getY() - rootOffset.getY()),
+                     (int) image_box.getWidth(),
+                     (int) image_box.getHeight());
+    if (ROIrect.width * ROIrect.height > 0) {
+        cv::Mat matROI = mat(ROIrect);
+        const size_t numberOfBytesToCopy = 4 * matROI.cols;
 
-void TiledImage::tileUpwards(fRectangle baseLevelTile) {
+        Image::BitmapData bitmap_data(*tiles(x, y), 0,
+                                      0, matROI.cols, matROI.rows,
+                                      Image::BitmapData::ReadWriteMode::writeOnly);
+
+        for (int row_index = 0; row_index < matROI.rows; row_index++) {
+            auto *src_ptr = matROI.ptr(row_index);
+            auto *dst_ptr = bitmap_data.getPixelPointer(image_box.getX() - tile_box.getX(), row_index+image_box.getY() - tile_box.getY());
+            std::memcpy(dst_ptr, src_ptr, numberOfBytesToCopy);
+        }
+
+
+        //prepare to tile upward
+        auto tileROI = cv::Rect(image_box.getX() - tile_box.getX(), image_box.getY() - tile_box.getY(), matROI.cols, matROI.rows);
+
+        //weird edge case
+        Mat temp;
+        if(matROI.cols < tile_size || matROI.rows < tile_size){
+            temp = Mat::zeros(tile_size,tile_size,CV_8UC4);
+            matROI.copyTo(temp(tileROI));
+        }else{
+            temp = matROI;
+        }
+        tileUpwards(tile_box,Rect(0,0,tile_size,tile_size), temp);
+    }
+}
+
+
+void TiledImage::tileUpwards(fRectangle myLevelRegion, cv::Rect myROI, const cv::Mat &myCV) {
+
     //find appropriate region of upper level
-    float xloc = baseLevelTile.getX() / 2.f;
-    float yloc = baseLevelTile.getY() / 2.f;
-    float width = baseLevelTile.getWidth() / 2.f;
-    float height = baseLevelTile.getHeight() / 2.f;
-    auto region = fRectangle(xloc,yloc,width,height);
+    float xloc = myLevelRegion.getX() / 2.f;
+    float yloc = myLevelRegion.getY() / 2.f;
+    float width = myLevelRegion.getWidth() / 2.f;
+    float height = myLevelRegion.getHeight() / 2.f;
+    auto theirLevelRegion = fRectangle(xloc, yloc, width, height);
 
-    //find appropriate tile in level up
-    auto tileIndex = parent->level[levelWithinPyramid + 1]->getIJ(baseLevelTile.getCentre());
+    //find appropriate tiles
+    iPoint them = parent->level[levelWithinPyramid + 1]->getIJ(myLevelRegion.getCentre());
+    iPoint me = getIJ(myLevelRegion.getCentre());
 
-    //make region relative to tile
-    float xlocUp = (long)region.getX() % tile_size;
-    float ylocUp = (long)region.getY() % tile_size;
+    //instantiate
+    parent->level[levelWithinPyramid + 1]->makeTile(them.getX(), them.getY());
 
-    //calculate ROI
-    //cv::Rect ROI(baseLevelTile.getX(),baseLevelTile.getY(),);
+    //make myLevelRegion relative to tile
+    float myTileRegionX = (long) myLevelRegion.getX() % tile_size;
+    myTileRegionX = myTileRegionX < 0 ? myTileRegionX + tile_size : myTileRegionX;
+    float myTileRegionY = (long) myLevelRegion.getY() % tile_size;
+    myTileRegionY = myTileRegionY < 0 ? myTileRegionY + tile_size : myTileRegionY;
+
+    //make theirLevelRegion relative to tile
+    float theirTileRegionX = (long) theirLevelRegion.getX() % tile_size;
+    theirTileRegionX = theirTileRegionX < 0 ? theirTileRegionX + tile_size : theirTileRegionX;
+    float theirTileRegionY = (long) theirLevelRegion.getY() % tile_size;
+    theirTileRegionY = theirTileRegionY < 0 ? theirTileRegionY + tile_size : theirTileRegionY;
+
+    //calculate myROI
+    //cv::Rect myROI(myTileRegionX, myTileRegionY, myLevelRegion.getWidth(), myLevelRegion.getHeight());
+
+    //calculate theirROI
+    cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.getWidth(), theirLevelRegion.getHeight());
 
     //resize self cv image into their cv image ROI
-    iPoint myIndex = getIJ(baseLevelTile.getCentre());
-    Mat* mine = cvTiles(myIndex.getX(),myIndex.getY());
-    Mat* theirs = parent->level[levelWithinPyramid + 1]->cvTiles(tileIndex.getX(),tileIndex.getY());
-    //resize(cvTiles(),parent->level[levelWithinPyramid + 1]->cvTiles(tileIndex.getX(),tileIndex.getY());
+    auto theirCV = *parent->level[levelWithinPyramid + 1]->cvTiles(them.getX(), them.getY());
+
+    auto theirCopyMat = theirCV(theirROI);
+    auto myCopyMat = myCV(myROI);
+    try {
+        resize(myCopyMat, theirCopyMat, cv::Size(theirROI.width, theirROI.height));
+    }
+    catch (cv::Exception &e) {
+        const char *err_msg = e.what();
+        std::cout << err_msg << std::endl;
+        int k = 0;
+    }
 
     //bitmap memcpy my cv image into juce image
+
+    auto theirJuceImage = *parent->level[levelWithinPyramid + 1]->tiles(them.getX(), them.getY());
+    auto bitmap_data = new Image::BitmapData(theirJuceImage, 0, 0, theirROI.width, theirROI.height,
+                                  Image::BitmapData::ReadWriteMode::writeOnly);
+    size_t bytesToCopy = 4 * theirROI.width;
+    for (int row_index = 0; row_index < theirROI.height; row_index++) {
+        auto *src_ptr = theirCopyMat.ptr(row_index);
+        auto *dst_ptr = bitmap_data->getPixelPointer(theirROI.x, row_index + theirROI.y);
+        std::memcpy(dst_ptr, src_ptr, bytesToCopy);
+    }
+    delete bitmap_data;
+/*
+    imwrite("cv" + std::to_string(levelWithinPyramid)+".png",myCV);
+
+    FileOutputStream stream (File ("./test"+std::to_string(levelWithinPyramid)+".png"));
+    PNGImageFormat pngWriter;
+    pngWriter.writeImageToStream(*theirJuceImage, stream);
+*/
+    //continue up pyramid
+    if (levelWithinPyramid + 1 < parent->level.size() - 1) {
+        parent->level[levelWithinPyramid + 1]->tileUpwards(theirLevelRegion, theirROI, theirCV);
+    }
     int k = 0;
 }
 
 
-void TiledImage::matToImage4Channel(const cv::Mat &mat, juce::Image *image, fPoint offset, fRectangle image_box,
-                                    fRectangle tile_box) {
-    cv::Rect ROIrect((int) (image_box.getX() - offset.getX()),
-                     (int) (image_box.getY() - offset.getY()),
-                     (int) image_box.getWidth(),
-                     (int) image_box.getHeight());
-    if(ROIrect.width * ROIrect.height > 0) {
-        cv::Mat ROI = mat(ROIrect);
-        const size_t numberOfBytesToCopy = 4 * ROI.cols;
-
-        Image::BitmapData bitmap_data(*image, 0, 0, ROI.cols, ROI.rows, Image::BitmapData::ReadWriteMode::writeOnly);
-
-        for (int row_index = 0; row_index < ROI.rows; row_index++) {
-            auto *src_ptr = ROI.ptr(row_index);
-            auto *dst_ptr = bitmap_data.getLinePointer(row_index + image_box.getY() - tile_box.getY());
-            std::memcpy(dst_ptr, src_ptr, numberOfBytesToCopy);
-        }
-
-        //tileUpwards(tile_box);
-    }
-}
-
 void TiledImage::matToImage2(const cv::Mat &mat, juce::Image *image,
-                            fPoint offset, fRectangle image_box,
-                            fRectangle tile_box) {
+                             fPoint offset, fRectangle image_box,
+                             fRectangle tile_box) {
     jassert(mat.type() == CV_8UC4);
 
     cv::Rect ROIrect((int) (image_box.getX() - offset.getX()),
@@ -123,7 +174,7 @@ void TiledImage::matToImage2(const cv::Mat &mat, juce::Image *image,
             juce::Colour orig = data.getPixelColour(u, v);
             juce::Colour newColor = juce::Colour(bgr[2], bgr[1], bgr[0], alpha);
             auto test = newColor.getARGB();
-            if(test > 0){
+            if (test > 0) {
                 int k = 0;
             }
             if (alpha == 0) {
@@ -186,9 +237,8 @@ void TiledImage::insertMat(cv::Mat image_in, fRectangle box) {
 
     for (int i = getIJ(top_left).getX(); i <= getIJ(bottom_right).getX(); i++) {
         for (int j = getIJ(top_left).getY(); j <= getIJ(bottom_right).getY(); j++) {
-            if (tiles(i, j) == NULL) {
-                tiles(i, j) = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
-            }
+
+            makeTile(i, j);
 
             fRectangle tile_box = fRectangle(i * float(logic_size),
                                              j * float(logic_size),
@@ -197,11 +247,10 @@ void TiledImage::insertMat(cv::Mat image_in, fRectangle box) {
 
             fRectangle image_box = tile_box.getIntersection(box);
 
-
             fPoint offset = box.getTopLeft();
-            if(image_in.type() == CV_8UC3) {
+            if (image_in.type() == CV_8UC3) {
                 matToImage(image_in, tiles(i, j), offset * scale, image_box * scale, tile_box * scale);
-            }else if(image_in.type() == CV_8UC4){
+            } else if (image_in.type() == CV_8UC4) {
                 matToImage2(image_in, tiles(i, j), offset * scale, image_box * scale, tile_box * scale);
             }
         }
@@ -227,4 +276,11 @@ std::vector<TileQuery> TiledImage::getTiles(fRectangle box) {
     }
 
     return box_tiles;
+}
+
+void TiledImage::makeTile(int x, int y) {
+    if (tiles(x, y) == NULL) {
+        cvTiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4);
+        tiles(x, y) = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
+    }
 }
