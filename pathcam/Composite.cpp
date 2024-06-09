@@ -145,6 +145,7 @@ namespace pathCam {
         tiledImageBounds = fRectangle((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
         parent->imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
         parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
+
 /*
         parent->parent->imageview->setImage(parent->parent->MRimage);
         parent->parent->capture->setImage(parent->parent->MRimage);

@@ -71,13 +71,16 @@ void TiledImage::matToImage4Channel(const cv::Mat &mat, int x, int y, fPoint roo
         }else{
             temp = matROI;
         }
-        tileUpwards(tile_box,Rect(0,0,tile_size,tile_size), temp);
+
+        tileUpwards(iPoint(x,y),tile_box, temp);
     }
 }
 
 
-void TiledImage::tileUpwards(fRectangle myLevelRegion, cv::Rect myROI, const cv::Mat &myCV) {
-
+void TiledImage::tileUpwards(iPoint myTileIndex, fRectangle myLevelRegion, const cv::Mat &myCV) {
+    if(myLevelRegion.getX() < 0 || myLevelRegion.getY() < 0){
+        int k = 0;
+    }
     //find appropriate region of upper level
     float xloc = myLevelRegion.getX() / 2.f;
     float yloc = myLevelRegion.getY() / 2.f;
@@ -86,17 +89,12 @@ void TiledImage::tileUpwards(fRectangle myLevelRegion, cv::Rect myROI, const cv:
     auto theirLevelRegion = fRectangle(xloc, yloc, width, height);
 
     //find appropriate tiles
-    iPoint them = parent->level[levelWithinPyramid + 1]->getIJ(myLevelRegion.getCentre());
-    iPoint me = getIJ(myLevelRegion.getCentre());
+    iPoint theirTileIndex;
+    theirTileIndex.x = myTileIndex.getX() == -1 ? myTileIndex.getX() : myTileIndex.getX() / 2;
+    theirTileIndex.y = myTileIndex.getY() == -1 ? myTileIndex.getY() : myTileIndex.getY() / 2;
 
     //instantiate
-    parent->level[levelWithinPyramid + 1]->makeTile(them.getX(), them.getY());
-
-    //make myLevelRegion relative to tile
-    float myTileRegionX = (long) myLevelRegion.getX() % tile_size;
-    myTileRegionX = myTileRegionX < 0 ? myTileRegionX + tile_size : myTileRegionX;
-    float myTileRegionY = (long) myLevelRegion.getY() % tile_size;
-    myTileRegionY = myTileRegionY < 0 ? myTileRegionY + tile_size : myTileRegionY;
+    parent->level[levelWithinPyramid + 1]->makeTile(theirTileIndex.getX(), theirTileIndex.getY());
 
     //make theirLevelRegion relative to tile
     float theirTileRegionX = (long) theirLevelRegion.getX() % tile_size;
@@ -104,50 +102,32 @@ void TiledImage::tileUpwards(fRectangle myLevelRegion, cv::Rect myROI, const cv:
     float theirTileRegionY = (long) theirLevelRegion.getY() % tile_size;
     theirTileRegionY = theirTileRegionY < 0 ? theirTileRegionY + tile_size : theirTileRegionY;
 
-    //calculate myROI
-    //cv::Rect myROI(myTileRegionX, myTileRegionY, myLevelRegion.getWidth(), myLevelRegion.getHeight());
-
     //calculate theirROI
     cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.getWidth(), theirLevelRegion.getHeight());
 
     //resize self cv image into their cv image ROI
-    auto theirCV = *parent->level[levelWithinPyramid + 1]->cvTiles(them.getX(), them.getY());
+    jassert(holdingMatrix.rows == myCV.rows / 2 && holdingMatrix.cols == myCV.cols / 2);
+    resize(myCV,holdingMatrix,Size(holdingMatrix.cols,holdingMatrix.rows));
 
-    auto theirCopyMat = theirCV(theirROI);
-    auto myCopyMat = myCV(myROI);
-    try {
-        resize(myCopyMat, theirCopyMat, cv::Size(theirROI.width, theirROI.height));
-    }
-    catch (cv::Exception &e) {
-        const char *err_msg = e.what();
-        std::cout << err_msg << std::endl;
-        int k = 0;
-    }
 
     //bitmap memcpy my cv image into juce image
-
-    auto theirJuceImage = *parent->level[levelWithinPyramid + 1]->tiles(them.getX(), them.getY());
-    auto bitmap_data = new Image::BitmapData(theirJuceImage, 0, 0, theirROI.width, theirROI.height,
+    auto theirJuceImage = *parent->level[levelWithinPyramid + 1]->tiles(theirTileIndex.getX(), theirTileIndex.getY());
+    auto bitmap_data = new Image::BitmapData(theirJuceImage, theirROI.x, theirROI.y, theirROI.width, theirROI.height,
                                   Image::BitmapData::ReadWriteMode::writeOnly);
+
     size_t bytesToCopy = 4 * theirROI.width;
     for (int row_index = 0; row_index < theirROI.height; row_index++) {
-        auto *src_ptr = theirCopyMat.ptr(row_index);
-        auto *dst_ptr = bitmap_data->getPixelPointer(theirROI.x, row_index + theirROI.y);
+        auto *src_ptr = holdingMatrix.ptr(row_index);
+        auto *dst_ptr = bitmap_data->getLinePointer(row_index);
         std::memcpy(dst_ptr, src_ptr, bytesToCopy);
     }
-    delete bitmap_data;
-/*
-    imwrite("cv" + std::to_string(levelWithinPyramid)+".png",myCV);
 
-    FileOutputStream stream (File ("./test"+std::to_string(levelWithinPyramid)+".png"));
-    PNGImageFormat pngWriter;
-    pngWriter.writeImageToStream(*theirJuceImage, stream);
-*/
+    delete bitmap_data;
+
     //continue up pyramid
     if (levelWithinPyramid + 1 < parent->level.size() - 1) {
-        parent->level[levelWithinPyramid + 1]->tileUpwards(theirLevelRegion, theirROI, theirCV);
+        parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex,theirLevelRegion, holdingMatrix);
     }
-    int k = 0;
 }
 
 
@@ -280,7 +260,7 @@ std::vector<TileQuery> TiledImage::getTiles(fRectangle box) {
 
 void TiledImage::makeTile(int x, int y) {
     if (tiles(x, y) == NULL) {
-        cvTiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4);
+        //cvTiles(x, y) = new Mat(Size(tile_size, tile_size), CV_8UC4);
         tiles(x, y) = new juce::Image(juce::Image::PixelFormat::ARGB, tile_size, tile_size, true);
     }
 }
