@@ -129,7 +129,7 @@ void TiledImage::tileUpwards(iPoint myTileIndex, fRectangle myLevelRegion, const
     }
 
     delete bitmap_data;
-    
+
     //continue up pyramid
     if (levelWithinPyramid + 1 < parent->level.size() - 1) {
         parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, holdingMatrix);

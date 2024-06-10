@@ -18,14 +18,7 @@ namespace pathCam {
 
     void MatchRunnable::run() {
         pathCam::Image *image = parent->get_image_ref(image_idx);
-        /*
-        if (image->image_file.getFileName() == "frame-10282021160841-919.Raw" ||
-            image->image_file.getFileName() == "frame-10282021160841-918.Raw" ||
-            image->image_file.getFileName() == "frame-10282021160839-893.Raw" ||
-            image->image_file.getFileName() == "frame-10282021160839-892.Raw") {
-            int k = 0;
-        }
-        */
+
 
         if (!image->is_good()) {
             return;

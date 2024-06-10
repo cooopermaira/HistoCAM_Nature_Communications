@@ -75,7 +75,7 @@ namespace pathCam {
         void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<iPoint>& result, Vec2 absCoord);
         static void remove_duplicates_without_sort( std::vector<Point2i>& vec);
         void reset_image_as_polygon();
-
+        void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
     public:
         CompositeVoronoi(StreamCam *parent, cv::Size image_size);
 

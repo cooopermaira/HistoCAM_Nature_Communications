@@ -31,11 +31,10 @@ int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type,
   m->H = cv::findHomography(image_1_pts, image_2_pts, estimator_type,
                              ransacReprojThreshold, noArray(), maxIters,
                              confidence);
-  
+
   if(m->H.empty()){
     return -2;
   }
-  
   m->t_x = m->H.at<double>(0,0)*m->H.at<double>(0,2)*(1.0/m->image_2->get_reg_scale());
   m->t_y = m->H.at<double>(1,1)*m->H.at<double>(1,2)*(1.0/m->image_2->get_reg_scale());
   
