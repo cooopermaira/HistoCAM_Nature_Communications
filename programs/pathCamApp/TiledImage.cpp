@@ -55,30 +55,35 @@ void TiledImage::matToImage4Channel(const cv::Mat &mat, int x, int y, fPoint roo
 
         for (int row_index = 0; row_index < matROI.rows; row_index++) {
             auto *src_ptr = matROI.ptr(row_index);
-            auto *dst_ptr = bitmap_data.getPixelPointer(image_box.getX() - tile_box.getX(), row_index+image_box.getY() - tile_box.getY());
+            auto *dst_ptr = bitmap_data.getPixelPointer(image_box.getX() - tile_box.getX(),
+                                                        row_index + image_box.getY() - tile_box.getY());
             std::memcpy(dst_ptr, src_ptr, numberOfBytesToCopy);
         }
 
 
         //prepare to tile upward
-        auto tileROI = cv::Rect(image_box.getX() - tile_box.getX(), image_box.getY() - tile_box.getY(), matROI.cols, matROI.rows);
+        auto tileROI = cv::Rect(image_box.getX() - tile_box.getX(), image_box.getY() - tile_box.getY(), matROI.cols,
+                                matROI.rows);
 
         //weird edge case
         Mat temp;
-        if(matROI.cols < tile_size || matROI.rows < tile_size){
-            temp = Mat::zeros(tile_size,tile_size,CV_8UC4);
+        if (matROI.cols < tile_size || matROI.rows < tile_size) {
+            temp = Mat::zeros(tile_size, tile_size, CV_8UC4);
             matROI.copyTo(temp(tileROI));
-        }else{
+        } else {
             temp = matROI;
         }
 
-        tileUpwards(iPoint(x,y),tile_box, temp);
+        if (x == -3 && y == -3) {
+            int k = 0;
+        }
+        tileUpwards(iPoint(x, y), tile_box, temp);
     }
 }
 
 
 void TiledImage::tileUpwards(iPoint myTileIndex, fRectangle myLevelRegion, const cv::Mat &myCV) {
-    if(myLevelRegion.getX() < 0 || myLevelRegion.getY() < 0){
+    if (myLevelRegion.getX() < 0 || myLevelRegion.getY() < 0) {
         int k = 0;
     }
     //find appropriate region of upper level
@@ -90,8 +95,8 @@ void TiledImage::tileUpwards(iPoint myTileIndex, fRectangle myLevelRegion, const
 
     //find appropriate tiles
     iPoint theirTileIndex;
-    theirTileIndex.x = myTileIndex.getX() == -1 ? myTileIndex.getX() : myTileIndex.getX() / 2;
-    theirTileIndex.y = myTileIndex.getY() == -1 ? myTileIndex.getY() : myTileIndex.getY() / 2;
+    theirTileIndex.x = myTileIndex.getX() < 0 ? (myTileIndex.getX() - 1) / 2 : myTileIndex.getX() / 2;
+    theirTileIndex.y = myTileIndex.getY() < 0 ? (myTileIndex.getY() - 1)/ 2  : myTileIndex.getY() / 2;
 
     //instantiate
     parent->level[levelWithinPyramid + 1]->makeTile(theirTileIndex.getX(), theirTileIndex.getY());
@@ -107,15 +112,16 @@ void TiledImage::tileUpwards(iPoint myTileIndex, fRectangle myLevelRegion, const
 
     //resize self cv image into their cv image ROI
     jassert(holdingMatrix.rows == myCV.rows / 2 && holdingMatrix.cols == myCV.cols / 2);
-    resize(myCV,holdingMatrix,Size(holdingMatrix.cols,holdingMatrix.rows));
+    resize(myCV, holdingMatrix, Size(holdingMatrix.cols, holdingMatrix.rows));
 
 
     //bitmap memcpy my cv image into juce image
     auto theirJuceImage = *parent->level[levelWithinPyramid + 1]->tiles(theirTileIndex.getX(), theirTileIndex.getY());
     auto bitmap_data = new Image::BitmapData(theirJuceImage, theirROI.x, theirROI.y, theirROI.width, theirROI.height,
-                                  Image::BitmapData::ReadWriteMode::writeOnly);
+                                             Image::BitmapData::ReadWriteMode::writeOnly);
 
     size_t bytesToCopy = 4 * theirROI.width;
+
     for (int row_index = 0; row_index < theirROI.height; row_index++) {
         auto *src_ptr = holdingMatrix.ptr(row_index);
         auto *dst_ptr = bitmap_data->getLinePointer(row_index);
@@ -123,10 +129,10 @@ void TiledImage::tileUpwards(iPoint myTileIndex, fRectangle myLevelRegion, const
     }
 
     delete bitmap_data;
-
+    
     //continue up pyramid
     if (levelWithinPyramid + 1 < parent->level.size() - 1) {
-        parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex,theirLevelRegion, holdingMatrix);
+        parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, holdingMatrix);
     }
 }
 
