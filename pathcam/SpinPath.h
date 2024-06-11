@@ -72,10 +72,10 @@ private:
   Poco::Path root_path;
   string captureSetName;
   
-  Logger& camlogger;
+  Poco::Logger& camlogger;
   AutoPtr<SimpleFileChannel> camChannel;
   
-  Logger& IOlogger;
+  Poco::Logger& IOlogger;
   AutoPtr<SimpleFileChannel> IOChannel;
  
  CameraStream * cameraStream;

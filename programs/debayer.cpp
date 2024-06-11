@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    Path inFile = Path(argv[1]);
-    Path outFile = Path(argv[2]);
+    auto inFile = Poco::Path(argv[1]);
+    auto outFile = Poco::Path(argv[2]);
 
     if (!(inFile.isDirectory() == outFile.isDirectory())) {
         std::cout << "Input needs to be both directories or files.\n";
@@ -32,11 +32,11 @@ int main(int argc, char *argv[]) {
         std::cout << "Processing Directories\n";
         auto jq = pathCam::JobQueue(20, 20);
 
-        DirectoryIterator it(inFile);
-        DirectoryIterator end;
+        Poco::DirectoryIterator it(inFile);
+        Poco::DirectoryIterator end;
         while (it != end) {
 
-            Path p(it.path());
+            Poco::Path p(it.path());
 
             if (p.getExtension() == "Raw") {
                 //std::cout << "read:" << p.toString() << "\n";

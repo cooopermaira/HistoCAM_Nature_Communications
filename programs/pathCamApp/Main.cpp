@@ -122,6 +122,7 @@ public:
     
   private:
     std::shared_ptr< pathCam::StreamCam > bcam;
+    std::shared_ptr < pathCam::SpinPath > camera;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
   };
   

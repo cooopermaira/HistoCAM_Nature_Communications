@@ -49,9 +49,9 @@ void TiledImage::matToImage4Channel(const cv::Mat &mat, int x, int y, fPoint roo
         cv::Mat matROI = mat(ROIrect);
         const size_t numberOfBytesToCopy = 4 * matROI.cols;
 
-        Image::BitmapData bitmap_data(*tiles(x, y), 0,
+        juce::Image::BitmapData bitmap_data(*tiles(x, y), 0,
                                       0, matROI.cols, matROI.rows,
-                                      Image::BitmapData::ReadWriteMode::writeOnly);
+                                      juce::Image::BitmapData::ReadWriteMode::writeOnly);
 
         for (int row_index = 0; row_index < matROI.rows; row_index++) {
             auto *src_ptr = matROI.ptr(row_index);
@@ -117,8 +117,8 @@ void TiledImage::tileUpwards(iPoint myTileIndex, fRectangle myLevelRegion, const
 
     //bitmap memcpy my cv image into juce image
     auto theirJuceImage = *parent->level[levelWithinPyramid + 1]->tiles(theirTileIndex.getX(), theirTileIndex.getY());
-    auto bitmap_data = new Image::BitmapData(theirJuceImage, theirROI.x, theirROI.y, theirROI.width, theirROI.height,
-                                             Image::BitmapData::ReadWriteMode::writeOnly);
+    auto bitmap_data = new juce::Image::BitmapData(theirJuceImage, theirROI.x, theirROI.y, theirROI.width, theirROI.height,
+                                             juce::Image::BitmapData::ReadWriteMode::writeOnly);
 
     size_t bytesToCopy = 4 * theirROI.width;
 
@@ -155,7 +155,7 @@ void TiledImage::matToImage2(const cv::Mat &mat, juce::Image *image,
         const auto *matRowPtr = ROI.ptr<cv::Vec4b>(y);
         for (int x = 0, u = (int) (image_box.getX() - tile_box.getX()); x < ROI.cols; ++x, ++u) {
             const cv::Vec4b &bgr = matRowPtr[x];
-            jassert(u < (tile_size) and v < (tile_size));
+            jassert(u < (tile_size) && v < (tile_size));
             uint8 alpha = (bgr[2] == 0 && bgr[1] == 0 && bgr[0] == 0) ? 0 : 255;
             juce::Colour orig = data.getPixelColour(u, v);
             juce::Colour newColor = juce::Colour(bgr[2], bgr[1], bgr[0], alpha);
@@ -192,7 +192,7 @@ void TiledImage::matToImage(const cv::Mat &mat, juce::Image *image,
         const auto *matRowPtr = ROI.ptr<cv::Vec3b>(y);
         for (int x = 0, u = (int) (image_box.getX() - tile_box.getX()); x < ROI.cols; ++x, ++u) {
             const cv::Vec3b &bgr = matRowPtr[x];
-            jassert(u < (tile_size) and v < (tile_size));
+            jassert(u < (tile_size) && v < (tile_size));
             uint8 alpha = (bgr[2] == 0 && bgr[1] == 0 && bgr[0] == 0) ? 0 : 255;
             juce::Colour orig = data.getPixelColour(u, v);
             if (alpha == 0) {

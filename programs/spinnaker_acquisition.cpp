@@ -228,7 +228,7 @@ int AcquireImages(CameraPtr pCam, INodeMap& nodeMap, INodeMap& nodeMapTLDevice)
                 if (pResultImage->IsIncomplete())
                 {
                     // Retrieve and print the image status description
-                    cout << "Image incomplete: " << Image::GetImageStatusDescription(pResultImage->GetImageStatus())
+                    cout << "Image incomplete: " << Spinnaker::Image::GetImageStatusDescription(pResultImage->GetImageStatus())
                         << "..." << endl
                         << endl;
                 }

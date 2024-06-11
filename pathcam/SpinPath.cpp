@@ -204,8 +204,8 @@ void ProcessStream::run() {
 
 }
 
-SpinPath::SpinPath(LayeredConfiguration::Ptr config):  camChannel(new SimpleFileChannel), camlogger(Logger::get("CamLogger")),
-                       IOChannel(new SimpleFileChannel), IOlogger(Logger::get("IOLogger")),sCam(new StreamCam(config))
+SpinPath::SpinPath(LayeredConfiguration::Ptr config):  camChannel(new SimpleFileChannel), camlogger(Poco::Logger::get("CamLogger")),
+                       IOChannel(new SimpleFileChannel), IOlogger(Poco::Logger::get("IOLogger")),sCam(new StreamCam(config))
 {
 
   cache = new std::queue < cache_element >();
@@ -501,7 +501,7 @@ int SpinPath::startCamera(){
     thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
     thread_cam.start(*cameraStream);
     thread_file.start(*fileStream);
-    sCam->microscope_input = true;
+    sCam->microscopeInput = true;
     thread_sCam.start(*processStream);
     if (0 == 0) { int j = 0;  }
   }
@@ -514,7 +514,7 @@ void SpinPath::stopCamera(){
   cameraStream->interrupt = true;
   fileStream->interrupt = true;
   
-  sCam->microscope_input = false;
+  sCam->microscopeInput = false;
   std::cout << "Collection complete, processing " << std::endl;
   thread_cam.join();
   thread_file.join();
