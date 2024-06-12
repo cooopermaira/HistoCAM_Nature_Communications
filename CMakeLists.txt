@@ -91,16 +91,16 @@ IF (NOT OVERRRIDE_SPINNAKER)
 
     IF (APPLE)
         IF (EXISTS "/Applications/Spinnaker")
-            MESSAGE(STATUS "Spinnaker directory found")
-            SET(BUILD_SPINNAKER "" OFF)
-            add_compile_definitions(WITH_SPINNAKER)
-            include_directories( "/Applications/Spinnaker/include" )
-            SET(SPINNAKER_LIBRARIES
-            "/Applications/Spinnaker/lib/libSpinVideo.dylib"
-            "/Applications/Spinnaker/lib/libSpinnaker_C.dylib"
-            "/Applications/Spinnaker/lib/libSpinnaker.dylib"
-            "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
-            "/Applications/Spinnaker/lib/libSpinVideo_C.dylib")
+            #MESSAGE(STATUS "Spinnaker directory found")
+            #SET(BUILD_SPINNAKER "" OFF)
+            #add_compile_definitions(WITH_SPINNAKER)
+            #include_directories( "/Applications/Spinnaker/include" )
+            #SET(SPINNAKER_LIBRARIES
+            #"/Applications/Spinnaker/lib/libSpinVideo.dylib"
+            #"/Applications/Spinnaker/lib/libSpinnaker_C.dylib"
+            #"/Applications/Spinnaker/lib/libSpinnaker.dylib"
+            #"/Applications/Spinnaker/lib/libSpinUpdate.dylib"
+            #"/Applications/Spinnaker/lib/libSpinVideo_C.dylib")
         ENDIF ()
     ELSEIF (WIN32)
         IF (EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
@@ -256,6 +256,13 @@ IF (BUILD_PATHCAM_GUI)
                 POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
                 "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/Debug/")
+                
+        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Release/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Release/*.pdb")
+
+        add_custom_command(TARGET pathCamApp
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
+                "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/Release/")
     endif ()
 
 
