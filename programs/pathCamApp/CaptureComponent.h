@@ -11,9 +11,9 @@
 #include "JuceHeader.h"
 
 #ifdef WITH_SPINNAKER
-class pathCam::SpinPath;
+class SpinPath;
 #else
-class pathCam::StreamCam;
+class StreamCam;
 #endif
 
 
@@ -23,7 +23,8 @@ public:
         StringArray& iconNames,
         OwnedArray<Drawable>& iconsFromZipFile, Poco::Util::LayeredConfiguration::Ptr config,
         MainComponent* parent);
-    Poco::Util::LayeredConfiguration::Ptr config;
+    
+  Poco::Util::LayeredConfiguration::Ptr config;
 
     
 #ifdef WITH_SPINNAKER

@@ -55,14 +55,17 @@
 #include "BatchCam.h"
 #include "ConsecQ.h"
 #include "StreamCam.h"
-#include "Runnables.h"
-#include "JobQueue.h"
-#include "Composite.h"
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"
 #include "SpinPath.h"
 #endif
+
+#include "Runnables.h"
+#include "JobQueue.h"
+#include "Composite.h"
+
+
 
 
 #endif /* pathCam_h */

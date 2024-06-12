@@ -91,17 +91,16 @@ IF (NOT OVERRRIDE_SPINNAKER)
 
     IF (APPLE)
         IF (EXISTS "/Applications/Spinnaker")
-            #      MESSAGE(STATUS "Spinnaker directory found")
-            #      SET(BUILD_SPINNAKER "" OFF)
-            #      add_compile_definitions(WITH_SPINNAKER)
-            #      include_directories( "/Applications/Spinnaker/include" )
-            #      SET(SPINNAKER_LIBRARIES
-            #      "/Applications/Spinnaker/lib/libSpinVideo.dylib"
-            #      "/Applications/Spinnaker/lib/libSpinnaker_C.dylib"
-            #      "/Applications/Spinnaker/lib/libSpinnaker.dylib"
-            #      "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
-            #      "/Applications/Spinnaker/lib/libSpinVideo_C.dylib")
-
+            MESSAGE(STATUS "Spinnaker directory found")
+            SET(BUILD_SPINNAKER "" OFF)
+            add_compile_definitions(WITH_SPINNAKER)
+            include_directories( "/Applications/Spinnaker/include" )
+            SET(SPINNAKER_LIBRARIES
+            "/Applications/Spinnaker/lib/libSpinVideo.dylib"
+            "/Applications/Spinnaker/lib/libSpinnaker_C.dylib"
+            "/Applications/Spinnaker/lib/libSpinnaker.dylib"
+            "/Applications/Spinnaker/lib/libSpinUpdate.dylib"
+            "/Applications/Spinnaker/lib/libSpinVideo_C.dylib")
         ENDIF ()
     ELSEIF (WIN32)
         IF (EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
