@@ -10,22 +10,28 @@
 
 #include "JuceHeader.h"
 
+#ifdef WITH_SPINNAKER
+class pathCam::SpinPath;
+#else
+class pathCam::StreamCam;
+#endif
+
 
 class CaptureComponent : public ImageViewComponent {
 public:
     CaptureComponent(std::shared_ptr<fRectangle> view,
-                     StringArray &iconNames,
-                     OwnedArray<Drawable> &iconsFromZipFile, std::shared_ptr<pathCam::StreamCam> bcam,
-                     MainComponent *parent) : bcam(bcam), parent(parent),
-                                              ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false) {
+        StringArray& iconNames,
+        OwnedArray<Drawable>& iconsFromZipFile, Poco::Util::LayeredConfiguration::Ptr config,
+        MainComponent* parent);
+    Poco::Util::LayeredConfiguration::Ptr config;
 
-        captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
-        addAndMakeVisible(captureOverlay.get());
-
-
-    }
-
+    
+#ifdef WITH_SPINNAKER
+    std::shared_ptr<pathCam::SpinPath> bcam;
+#else
     std::shared_ptr<pathCam::StreamCam> bcam;
+#endif
+
     MainComponent *parent;
 
     void resized() {
@@ -56,6 +62,11 @@ public:
     void startRecording();
 
     void stopRecording() {
+        
+#ifdef WITH_SPINNAKER
+        bcam->stopCamera();
+#endif
+
         recording = false;
         repaint();
     }

@@ -101,10 +101,10 @@ public:
   
   SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();
-  int startCamera();
+  int run();
   void stopCamera();
 
-  
+  void set_MainComponent_reference(MainComponent* parent) { sCam->set_MainComponent_reference(parent); };
   void newCaptureSet();
   
   void setRootPath(Poco::Path _root_path){ root_path = _root_path; }

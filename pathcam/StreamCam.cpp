@@ -173,7 +173,7 @@ namespace pathCam {
 
     void StreamCam::push_compositeQ(RegInfo index) {
         compositeQ_mutex->lock();
-        if (compositeBatch.empty() || compositeBatch.back().size() >= 1) {
+        if (compositeBatch.empty() || compositeBatch.back().size() >= 15) {
             compositeBatch.push(std::vector<RegInfo>());
         }
         compositeBatch.back().push_back(index);

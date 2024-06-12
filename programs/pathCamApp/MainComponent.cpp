@@ -2,7 +2,8 @@
 
 
 //==============================================================================
-MainComponent::MainComponent(std::shared_ptr<pathCam::StreamCam> bcam) : bcam(bcam) {
+//MainComponent::MainComponent(std::shared_ptr<pathCam::StreamCam> bcam) : bcam(bcam) {
+MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):config(config){ 
     //Won't work for deployment, but ok for now
     std::stringstream ss;
     ss << PROJECT_SOURCE_DIR << "/resources/hud_icons.zip";
@@ -22,9 +23,9 @@ MainComponent::MainComponent(std::shared_ptr<pathCam::StreamCam> bcam) : bcam(bc
     toolbar = new ToolbarComponent(this);
     view.reset(new fRectangle());
     imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile);
-    capture = new CaptureComponent(view, iconNames, iconsFromZipFile, bcam, this); //pass reference to bcam
+    capture = new CaptureComponent(view, iconNames, iconsFromZipFile, config, this); //pass reference to bcam
     MRimage.reset(new MRTiledImage);
-    bcam->set_MainComponent_reference(this);
+    //capture->bcam->set_MainComponent_reference(this);
     annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile);
 
     addAndMakeVisible(imageview);

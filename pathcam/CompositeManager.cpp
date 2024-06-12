@@ -54,51 +54,7 @@ namespace pathCam {
             }
         }
 
-        if (parent->withFrontEnd) {
-
-            Mat image_in = parent->composites[0]->get_composite();
-
-            unsigned int height = image_in.rows;
-            unsigned int width = image_in.cols;
-
-            //parent->imagePyramid->bounds = fRectangle(0, 0, width, height);
-
-            unsigned int tile_size = parent->imagePyramid->tile_size;
-/*
-            double total_levels = ceil(max(log2(width), log2(height)) - log2(tile_size) + 1);
-            double total_pixels = 0.0;
-            for (unsigned int i = 0; i < total_levels; i++) {
-                total_pixels += (width / (pow(2, i))) * (height / (pow(2, i)));
-            }
-
-
-            std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid,tile_size, tile_size,0);
-            current->insertMat(image_in, fRectangle(0, 0, width, height));
-
-            parent->imagePyramid->level.push_back(current);
-*/
-/*
-            unsigned int num_levels = 1;
-            while (image_in.cols > tile_size || image_in.rows > tile_size) {
-                std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid,tile_size,tile_size * pow(2, num_levels),num_levels);
-                //cv::resize causes a reallocation and is possibly better done with cv::pyrDown()
-                cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
-
-                //current->insertMat(image_in, fRectangle(0, 0, width, height));
-                current->insertMat(image_in,parent->imagePyramid->bounds);
-                parent->imagePyramid->level[num_levels]=current;
-                num_levels += 1;
-
-            }
-            */
-/*
-            for (int i = 1; i < parent->imagePyramid->level.size(); i++){
-                cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
-                parent->imagePyramid->level[i]->insertMat(image_in,parent->imagePyramid->bounds);
-            }
-*/
-        }
-
+        
 
 /*
         for (int i = 0; i < parent->composites.size(); i++){

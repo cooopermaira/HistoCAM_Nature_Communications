@@ -184,7 +184,7 @@ public:
     capture_button->set_change_callback([this](bool state) {
 #ifdef WITH_SPINNAKER
       if(state){
-        capturing = (camera->startCamera() != -1);
+        capturing = (camera->run() != -1);
       }else{
         capturing = false;
         camera->stopCamera();
@@ -227,7 +227,7 @@ public:
 #endif
       }else{
 #ifdef WITH_SPINNAKER
-        int result = camera->startCamera();
+        int result = camera->run();
 #else
         int result = -1;
 #endif

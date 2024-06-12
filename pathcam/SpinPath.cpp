@@ -488,7 +488,7 @@ int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
 }
 
 
-int SpinPath::startCamera(){
+int SpinPath::run(){
   
   int result = spinUpCamera();
   

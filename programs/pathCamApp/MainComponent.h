@@ -12,7 +12,8 @@ class MainComponent final : public juce::Component
     
 public:
   //==============================================================================
-  MainComponent(std::shared_ptr< pathCam::StreamCam > bcam);
+  //MainComponent(std::shared_ptr< pathCam::StreamCam > bcam);
+    MainComponent(Poco::Util::LayeredConfiguration::Ptr config);
   ~MainComponent() override;
   
   
@@ -31,8 +32,8 @@ private:
   void loadImage(std::string path);
   void loadImageDialog(const FileChooser& fc);
 
-  
-  std::shared_ptr< pathCam::StreamCam > bcam;
+  Poco::Util::LayeredConfiguration::Ptr config;
+  //std::shared_ptr< pathCam::StreamCam > bcam;
 
     std::unique_ptr<FileChooser> fc;
   

@@ -7,32 +7,35 @@
 
 #include "JuceHeader.h"
 
-class bcamThread final : public juce::Thread {
-public:
-    explicit bcamThread(const juce::String &threadName, MainComponent *parent,
-                        std::shared_ptr<pathCam::StreamCam> bcam) : Thread(threadName), parent(parent),
-                                                                    bcam(bcam) {};
-    void run() override{
-        bcam->run();
-
-    }
-
-    MainComponent *parent;
-    std::shared_ptr<pathCam::StreamCam> bcam;
-};
 
 class bcamPocoRunnable: public Poco::Runnable{
 public:
-    bcamPocoRunnable(std::shared_ptr<pathCam::StreamCam> bcam):bcam(bcam){};
-    std::shared_ptr<pathCam::StreamCam> bcam;
-
+    bcamPocoRunnable(CaptureComponent* cptcmp):cptcmp(cptcmp) {};
+    CaptureComponent* cptcmp;
     virtual void run(){
-        bcam->run();
+        cptcmp->bcam->run();
     }
 
 };
 
+CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
+    StringArray& iconNames,
+    OwnedArray<Drawable>& iconsFromZipFile, Poco::Util::LayeredConfiguration::Ptr config,
+    MainComponent* parent) : config(config), parent(parent),
+ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false) {
+    
+#ifdef WITH_SPINNAKER
+    bcam.reset(new pathCam::SpinPath(config));
+#else
+    bcam.reset(new pathCam::StreamCam(config));
+#endif
 
+    bcam->set_MainComponent_reference(parent);
+    captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
+    addAndMakeVisible(captureOverlay.get());
+
+
+}
 void CaptureComponent::startRecording() {
     recording = true;
 
@@ -42,8 +45,7 @@ void CaptureComponent::startRecording() {
     parent->annotate->setImage(parent->MRimage);
 
 
-
-    auto bcamRunnable = new bcamPocoRunnable(bcam);
+    auto bcamRunnable = new bcamPocoRunnable(this);
     bcamThread.start(bcamRunnable);
 
     //(new bcamThread("bcam Thread", parent, bcam))->run();

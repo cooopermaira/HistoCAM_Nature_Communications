@@ -85,18 +85,18 @@ protected:
     int main(const ArgVec& args) {
         if (!_helpRequested)
         {
-            Poco::Path root_path = Poco::Path("D:/Gabe");
+            Poco::Path root_path = Poco::Path("D:/front_end_test");
 
             camera->setRootPath(root_path);
 
             camera->newCaptureSet();
 
-            camera->startCamera();
+            camera->run();
             Poco::Thread::sleep(3000);
             camera->stopCamera();
 
 
-            //if (!bcam->startCamera()) { return Application::EXIT_SOFTWARE; }
+            //if (!bcam->run()) { return Application::EXIT_SOFTWARE; }
         }
         return Application::EXIT_OK;
     }
@@ -122,7 +122,7 @@ int main( int argc, char* argv[] ){
   
   camera->newCaptureSet();
   
-  camera->startCamera();
+  camera->run();
   Poco::Thread::sleep(5000);
   camera->stopCamera();
   

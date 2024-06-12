@@ -90,10 +90,11 @@ public:
     {
       
       
-      bcam.reset( new pathCam::StreamCam(config) );
+      //bcam.reset( new pathCam::StreamCam(config) );
       
       setUsingNativeTitleBar (true);
-      setContentOwned (new MainComponent(bcam), true);
+      //setContentOwned (new MainComponent(bcam), true);
+      setContentOwned(new MainComponent(config), true);
       
 #if JUCE_IOS || JUCE_ANDROID
       setFullScreen (true);
@@ -121,8 +122,8 @@ public:
      */
     
   private:
-    std::shared_ptr< pathCam::StreamCam > bcam;
-    std::shared_ptr < pathCam::SpinPath > camera;
+    //std::shared_ptr< pathCam::StreamCam > bcam;
+    //std::shared_ptr < pathCam::SpinPath > camera;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainWindow)
   };
   
