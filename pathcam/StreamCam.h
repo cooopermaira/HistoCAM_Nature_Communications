@@ -69,6 +69,16 @@ public:
   bool withFrontEnd = false;
 
   void set_MainComponent_reference(MainComponent* parent);
+  
+  void add_observer(DataObserver * new_observer){
+    observers.push_back(new_observer);
+  }
+  
+  void update_observers(){
+    for(unsigned int i=0; i < observers.size(); i++){
+      observers[i]->update();
+    }
+  }
 
 protected:
 
@@ -110,7 +120,8 @@ protected:
   
   pathCam::ConsecQ RegistrationConsecQ;
   
-  
+  std::vector < DataObserver *> observers;
+
 };
 
 }

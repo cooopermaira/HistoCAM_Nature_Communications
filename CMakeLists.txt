@@ -150,6 +150,8 @@ SET(PATHCAM_FILES pathcam/pathCam.h
         pathcam/Composite.h
         pathcam/Composite.cpp
         pathcam/CompositeManager.cpp
+        pathcam/DataObserver.h
+        pathcam/DataObserver.cpp
         pathcam/util.h)
 
 IF (BUILD_SPINNAKER)

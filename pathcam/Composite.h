@@ -56,6 +56,7 @@ namespace pathCam {
         Mat get_composite();
 
         Mat score_image_2X(int, int, int);
+      
     };
 
 

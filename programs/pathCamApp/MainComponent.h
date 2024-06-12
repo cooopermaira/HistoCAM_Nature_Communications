@@ -6,7 +6,7 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
-class MainComponent final : public juce::Component
+class MainComponent final : public juce::Component, public DataObserver
 {
   friend class LoadingThread;
     
@@ -28,7 +28,12 @@ public:
     CaptureComponent * capture;
     AnnotateComponent * annotate;
   
-  void refreshImage(){
+  inline void update() override {
+    const MessageManagerLock mmLock;
+    refreshImage();
+  }
+  
+  inline void refreshImage(){
     repaint();
     imageview->refreshImage();
     capture->refreshImage();

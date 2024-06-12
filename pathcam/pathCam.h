@@ -45,6 +45,7 @@
 
 //#include "JuceHeader.h"
 #include "util.h"
+#include "DataObserver.h"
 #include "Image.h"
 #include "ImageList.h"
 #include "FeatureDetector.h"

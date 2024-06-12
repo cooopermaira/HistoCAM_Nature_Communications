@@ -29,7 +29,8 @@ ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false) {
 #else
     bcam.reset(new pathCam::StreamCam(config));
 #endif
-
+  
+    bcam->add_observer(parent);
     bcam->set_MainComponent_reference(parent);
     captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
     addAndMakeVisible(captureOverlay.get());
