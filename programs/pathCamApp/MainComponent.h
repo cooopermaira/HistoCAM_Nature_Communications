@@ -27,6 +27,14 @@ public:
     std::shared_ptr< MRTiledImage >  MRimage;
     CaptureComponent * capture;
     AnnotateComponent * annotate;
+  
+  void refreshImage(){
+    repaint();
+    imageview->refreshImage();
+    capture->refreshImage();
+    annotate->refreshImage();
+  }
+  
 private:
   
   void loadImage(std::string path);

@@ -51,6 +51,8 @@ public:
     }
   }
   
+  void refreshImage();
+  
 protected:
   std::shared_ptr< MRTiledImage> MRImage;
   

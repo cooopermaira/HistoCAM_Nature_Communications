@@ -34,6 +34,18 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
 ImageViewComponent::~ImageViewComponent() {
 }
 
+void ImageViewComponent::refreshImage(){
+  const ScopedLock lock(mutex);
+  horizontalScrollBar.setRangeLimits(MRImage->bounds.getX(), MRImage->bounds.getWidth());
+  verticalScrollBar.setRangeLimits(MRImage->bounds.getY(), MRImage->bounds.getHeight());
+
+  horizontalScrollBar.setVisible(true);
+  verticalScrollBar.setVisible(true);
+
+  zoomAndCenter();
+  repaint();
+}
+
 void ImageViewComponent::setImage(std::shared_ptr<MRTiledImage> image) {
     const ScopedLock lock(mutex);
 

@@ -150,8 +150,9 @@ namespace pathCam {
         parent->imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
         parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
 
-        { const MessageManagerLock mmLock;
-            parent->parent->repaint(); }
+      { const MessageManagerLock mmLock;
+        parent->parent->refreshImage();
+      }
 /*
         parent->parent->imageview->setImage(parent->parent->MRimage);
         parent->parent->capture->setImage(parent->parent->MRimage);

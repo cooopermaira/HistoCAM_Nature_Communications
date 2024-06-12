@@ -78,6 +78,8 @@ public:
   
   void setImage(std::shared_ptr<MRTiledImage> image){  rightComponent->setImage(image); }
   
+  void refreshImage(){ rightComponent->refreshImage(); }
+  
   void resized() override  {
     auto area = getLocalBounds();
     juce::Component* components[] = { leftComponent.get(), resizerBar.get(), rightComponent.get() };
