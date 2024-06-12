@@ -19,12 +19,12 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
         }
     }
 
-
+    MRimage.reset(new MRTiledImage);
     toolbar = new ToolbarComponent(this);
     view.reset(new fRectangle());
     imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile);
     capture = new CaptureComponent(view, iconNames, iconsFromZipFile, config, this); //pass reference to bcam
-    MRimage.reset(new MRTiledImage);
+
     //capture->bcam->set_MainComponent_reference(this);
     annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile);
 

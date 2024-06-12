@@ -77,7 +77,7 @@ IF (APPLE)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
     ENDIF ()
 ELSEIF (WIN32)
-    SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install_debug")
+    SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install")
 ELSEIF (LINUX)
     SET(OpenCV_DIR "home/opencv/cmake/templates")
 ENDIF ()
@@ -250,12 +250,12 @@ IF (BUILD_PATHCAM_GUI)
     target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 
     if (MSVC)
-        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Debug/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Debug/*.pdb")
+        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Release/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Release/*.pdb")
 
         add_custom_command(TARGET pathCamApp
                 POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
-                "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/Debug/")
+                "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/Release/")
     endif ()
 
 
