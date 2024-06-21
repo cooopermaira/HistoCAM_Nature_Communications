@@ -6,7 +6,6 @@
 
 #ifndef pathCam_h
 #define pathCam_h
-#define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
 #include <iostream>
 #include <chrono>
 #include <fstream>
@@ -43,7 +42,6 @@
 #include "Poco/ThreadPool.h"
 #include "Poco/DateTimeFormatter.h"
 
-//#include "JuceHeader.h"
 #include "util.h"
 #include "DataObserver.h"
 #include "Image.h"
@@ -66,7 +64,8 @@
 #include "JobQueue.h"
 #include "Composite.h"
 
-
+#include "TiledImage.h"
+#include "MRTiledImage.h"
 
 
 #endif /* pathCam_h */

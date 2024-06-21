@@ -16,7 +16,6 @@ using Poco::Path;
 using Poco::Logger;
 
 class MRTiledImage;
-class MainComponent;
 
 namespace pathCam{
 class Composite;
@@ -57,7 +56,6 @@ public:
   Poco::FastMutex *compositeQ_mutex;
   Poco::FastMutex *component_mutex;
 
-  MainComponent* parent;
   std::shared_ptr< MRTiledImage >  imagePyramid;
 
   bool run();
@@ -66,10 +64,9 @@ public:
   void set_match(unsigned long image_idx, unsigned long prev_idx);
 
   bool microscopeInput;
-  bool withFrontEnd = false;
 
-  void set_MainComponent_reference(MainComponent* parent);
-  
+  void set_image_reference(std::shared_ptr< MRTiledImage >  MRImage);
+
   void add_observer(DataObserver * new_observer){
     observers.push_back(new_observer);
   }

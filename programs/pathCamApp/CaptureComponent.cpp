@@ -31,7 +31,7 @@ ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false) {
 #endif
   
     bcam->add_observer(parent);
-    bcam->set_MainComponent_reference(parent);
+    bcam->set_image_reference(parent->MRimage);
     captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
     addAndMakeVisible(captureOverlay.get());
 

@@ -187,9 +187,7 @@ namespace pathCam {
         return isEmpty;
     }
 
-    void StreamCam::set_MainComponent_reference(MainComponent* mc) {
-        parent = mc;
-        imagePyramid = parent->MRimage;
-        withFrontEnd = true;
+    void StreamCam::set_image_reference(std::shared_ptr< MRTiledImage >  MRImage) {
+      imagePyramid = MRImage;
     }
 }

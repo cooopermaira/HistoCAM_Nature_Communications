@@ -28,10 +28,23 @@
 
 using namespace juce;
 
+typedef juce::Rectangle<float> fRectangle;
+typedef juce::Rectangle<int> iRectangle;
+typedef juce::Point<int> iPoint;
+typedef juce::Point<float> fPoint;
+
+template < typename T >
+juce::Rectangle < T > RectCtoJ (cv::Rect_< T > r) {
+ return juce::Rectangle < T >(r.x, r.y, r.width, r.height);
+}
+
+template < typename T >
+cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
+ return cv::Rect_< T >(r.getX(), r.getY(), r.getWidth(), r.getHeight());
+}
+
 #include "SvgButton.h"
 #include "ColorButton.h"
-#include "TiledImage.h"
-#include "MRTiledImage.h"
 
 #include "ToolBarComponent.h"
 

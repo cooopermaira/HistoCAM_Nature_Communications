@@ -5,12 +5,8 @@
 //  Created by cooper maira on 12/23/23.
 //
 // This class listens for registered frames, sorts them by component membership, then passes them to the component object for compositing.
-#define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
 
 #include "pathCam.h"
-
-//class MRTiledImage;
-//class TiledImage;
 
 namespace pathCam {
 

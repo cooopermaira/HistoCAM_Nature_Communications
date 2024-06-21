@@ -118,45 +118,11 @@ ENDIF ()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-SET(PATHCAM_FILES pathcam/pathCam.h
-        pathcam/Image.cpp
-        pathcam/Image.h
-        pathcam/MotionEstimator.cpp
-        pathcam/MotionEstimator.h
-        pathcam/Match.cpp
-        pathcam/Match.h
-        pathcam/OverlapMatrix.cpp
-        pathcam/OverlapMatrix.h
-        pathcam/ImageList.cpp
-        pathcam/ImageList.h
-        pathcam/DescriptorMatcher.h
-        pathcam/DescriptorMatcher.cpp
-        pathcam/FeatureDetector.h
-        pathcam/FeatureDetector.cpp
-        pathcam/BatchCam.h
-        pathcam/BatchCam.cpp
-        pathcam/StreamCam.h
-        pathcam/StreamCam.cpp
-        pathcam/ConsecQ.h
-        pathcam/ConsecQ.cpp
-        pathcam/Runnables.h
-        pathcam/MatchRunnable.cpp
-        pathcam/DiskStreamer.cpp
-        pathcam/JobQueue.h
-        pathcam/JobQueue.cpp
-        pathcam/QManager.cpp
-        pathcam/RegManager.cpp
-        pathcam/Loader.cpp
-        pathcam/Composite.h
-        pathcam/Composite.cpp
-        pathcam/CompositeManager.cpp
-        pathcam/DataObserver.h
-        pathcam/DataObserver.cpp
-        pathcam/util.h)
+FILE(GLOB PATHCAM_FILES pathcam/*.h pathcam/*.cpp)
 
-IF (BUILD_SPINNAKER)
-    set(PATHCAM_FILES ${PATHCAM_FILES} pathcam/SpinPath.h pathcam/SpinPath.cpp)
-ENDIF ()
+IF (NOT BUILD_SPINNAKER)
+  list(FILTER PATHCAM_FILES EXCLUDE REGEX SpinPath)
+ENDIF()
 
 add_library(pathCamLib STATIC ${PATHCAM_FILES})
 

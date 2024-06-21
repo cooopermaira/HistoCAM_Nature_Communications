@@ -88,12 +88,8 @@ public:
                       .findColour (juce::ResizableWindow::backgroundColourId),
                       DocumentWindow::allButtons)
     {
-      
-      
-      //bcam.reset( new pathCam::StreamCam(config) );
-      
+
       setUsingNativeTitleBar (true);
-      //setContentOwned (new MainComponent(bcam), true);
       setContentOwned(new MainComponent(config), true);
       
 #if JUCE_IOS || JUCE_ANDROID

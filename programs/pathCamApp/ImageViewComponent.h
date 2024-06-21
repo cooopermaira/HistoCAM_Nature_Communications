@@ -65,18 +65,18 @@ protected:
   
   
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
-
+  
   
   void zoomAndCenter(){
     if(!MRImage || !isVisible()){ return; }
     juce::Rectangle<int> b = getLocalBounds();
     *view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
     //view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
-    view->setCentre(MRImage->bounds.getCentre());
+    view->setCentre(RectCtoJ(MRImage->bounds).getCentre());
     
-    float scale = max((float)MRImage->bounds.getHorizontalRange().getLength()/
+    float scale = max((float)MRImage->bounds.width/
                       (float)view->getHorizontalRange().getLength(),
-                      (float)MRImage->bounds.getVerticalRange().getLength()/
+                      (float)MRImage->bounds.height/
                       (float)view->getVerticalRange().getLength());
     
     scaleCenter(fPoint(scale,scale));

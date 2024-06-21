@@ -4,7 +4,6 @@
 //
 //  Created by cooper maira on 12/24/23.
 //
-#define JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED 1
 
 #include <stdio.h>
 #include <pathCam.h>
@@ -69,7 +68,7 @@ namespace pathCam {
         }
         std::vector<Image *> images = parent->get_image_refs(indexes);
 
-        std::vector<iPoint> effectedTiles;
+        std::vector<Point2i> effectedTiles;
         for (int i = 0; i < images.size(); i++) {
 
             //calculate where the new image will be copied to in the composite
@@ -141,42 +140,33 @@ namespace pathCam {
             //calculate effected tiles
             calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
         }
-        std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<iPoint>());
-        effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<iPoint>()),
+        std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<Point2i>());
+        effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<Point2i>()),
                             effectedTiles.end());
 
-
-        tiledImageBounds = fRectangle((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
+        
+        tiledImageBounds = cv::Rect_<float>((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
         parent->imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
         parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
 
-//      { const MessageManagerLock mmLock;
-//        parent->parent->refreshImage();
-//      }
-      
       parent->update_observers();
-/*
-        parent->parent->imageview->setImage(parent->parent->MRimage);
-        parent->parent->capture->setImage(parent->parent->MRimage);
-        parent->parent->annotate->setImage(parent->parent->MRimage);
-*/
     }
 
 
-    void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<iPoint> &result,
+    void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                     Vec2 absCoord) {
-        std::vector<iPoint> tileIndices;
+        std::vector<Point2i> tileIndices;
         std::map<int, std::vector<float>> tilesByColumn;
 
         //get the tile column of the left and right edges of the image frame
-        int columnBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x, absCoord.y)).x;
+        int columnBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
         int columnBoundHigh = parent->imagePyramid->level[0]->getIJ(
-                fPoint(absCoord.x + image_size.width, absCoord.y)).x;
+                                                                    Point2f(absCoord.x + image_size.width, absCoord.y)).x;
 
         //get the tile row the top and bottom edges of the image frame
-        long rowBoundLow = parent->imagePyramid->level[0]->getIJ(fPoint(absCoord.x, absCoord.y)).y;
+        long rowBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
         long rowBoundHigh = parent->imagePyramid->level[0]->getIJ(
-                fPoint(absCoord.x, absCoord.y + image_size.height)).y;
+                                                                  Point2f(absCoord.x, absCoord.y + image_size.height)).y;
 
         float yPixelBoundLow = float(rowBoundLow) * float(parent->imagePyramid->tile_size);
         float yPixelBoundHigh = float(rowBoundHigh) * float(parent->imagePyramid->tile_size);
@@ -186,9 +176,9 @@ namespace pathCam {
             //if we are at the last point, make the next point the first point (this makes the last edge)
             int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
 
-            //create an fPoint from the cv::Point2i
-            auto p1 = fPoint(maskAsPolygon[ii].x + absCoord.x, maskAsPolygon[ii].y + absCoord.y);
-            auto p2 = fPoint(maskAsPolygon[ii2].x + absCoord.x, maskAsPolygon[ii2].y + absCoord.y);
+            //create an Point2f from the cv::Point2i
+            auto p1 = Point2f(maskAsPolygon[ii].x + absCoord.x, maskAsPolygon[ii].y + absCoord.y);
+            auto p2 = Point2f(maskAsPolygon[ii2].x + absCoord.x, maskAsPolygon[ii2].y + absCoord.y);
 
             //test for duplicate points that result from the voronoi calculation
             if (p1.x == p2.x && p1.y == p2.y) {
@@ -200,8 +190,8 @@ namespace pathCam {
             auto tile2 = parent->imagePyramid->level[0]->getIJ(p2);
 
             //get the column of these tiles
-            int column1 = tile1.getX();
-            int column2 = tile2.getX();
+            int column1 = tile1.x;
+            int column2 = tile2.x;
 
             //determine which column is on the right and which is on the left
             int xlow = min(column1, column2);
@@ -250,13 +240,13 @@ namespace pathCam {
             }
 
             int lastTile = parent->imagePyramid->level[0]->getIJ(
-                    fPoint(key * parent->imagePyramid->level[0]->getTileSize(), lastPoint_y)).getY();
+                                                                 Point2f(key * parent->imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
             int firstTile = parent->imagePyramid->level[0]->getIJ(
-                    fPoint(key * parent->imagePyramid->level[0]->getTileSize(), firstPoint_y)).getY();
+                                                                  Point2f(key * parent->imagePyramid->level[0]->getTileSize(), firstPoint_y)).y;
 
             for (int ii = firstTile; ii <= lastTile; ii++) {
                 if(ii <= rowBoundHigh && ii >= rowBoundLow) {
-                    result.push_back(iPoint(key, ii));
+                    result.push_back(Point2i(key, ii));
                 }
             }
         }
@@ -326,7 +316,7 @@ namespace pathCam {
                 if(composite.data){
                     Mat temp;
                     resize(composite,temp,Size(composite.cols / pow(2, levelWithinPyramid), composite.rows / pow(2, levelWithinPyramid)));
-                    tiledImageBounds = fRectangle((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
+                    tiledImageBounds = cv::Rect_<float>(root_offset.x, root_offset.y, composite.cols, composite.rows);
                     next_level->insertMat(temp,tiledImageBounds);
                 }
                 parent->imagePyramid->level.push_back(next_level);
@@ -412,7 +402,7 @@ namespace pathCam {
     }
 
 
-    long CompositeVoronoi::segment_yval_at_point(float xloc, fPoint p1, fPoint p2) {
+    long CompositeVoronoi::segment_yval_at_point(float xloc, Point2f p1, Point2f p2) {
         if (p1.x == p2.x) {
             return max(p1.y, p2.y);
         }

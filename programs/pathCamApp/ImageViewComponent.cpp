@@ -36,8 +36,8 @@ ImageViewComponent::~ImageViewComponent() {
 
 void ImageViewComponent::refreshImage(){
   const ScopedLock lock(mutex);
-  horizontalScrollBar.setRangeLimits(MRImage->bounds.getX(), MRImage->bounds.getWidth());
-  verticalScrollBar.setRangeLimits(MRImage->bounds.getY(), MRImage->bounds.getHeight());
+  horizontalScrollBar.setRangeLimits(MRImage->bounds.x, MRImage->bounds.width);
+  verticalScrollBar.setRangeLimits(MRImage->bounds.y, MRImage->bounds.height);
 
   horizontalScrollBar.setVisible(true);
   verticalScrollBar.setVisible(true);
@@ -51,8 +51,8 @@ void ImageViewComponent::setImage(std::shared_ptr<MRTiledImage> image) {
 
     MRImage = image;
 
-    horizontalScrollBar.setRangeLimits(MRImage->bounds.getX(), MRImage->bounds.getWidth());
-    verticalScrollBar.setRangeLimits(MRImage->bounds.getY(), MRImage->bounds.getHeight());
+    horizontalScrollBar.setRangeLimits(MRImage->bounds.x, MRImage->bounds.width);
+    verticalScrollBar.setRangeLimits(MRImage->bounds.y, MRImage->bounds.height);
 
     horizontalScrollBar.setVisible(true);
     verticalScrollBar.setVisible(true);
@@ -128,21 +128,29 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRa
 
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
-    std::vector<TileQuery> tiles = MRImage->getTiles(*view, getLocalBounds());
+    std::vector<TileQuery> tiles = MRImage->getTiles(RectJtoC(*view), RectJtoC(getLocalBounds()));
 
     for (unsigned int i = 0; i < tiles.size(); i++) {
-        juce::Image *im = tiles[i].image;
-        tiles[i].bounds *= view2screenScale() * scale;
-        tiles[i].bounds.expand(0.5, 0.5);
-        if (im != NULL) {
-            g.drawImage(*im, tiles[i].bounds);
-        }
+      cv::Mat *tile = tiles[i].image;
+      auto bounds = RectCtoJ < float >(tiles[i].bounds);
+      bounds *= view2screenScale() * scale;
+      bounds.expand(0.5, 0.5);
+      tiles[i].bounds = RectJtoC <float> (bounds);
+      if (tile != NULL) {
+        juce::Image im = juce::Image(juce::Image::ARGB, tile->cols, tile->rows, true);
+        juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
+        
+        jassert(tile->step == bitmap_data.lineStride);
+        memcpy(bitmap_data.data, (*tile).data, tile->cols*tile->rows*4);
+        
+        g.drawImage(im, bounds);
+      }
     }
 
 
 #ifdef DEBUG
     for (unsigned int i = 0; i < tiles.size(); i++) {
-        auto bounds = tiles[i].bounds * scale;
+        auto bounds = RectCtoJ < float >(tiles[i].bounds) * scale;
         g.setColour(juce::Colours::greenyellow);
         g.drawRect(bounds, 3);
         std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);

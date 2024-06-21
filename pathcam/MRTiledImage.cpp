@@ -5,14 +5,16 @@
 //  Created by Brian Summa on 4/11/24.
 //
 
-#include "JuceHeader.h"
+#include "pathCam.h"
 
-std::vector < TileQuery > MRTiledImage::getTiles(fRectangle view, juce::Rectangle <int> screen){
+std::vector < TileQuery > MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect_<int> screen){
   
   if(level.size() == 0){ return std::vector<TileQuery>(); }
-  
-  float scale = max(view.getHorizontalRange().getLength()/float(screen.getHorizontalRange().getLength()),
-                    view.getVerticalRange().getLength()/float(screen.getVerticalRange().getLength()));  
+//  float scale = max(view.getHorizontalRange().getLength()/float(screen.getHorizontalRange().getLength()),
+//                    view.getVerticalRange().getLength()/float(screen.getVerticalRange().getLength()));  
+  float scale = max(view.width/float(screen.width),
+                    view.height/float(screen.height));
+
   scale = log2(scale);
   unsigned int i_scale =  (unsigned int)(scale+0.5);
   i_scale = min((unsigned int)(level.size()-1), i_scale);
@@ -47,9 +49,9 @@ void MRTiledImage::build(cv::Mat &image_in){
 }
 */
 
-void MRTiledImage::insertMat(cv::Mat &image_in, fRectangle box){
+void MRTiledImage::insertMat(cv::Mat &image_in, cv::Rect_<float> box){
     
-  bounds = bounds.getUnion(box);
+  bounds = bounds | box;
 
   //This assumes that the # of levels won't change after adding a new image,
   //which isn't going to be necessarily true.
