@@ -11,7 +11,7 @@ class Image{
 public:
   unsigned int width, height;
   unsigned int reference_count;
-
+  unsigned long index;
   enum{ _NOLABEL=0, _2X, _4X, _10x, _20x, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _LENS_CHANGE};
   unsigned int label;
   

@@ -101,18 +101,18 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
     float theirTileRegionY = (long) theirLevelRegion.y % tile_size;
     theirTileRegionY = theirTileRegionY < 0 ? theirTileRegionY + tile_size : theirTileRegionY;
 
-    //calculate theirROI
+    //calculate theirROI and grab tile
     cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
+    auto theirImage = *parent->level[levelWithinPyramid + 1]->tiles(theirTileIndex.x, theirTileIndex.y);
 
     //resize self cv image into their cv image ROI
-    assert(holdingMatrix.rows == myCV.rows / 2 && holdingMatrix.cols == myCV.cols / 2);
-    resize(myCV, holdingMatrix, Size(holdingMatrix.cols, holdingMatrix.rows));
+    assert(theirImage(theirROI).rows == myCV.rows / 2 && theirImage(theirROI).cols == myCV.cols / 2);
+    resize(myCV, theirImage(theirROI), Size(theirImage(theirROI).cols, theirImage(theirROI).rows));
 
 
-    //bitmap memcpy my cv image into juce image
-    auto theirImage = *parent->level[levelWithinPyramid + 1]->tiles(theirTileIndex.x, theirTileIndex.y);
+
     
-    holdingMatrix.copyTo(theirImage(theirROI));
+    //holdingMatrix.copyTo(theirImage(theirROI));
   
   
 //    auto bitmap_data = new juce::Image::BitmapData(theirJuceImage, theirROI.x, theirROI.y, theirROI.width, theirROI.height,
@@ -130,7 +130,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 
     //continue up pyramid
     if (levelWithinPyramid + 1 < parent->level.size() - 1) {
-        parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, holdingMatrix);
+        parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirImage(theirROI));
     }
 }
 
@@ -153,6 +153,34 @@ void TiledImage::matToImage2(const cv::Mat &mat, cv::Mat *image,
                                 ROI.cols,
                                 ROI.rows))) ;
 
+}
+
+void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
+  auto tL = getIJ(topLeft);
+  auto bR = getIJ(bottomRight);
+  std::vector<Point2i> edgeTiles;
+  bool escape = false;
+  for (int x = tL.x; x <= bR.x; x++) {
+    for (int y = tL.y; y <= bR.y; y++) {
+      for (int i = -1; i <= 1; i++) {
+        for (int j = -1; j <= 1; j++) {
+          if (tiles(x + i, y + j) == nullptr){
+            edgeTiles.push_back(Point2i(x,y));
+            escape = true;
+            break;
+          }
+        }
+        if(escape){
+          escape = false;
+          break;
+        }
+      }
+    }
+  }
+  for (int i = 0; i < edgeTiles.size(); i++){
+    delete tiles(edgeTiles[i].x,edgeTiles[i].y);
+    tiles(edgeTiles[i].x,edgeTiles[i].y) = nullptr;
+  }
 }
 
 

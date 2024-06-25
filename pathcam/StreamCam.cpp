@@ -136,17 +136,18 @@ namespace pathCam {
     }
 
     void StreamCam::add_new_component(unsigned long image_index, cv::Size image_size) {
-        reg_results[image_index] = RegInfo(true, Vec2(0.0, 0.0), true, increment_and_get_components());
-        reg_results[image_index].index = image_index;
-        reg_results[image_index].resolved = true;
-        reg_results[image_index].matchedTo = image_index;
+      auto component_index = increment_and_get_components();
+      reg_results[image_index] = RegInfo(true, Vec2(0.0, 0.0), true, component_index);
+      reg_results[image_index].index = image_index;
+      reg_results[image_index].resolved = true;
+      reg_results[image_index].matchedTo = image_index;
 
-        //delete these pointers when destroyed
-        auto *temp = new CompositeVoronoi(this, image_size);
-        temp->update(std::vector<RegInfo>{reg_results[image_index]});
-        component_mutex->lock();
-        composites.push_back(temp);
-        component_mutex->unlock();
+      //delete these pointers when destroyed
+      auto *temp = new CompositeVoronoi(this, image_size, component_index);
+      temp->update(std::vector<RegInfo>{reg_results[image_index]});
+      component_mutex->lock();
+      composites.push_back(temp);
+      component_mutex->unlock();
     }
 
     std::vector<RegInfo> StreamCam::get_Q_front() {

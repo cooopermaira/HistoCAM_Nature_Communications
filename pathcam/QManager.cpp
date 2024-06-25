@@ -13,14 +13,19 @@ namespace pathCam{
 QManager::QManager(StreamCam *parent): parent(parent){};
 
 void QManager::run(){
+  auto jq = parent->JobQ;
   Poco::Thread::sleep(200);
-  while(parent->microscopeInput || parent->diskCount > 0 || parent->loaderCount > 0 || parent->matchableCount > 0 || parent->regCount > 0){
-    
-    parent->JobQ->run_jobs(true,true);
-    
-    
+  while(parent->compositing){
+    //jq->run_jobs(false);
+
+    while(jq->pool->available() && !jq->jobQueue.empty()){
+      jq->queue_mutex->lock();
+      jq->pool->start(*jq->jobQueue.top());
+      jq->jobQueue.pop();
+      jq->queue_mutex->unlock();
+    }
+
   }
-  std::cout<<"jobs processed"<<std::endl;
 }
 
 

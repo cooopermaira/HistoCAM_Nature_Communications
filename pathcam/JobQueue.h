@@ -14,10 +14,11 @@
 namespace pathCam{
 
 class JobQueue{
+  friend class QManager;
 public:
   static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
-private:
 
+protected:
     struct CompareRunnable {
         bool operator()(const RunnableIntermediate *a, const RunnableIntermediate *b); 
     };
@@ -31,7 +32,7 @@ public:
   JobQueue(int min_threads, int max_threads);
   
   void add_runnable(RunnableIntermediate *job);
-  bool run_jobs(bool join_all, bool order_before_run);
+  bool run_jobs(bool join_all);
   bool run_jobs(std::vector < Poco::Runnable * > jobs);
   bool is_empty(){return jobQueue.empty();}
 

@@ -62,6 +62,15 @@ namespace pathCam {
             cv::imwrite("test"+std::to_string(i)+".png", *parent->imagePyramid->level[i]->cvTiles(0, 0));
         }
         */
+
+      perform_global_alignment();
+      parent->compositing = false;
     }
+
+  void CompositeManager::perform_global_alignment() {
+    for (auto &i: parent->composites) {
+      i->perform_global_alignment();
+    }
+  }
 
 }

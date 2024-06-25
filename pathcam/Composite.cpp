@@ -10,494 +10,814 @@
 
 namespace pathCam {
 
-    CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size) : Composite(parent),
-                                                                                 image_size(image_size) {
-        subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
-        subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
-        circleMask = cv::Mat::zeros(image_size, CV_8U);
-        cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), 2190, cv::Scalar(1), -1);
-        std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid);
-        parent->imagePyramid->level.push_back(current);
-        channels.resize(2);
-        imageBoundsAsPolygon.resize(4);
-        reset_image_as_polygon();
+  CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int component_index) : Composite(parent),componentIndex(component_index),
+                                                                               image_size(image_size) {
+    subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
+    subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
+    circleMask = cv::Mat::zeros(image_size, CV_8U);
+    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), 2190, cv::Scalar(1), -1);
+    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid);
+    parent->imagePyramid->level.push_back(current);
+    channels.resize(2);
+    imageBoundsAsPolygon.resize(4);
+    reset_image_as_polygon();
+    polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
+    zeros = polyMaskOutput.clone();
 
+  }
+
+
+  void CompositeVoronoi::self_reset() {
+    parent->imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),
+                                               Point2i(max_offset.x, max_offset.y));
+    subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
+    subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
+    composite.release();
+    delaunayMembers.clear();
+    root_offset = Vec2(0, 0);
+    max_offset = Vec2(0, 0);
+
+  }
+
+
+  void CompositeVoronoi::expand_subdiv(std::vector<RegInfo> new_info) {
+    bool extend = false;
+    if (root_offset.x < subdiv_Bbox.min_x) {
+      extend = true;
+      subdiv_Bbox.min_x *= 2;
+    }
+    if (root_offset.y < subdiv_Bbox.min_y) {
+      extend = true;
+      subdiv_Bbox.min_y *= 2;
+    }
+    if (max_offset.x > subdiv_Bbox.max_x) {
+      extend = true;
+      subdiv_Bbox.max_x *= 2;
+    }
+    if (max_offset.y > subdiv_Bbox.max_y) {
+      extend = true;
+      subdiv_Bbox.max_y *= 2;
+    }
+    if (extend) {
+      std::vector<std::vector<Point2f>> facets;
+      std::vector<Point2f> centers;
+
+      subdiv.getVoronoiFacetList({}, facets, centers);
+      subdiv = Subdiv2D(subdiv_Bbox.as_cvRect());
+      subdiv.insert(centers);
+    }
+  }
+
+  void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
+    update_Bbox(new_info);
+    expand_subdiv(new_info);
+    add_images(new_info);
+  }
+
+
+  int CompositeVoronoi::add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
+                                                            std::vector<Point2i> &_face) {
+    //make copy of subdiv incase we decide not to use new point
+    Subdiv2D tempSubdiv(subdiv);
+
+    //add new point
+    int vertxId = subdiv.insert(_point);
+    //auto image = parent->get_image_ref(_image_index);
+
+    //get voronoi facets for only this face
+    std::vector<std::vector<Point2f>> facets;
+    std::vector<Point2f> centers;
+    subdiv.getVoronoiFacetList({vertxId}, facets, centers);
+
+    //shift and recast
+    for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
+      ii.x -= centers[0].x;
+      ii.x += 6464 / 2;
+      ii.y -= centers[0].y;
+      ii.y += 4852 / 2;
+      _face.push_back((Point2i) ii);
+    }
+
+    //build polygon mask for new point
+    cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
+
+    //test for exclusion of frame via rollback
+    int nonzeroMin;
+    if (_image->label == Image::_2X) {
+      polyMaskOutput = polyMaskOutput.mul(circleMask);
+      nonzeroMin = 2190 * 2190 * 3.14 * 0.20;
+    } else {
+      nonzeroMin = _image->width * _image->height * 0.1;
+    }
+
+    if (countNonZero(polyMaskOutput) <= nonzeroMin) {
+      //contributing less than x% of its pixels, revert and don't bother loading from disk
+      subdiv = tempSubdiv;
+      _image->free_memory_RAW();
+      memberImages.push_back({_image->image_file.getFileName(), false});
+      return -1;
+    }
+    memberImages.push_back({_image->image_file.getFileName(), true});
+    delaunayMembers.insert({vertxId, _image->index});
+    return vertxId;
+  }
+
+
+  void CompositeVoronoi::add_images(std::vector<RegInfo> new_info) {
+
+    // get a copy of references to all images at once so that only one mutex lock is needed
+    std::vector<unsigned long> indexes;
+    for (int i = 0; i < new_info.size(); i++) {
+      indexes.push_back(new_info[i].index);
+    }
+    std::vector<Image *> images = parent->get_image_refs(indexes);
+
+    std::vector<Point2i> effectedTiles;
+    for (int i = 0; i < images.size(); i++) {
+
+      //calculate where the new image will be copied to in the composite
+      Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x,
+                           new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
+
+
+      //add point to delaunay triangulation
+      std::vector<Point2i> face;
+      auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
+
+      if (add_point_to_delaunay_triangulation(fShift, images[i], face) == -1) {
+        zeros.copyTo(polyMaskOutput);
+        continue;
+      }
+
+      //proceed with addition to composite
+      images[i]->load_raw_from_disk();
+      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+
+      if (images[i]->label == Image::_2X) {
+        cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
+      }
+
+      //add alpha channel now so cvMat can be turned into juce image via memcpy
+      channels[0] = threeChannelPreallocated; //3 channel
+      channels[1] = polyMaskOutput;              //1 channel
+      merge(channels, fourChannelPreallocated);
+
+      fourChannelPreallocated.copyTo(composite(copyzone), polyMaskOutput);
+      zeros.copyTo(polyMaskOutput);
+      images[i]->free_memory_RAW();
+
+      //calculate effected tiles
+      calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
+    }
+    std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<Point2i>());
+    effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<Point2i>()),
+                        effectedTiles.end());
+
+
+    tiledImageBounds = cv::Rect_<float>((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
+    parent->imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
+    parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
+
+    parent->update_observers();
+  }
+
+
+  void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
+                                                  Vec2 absCoord) {
+    std::vector<Point2i> tileIndices;
+    std::map<int, std::vector<float>> tilesByColumn;
+
+    //get the tile column of the left and right edges of the image frame
+    int columnBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
+    int columnBoundHigh = parent->imagePyramid->level[0]->getIJ(
+        Point2f(absCoord.x + image_size.width, absCoord.y)).x;
+
+    //get the tile row the top and bottom edges of the image frame
+    long rowBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
+    long rowBoundHigh = parent->imagePyramid->level[0]->getIJ(
+        Point2f(absCoord.x, absCoord.y + image_size.height)).y;
+
+    float yPixelBoundLow = float(rowBoundLow) * float(parent->imagePyramid->tile_size);
+    float yPixelBoundHigh = float(rowBoundHigh) * float(parent->imagePyramid->tile_size);
+
+    //for each edge of the voronoi mask
+    for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
+      //if we are at the last point, make the next point the first point (this makes the last edge)
+      int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
+
+      //create an Point2f from the cv::Point2i
+      auto p1 = Point2f(maskAsPolygon[ii].x + absCoord.x, maskAsPolygon[ii].y + absCoord.y);
+      auto p2 = Point2f(maskAsPolygon[ii2].x + absCoord.x, maskAsPolygon[ii2].y + absCoord.y);
+
+      //test for duplicate points that result from the voronoi calculation
+      if (p1.x == p2.x && p1.y == p2.y) {
+        continue;
+      }
+
+      //retreive the tiles these points fall within
+      auto tile1 = parent->imagePyramid->level[0]->getIJ(p1);
+      auto tile2 = parent->imagePyramid->level[0]->getIJ(p2);
+
+      //get the column of these tiles
+      int column1 = tile1.x;
+      int column2 = tile2.x;
+
+      //determine which column is on the right and which is on the left
+      int xlow = min(column1, column2);
+      int xhigh = max(column1, column2);
+
+      //take the column range bounds to be the most inward of the frame edges and the voronoi cell vertices
+      //this accomplishes the same thing as taking the polygon intersection of the voronoi face and the image frame
+      if (columnBoundHigh < xlow || columnBoundLow > xhigh) {
+        continue; //no intersection with frame tiles
+      }
+      xlow = max(columnBoundLow, xlow);
+      xhigh = min(columnBoundHigh, xhigh);
+
+      auto plow = p1.x < p2.x ? p1 : p2;
+      auto phigh = p1.x >= p2.x ? p1 : p2;
+
+      for (float j = xlow; j <= xhigh; j++) {
+
+        float columnLeftEdge = j * float(parent->imagePyramid->level[0]->getTileSize());
+        float columnRightEdge = (j + 1) * float(parent->imagePyramid->level[0]->getTileSize());
+        float xloclow = max(columnLeftEdge, plow.x);
+        float xlochigh = min(columnRightEdge, phigh.x);
+
+        long enterColumn = segment_yval_at_point(xloclow, p1, p2);
+        long exitColumn = segment_yval_at_point(xlochigh, p1, p2);
+
+        //if((enterColumn >= yPixelBoundLow || exitColumn >= yPixelBoundLow) && (enterColumn <= yPixelBoundHigh || exitColumn <= yPixelBoundHigh)) {
+        //enterColumn = max(enterColumn, yPixelBoundLow);
+        //enterColumn = min(enterColumn, yPixelBoundHigh);
+        tilesByColumn[j].push_back((float) enterColumn);
+
+        //exitColumn = max(exitColumn, yPixelBoundLow);
+        //exitColumn = min(exitColumn, yPixelBoundHigh);
+        tilesByColumn[j].push_back((float) exitColumn);
+        //}
+      }
+
+    }
+    for (auto &[key, value]: tilesByColumn) {
+
+      float firstPoint_y = *std::min_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
+      float lastPoint_y = *std::max_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
+
+      if (lastPoint_y < yPixelBoundLow || firstPoint_y > yPixelBoundHigh) {
+        continue;
+      }
+
+      int lastTile = parent->imagePyramid->level[0]->getIJ(
+          Point2f(key * parent->imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
+      int firstTile = parent->imagePyramid->level[0]->getIJ(
+          Point2f(key * parent->imagePyramid->level[0]->getTileSize(), firstPoint_y)).y;
+
+      for (int ii = firstTile; ii <= lastTile; ii++) {
+        if (ii <= rowBoundHigh && ii >= rowBoundLow) {
+          result.push_back(Point2i(key, ii));
+        }
+      }
+    }
+  }
+
+
+  Composite::Composite(StreamCam *parent) : parent(parent), root_offset(0.0, 0.0), max_offset(0.0, 0.0) {
+    flat_field = cv::imread(parent->flat_field_file.toString());
+    flat_field.convertTo(flat_field, CV_32F);
+    flat_field *= 1 / 170.0;
+    //local_quality_score = score_image_2X(4852,6464,2190);
+  }
+
+
+  void Composite::update_Bbox(std::vector<RegInfo> new_info) {
+
+    bool update_box = false;
+
+    //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
+    Vec2 temp_offset = root_offset;
+
+    // If any new frames extend beyond the current extent, expand cv image dimensions
+    for (int i = 0; i < new_info.size(); i++) {
+      if (new_info[i].absoluteCoords.x < root_offset.x) {
+        update_box = true;
+        root_offset.x = new_info[i].absoluteCoords.x;
+      }
+      if (new_info[i].absoluteCoords.y < root_offset.y) {
+        update_box = true;
+        root_offset.y = new_info[i].absoluteCoords.y;
+      }
+
+      if (new_info[i].absoluteCoords.x + 6464 > max_offset.x) {
+        update_box = true;
+        max_offset.x = new_info[i].absoluteCoords.x + 6464;
+      }
+      if (new_info[i].absoluteCoords.y + 4852 > max_offset.y) {
+        update_box = true;
+        max_offset.y = new_info[i].absoluteCoords.y + 4852;
+      }
 
     }
 
-    void CompositeVoronoi::expand_subdiv(std::vector<RegInfo> new_info) {
-        bool extend = false;
-        if (root_offset.x < subdiv_Bbox.min_x) {
-            extend = true;
-            subdiv_Bbox.min_x *= 2;
-        }
-        if (root_offset.y < subdiv_Bbox.min_y) {
-            extend = true;
-            subdiv_Bbox.min_y *= 2;
-        }
-        if (max_offset.x > subdiv_Bbox.max_x) {
-            extend = true;
-            subdiv_Bbox.max_x *= 2;
-        }
-        if (max_offset.y > subdiv_Bbox.max_y) {
-            extend = true;
-            subdiv_Bbox.max_y *= 2;
-        }
-        if (extend) {
-            std::vector<std::vector<Point2f>> facets;
-            std::vector<Point2f> centers;
+    if (update_box) {
+      //if we are updating the bounding box, create a new combined image and copy old image into the correct location
+      Mat4b new_combined(int(max_offset.y - root_offset.y), int(max_offset.x - root_offset.x), Vec4b(0, 0, 0, 0));
+      //Mat new_combined_z_buffer = cv::Mat::zeros(cv::Size(new_combined.cols, new_combined.rows), CV_16U);
 
-            subdiv.getVoronoiFacetList({}, facets, centers);
-            subdiv = Subdiv2D(subdiv_Bbox.as_cvRect());
-            subdiv.insert(centers);
+      if (composite.data) {
+
+        Rect copyzone = Rect(temp_offset.x - root_offset.x, temp_offset.y - root_offset.y, composite.cols,
+                             composite.rows);
+
+        composite.copyTo(new_combined(copyzone));
+        //composite_z_buffer.copyTo(new_combined_z_buffer(copyzone));
+
+      }
+
+      composite = new_combined;
+      //composite_z_buffer = new_combined_z_buffer;
+      unsigned int topLogicSize = parent->imagePyramid->level.back()->getLogicSize();
+      while (topLogicSize < composite.rows || topLogicSize < composite.cols) {
+        unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
+        unsigned int logic_size = 2 * parent->imagePyramid->level.back()->getLogicSize();
+        int levelWithinPyramid = parent->imagePyramid->level.size();
+        std::shared_ptr<TiledImage> next_level = std::make_shared<TiledImage>(parent->imagePyramid, tile_size,
+                                                                              logic_size, levelWithinPyramid);
+        if (composite.data) {
+          Mat temp;
+          resize(composite, temp,
+                 Size(composite.cols / pow(2, levelWithinPyramid), composite.rows / pow(2, levelWithinPyramid)));
+          tiledImageBounds = cv::Rect_<float>(root_offset.x, root_offset.y, composite.cols, composite.rows);
+          next_level->insertMat(temp, tiledImageBounds);
         }
+        parent->imagePyramid->level.push_back(next_level);
+        topLogicSize = logic_size;
+      }
+    }
+  };
+
+  void Composite::add_images(std::vector<RegInfo> new_info) {
+
+    std::vector<unsigned long int> indexes;
+
+    for (int i = 0; i < new_info.size(); i++) {
+      indexes.push_back(new_info[i].index);
     }
 
-    void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
-        update_Bbox(new_info);
-        expand_subdiv(new_info);
-        add_images(new_info);
+    // get a copy of references to all images at once so that only one mutex lock is needed
+    std::vector<Image *> images = parent->get_image_refs(indexes);
+
+    //this may need to be placed inside the below for loop if frames ever vary in size. For now it is here so the mask only needs to be built once
+    cv::Size image_size(images[0]->width, images[0]->height);
+    /*
+    Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
+
+    circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255), -1);
+    */
+
+    for (int i = 0; i < images.size(); i++) {
+      //calculate where the new image will be copied to in the composite
+      Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x,
+                           new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
+
+      //calculate which pixels of the new image will be copied into the composite
+      Mat use_locations = local_quality_score > composite_z_buffer(copyzone);
+
+
+      if (countNonZero(use_locations) == 0) {
+        continue; //not contributing, don't bother loading from disk
+      }
+
+      images[i]->load_raw_from_disk();
+      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+      cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
+
+      //imwrite(images[i]->get_ImageFile().getBaseName()+".png", image_Mat);
+      /*
+      Mat temp;
+      composite_z_buffer.copyTo(temp, copyzone);
+          */
+
+      /*
+      Mat temp = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
+      image_Mat.copyTo(temp,use_locations);
+      imwrite(images[i]->get_ImageFile().getBaseName() + ".png", temp);
+      */
+
+      image_Mat.copyTo(composite(copyzone), use_locations);
+      local_quality_score.copyTo(composite_z_buffer(copyzone), use_locations);
+
+      images[i]->free_memory_RAW();
     }
+    /*
+    imshow("display",composite);
+    waitKey(10);
+    */
+  }
 
-    void CompositeVoronoi::add_images(std::vector<RegInfo> new_info) {
+  void Composite::update(std::vector<RegInfo> new_info) {
+    update_Bbox(new_info);
+    add_images(new_info);
+  }
 
-        // get a copy of references to all images at once so that only one mutex lock is needed
-        std::vector<unsigned long int> indexes;
-        for (int i = 0; i < new_info.size(); i++) {
-            indexes.push_back(new_info[i].index);
-        }
-        std::vector<Image *> images = parent->get_image_refs(indexes);
+  Mat Composite::get_composite() {
+    return composite;
+  }
 
-        std::vector<Point2i> effectedTiles;
-        for (int i = 0; i < images.size(); i++) {
+  void CompositeVoronoi::reset_image_as_polygon() {
+    imageBoundsAsPolygon[0] = Point2i(0, 0);
+    imageBoundsAsPolygon[1] = Point2i(image_size.width, 0);
+    imageBoundsAsPolygon[2] = Point2i(image_size.width, image_size.height);
+    imageBoundsAsPolygon[3] = Point2i(0, image_size.height);
+  }
 
-            //calculate where the new image will be copied to in the composite
-            Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x,
-                                 new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
 
-            //make copy of subdiv incase we decide not to use new point
-            Subdiv2D tempSubdiv(subdiv);
-
-            //add new point
-            auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
-            int id = subdiv.insert(fShift);
-
-            //get voronoi facets for only this face
-            std::vector<std::vector<Point2f>> facets;
-            std::vector<Point2f> centers;
-            subdiv.getVoronoiFacetList({id}, facets, centers);
-
-            //shift and recast
-            std::vector<Point2i> face;
-            for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
-                ii.x -= centers[0].x;
-                ii.x += 6464 / 2;
-                ii.y -= centers[0].y;
-                ii.y += 4852 / 2;
-                face.push_back((Point2i) ii);
-            }
-
-            //build polygon mask for new point
-            Mat polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
-            cv::fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
-
-            //test for exclusion of frame via rollback
-            int nonzeroMin;
-            if (images[i]->label == Image::_2X) {
-                polyMaskOutput = polyMaskOutput.mul(circleMask);
-                nonzeroMin = 2190 * 2190 * 3.14 * 0.20;
-            } else {
-                nonzeroMin = images[i]->width * images[i]->height * 0.1;
-            }
-
-            if (countNonZero(polyMaskOutput) <= nonzeroMin) {
-                //contributing less than x% of its pixels, revert and don't bother loading from disk
-                subdiv = tempSubdiv;
-                images[i]->free_memory_RAW();
-                memberImages.push_back({images[i]->image_file.getFileName(), false});
-                continue;
-            }
-            memberImages.push_back({images[i]->image_file.getFileName(), true});
-
-            //proceed with addition to composite
-            images[i]->load_raw_from_disk();
-            Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-            cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
-
-            if (images[i]->label == Image::_2X) {
-                cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
-            }
-
-            //add alpha channel now so cvMat can be turned into juce image via memcpy
-            channels[0] = threeChannelPreallocated; //3 channel
-            channels[1] = polyMaskOutput;              //1 channel
-            merge(channels,fourChannelPreallocated);
-
-            fourChannelPreallocated.copyTo(composite(copyzone), polyMaskOutput);
-
-            images[i]->free_memory_RAW();
-
-            //calculate effected tiles
-            calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
-        }
-        std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<Point2i>());
-        effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<Point2i>()),
-                            effectedTiles.end());
-
-        
-        tiledImageBounds = cv::Rect_<float>((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
-        parent->imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
-        parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
-
-      parent->update_observers();
+  long CompositeVoronoi::segment_yval_at_point(float xloc, Point2f p1, Point2f p2) {
+    if (p1.x == p2.x) {
+      return max(p1.y, p2.y);
     }
+    return long((p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y);
+  }
 
 
-    void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
-                                                    Vec2 absCoord) {
-        std::vector<Point2i> tileIndices;
-        std::map<int, std::vector<float>> tilesByColumn;
+  void CompositeVoronoi::remove_duplicates_without_sort(std::vector<Point2i> &vec) {
+    auto new_last = vec.end() - 1;
 
-        //get the tile column of the left and right edges of the image frame
-        int columnBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
-        int columnBoundHigh = parent->imagePyramid->level[0]->getIJ(
-                                                                    Point2f(absCoord.x + image_size.width, absCoord.y)).x;
-
-        //get the tile row the top and bottom edges of the image frame
-        long rowBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
-        long rowBoundHigh = parent->imagePyramid->level[0]->getIJ(
-                                                                  Point2f(absCoord.x, absCoord.y + image_size.height)).y;
-
-        float yPixelBoundLow = float(rowBoundLow) * float(parent->imagePyramid->tile_size);
-        float yPixelBoundHigh = float(rowBoundHigh) * float(parent->imagePyramid->tile_size);
-
-        //for each edge of the voronoi mask
-        for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
-            //if we are at the last point, make the next point the first point (this makes the last edge)
-            int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
-
-            //create an Point2f from the cv::Point2i
-            auto p1 = Point2f(maskAsPolygon[ii].x + absCoord.x, maskAsPolygon[ii].y + absCoord.y);
-            auto p2 = Point2f(maskAsPolygon[ii2].x + absCoord.x, maskAsPolygon[ii2].y + absCoord.y);
-
-            //test for duplicate points that result from the voronoi calculation
-            if (p1.x == p2.x && p1.y == p2.y) {
-                continue;
-            }
-
-            //retreive the tiles these points fall within
-            auto tile1 = parent->imagePyramid->level[0]->getIJ(p1);
-            auto tile2 = parent->imagePyramid->level[0]->getIJ(p2);
-
-            //get the column of these tiles
-            int column1 = tile1.x;
-            int column2 = tile2.x;
-
-            //determine which column is on the right and which is on the left
-            int xlow = min(column1, column2);
-            int xhigh = max(column1, column2);
-
-            //take the column range bounds to be the most inward of the frame edges and the voronoi cell vertices
-            //this accomplishes the same thing as taking the polygon intersection of the voronoi face and the image frame
-            if( columnBoundHigh < xlow || columnBoundLow > xhigh){
-                continue; //no intersection with frame tiles
-            }
-            xlow = max(columnBoundLow,xlow);
-            xhigh = min(columnBoundHigh,xhigh);
-
-            auto plow = p1.x < p2.x ? p1 : p2;
-            auto phigh = p1.x >= p2.x ? p1 : p2;
-
-            for (float j = xlow; j <= xhigh; j++) {
-
-                float columnLeftEdge = j * float(parent->imagePyramid->level[0]->getTileSize());
-                float columnRightEdge = (j + 1) * float(parent->imagePyramid->level[0]->getTileSize());
-                float xloclow = max(columnLeftEdge, plow.x);
-                float xlochigh = min(columnRightEdge, phigh.x);
-
-                long enterColumn = segment_yval_at_point(xloclow, p1, p2);
-                long exitColumn = segment_yval_at_point(xlochigh, p1, p2);
-
-                //if((enterColumn >= yPixelBoundLow || exitColumn >= yPixelBoundLow) && (enterColumn <= yPixelBoundHigh || exitColumn <= yPixelBoundHigh)) {
-                //enterColumn = max(enterColumn, yPixelBoundLow);
-                //enterColumn = min(enterColumn, yPixelBoundHigh);
-                tilesByColumn[j].push_back((float) enterColumn);
-
-                //exitColumn = max(exitColumn, yPixelBoundLow);
-                //exitColumn = min(exitColumn, yPixelBoundHigh);
-                tilesByColumn[j].push_back((float) exitColumn);
-                //}
-            }
-
+    for (auto current = vec.begin(); current != new_last; ++current) {
+      for (auto consider = current + 1; consider != new_last && consider != vec.end();) {
+        if (consider->x == current->x && consider->y == current->y) {
+          std::iter_swap(consider, new_last);
+          new_last--;
+        } else {
+          consider++;
         }
-        for (auto &[key, value]: tilesByColumn) {
-
-            float firstPoint_y = *std::min_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
-            float lastPoint_y = *std::max_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
-
-            if (lastPoint_y < yPixelBoundLow || firstPoint_y > yPixelBoundHigh){
-                continue;
-            }
-
-            int lastTile = parent->imagePyramid->level[0]->getIJ(
-                                                                 Point2f(key * parent->imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
-            int firstTile = parent->imagePyramid->level[0]->getIJ(
-                                                                  Point2f(key * parent->imagePyramid->level[0]->getTileSize(), firstPoint_y)).y;
-
-            for (int ii = firstTile; ii <= lastTile; ii++) {
-                if(ii <= rowBoundHigh && ii >= rowBoundLow) {
-                    result.push_back(Point2i(key, ii));
-                }
-            }
-        }
+      }
     }
+    vec.erase(new_last + 1, vec.end());
+  }
+
+  cv::Mat Composite::score_image_2X(int rows, int cols, int radius) {
+
+    cv::Mat img = cv::Mat::zeros(cv::Size(cols, rows), CV_16U);
+    //cv::Mat img = cv::Mat_<uint16_t>(rows,cols);
+    double idist, jdist, rad_sq;
+    rad_sq = pow(radius, 2);
+    double k = 0;
+    for (int i = 0; i < radius; i++) {
 
 
-    Composite::Composite(StreamCam *parent) : parent(parent), root_offset(0.0, 0.0), max_offset(0.0, 0.0) {
-        flat_field = cv::imread(parent->flat_field_file.toString());
-        flat_field.convertTo(flat_field, CV_32F);
-        flat_field *= 1 / 170.0;
-        //local_quality_score = score_image_2X(4852,6464,2190);
-    }
-
-
-    void Composite::update_Bbox(std::vector<RegInfo> new_info) {
-
-        bool update_box = false;
-
-        //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
-        Vec2 temp_offset = root_offset;
-
-        // If any new frames extend beyond the current extent, expand cv image dimensions
-        for (int i = 0; i < new_info.size(); i++) {
-            if (new_info[i].absoluteCoords.x < root_offset.x) {
-                update_box = true;
-                root_offset.x = new_info[i].absoluteCoords.x;
-            }
-            if (new_info[i].absoluteCoords.y < root_offset.y) {
-                update_box = true;
-                root_offset.y = new_info[i].absoluteCoords.y;
-            }
-
-            if (new_info[i].absoluteCoords.x + 6464 > max_offset.x) {
-                update_box = true;
-                max_offset.x = new_info[i].absoluteCoords.x + 6464;
-            }
-            if (new_info[i].absoluteCoords.y + 4852 > max_offset.y) {
-                update_box = true;
-                max_offset.y = new_info[i].absoluteCoords.y + 4852;
-            }
-
-        }
-
-        if (update_box) {
-            //if we are updating the bounding box, create a new combined image and copy old image into the correct location
-            Mat4b new_combined(int(max_offset.y - root_offset.y), int(max_offset.x - root_offset.x), Vec4b(0,0, 0, 0));
-            //Mat new_combined_z_buffer = cv::Mat::zeros(cv::Size(new_combined.cols, new_combined.rows), CV_16U);
-
-            if (composite.data) {
-
-                Rect copyzone = Rect(temp_offset.x - root_offset.x, temp_offset.y - root_offset.y, composite.cols,
-                                     composite.rows);
-
-                composite.copyTo(new_combined(copyzone));
-                //composite_z_buffer.copyTo(new_combined_z_buffer(copyzone));
-
-            }
-
-            composite = new_combined;
-            //composite_z_buffer = new_combined_z_buffer;
-            unsigned int topLogicSize = parent->imagePyramid->level.back()->getLogicSize();
-            while (topLogicSize < composite.rows || topLogicSize < composite.cols ){
-                unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
-                unsigned int logic_size = 2 * parent->imagePyramid->level.back()->getLogicSize();
-                int levelWithinPyramid = parent->imagePyramid->level.size();
-                std::shared_ptr<TiledImage> next_level = std::make_shared<TiledImage>(parent->imagePyramid,tile_size,logic_size,levelWithinPyramid);
-                if(composite.data){
-                    Mat temp;
-                    resize(composite,temp,Size(composite.cols / pow(2, levelWithinPyramid), composite.rows / pow(2, levelWithinPyramid)));
-                    tiledImageBounds = cv::Rect_<float>(root_offset.x, root_offset.y, composite.cols, composite.rows);
-                    next_level->insertMat(temp,tiledImageBounds);
-                }
-                parent->imagePyramid->level.push_back(next_level);
-                topLogicSize = logic_size;
-            }
-        }
-    };
-
-    void Composite::add_images(std::vector<RegInfo> new_info) {
-
-        std::vector<unsigned long int> indexes;
-
-        for (int i = 0; i < new_info.size(); i++) {
-            indexes.push_back(new_info[i].index);
-        }
-
-        // get a copy of references to all images at once so that only one mutex lock is needed
-        std::vector<Image *> images = parent->get_image_refs(indexes);
-
-        //this may need to be placed inside the below for loop if frames ever vary in size. For now it is here so the mask only needs to be built once
-        cv::Size image_size(images[0]->width, images[0]->height);
+      for (int j = 0; j < radius; j++) {
+        int16_t x = rows / 2 - radius + i + 1;
+        int16_t y = cols / 2 - radius + j + 1;
         /*
-        Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
-
-        circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255), -1);
+        //pyramid
+        if (j < i) {
+            img.at<uint16_t>(x,y) = j;
+            img.at<uint16_t>(img.rows - x, y) = j;
+            img.at<uint16_t>(x,img.cols - y) = j;
+            img.at<uint16_t>(img.rows -x, img.cols - y) = j;
+        }
+        else {
+            img.at<uint16_t>(x, y) = i;
+            img.at<uint16_t>(img.rows - x, y) = i;
+            img.at<uint16_t>(x, img.cols - y) = i;
+            img.at<uint16_t>(img.rows - x, img.cols - y) = i;
+        }
         */
 
-        for (int i = 0; i < images.size(); i++) {
-            //calculate where the new image will be copied to in the composite
-            Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x,
-                                 new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
+        //cone
+        img.at<uint16_t>(x, y) = radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
+        img.at<uint16_t>(img.rows - x, y) =
+            radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
+        img.at<uint16_t>(x, img.cols - y) =
+            radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
+        img.at<uint16_t>(img.rows - x, img.cols - y) =
+            radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
+      }
 
-            //calculate which pixels of the new image will be copied into the composite
-            Mat use_locations = local_quality_score > composite_z_buffer(copyzone);
+    }
+    Mat mask = cv::Mat::zeros(cv::Size(img.cols, img.rows), CV_16U);
+
+    circle(mask, cv::Point(img.cols / 2, img.rows / 2), 2190, cv::Scalar(1), -1);
+    cv::Mat temp = mask.mul(img);
+    imwrite("mask.png", temp);
+    //imwrite("img.png", img);
+    return temp;
+  }
+
+  void CompositeVoronoi::debug_write_contribution_on_grid(std::string name, pathCam::Vec2 absCoord, cv::Mat &img,
+                                                          cv::Mat &mask) {
+    int k = int(absCoord.x);
+    k = 512 - k % 512;
+    if (k < 0) { k = abs(k); }
+    Mat debugmat = Mat::zeros(4852, 6464, CV_8UC4);
+    img.copyTo(img, mask);
+    for (int m = k; m < debugmat.cols; m += 512) {
+      cv::line(debugmat, cv::Point(m, 0), cv::Point(m, 4852), Scalar(0, 0, 255, 255));
+      cv::line(debugmat, cv::Point(m + 1, 0), cv::Point(m + 1, 4852), Scalar(0, 0, 255, 255));
+      cv::line(debugmat, cv::Point(m + 2, 0), cv::Point(m + 2, 4852), Scalar(0, 0, 255, 255));
+
+    }
+    k = int(absCoord.y);
+    k = 512 - k % 512;
+
+    if (k < 0) { k = abs(k); }
+    for (int m = k; m < debugmat.rows; m += 512) {
+      cv::line(debugmat, cv::Point(0, m), cv::Point(6464, m), Scalar(0, 0, 255, 255));
+      cv::line(debugmat, cv::Point(0, m + 1), cv::Point(6464, m + 1), Scalar(0, 0, 255, 255));
+      cv::line(debugmat, cv::Point(0, m + 2), cv::Point(6464, m + 2), Scalar(0, 0, 255, 255));
+
+    }
+    imwrite(name, debugmat);
+  }
 
 
-            if (countNonZero(use_locations) == 0) {
-                continue; //not contributing, don't bother loading from disk
-            }
+  void CompositeVoronoi::perform_global_alignment() {
 
-            images[i]->load_raw_from_disk();
-            Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-            cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-            cv::divide(image_Mat, flat_field, image_Mat, 1.0, CV_8U);
+    //collect list of all edges.
+    std::vector<Vec4f> edges;
+    std::vector<Vec2i> verticePairs;
+    std::vector<Point2f> coords;
 
-            //imwrite(images[i]->get_ImageFile().getBaseName()+".png", image_Mat);
-            /*
-            Mat temp;
-            composite_z_buffer.copyTo(temp, copyzone);
-                */
+    subdiv.getEdgeList(edges);
+    matchedEdges.resize(edges.size(), {-1, -1}); //preallocated to avoid mutex
+    parent->resize_mmatch_mutex->lock();
 
-            /*
-            Mat temp = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
-            image_Mat.copyTo(temp,use_locations);
-            imwrite(images[i]->get_ImageFile().getBaseName() + ".png", temp);
-            */
+    //collect list of all vertices that share an edge
+    int count = 0;
+    for (int i = 0; i < edges.size(); i++) {
+      //set point to shorten if statement
+      auto ep = edges[i];
+      auto x1 = subdiv_Bbox.max_x;
+      auto x2 = subdiv_Bbox.min_x;
+      auto y1 = subdiv_Bbox.max_y;
+      auto y2 = subdiv_Bbox.min_y;
 
-            image_Mat.copyTo(composite(copyzone), use_locations);
-            local_quality_score.copyTo(composite_z_buffer(copyzone), use_locations);
+      //make sure edge ends are within bounding box
+      if (ep[0] < x1 && ep[0] > x2 && ep[1] < y1 && ep[1] > y2 && ep[2] < x1 && ep[2] > x2 && ep[3] < y1 &&
+          ep[3] > y2) {
 
-            images[i]->free_memory_RAW();
+        //find vertex IDs
+        int vertId1 = subdiv.findNearest({ep[0], ep[1]});
+        int vertId2 = subdiv.findNearest({ep[2], ep[3]});
+
+        //verify vertices correspond to images added to composite
+        auto val1 = delaunayMembers.count(vertId1);
+        auto val2 = delaunayMembers.count(vertId2);
+
+        if (val1 > 0 && val2 > 0) {
+          auto image_idx1 = delaunayMembers[vertId1];
+          auto image_idx2 = delaunayMembers[vertId2];
+          if (vertId1 == vertId2) {
+            int k = 0;
+          }
+          //if match is already made, don't run job to calculate it
+          if (parent->matchM.match[image_idx1][image_idx2] != nullptr) {
+            matchedEdges[i].first = image_idx1;
+            matchedEdges[i].second = image_idx2;
+
+          } else {
+            //create matchable job
+            matchableCount++;
+            count++;
+            auto sm = new SingleMatchRunnable(parent, delaunayMembers[vertId1], delaunayMembers[vertId2],
+                                              componentIndex, i, 0);
+            parent->JobQ->add_runnable(sm);
+          }
         }
-        /*
-        imshow("display",composite);
-        waitKey(10);
-        */
+      }
     }
 
-    void Composite::update(std::vector<RegInfo> new_info) {
-        update_Bbox(new_info);
-        add_images(new_info);
+    //wait until these jobs have completed
+    while (matchableCount > 0) {
+      Poco::Thread::sleep(100);
     }
 
-    Mat Composite::get_composite() {
-        return composite;
-    }
+    parent->resize_mmatch_mutex->unlock();
 
-    void CompositeVoronoi::reset_image_as_polygon() {
-        imageBoundsAsPolygon[0] = Point2i(0, 0);
-        imageBoundsAsPolygon[1] = Point2i(image_size.width, 0);
-        imageBoundsAsPolygon[2] = Point2i(image_size.width, image_size.height);
-        imageBoundsAsPolygon[3] = Point2i(0, image_size.height);
-    }
-
-
-    long CompositeVoronoi::segment_yval_at_point(float xloc, Point2f p1, Point2f p2) {
-        if (p1.x == p2.x) {
-            return max(p1.y, p2.y);
+    //give each frame index a linear system index.
+    std::map<long, long> frameIndexToSystemIndex;
+    std::map<long, long> systemIndexToFrameIndex;
+    for (int i = 0; i < matchedEdges.size();) {
+      if (matchedEdges[i].first == -1) {
+        //just because a delaunay edge exists between two frames doesn't mean they actually overlap. Some edges may
+        //be far enough away that a registration between them is impossible, but a delaunay edge still exists. Delete
+        //these so that an accurate count of system equations can be made.
+        matchedEdges.erase(matchedEdges.begin() + i);
+        continue;
+      }
+      if (matchedEdges[i].first != 0) {
+        if (frameIndexToSystemIndex.find(matchedEdges[i].first) == frameIndexToSystemIndex.end()) {
+          long val = frameIndexToSystemIndex.size();
+          frameIndexToSystemIndex[matchedEdges[i].first] = val;
+          systemIndexToFrameIndex[val] = matchedEdges[i].first;
         }
-        return long((p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y);
+      }
+      if (matchedEdges[i].second != 0) {
+        long val = frameIndexToSystemIndex.size();
+        if (frameIndexToSystemIndex.find(matchedEdges[i].second) == frameIndexToSystemIndex.end()) {
+          frameIndexToSystemIndex[matchedEdges[i].second] = val;
+          systemIndexToFrameIndex[val] = matchedEdges[i].second;
+        }
+      }
+      i++;
     }
 
+    //minimize norm2(Ax-b).
+    Mat A = Mat::zeros(matchedEdges.size(), frameIndexToSystemIndex.size(), CV_64FC1);
+    Mat xpr = Mat::zeros(matchedEdges.size(), 1, CV_64FC1);
+    Mat ypr = xpr.clone();
+    Mat xprLP = xpr.clone();
+    Mat yprLP = ypr.clone();
 
-    void CompositeVoronoi::remove_duplicates_without_sort(std::vector<Point2i> &vec) {
-        auto new_last = vec.end() - 1;
+    double valtest1 = 0;
+    std::vector<int> bins1;
+    for (int i = 0; i < matchedEdges.size(); i++) {
+      //build system (A in Ax - b)
+      if (matchedEdges[i].first != 0) {
+        A.at<double>(i, frameIndexToSystemIndex[matchedEdges[i].first]) = 1;
+      } else {
+        xprLP.at<double>(i, 0) += root_offset.x;
+        yprLP.at<double>(i, 0) += root_offset.y;
+      }
+      if (matchedEdges[i].second != 0) {
+        A.at<double>(i, frameIndexToSystemIndex[matchedEdges[i].second]) = -1;
+      } else {
+        xprLP.at<double>(i, 0) += -1 * root_offset.x;
+        yprLP.at<double>(i, 0) += -1 * root_offset.y;
+      }
+      //build pairwise reg vector (b in Ax - b)
+      auto pwr = parent->matchM.match[matchedEdges[i].first][matchedEdges[i].second];
+      xpr.at<double>(i, 0) = pwr->t_x;
+      ypr.at<double>(i, 0) = pwr->t_y;
+      xprLP.at<double>(i, 0) += pwr->t_x;
+      yprLP.at<double>(i, 0) += pwr->t_y;
 
-        for (auto current = vec.begin(); current != new_last; ++current) {
-            for (auto consider = current + 1; consider != new_last && consider != vec.end();) {
-                if (consider->x == current->x && consider->y == current->y) {
-                    std::iter_swap(consider, new_last);
-                    new_last--;
-                } else {
-                    consider++;
-                }
-            }
-        }
-        vec.erase(new_last + 1, vec.end());
+      auto verify1 = parent->reg_results[matchedEdges[i].first].absoluteCoords;
+      auto verify2 = parent->reg_results[matchedEdges[i].second].absoluteCoords;
+      auto val = abs(verify1.x - verify2.x - pwr->t_x);
+      if (val > valtest1) {
+        valtest1 = val;
+      }
+      if (val > 35) {
+        int k = 0;
+      }
+      if ((int) val >= bins1.size()) {
+        bins1.resize((int) val + 1, 0);
+        bins1[(int) val] = 1;
+      } else {
+        bins1[(int) val]++;
+      }
+
+
     }
 
-    cv::Mat Composite::score_image_2X(int rows, int cols, int radius) {
+    //build absolute coord/solution vector (x in Ax - b)
+    Mat xac = Mat::zeros(systemIndexToFrameIndex.size(), 1, CV_64FC1);
+    Mat yac = xac.clone();
 
-        cv::Mat img = cv::Mat::zeros(cv::Size(cols, rows), CV_16U);
-        //cv::Mat img = cv::Mat_<uint16_t>(rows,cols);
-        double idist, jdist, rad_sq;
-        rad_sq = pow(radius, 2);
-        double k = 0;
-        for (int i = 0; i < radius; i++) {
-
-
-            for (int j = 0; j < radius; j++) {
-                int16_t x = rows / 2 - radius + i + 1;
-                int16_t y = cols / 2 - radius + j + 1;
-                /*
-                //pyramid
-                if (j < i) {
-                    img.at<uint16_t>(x,y) = j;
-                    img.at<uint16_t>(img.rows - x, y) = j;
-                    img.at<uint16_t>(x,img.cols - y) = j;
-                    img.at<uint16_t>(img.rows -x, img.cols - y) = j;
-                }
-                else {
-                    img.at<uint16_t>(x, y) = i;
-                    img.at<uint16_t>(img.rows - x, y) = i;
-                    img.at<uint16_t>(x, img.cols - y) = i;
-                    img.at<uint16_t>(img.rows - x, img.cols - y) = i;
-                }
-                */
-
-                //cone
-                img.at<uint16_t>(x, y) = radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
-                img.at<uint16_t>(img.rows - x, y) =
-                        radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
-                img.at<uint16_t>(x, img.cols - y) =
-                        radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
-                img.at<uint16_t>(img.rows - x, img.cols - y) =
-                        radius - max(sqrt(pow(img.rows / 2 - x, 2) + pow(img.cols / 2 - y, 2)), 0.0);
-            }
-
-        }
-        Mat mask = cv::Mat::zeros(cv::Size(img.cols, img.rows), CV_16U);
-
-        circle(mask, cv::Point(img.cols / 2, img.rows / 2), 2190, cv::Scalar(1), -1);
-        cv::Mat temp = mask.mul(img);
-        imwrite("mask.png", temp);
-        //imwrite("img.png", img);
-        return temp;
+    for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
+      auto coords = parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords;
+      xac.at<double>(i) = coords.x;
+      yac.at<double>(i) = coords.y;
     }
 
-    void CompositeVoronoi::debug_write_contribution_on_grid(std::string name ,pathCam::Vec2 absCoord, cv::Mat &img, cv::Mat &mask) {
-        int k = int(absCoord.x);
-        k = 512 - k%512;
-        if(k < 0){k=abs(k);}
-        Mat debugmat = Mat::zeros(4852,6464,CV_8UC4);
-        img.copyTo(img,mask);
-        for (int m = k; m < debugmat.cols; m += 512){
-            cv::line(debugmat,cv::Point(m,0),cv::Point(m,4852),Scalar(0,0,255,255));
-            cv::line(debugmat,cv::Point(m+1,0),cv::Point(m+1,4852),Scalar(0,0,255,255));
-            cv::line(debugmat,cv::Point(m+2,0),cv::Point(m+2,4852),Scalar(0,0,255,255));
+    /*some comments:
+     * Because of the geometry of the delaunay triangulation, A^T * A is guaranteed to be symmetric positive definite.
+     * For this reason, minimizing the norm of Ax-b is well suited for conjugate gradient. I have written my own
+     * easy implementation and compared it in time trials to calculating the moore-pemrose inverse. for 100 iterations,
+     * CG takes 3 miliseconds while the MP inverse takes 11. Results are comparable.
+     *
+    start = std::chrono::high_resolution_clock::now();
+    Mat At = A.t();
+    Mat MPI = (At*A).inv()*At*xpr;
+    stop = std::chrono::high_resolution_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    std::cout << duration.count() << std::endl;
+     */
 
-        }
-        k = int(absCoord.y);
-        k = 512 - k%512;
+    //solve problem for x and y
+    coopers_conj_grad(A, xpr, xac, 100, 0.0001);
+    coopers_conj_grad(A, ypr, yac, 100, 0.0001);
 
-        if(k < 0){k=abs(k);}
-        for (int m = k; m < debugmat.rows; m += 512){
-            cv::line(debugmat,cv::Point(0,m),cv::Point(6464,m),Scalar(0,0,255,255));
-            cv::line(debugmat,cv::Point(0,m+1),cv::Point(6464,m+1),Scalar(0,0,255,255));
-            cv::line(debugmat,cv::Point(0,m+2),cv::Point(6464,m+2),Scalar(0,0,255,255));
+    /*
+    //for debug, test for change in error
+    double valtest2 = 0;
+    std::vector<int> bins2;
+    for (int i = 0; i < matchedEdges.size(); i++) {
+      auto pwr = parent->matchM.match[matchedEdges[i].first][matchedEdges[i].second];
+      Vec2 verify1;
+      verify1.x = xac.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
+      verify1.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
 
-        }
-        imwrite(name,debugmat);
+      Vec2 verify2;
+      verify2.x = xac.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
+      verify2.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
+      double val = abs(verify1.x - verify2.x - pwr->t_x);
+      if (val > valtest2) {
+        valtest2 = val;
+      }
+      if ((int) val >= bins2.size()) {
+        bins2.resize((int) val + 1, 0);
+        bins2[(int) val] = 1;
+      } else {
+        bins2[(int) val]++;
+      }
+
     }
+ //compute LP problem to minimize inf norm instead of 2 norm
+    Mat c = Mat::zeros(A.cols + 1, 1, CV_64FC1);
+    c.at<double>(A.cols) = -1.0;
+
+    Mat G = Mat::zeros(2 * A.rows, A.cols + 2, CV_64FC1);
+    A.copyTo(G(Rect(0, 0, A.cols, A.rows)));
+    A.copyTo(G(Rect(0, A.rows, A.cols, A.rows)));
+    G(Rect(0, A.rows, A.cols, A.rows)) *= -1;
+    for (int i = 0; i < G.rows; i++) {
+      G.at<double>(i, A.cols) = -1;
+    }
+
+    xprLP.copyTo(G(Rect(A.cols + 1, 0, 1, xpr.rows)));
+    xprLP.copyTo(G(Rect(A.cols + 1, xpr.rows, 1, xpr.rows)));
+    G(Rect(A.cols + 1, xpr.rows, 1, xprLP.rows)) *= -1;
+
+    Mat xLP;
+    auto result = cv::solveLP(c, G, xLP);
+
+
+    Mat hy = Mat::zeros(2*A.rows,1,CV_64FC1);
+    ypr.copyTo(hy(Rect(0,0,1,ypr.rows)));
+    ypr.copyTo(hy(Rect(0,ypr.rows,1,ypr.rows)));
+    hy(Rect(0,ypr.rows,1,ypr.rows)) *= -1;
+
+
+
+
+    double valtest3 = 0;
+    std::vector<int> bins3;
+    for (int i = 0; i < matchedEdges.size(); i++) {
+      auto pwr = parent->matchM.match[matchedEdges[i].first][matchedEdges[i].second];
+      Vec2 verify1;
+      verify1.x = xLP.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
+      verify1.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
+
+      Vec2 verify2;
+      verify2.x = xLP.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
+      verify2.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
+      double val = abs(verify1.x - verify2.x - pwr->t_x);
+      if (val > valtest3) {
+        valtest3 = val;
+      }
+
+      if ((int) val >= bins3.size()) {
+        bins3.resize((int) val + 1, 0);
+        bins3[(int) val] = 1;
+      } else {
+        bins3[(int) val]++;
+      }
+
+
+    }
+*/
+    auto start = std::chrono::high_resolution_clock::now();
+    self_reset();
+    parent->resize_mmatch_mutex->lock();
+    std::vector<RegInfo> newinfo;
+    for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
+      parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.x = xac.at<double>(i);
+      parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.y = yac.at<double>(i);
+      newinfo.push_back(parent->reg_results[systemIndexToFrameIndex[i]]);
+    }
+
+    update(newinfo);
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    std::cout << duration.count() << std::endl;
+    int k = 0;
+  }
+
+
+  double CompositeVoronoi::coopers_conj_grad(Mat A, Mat b, Mat x, int steps, double epsilon) {
+    Mat ATranspose = A.t();
+    Mat ATA = ATranspose * A;
+    Mat ATb = ATranspose * b;
+    Mat r = ATb - (ATA * x);
+    Mat p = r.clone();
+
+    for (int i = 0; i < steps; i++) {
+      auto stepSize = r.dot(r) / (p.dot(ATA * p));
+      x += stepSize * p;
+      double denom = r.dot(r);
+      r -= stepSize * ATA * p;
+      double adjustment = r.dot(r) / denom;
+      p = r + adjustment * p;
+      if (norm(r) < epsilon) {
+        break;
+      }
+    }
+    return norm(A * x - b);
+  }
 }
 

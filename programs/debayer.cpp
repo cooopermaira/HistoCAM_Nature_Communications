@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
             ++it;
         }
         while (!jq.is_empty()) {
-            jq.run_jobs(false, true);
+          jq.run_jobs(false);
         }
 
 

@@ -76,6 +76,7 @@ namespace pathCam {
 
             //unsigned long image_index = parent->add_image(image);
             unsigned long image_index = sort_order;
+            image->index = image_index;
             parent->add_image(image, image_index);
             auto matchjob = new MatchRunnable(parent, image_index, sort_order + 20);
             parent->matchableCount++;

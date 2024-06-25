@@ -39,6 +39,8 @@ class StreamCam: public BatchCam{
   friend class CompositeManager;
   friend class LoaderLogicRunnable;
   friend class RegistrationRunnable;
+  friend class SingleMatchRunnable;
+  friend class XCompRunnable;
   
 private:
 std::queue < std::vector < RegInfo > > compositeBatch;
@@ -104,8 +106,8 @@ protected:
   std::queue < std::string > disk_image;
   std::queue < char* > buffer;
   std::queue < Image* > spin_image_buffer;
-  
-  
+
+  std::atomic<bool> compositing = true;
   std::atomic < bool > reg_complete = false;
   std::atomic < bool > disk_empty = false;
   std::atomic < bool > jobs_queued = false;

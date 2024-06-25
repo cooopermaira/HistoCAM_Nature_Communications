@@ -19,7 +19,7 @@ namespace pathCam {
         queue_mutex->unlock();
     };
 
-    bool JobQueue::run_jobs(bool join_all, bool order_before_run) {
+    bool JobQueue::run_jobs(bool join_all) {
         queue_mutex->lock();
         int batchSize = std::min(20, (int) jobQueue.size());
         queue_mutex->unlock();
@@ -32,7 +32,7 @@ namespace pathCam {
                 jobQueue.pop();
                 queue_mutex->unlock();
             } else {
-                Poco::Thread::sleep(100);
+                Poco::Thread::sleep(10);
             }
         }
 

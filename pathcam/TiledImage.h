@@ -83,6 +83,8 @@ public:
   unsigned int getTileSize() { return tile_size; }
   
   unsigned int getLogicSize() { return logic_size; }
+
+  void resetEdges(Point2i topLeft, Point2i bottomRight);
   
   void makeTile(int x, int y);
   
