@@ -10,8 +10,10 @@
 
 namespace pathCam {
 
-  CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int component_index) : Composite(parent),componentIndex(component_index),
-                                                                               image_size(image_size) {
+  CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int component_index) : Composite(
+      parent), componentIndex(component_index),
+                                                                                                             image_size(
+                                                                                                                 image_size) {
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
     circleMask = cv::Mat::zeros(image_size, CV_8U);
@@ -22,8 +24,15 @@ namespace pathCam {
     imageBoundsAsPolygon.resize(4);
     reset_image_as_polygon();
     polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
-    zeros = polyMaskOutput.clone();
+    freshMask = polyMaskOutput.clone();
 
+    //these are used in the add_point_to_DT_multithread function
+    masks.resize(1000);
+    threeChanPreals.resize(1000);
+    fourChanPreals.resize(1000);
+    for (unsigned int i = 0; i < 1000; i++) {
+      freeMasks.push(i);
+    }
   }
 
 
@@ -69,9 +78,69 @@ namespace pathCam {
   }
 
   void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
-    update_Bbox(new_info);
+    update_mutex->lock();
+    update_Bbox_no_composite(new_info);
     expand_subdiv(new_info);
-    add_images(new_info);
+    add_images_multithread(new_info);
+    update_mutex->unlock();
+  }
+
+
+  std::pair<int, unsigned int> CompositeVoronoi::add_point_to_DT_multithread(cv::Point2f _point, pathCam::Image *_image,
+                                                                             std::vector<Point2i> &_face) {
+    //make copy of subdiv incase we decide not to use new point
+    Subdiv2D tempSubdiv(subdiv);
+
+    //add new point
+    int vertxId = subdiv.insert(_point);
+    //auto image = parent->get_image_ref(_image_index);
+
+    //get voronoi facets for only this face
+    std::vector<std::vector<Point2f>> facets;
+    std::vector<Point2f> centers;
+    subdiv.getVoronoiFacetList({vertxId}, facets, centers);
+
+    //shift and recast
+    for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
+      ii.x -= centers[0].x;
+      ii.x += 6464 / 2;
+      ii.y -= centers[0].y;
+      ii.y += 4852 / 2;
+      _face.push_back((Point2i) ii);
+    }
+
+    //get free mask from queue least likely to need initial allocation
+    auto top = freeMasks.top();
+    unsigned int maskIndex = top;
+    freeMasks.pop();
+
+    //copyto will only reallocate if not previously allocated
+    freshMask.copyTo(masks[maskIndex]);
+
+    //build polygon mask for new point
+    cv::fillConvexPoly(masks[maskIndex], _face, cv::Scalar(255));
+
+    //test for exclusion of frame via rollback
+    int nonzeroMin;
+    if (_image->label == Image::_2X) {
+      masks[maskIndex] = masks[maskIndex].mul(circleMask);
+      nonzeroMin = 2190 * 2190 * 3.14 * 0.20;
+    } else {
+      nonzeroMin = _image->width * _image->height * 0.1;
+    }
+
+    int nonzero = countNonZero(masks[maskIndex]);
+    if (nonzero <= nonzeroMin) {
+      //contributing less than x% of its pixels, revert and don't bother loading from disk
+      subdiv = tempSubdiv;
+      _image->free_memory_RAW();
+      memberImages.push_back({_image->image_file.getFileName(), false});
+      freeMasks.push(maskIndex);
+      return {-1, 0};
+    }
+    memberImages.push_back({_image->image_file.getFileName(), true});
+    delaunayMembers.insert({vertxId, _image->index});
+    return {vertxId, maskIndex};
   }
 
 
@@ -123,6 +192,65 @@ namespace pathCam {
   }
 
 
+  void CompositeVoronoi::add_images_multithread(std::vector<RegInfo> new_info) {
+
+    // get a copy of references to all images at once so that only one mutex lock is needed
+    std::vector<unsigned long> indexes;
+    for (int i = 0; i < new_info.size(); i++) {
+      indexes.push_back(new_info[i].index);
+    }
+    std::vector<Image *> images = parent->get_image_refs(indexes);
+
+    for (int i = 0; i < images.size(); i++) {
+
+      //add point to delaunay triangulation
+      std::vector<Point2i> face;
+      auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
+      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face);
+
+      //res is {vertexId,maskId}
+      if (res == -1) { continue; }
+      images[i]->vertexId = res;
+      images[i]->absoluteCoords = new_info[i].absoluteCoords;
+
+      //calculate effected tiles
+      std::vector<Point2i> effectedTiles;
+      calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
+
+      //build image with alpha channel
+
+      images[i]->load_raw_from_disk();
+      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+
+      images[i]->free_memory_RAW();
+
+      if (images[i]->label == Image::_2X) {//flat field correction if needed
+        cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
+      }
+
+      channels[0] = threeChannelPreallocated; //3 channel
+      channels[1] = polyMaskOutput;           //alpha channel
+      merge(channels, fourChannelPreallocated);
+
+      //build and run copy runnable
+      for (auto tile: effectedTiles) {
+        jobCount++;
+        auto cr = new ImageToTileCopyRunnable(parent, images[i], componentIndex, tile, 0);
+        parent->JobQ->add_runnable(cr);
+      }
+
+      //wait till jobs have processed
+      if (parent->composite_thread.trySleep(100000)) {
+        throw std::invalid_argument("tile jobs not processing");
+      }
+      parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
+      parent->update_observers();
+      freshMask.copyTo(polyMaskOutput);
+    }
+  }
+
+
   void CompositeVoronoi::add_images(std::vector<RegInfo> new_info) {
 
     // get a copy of references to all images at once so that only one mutex lock is needed
@@ -145,7 +273,7 @@ namespace pathCam {
       auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
 
       if (add_point_to_delaunay_triangulation(fShift, images[i], face) == -1) {
-        zeros.copyTo(polyMaskOutput);
+        freshMask.copyTo(polyMaskOutput);
         continue;
       }
 
@@ -164,7 +292,7 @@ namespace pathCam {
       merge(channels, fourChannelPreallocated);
 
       fourChannelPreallocated.copyTo(composite(copyzone), polyMaskOutput);
-      zeros.copyTo(polyMaskOutput);
+      freshMask.copyTo(polyMaskOutput);
       images[i]->free_memory_RAW();
 
       //calculate effected tiles
@@ -283,11 +411,71 @@ namespace pathCam {
   }
 
 
-  Composite::Composite(StreamCam *parent) : parent(parent), root_offset(0.0, 0.0), max_offset(0.0, 0.0) {
+  Composite::Composite(StreamCam *parent) : update_mutex(new Poco::FastMutex()), parent(parent), root_offset(0.0, 0.0),
+                                            max_offset(0.0, 0.0) {
     flat_field = cv::imread(parent->flat_field_file.toString());
     flat_field.convertTo(flat_field, CV_32F);
     flat_field *= 1 / 170.0;
+
     //local_quality_score = score_image_2X(4852,6464,2190);
+  }
+
+
+  void CompositeVoronoi::update_Bbox_no_composite(std::vector<RegInfo> new_info) {
+    bool update_box = false;
+
+    //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
+    Vec2 temp_offset = root_offset;
+
+    // If any new frames extend beyond the current extent, expand cv image dimensions
+    for (int i = 0; i < new_info.size(); i++) {
+      if (new_info[i].absoluteCoords.x < root_offset.x) {
+        update_box = true;
+        root_offset.x = new_info[i].absoluteCoords.x;
+      }
+      if (new_info[i].absoluteCoords.y < root_offset.y) {
+        update_box = true;
+        root_offset.y = new_info[i].absoluteCoords.y;
+      }
+
+      if (new_info[i].absoluteCoords.x + 6464 > max_offset.x) {
+        update_box = true;
+        max_offset.x = new_info[i].absoluteCoords.x + 6464;
+      }
+      if (new_info[i].absoluteCoords.y + 4852 > max_offset.y) {
+        update_box = true;
+        max_offset.y = new_info[i].absoluteCoords.y + 4852;
+      }
+
+    }
+    if (update_box) {
+      auto topLevelBeforeAdding = parent->imagePyramid->level.back();
+      unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
+      unsigned int topLogicSize = parent->imagePyramid->level.back()->getLogicSize();
+      bool addedLevel = false;
+      while (topLogicSize < max_offset.x - root_offset.x || topLogicSize < max_offset.y - root_offset.y) {
+        addedLevel = true;
+        unsigned int logic_size = 2 * topLogicSize;
+        int levelWithinPyramid = parent->imagePyramid->level.size();
+        assert(pow(2, levelWithinPyramid) == logic_size / tile_size);
+        parent->imagePyramid->level.push_back(
+            std::make_shared<TiledImage>(parent->imagePyramid, tile_size, logic_size, levelWithinPyramid));
+        topLogicSize = logic_size;
+      }
+      if (addedLevel) {
+        auto tl = topLevelBeforeAdding->getIJ(Point2f(root_offset.x, root_offset.y));
+        auto br = topLevelBeforeAdding->getIJ(Point2f(max_offset.x, max_offset.y));
+        for (int x = tl.x; x <= br.x; x++) {
+          for (int y = tl.y; y <= br.y; y++) {
+            if (topLevelBeforeAdding->tiles(x, y).data) {
+              auto tile = Point2i(x, y);
+              auto myLevelRegion = cv::Rect_<float>(tile.x * tile_size, tile.y * tile_size, tile_size, tile_size);
+              topLevelBeforeAdding->tileUpwards(tile, myLevelRegion, topLevelBeforeAdding->tiles(tile.x, tile.y));
+            }
+          }
+        }
+      }
+    }
   }
 
 
@@ -339,20 +527,23 @@ namespace pathCam {
       //composite_z_buffer = new_combined_z_buffer;
       unsigned int topLogicSize = parent->imagePyramid->level.back()->getLogicSize();
       while (topLogicSize < composite.rows || topLogicSize < composite.cols) {
+
         unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
-        unsigned int logic_size = 2 * parent->imagePyramid->level.back()->getLogicSize();
+        unsigned int logic_size = 2 * topLogicSize;
         int levelWithinPyramid = parent->imagePyramid->level.size();
-        std::shared_ptr<TiledImage> next_level = std::make_shared<TiledImage>(parent->imagePyramid, tile_size,
-                                                                              logic_size, levelWithinPyramid);
+        assert(pow(2, levelWithinPyramid) == logic_size / tile_size);
+        parent->imagePyramid->level.push_back(
+            std::make_shared<TiledImage>(parent->imagePyramid, tile_size, logic_size, levelWithinPyramid));
+        topLogicSize = logic_size;
+
         if (composite.data) {
           Mat temp;
           resize(composite, temp,
                  Size(composite.cols / pow(2, levelWithinPyramid), composite.rows / pow(2, levelWithinPyramid)));
           tiledImageBounds = cv::Rect_<float>(root_offset.x, root_offset.y, composite.cols, composite.rows);
-          next_level->insertMat(temp, tiledImageBounds);
+          parent->imagePyramid->level.back()->insertMat(temp, tiledImageBounds);
         }
-        parent->imagePyramid->level.push_back(next_level);
-        topLogicSize = logic_size;
+
       }
     }
   };
@@ -433,14 +624,12 @@ namespace pathCam {
     imageBoundsAsPolygon[3] = Point2i(0, image_size.height);
   }
 
-
   long CompositeVoronoi::segment_yval_at_point(float xloc, Point2f p1, Point2f p2) {
     if (p1.x == p2.x) {
       return max(p1.y, p2.y);
     }
     return long((p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y);
   }
-
 
   void CompositeVoronoi::remove_duplicates_without_sort(std::vector<Point2i> &vec) {
     auto new_last = vec.end() - 1;
@@ -533,6 +722,27 @@ namespace pathCam {
     imwrite(name, debugmat);
   }
 
+
+  void ImageToTileCopyRunnable::run() {
+    auto composite = parent->composites[component_membership];
+    auto mask = composite->polyMaskOutput;
+    auto imageMat = composite->fourChannelPreallocated;
+    auto tileSize = parent->imagePyramid->level[0]->getTileSize();
+    auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
+    auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
+
+    parent->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+
+    composite->notify_job_complete();
+
+  }
+
+  void CompositeVoronoi::notify_job_complete() {
+    jobCount--;
+    if (jobCount == 0) {
+      parent->composite_thread.wakeUp();
+    }
+  }
 
   void CompositeVoronoi::perform_global_alignment() {
 

@@ -41,6 +41,7 @@ namespace pathCam {
     Mat4b composite;
     Vec2 root_offset, max_offset;
     Rect_<float> tiledImageBounds;
+    Poco::FastMutex *update_mutex;
 
 
   public:
@@ -60,10 +61,12 @@ namespace pathCam {
 
 
   class CompositeVoronoi : public Composite {
+    friend class ImageToTileCopyRunnable;
+    friend class CompositeManager;
   private:
     Mat circleMask;
     Mat polyMaskOutput;
-    Mat zeros;
+    Mat freshMask;
     Mat3b threeChannelPreallocated;
     Mat4b fourChannelPreallocated;
     Subdiv2D subdiv;
@@ -72,6 +75,7 @@ namespace pathCam {
     std::vector<std::pair<std::string, bool>> memberImages;
     std::map<int, unsigned long> delaunayMembers;
     std::vector<Point2i> imageBoundsAsPolygon;
+    std::atomic<unsigned int> jobCount = 0;
     unsigned int componentIndex;
     Bbox subdiv_Bbox;
 
@@ -79,6 +83,8 @@ namespace pathCam {
     long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
 
     void add_images(std::vector<RegInfo> new_info);
+
+    void add_images_multithread(std::vector<RegInfo> new_info);
 
     void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord);
 
@@ -90,6 +96,9 @@ namespace pathCam {
 
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
                                             std::vector<Point2i> &_face);
+
+    std::pair<int,unsigned int> add_point_to_DT_multithread(cv::Point2f _point, pathCam::Image *_image,
+                                                            std::vector<Point2i> &_face);
 
     void expand_subdiv(std::vector<RegInfo> new_info);
 
@@ -104,9 +113,18 @@ namespace pathCam {
 
     void update(std::vector<RegInfo> new_info);
 
+    void update_Bbox_no_composite(std::vector<RegInfo> new_info);
+
     double coopers_conj_grad(Mat A, Mat b, Mat x, int steps, double epsilon);
 
     void perform_global_alignment();
+
+  protected:
+    std::priority_queue<unsigned int> freeMasks;
+    std::vector<Mat> masks;
+    std::vector<Mat> threeChanPreals;
+    std::vector<Mat> fourChanPreals;
+    void notify_job_complete();
   };
 }
 

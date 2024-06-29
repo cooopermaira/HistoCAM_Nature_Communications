@@ -41,6 +41,7 @@ class StreamCam: public BatchCam{
   friend class RegistrationRunnable;
   friend class SingleMatchRunnable;
   friend class XCompRunnable;
+  friend class ImageToTileCopyRunnable;
   
 private:
 std::queue < std::vector < RegInfo > > compositeBatch;
@@ -97,12 +98,13 @@ protected:
   void push_compositeQ(RegInfo index);
   //void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
   void add_new_component(unsigned long image_index, cv::Size image_size);
+  void add_new_component_Q(unsigned long image_index, cv::Size image_size){newComponentQ.push({image_index,image_size});}
 
   //std::vector < double > variancesForDebug;
   std::vector < CompositeVoronoi* > composites;
   std::vector < bool > visited;
   
-
+  std::queue < std::pair <unsigned long, cv::Size> > newComponentQ;
   std::queue < std::string > disk_image;
   std::queue < char* > buffer;
   std::queue < Image* > spin_image_buffer;
@@ -120,6 +122,8 @@ protected:
   pathCam::ConsecQ RegistrationConsecQ;
   
   std::vector < DataObserver *> observers;
+
+  Poco::Thread stream_thread, Q_thread, composite_thread;
 
 };
 

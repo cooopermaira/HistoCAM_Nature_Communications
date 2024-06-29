@@ -16,7 +16,11 @@ namespace pathCam {
 
         while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
                parent->matchableCount > 0 || !parent->compositeQ_empty()) {
-
+            while(!parent->newComponentQ.empty()){
+              auto res = parent->newComponentQ.front();
+              parent->newComponentQ.pop();
+              parent->add_new_component(res.first,res.second);
+            }
             //if nothing in the Q but termination condition not met, wait
             if (parent->compositeQ_empty()) {
                 Poco::Thread::sleep(100);
@@ -45,6 +49,7 @@ namespace pathCam {
                         new_info.clear();
                     }
                 }
+
                 parent->composites[current_component]->update(new_info);
 
             }
@@ -64,6 +69,10 @@ namespace pathCam {
         */
 
       perform_global_alignment();
+      int allocated = 0;
+      for (int i = 0; i < 1000; i++){
+        if(parent->composites[0]->masks[i].data){allocated++;}
+      }
       parent->compositing = false;
     }
 

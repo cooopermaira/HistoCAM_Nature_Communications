@@ -131,17 +131,17 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     std::vector<TileQuery> tiles = MRImage->getTiles(RectJtoC(*view), RectJtoC(getLocalBounds()));
 
     for (unsigned int i = 0; i < tiles.size(); i++) {
-      cv::Mat *tile = tiles[i].image;
+      cv::Mat tile = tiles[i].image;
       auto bounds = RectCtoJ < float >(tiles[i].bounds);
       bounds *= view2screenScale() * scale;
       bounds.expand(0.5, 0.5);
       tiles[i].bounds = RectJtoC <float> (bounds);
-      if (tile != NULL) {
-        juce::Image im = juce::Image(juce::Image::ARGB, tile->cols, tile->rows, true);
+      if (tile.data) {
+        juce::Image im = juce::Image(juce::Image::ARGB, tile.cols, tile.rows, true);
         juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
         
-        jassert(tile->step == bitmap_data.lineStride);
-        memcpy(bitmap_data.data, (*tile).data, tile->cols*tile->rows*4);
+        jassert(tile.step == bitmap_data.lineStride);
+        memcpy(bitmap_data.data, tile.data, tile.cols*tile.rows*4);
         
         g.drawImage(im, bounds);
       }

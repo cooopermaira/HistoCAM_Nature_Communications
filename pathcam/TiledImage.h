@@ -9,9 +9,9 @@
 
 #include "pathCam.h"
 
-template < typename T >
-inline cv::Rect_<T> RecMult(cv::Rect_<T> r, T scalar){
-  return cv::Rect_<T>(r.x*scalar,r.y*scalar,r.width*scalar,r.height*scalar);
+template<typename T>
+inline cv::Rect_<T> RecMult(cv::Rect_<T> r, T scalar) {
+  return cv::Rect_<T>(r.x * scalar, r.y * scalar, r.width * scalar, r.height * scalar);
 }
 
 
@@ -19,28 +19,30 @@ template<typename T>
 class Dense2DArray {
 public:
   Dense2DArray(int minX = -4000, int maxX = 4000, int minY = -4000, int maxY = 4000)
-  : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
-    data.resize(width * height, NULL);
+      : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
+    data.resize(width * height);
   }
-  
+
   ~Dense2DArray() {
+    /*
     for (auto i = 0; i < data.size(); i++) {
       delete data[i];
     }
+     */
   }
-  
+
   T &operator()(int x, int y) {
     return data[getIndex(x, y)];
   }
-  
+
   const T &operator()(int x, int y) const {
     return data[getIndex(x, y)];
   }
-  
+
 private:
   std::vector<T> data;
   int minX, minY, width, height;
-  
+
   inline int64_t getIndex(int x, int y) const {
     assert(x >= minX && x < minX + width);
     assert(y >= minY && y < minY + height);
@@ -50,12 +52,12 @@ private:
 
 struct TileQuery {
 public:
-  cv::Mat *image;
+  cv::Mat image;
   int i, j;
-  cv::Rect_<float>  bounds;
-  
-  TileQuery(cv::Mat *image, int i, int j, cv::Rect_<float>  bounds) :
-  image(image), i(i), j(j), bounds(bounds) {};
+  cv::Rect_<float> bounds;
+
+  TileQuery(cv::Mat image, int i, int j, cv::Rect_<float> bounds) :
+      image(image), i(i), j(j), bounds(bounds) {};
 };
 
 class TiledImage {
@@ -63,63 +65,67 @@ private:
   std::shared_ptr<MRTiledImage> parent;
   unsigned int tile_size;
   unsigned int logic_size;
-  
+
 public:
-  Dense2DArray<cv::Mat *> tiles;
-  cv::Rect_<float>  bounds;
-  Mat holdingMatrix;
-  
+  Dense2DArray<cv::Mat> tiles;
+  cv::Rect_<float> bounds;
+  std::vector<Point2i> tilesWithData;
+  //Mat holdingMatrix;
+
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 512,
              unsigned int logic_size = 512, int levelWithinPyramid = 0) :
-  tile_size(tile_size), logic_size(logic_size), levelWithinPyramid(levelWithinPyramid), parent(parent) {
-    holdingMatrix = Mat::zeros(Size(tile_size / pow(2, levelWithinPyramid+1), tile_size / pow(2, levelWithinPyramid+1)),
-                               CV_8UC4);
+      tile_size(tile_size), logic_size(logic_size), levelWithinPyramid(levelWithinPyramid), parent(parent) {
   };
-  
+
   ~TiledImage() {};
-  
+
   int levelWithinPyramid;
-  
+
   unsigned int getTileSize() { return tile_size; }
-  
+
   unsigned int getLogicSize() { return logic_size; }
 
   void resetEdges(Point2i topLeft, Point2i bottomRight);
-  
+
   void makeTile(int x, int y);
-  
-  void insertMat(cv::Mat image_in, cv::Rect_<float>  i_bounds);
-  
-  void insertMatAtBase(cv::Mat image_in, cv::Rect_<float>  box, std::vector<Point2i> retileIndices);
-  
-  void tileUpwards(Point2i myTileIndex, cv::Rect_<float>  myLevelRegion, const cv::Mat &mat);
-  
-  inline cv::Mat *getTile(int i, int j) { return tiles(i, j); }
-  
+
+  void insertMat(cv::Mat image_in, cv::Rect_<float> i_bounds);
+
+  void insertMatAtBase(cv::Mat image_in, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+
+  void inserTileAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+
+  void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
+
+  inline cv::Mat getTile(int i, int j) { return tiles(i, j); }
+
   inline Point2i getIJ(Point2f p) {
     Point2i ij = Point2i(p.x / (int) logic_size, p.y / (int) logic_size);
     if (p.x < 0) { ij.x--; }
-    if (p.y< 0) { ij.y--; }
+    if (p.y < 0) { ij.y--; }
     return ij;
   }
-  
-  std::vector<TileQuery> getTiles(cv::Rect_<float>  box);
-  
+
+  std::vector<TileQuery> getTiles(cv::Rect_<float> box);
+
 private:
   void matToImage(const cv::Mat &mat, cv::Mat *image, Point2f offset,
                   cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
-  
+
+  void matToTile(const cv::Mat &mat, const cv::Mat &mask,int x, int y, Point2f rootOffset,
+                 cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
+
   void matToImage4Channel(const cv::Mat &mat, int x, int y, Point2f rootOffset,
                           cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
-  void matToImage2(const cv::Mat &mat, cv::Mat *image,
-                    Point2f offset, cv::Rect_<float> image_box,
+  void matToImage2(const cv::Mat mat, cv::Mat image,
+                   Point2f offset, cv::Rect_<float> image_box,
                    cv::Rect_<float> tile_box);
-  
-  void matToImage(const cv::Mat &mat, int x, int y, Point2f rootOffset,
+
+  void matToImage(const cv::Mat mat, int x, int y, Point2f rootOffset,
                   cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
-  
-  
+
+
   bool tileToDisk(const cv::Mat *image, const std::string &filePath) {
     return false;
     //        juce::File file(filePath);
@@ -130,8 +136,8 @@ private:
     //        bool success = pngFormat.writeImageToStream(*image, *outputStream);
     //        return success;
   }
-  
-  
+
+
 };
 
 

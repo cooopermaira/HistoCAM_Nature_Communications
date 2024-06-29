@@ -49,6 +49,7 @@ namespace pathCam {
     CompositeManager(StreamCam *parent);
 
     virtual void run();
+
     void perform_global_alignment();
   };
 
@@ -67,6 +68,7 @@ namespace pathCam {
 
     std::pair<bool, Vec2> trace_to_root(unsigned long index);
   };
+
 
   //loader class takes data from disk streamer/microscope and prepares matchable jobs
   class LoaderLogicRunnable : public RunnableIntermediate {
@@ -124,6 +126,25 @@ namespace pathCam {
   };
 
 
+  class ImageToTileCopyRunnable : public RunnableIntermediate {
+  private:
+    StreamCam *parent;
+    Image* image;
+    unsigned int component_membership;
+    Point2i tile;
+
+
+  public:
+    ImageToTileCopyRunnable(StreamCam *parent, Image *image, unsigned int component_membership,
+                            Point2i tile,unsigned long sort_order) : RunnableIntermediate(sort_order),
+                                                                  parent(parent),
+                                                                  image(image),
+                                                                  tile(tile),
+                                                                  component_membership(component_membership) {};
+    virtual void run();
+  };
+
+
   class SingleMatchRunnable : public RunnableIntermediate {
   private:
     StreamCam *parent;
@@ -131,7 +152,6 @@ namespace pathCam {
     unsigned int component_membership;
     int edgeNumber;
   public:
-    bool successful;
 
     SingleMatchRunnable(StreamCam *parent, unsigned long image_idx1, unsigned long image_idx2,
                         unsigned int component_membership, int edgeNumber, unsigned long sort_order);

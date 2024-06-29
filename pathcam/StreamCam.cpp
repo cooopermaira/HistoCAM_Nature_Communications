@@ -60,7 +60,6 @@ namespace pathCam {
     }
 
     bool StreamCam::run() {
-        Poco::Thread stream_thread, Q_thread, composite_thread;
 
         auto ds = new DiskReader(this);
         stream_thread.start(ds);
@@ -144,10 +143,10 @@ namespace pathCam {
 
       //delete these pointers when destroyed
       auto *temp = new CompositeVoronoi(this, image_size, component_index);
-      temp->update(std::vector<RegInfo>{reg_results[image_index]});
       component_mutex->lock();
       composites.push_back(temp);
       component_mutex->unlock();
+      temp->update(std::vector<RegInfo>{reg_results[image_index]});
     }
 
     std::vector<RegInfo> StreamCam::get_Q_front() {
@@ -174,7 +173,7 @@ namespace pathCam {
 
     void StreamCam::push_compositeQ(RegInfo index) {
         compositeQ_mutex->lock();
-        if (compositeBatch.empty() || compositeBatch.back().size() >= 15) {
+        if (compositeBatch.empty() || compositeBatch.back().size() >= 1) {
             compositeBatch.push(std::vector<RegInfo>());
         }
         compositeBatch.back().push_back(index);
