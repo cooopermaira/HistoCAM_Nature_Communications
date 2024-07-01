@@ -9,9 +9,7 @@
 
 namespace pathCam {
     void LoaderLogicRunnable::run() {
-        if (image->image_file.getFileName() == "frame-10282021161917-1410.Raw"){
-            int k = 0;
-        }
+
         if(!image->in_memory()){
             image->load_raw_from_disk();
         }

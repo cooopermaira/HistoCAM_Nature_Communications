@@ -14,31 +14,31 @@ namespace pathCam {
       parent), componentIndex(component_index),
                                                                                                              image_size(
                                                                                                                  image_size) {
+    imagePyramid.reset(new MRTiledImage);
+    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid);
+    imagePyramid->level.push_back(current);
+    parent->MRimage->add(imagePyramid);
+
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
+
     circleMask = cv::Mat::zeros(image_size, CV_8U);
     cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), 2190, cv::Scalar(1), -1);
-    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid);
-    parent->imagePyramid->level.push_back(current);
+
     channels.resize(2);
+
     imageBoundsAsPolygon.resize(4);
     reset_image_as_polygon();
+
     polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
     freshMask = polyMaskOutput.clone();
 
-    //these are used in the add_point_to_DT_multithread function
-    masks.resize(1000);
-    threeChanPreals.resize(1000);
-    fourChanPreals.resize(1000);
-    for (unsigned int i = 0; i < 1000; i++) {
-      freeMasks.push(i);
-    }
   }
 
 
   void CompositeVoronoi::self_reset() {
-    parent->imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),
-                                               Point2i(max_offset.x, max_offset.y));
+    imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),
+                                          Point2i(max_offset.x, max_offset.y));
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
     composite.release();
@@ -244,7 +244,7 @@ namespace pathCam {
       if (parent->composite_thread.trySleep(100000)) {
         throw std::invalid_argument("tile jobs not processing");
       }
-      parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
+      imagePyramid->bounds = imagePyramid->level[0]->bounds;
       parent->update_observers();
       freshMask.copyTo(polyMaskOutput);
     }
@@ -304,8 +304,8 @@ namespace pathCam {
 
 
     tiledImageBounds = cv::Rect_<float>((long) root_offset.x, (long) root_offset.y, composite.cols, composite.rows);
-    parent->imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
-    parent->imagePyramid->bounds = parent->imagePyramid->level[0]->bounds;
+    imagePyramid->level[0]->insertMatAtBase(composite, tiledImageBounds, effectedTiles);
+    imagePyramid->bounds = imagePyramid->level[0]->bounds;
 
     parent->update_observers();
   }
@@ -317,17 +317,17 @@ namespace pathCam {
     std::map<int, std::vector<float>> tilesByColumn;
 
     //get the tile column of the left and right edges of the image frame
-    int columnBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
-    int columnBoundHigh = parent->imagePyramid->level[0]->getIJ(
+    int columnBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
+    int columnBoundHigh = imagePyramid->level[0]->getIJ(
         Point2f(absCoord.x + image_size.width, absCoord.y)).x;
 
     //get the tile row the top and bottom edges of the image frame
-    long rowBoundLow = parent->imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
-    long rowBoundHigh = parent->imagePyramid->level[0]->getIJ(
+    long rowBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
+    long rowBoundHigh = imagePyramid->level[0]->getIJ(
         Point2f(absCoord.x, absCoord.y + image_size.height)).y;
 
-    float yPixelBoundLow = float(rowBoundLow) * float(parent->imagePyramid->tile_size);
-    float yPixelBoundHigh = float(rowBoundHigh) * float(parent->imagePyramid->tile_size);
+    float yPixelBoundLow = float(rowBoundLow) * float(imagePyramid->tile_size);
+    float yPixelBoundHigh = float(rowBoundHigh) * float(imagePyramid->tile_size);
 
     //for each edge of the voronoi mask
     for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
@@ -344,8 +344,8 @@ namespace pathCam {
       }
 
       //retreive the tiles these points fall within
-      auto tile1 = parent->imagePyramid->level[0]->getIJ(p1);
-      auto tile2 = parent->imagePyramid->level[0]->getIJ(p2);
+      auto tile1 = imagePyramid->level[0]->getIJ(p1);
+      auto tile2 = imagePyramid->level[0]->getIJ(p2);
 
       //get the column of these tiles
       int column1 = tile1.x;
@@ -368,8 +368,8 @@ namespace pathCam {
 
       for (float j = xlow; j <= xhigh; j++) {
 
-        float columnLeftEdge = j * float(parent->imagePyramid->level[0]->getTileSize());
-        float columnRightEdge = (j + 1) * float(parent->imagePyramid->level[0]->getTileSize());
+        float columnLeftEdge = j * float(imagePyramid->level[0]->getTileSize());
+        float columnRightEdge = (j + 1) * float(imagePyramid->level[0]->getTileSize());
         float xloclow = max(columnLeftEdge, plow.x);
         float xlochigh = min(columnRightEdge, phigh.x);
 
@@ -397,10 +397,10 @@ namespace pathCam {
         continue;
       }
 
-      int lastTile = parent->imagePyramid->level[0]->getIJ(
-          Point2f(key * parent->imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
-      int firstTile = parent->imagePyramid->level[0]->getIJ(
-          Point2f(key * parent->imagePyramid->level[0]->getTileSize(), firstPoint_y)).y;
+      int lastTile = imagePyramid->level[0]->getIJ(
+          Point2f(key * imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
+      int firstTile = imagePyramid->level[0]->getIJ(
+          Point2f(key * imagePyramid->level[0]->getTileSize(), firstPoint_y)).y;
 
       for (int ii = firstTile; ii <= lastTile; ii++) {
         if (ii <= rowBoundHigh && ii >= rowBoundLow) {
@@ -449,17 +449,17 @@ namespace pathCam {
 
     }
     if (update_box) {
-      auto topLevelBeforeAdding = parent->imagePyramid->level.back();
-      unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
-      unsigned int topLogicSize = parent->imagePyramid->level.back()->getLogicSize();
+      auto topLevelBeforeAdding = imagePyramid->level.back();
+      unsigned int tile_size = imagePyramid->level[0]->getTileSize();
+      unsigned int topLogicSize = imagePyramid->level.back()->getLogicSize();
       bool addedLevel = false;
       while (topLogicSize < max_offset.x - root_offset.x || topLogicSize < max_offset.y - root_offset.y) {
         addedLevel = true;
         unsigned int logic_size = 2 * topLogicSize;
-        int levelWithinPyramid = parent->imagePyramid->level.size();
+        int levelWithinPyramid = imagePyramid->level.size();
         assert(pow(2, levelWithinPyramid) == logic_size / tile_size);
-        parent->imagePyramid->level.push_back(
-            std::make_shared<TiledImage>(parent->imagePyramid, tile_size, logic_size, levelWithinPyramid));
+        imagePyramid->level.push_back(
+            std::make_shared<TiledImage>(imagePyramid, tile_size, logic_size, levelWithinPyramid));
         topLogicSize = logic_size;
       }
       if (addedLevel) {
@@ -525,15 +525,15 @@ namespace pathCam {
 
       composite = new_combined;
       //composite_z_buffer = new_combined_z_buffer;
-      unsigned int topLogicSize = parent->imagePyramid->level.back()->getLogicSize();
+      unsigned int topLogicSize = imagePyramid->level.back()->getLogicSize();
       while (topLogicSize < composite.rows || topLogicSize < composite.cols) {
 
-        unsigned int tile_size = parent->imagePyramid->level[0]->getTileSize();
+        unsigned int tile_size = imagePyramid->level[0]->getTileSize();
         unsigned int logic_size = 2 * topLogicSize;
-        int levelWithinPyramid = parent->imagePyramid->level.size();
+        int levelWithinPyramid = imagePyramid->level.size();
         assert(pow(2, levelWithinPyramid) == logic_size / tile_size);
-        parent->imagePyramid->level.push_back(
-            std::make_shared<TiledImage>(parent->imagePyramid, tile_size, logic_size, levelWithinPyramid));
+        imagePyramid->level.push_back(
+            std::make_shared<TiledImage>(imagePyramid, tile_size, logic_size, levelWithinPyramid));
         topLogicSize = logic_size;
 
         if (composite.data) {
@@ -541,7 +541,7 @@ namespace pathCam {
           resize(composite, temp,
                  Size(composite.cols / pow(2, levelWithinPyramid), composite.rows / pow(2, levelWithinPyramid)));
           tiledImageBounds = cv::Rect_<float>(root_offset.x, root_offset.y, composite.cols, composite.rows);
-          parent->imagePyramid->level.back()->insertMat(temp, tiledImageBounds);
+          imagePyramid->level.back()->insertMat(temp, tiledImageBounds);
         }
 
       }
@@ -727,11 +727,11 @@ namespace pathCam {
     auto composite = parent->composites[component_membership];
     auto mask = composite->polyMaskOutput;
     auto imageMat = composite->fourChannelPreallocated;
-    auto tileSize = parent->imagePyramid->level[0]->getTileSize();
+    auto tileSize = composite->imagePyramid->level[0]->getTileSize();
     auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
     auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
 
-    parent->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+    composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
 
     composite->notify_job_complete();
 
@@ -909,8 +909,8 @@ namespace pathCam {
      */
 
     //solve problem for x and y
-    coopers_conj_grad(A, xpr, xac, 100, 0.0001);
-    coopers_conj_grad(A, ypr, yac, 100, 0.0001);
+    coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001);
+    coopers_conjugate_gradient(A, ypr, yac, 100, 0.0001);
 
     /*
     //for debug, test for change in error
@@ -1008,26 +1008,5 @@ namespace pathCam {
     int k = 0;
   }
 
-
-  double CompositeVoronoi::coopers_conj_grad(Mat A, Mat b, Mat x, int steps, double epsilon) {
-    Mat ATranspose = A.t();
-    Mat ATA = ATranspose * A;
-    Mat ATb = ATranspose * b;
-    Mat r = ATb - (ATA * x);
-    Mat p = r.clone();
-
-    for (int i = 0; i < steps; i++) {
-      auto stepSize = r.dot(r) / (p.dot(ATA * p));
-      x += stepSize * p;
-      double denom = r.dot(r);
-      r -= stepSize * ATA * p;
-      double adjustment = r.dot(r) / denom;
-      p = r + adjustment * p;
-      if (norm(r) < epsilon) {
-        break;
-      }
-    }
-    return norm(A * x - b);
-  }
 }
 

@@ -8,6 +8,7 @@
 #pragma once
 
 #include "pathCam.h"
+#include "MRTiledImage.h"
 
 template<typename T>
 inline cv::Rect_<T> RecMult(cv::Rect_<T> r, T scalar) {
@@ -60,6 +61,7 @@ public:
       image(image), i(i), j(j), bounds(bounds) {};
 };
 
+class MRTiledImage;
 class TiledImage {
 private:
   std::shared_ptr<MRTiledImage> parent;

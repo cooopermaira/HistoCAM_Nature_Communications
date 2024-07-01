@@ -45,6 +45,9 @@ namespace pathCam {
 
 
   public:
+
+    std::shared_ptr< MRTiledImage >  imagePyramid;
+
     Composite(StreamCam *parent);
 
     void add_images(std::vector<RegInfo> new_info);
@@ -105,6 +108,7 @@ namespace pathCam {
     void self_reset();
 
   public:
+
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
     std::atomic<unsigned int> matchableCount = 0;
@@ -115,7 +119,7 @@ namespace pathCam {
 
     void update_Bbox_no_composite(std::vector<RegInfo> new_info);
 
-    double coopers_conj_grad(Mat A, Mat b, Mat x, int steps, double epsilon);
+    //double coopers_conjugate_gradient(Mat A, Mat b, Mat x, int steps, double epsilon);
 
     void perform_global_alignment();
 

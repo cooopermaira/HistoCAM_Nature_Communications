@@ -162,8 +162,8 @@ namespace pathCam {
 
   class XCompRunnable : public RunnableIntermediate {
   public:
-    XCompRunnable(unsigned long image_idx, unsigned int componentMembershipSelf,
-                  unsigned int componentMembershipMatchTo, StreamCam *parent) : image_idx(image_idx),
+    XCompRunnable(StreamCam *parent, unsigned long image_idx, unsigned int componentMembershipSelf,
+                  unsigned int componentMembershipMatchTo) : image_idx(image_idx),
                                                                                 componentMembershipSelf(
                                                                                     componentMembershipSelf),
                                                                                 componentMembershipMatchTo(

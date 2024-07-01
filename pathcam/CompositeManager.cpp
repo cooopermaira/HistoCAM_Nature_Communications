@@ -63,8 +63,8 @@ namespace pathCam {
           imwrite("finish" + std::to_string(i) + ".png", parent->composites[i]->get_composite());
         }
 
-        for(int i = 0; i < parent->imagePyramid->level.size(); i++) {
-            cv::imwrite("test"+std::to_string(i)+".png", *parent->imagePyramid->level[i]->cvTiles(0, 0));
+        for(int i = 0; i < parent->MRimage->level.size(); i++) {
+            cv::imwrite("test"+std::to_string(i)+".png", *parent->MRimage->level[i]->cvTiles(0, 0));
         }
         */
 

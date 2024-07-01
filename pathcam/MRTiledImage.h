@@ -9,6 +9,7 @@
 #define MRTiledImage_h
 
 #include "pathCam.h"
+#include "TiledImage.h"
 
 class MRTiledImage{
   
@@ -17,6 +18,8 @@ class MRTiledImage{
 public:
   cv::Rect_<float> bounds;
   unsigned int tile_size;
+  double scale;
+  Point2f offset;
  
   
   MRTiledImage(unsigned int tile_size=512):tile_size(tile_size){};
@@ -25,6 +28,10 @@ public:
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
   
   void build(cv::Mat &image_in);
+
+  void set_scale(double _scale){scale = _scale;}
+
+  void set_offset(Point2f _offset){offset = _offset;}
   
   std::vector < TileQuery > getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen);
 
@@ -58,16 +65,12 @@ class MRTiledImageSet{
 public:
   MRTiledImageSet(){};
 
-  void add(MRTiledImage &image, double scale, Point2f offset){
+  void add(std::shared_ptr<MRTiledImage> image){
     images.push_back(image);
-    scales.push_back(scale);
-    offsets.push_back(offset);
   }
 
 private:
-  std::vector < MRTiledImage > images;
-  std::vector < double > scales;
-  std::vector < Point2f > offsets;
+  std::vector < std::shared_ptr < MRTiledImage> > images;
 };
 
 

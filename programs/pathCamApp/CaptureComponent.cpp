@@ -41,9 +41,9 @@ void CaptureComponent::startRecording() {
     recording = true;
 
     //bcam->run();
-    parent->imageview->setImage(parent->MRimage);
-    parent->capture->setImage(parent->MRimage);
-    parent->annotate->setImage(parent->MRimage);
+    parent->imageview->setImage(parent->imagePyramid);
+    parent->capture->setImage(parent->imagePyramid);
+    parent->annotate->setImage(parent->imagePyramid);
 
 
     auto bcamRunnable = new bcamPocoRunnable(this);

@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include "pathCam.h"
+#include "MRTiledImage.h"
 
 using Poco::MemoryPool;
 using Poco::Path;
@@ -59,7 +60,7 @@ public:
   Poco::FastMutex *compositeQ_mutex;
   Poco::FastMutex *component_mutex;
 
-  std::shared_ptr< MRTiledImage >  imagePyramid;
+  std::shared_ptr< MRTiledImageSet >  MRimage;
 
   bool run();
   bool spin_run();
@@ -68,7 +69,7 @@ public:
 
   bool microscopeInput;
 
-  void set_image_reference(std::shared_ptr< MRTiledImage >  MRImage);
+  void set_image_reference(std::shared_ptr< MRTiledImageSet >  MRImage);
 
   void add_observer(DataObserver * new_observer){
     observers.push_back(new_observer);
@@ -81,7 +82,7 @@ public:
   }
 
 protected:
-
+  unsigned int get_last_active_component(unsigned long image_index);
   unsigned int increment_and_get_components(){return components++;}
   unsigned long add_image(Image* image);
   void add_image(Image* image, unsigned long index);
