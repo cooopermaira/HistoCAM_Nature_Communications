@@ -46,9 +46,9 @@ void ImageViewComponent::refreshImage(){
   repaint();
 }
 
-void ImageViewComponent::setImage(std::shared_ptr<MRTiledImage> image) {
+void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
     const ScopedLock lock(mutex);
-
+  
     MRImage = image;
 
     horizontalScrollBar.setRangeLimits(MRImage->bounds.x, MRImage->bounds.width);
@@ -127,15 +127,15 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRa
 }
 
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
-
-    std::vector<TileQuery> tiles = MRImage->getTiles(RectJtoC(*view), RectJtoC(getLocalBounds()));
-
-    for (unsigned int i = 0; i < tiles.size(); i++) {
-      cv::Mat tile = tiles[i].image;
-      auto bounds = RectCtoJ < float >(tiles[i].bounds);
+  
+  for(unsigned int i=0; i < MRImage->images.size(); i++){
+    std::vector<TileQuery> tiles = MRImage->images[i]->getTiles(RectJtoC(*view), RectJtoC(getLocalBounds()));
+    for (unsigned int t = 0; t < tiles.size(); t++) {
+      cv::Mat tile = tiles[t].image;
+      auto bounds = RectCtoJ < float >(tiles[t].bounds);
       bounds *= view2screenScale() * scale;
       bounds.expand(0.5, 0.5);
-      tiles[i].bounds = RectJtoC <float> (bounds);
+      tiles[t].bounds = RectJtoC <float> (bounds);
       if (tile.data) {
         juce::Image im = juce::Image(juce::Image::ARGB, tile.cols, tile.rows, true);
         juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
@@ -146,19 +146,27 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         g.drawImage(im, bounds);
       }
     }
-
-
+    
 #ifdef DEBUG
-    for (unsigned int i = 0; i < tiles.size(); i++) {
-        auto bounds = RectCtoJ < float >(tiles[i].bounds) * scale;
+    for (unsigned int t = 0; t < tiles.size(); t++) {
+        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
         g.setColour(juce::Colours::greenyellow);
         g.drawRect(bounds, 3);
-        std::string ij = Poco::format("(%i,%i)", tiles[i].i, tiles[i].j);
+        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
         g.setFont(20);
         g.drawText(ij, bounds.getCentreX() - 50,
                    bounds.getCentreY() - 15, 100, 30, Justification::centred);
     }
 #endif
+    
+    
+  }
+
+
+
+
+
+
 }
 
 

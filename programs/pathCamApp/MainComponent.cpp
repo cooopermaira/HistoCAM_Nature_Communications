@@ -116,11 +116,11 @@ public:
     }
 
     void threadComplete(bool userPressedCancel) override {
-        if (userPressedCancel) { parent->imagePyramid.reset(new MRTiledImage()); }
+      if (userPressedCancel) { parent->MRimage.reset(new MRTiledImageSet()); }
         else {
-            parent->imageview->setImage(parent->imagePyramid);
-            parent->capture->setImage(parent->imagePyramid);
-            parent->annotate->setImage(parent->imagePyramid);
+            parent->imageview->setImage(parent->MRimage);
+            parent->capture->setImage(parent->MRimage);
+            parent->annotate->setImage(parent->MRimage);
         }
         delete this;
     }

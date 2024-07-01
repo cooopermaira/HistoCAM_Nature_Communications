@@ -31,7 +31,7 @@ ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false) {
 #endif
   
     bcam->add_observer(parent);
-    MRImage.reset(bcam->get_image_reference());
+    MRImage = bcam->get_image_reference();
     captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
     addAndMakeVisible(captureOverlay.get());
 
@@ -41,9 +41,9 @@ void CaptureComponent::startRecording() {
     recording = true;
 
     //bcam->run();
-    parent->imageview->setImage(parent->imagePyramid);
-    parent->capture->setImage(parent->imagePyramid);
-    parent->annotate->setImage(parent->imagePyramid);
+    parent->imageview->setImage(parent->MRimage);
+    parent->capture->setImage(parent->MRimage);
+    parent->annotate->setImage(parent->MRimage);
 
 
     auto bcamRunnable = new bcamPocoRunnable(this);

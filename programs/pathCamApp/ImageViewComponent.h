@@ -27,7 +27,7 @@ public:
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
   
-  void setImage(std::shared_ptr< MRTiledImage > image);
+  void setImage(std::shared_ptr< MRTiledImageSet > image);
   
   void fixAspectRatio(){
     if(!MRImage || !isVisible()){ return; }
@@ -54,7 +54,7 @@ public:
   void refreshImage();
   
 protected:
-  std::shared_ptr< MRTiledImage> MRImage;
+  std::shared_ptr< MRTiledImageSet > MRImage;
   
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;

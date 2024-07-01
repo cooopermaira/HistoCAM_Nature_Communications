@@ -76,7 +76,7 @@ public:
 
   }
   
-  void setImage(std::shared_ptr<MRTiledImage> image){  rightComponent->setImage(image); }
+  void setImage(std::shared_ptr<MRTiledImageSet > image){  rightComponent->setImage(image); }
   
   void refreshImage(){ rightComponent->refreshImage(); }
   
