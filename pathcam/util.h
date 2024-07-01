@@ -66,28 +66,6 @@ namespace pathCam {
 
   };
 
-  double coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon) {
-    cv::Mat ATranspose = A.t();
-    cv::Mat ATA = ATranspose * A;
-    cv::Mat ATb = ATranspose * b;
-
-    cv::Mat r = ATb - (ATA * x);
-    cv::Mat p = r.clone();
-
-    for (int i = 0; i < steps; i++) {
-      auto stepSize = r.dot(r) / (p.dot(ATA * p));
-      x += stepSize * p;
-      double denom = r.dot(r);
-      r -= stepSize * ATA * p;
-      double adjustment = r.dot(r) / denom;
-      p = r + adjustment * p;
-      if (cv::norm(r) < epsilon) {
-        break;
-      }
-    }
-    return cv::norm(A * x - b);
-  }
-
 
   class ThreadQueue {
   private:

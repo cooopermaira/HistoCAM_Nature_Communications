@@ -13,6 +13,8 @@
 //#include "TiledImage.h"
 
 namespace pathCam {
+
+
   template<typename T>
   struct PointCompare {
     inline bool operator()(const T &p1, const T &p2) {
@@ -59,6 +61,7 @@ namespace pathCam {
     Mat get_composite();
 
     Mat score_image_2X(int, int, int);
+    
 
   };
 
@@ -106,6 +109,9 @@ namespace pathCam {
     void expand_subdiv(std::vector<RegInfo> new_info);
 
     void self_reset();
+    
+    double coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon);
+
 
   public:
 
