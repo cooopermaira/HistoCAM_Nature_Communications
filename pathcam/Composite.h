@@ -124,7 +124,7 @@ namespace pathCam {
     void update(std::vector<RegInfo> new_info);
 
     void update_Bbox_no_composite(std::vector<RegInfo> new_info);
-    
+
     void perform_global_alignment();
 
   protected:

@@ -62,6 +62,9 @@ public:
 
   std::shared_ptr< MRTiledImageSet >  MRimage;
 
+  std::vector<std::pair<std::string,double>> debugImageBlurWithNames;
+  std::vector<double> debugImageBlur;
+
   bool run();
   bool spin_run();
   void pass_image(Image*, unsigned long sort_order = 0);
