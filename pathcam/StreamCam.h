@@ -80,6 +80,7 @@ public:
   
   void update_observers(){
     for(unsigned int i=0; i < observers.size(); i++){
+      MRimage->update_bounds();
       observers[i]->update();
     }
   }

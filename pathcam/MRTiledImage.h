@@ -74,9 +74,7 @@ public:
     images.push_back(image);
   }
   
-  void update_bounds(){
-    
-  }
+  void update_bounds();
 
 private:
   std::vector < std::shared_ptr < MRTiledImage> > images;

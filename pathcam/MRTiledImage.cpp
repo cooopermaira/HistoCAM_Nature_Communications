@@ -61,3 +61,25 @@ void MRTiledImage::insertMat(cv::Mat &image_in, cv::Rect_<float> box){
   }
   
 }
+
+void MRTiledImageSet::update_bounds() {
+  auto minX = bounds.x;
+  auto minY = bounds.y;
+  auto maxX = minX+bounds.width;
+  auto maxY = minY+bounds.height;
+  for (const auto & image : images){
+    auto imageMinX = image->bounds.x + image->offset.x;
+    auto imageMinY = image->bounds.y + image->offset.y;
+    minX = min(minX,imageMinX);
+    minY = min(minY,imageMinY);
+
+    auto imageMaxX = imageMinX + image->scale * image->bounds.width;
+    auto imageMaxY = imageMinY + image->scale * image->bounds.height;
+    maxX = max(double(maxX),imageMaxX);
+    maxY = max(double(maxY),imageMaxY);
+  }
+  bounds.x = minX;
+  bounds.y = minY;
+  bounds.width = maxX - minX;
+  bounds.height = maxY - minY;
+}

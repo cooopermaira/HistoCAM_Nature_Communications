@@ -69,10 +69,6 @@ namespace pathCam {
         */
 
       perform_global_alignment();
-      int allocated = 0;
-      for (int i = 0; i < 1000; i++){
-        if(parent->composites[0]->masks[i].data){allocated++;}
-      }
       parent->compositing = false;
     }
 
