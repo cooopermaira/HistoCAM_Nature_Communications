@@ -69,7 +69,7 @@ public:
 
   bool microscopeInput;
 
-  void set_image_reference(std::shared_ptr< MRTiledImageSet >  MRImage);
+  std::shared_ptr<MRTiledImageSet> get_image_reference();
 
   void add_observer(DataObserver * new_observer){
     observers.push_back(new_observer);

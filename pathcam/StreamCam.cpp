@@ -23,8 +23,8 @@ namespace pathCam {
                                                            resize_mmatch_mutex(new Poco::FastMutex()),
                                                            compositeQ_mutex(new Poco::FastMutex()),
                                                            component_mutex(new Poco::FastMutex()),
-                                                           resize_buffer_mutex(new Poco::FastMutex()) {
-
+                                                           resize_buffer_mutex(new Poco::FastMutex()){
+    MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(10, 10);
     reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
     reg_results[0].index = 0;
@@ -202,7 +202,7 @@ namespace pathCam {
     return isEmpty;
   }
 
-  void StreamCam::set_image_reference(std::shared_ptr<MRTiledImageSet> MRImage) {
-    MRimage = MRImage;
+  std::shared_ptr<MRTiledImageSet> StreamCam::get_image_reference() {
+    return MRimage;
   }
 }
