@@ -11,7 +11,7 @@
 namespace pathCam {
 
   CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int component_index) : Composite(
-      parent), componentIndex(component_index),
+      parent), componentIndex(component_index), wakeEvent(true),
                                                                                                              image_size(
                                                                                                                  image_size) {
     imagePyramid.reset(new MRTiledImage);
@@ -32,7 +32,6 @@ namespace pathCam {
 
     polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
     freshMask = polyMaskOutput.clone();
-
   }
 
 
@@ -45,7 +44,6 @@ namespace pathCam {
     delaunayMembers.clear();
     root_offset = Vec2(0, 0);
     max_offset = Vec2(0, 0);
-
   }
 
 
@@ -85,64 +83,14 @@ namespace pathCam {
     update_mutex->unlock();
   }
 
-
-  std::pair<int, unsigned int> CompositeVoronoi::add_point_to_DT_multithread(cv::Point2f _point, pathCam::Image *_image,
-                                                                             std::vector<Point2i> &_face) {
-    //make copy of subdiv incase we decide not to use new point
-    Subdiv2D tempSubdiv(subdiv);
-
-    //add new point
-    int vertxId = subdiv.insert(_point);
-    //auto image = parent->get_image_ref(_image_index);
-
-    //get voronoi facets for only this face
-    std::vector<std::vector<Point2f>> facets;
-    std::vector<Point2f> centers;
-    subdiv.getVoronoiFacetList({vertxId}, facets, centers);
-
-    //shift and recast
-    for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
-      ii.x -= centers[0].x;
-      ii.x += 6464 / 2;
-      ii.y -= centers[0].y;
-      ii.y += 4852 / 2;
-      _face.push_back((Point2i) ii);
+  void CompositeVoronoi::notify_job_complete() {
+    jobCount--;
+    if (jobCount == 0) {
+      //parent->composite_thread.wakeUp();
+      wakeEvent.set();
+      int k = 0;
     }
-
-    //get free mask from queue least likely to need initial allocation
-    auto top = freeMasks.top();
-    unsigned int maskIndex = top;
-    freeMasks.pop();
-
-    //copyto will only reallocate if not previously allocated
-    freshMask.copyTo(masks[maskIndex]);
-
-    //build polygon mask for new point
-    cv::fillConvexPoly(masks[maskIndex], _face, cv::Scalar(255));
-
-    //test for exclusion of frame via rollback
-    int nonzeroMin;
-    if (_image->label == Image::_2X) {
-      masks[maskIndex] = masks[maskIndex].mul(circleMask);
-      nonzeroMin = 2190 * 2190 * 3.14 * 0.20;
-    } else {
-      nonzeroMin = _image->width * _image->height * 0.1;
-    }
-
-    int nonzero = countNonZero(masks[maskIndex]);
-    if (nonzero <= nonzeroMin) {
-      //contributing less than x% of its pixels, revert and don't bother loading from disk
-      subdiv = tempSubdiv;
-      _image->free_memory_RAW();
-      memberImages.push_back({_image->image_file.getFileName(), false});
-      freeMasks.push(maskIndex);
-      return {-1, 0};
-    }
-    memberImages.push_back({_image->image_file.getFileName(), true});
-    delaunayMembers.insert({vertxId, _image->index});
-    return {vertxId, maskIndex};
   }
-
 
   int CompositeVoronoi::add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
                                                             std::vector<Point2i> &_face) {
@@ -241,9 +189,17 @@ namespace pathCam {
       }
 
       //wait till jobs have processed
+      wakeEvent.wait();
+      /*
+      if (wakeEvent.tryWait(100000)) {
+        throw std::invalid_argument("tile jobs not processing");
+      }
+       */
+      /*
       if (Poco::Thread::trySleep(100000)) {
         throw std::invalid_argument("tile jobs not processing");
       }
+       */
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
       parent->update_observers();
       freshMask.copyTo(polyMaskOutput);
@@ -737,13 +693,7 @@ namespace pathCam {
 
   }
 
-  void CompositeVoronoi::notify_job_complete() {
-    jobCount--;
-    if (jobCount == 0) {
-      parent->composite_thread.wakeUp();
-      int k = 0;
-    }
-  }
+
 
 double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon) {
   cv::Mat ATranspose = A.t();

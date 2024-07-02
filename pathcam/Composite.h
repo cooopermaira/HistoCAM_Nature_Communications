@@ -84,6 +84,7 @@ namespace pathCam {
     std::atomic<unsigned int> jobCount = 0;
     unsigned int componentIndex;
     Bbox subdiv_Bbox;
+    Poco::Event wakeEvent;
 
 
     long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
