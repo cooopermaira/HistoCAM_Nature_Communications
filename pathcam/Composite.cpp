@@ -241,7 +241,7 @@ namespace pathCam {
       }
 
       //wait till jobs have processed
-      if (parent->composite_thread.trySleep(100000)) {
+      if (Poco::Thread::trySleep(100000)) {
         throw std::invalid_argument("tile jobs not processing");
       }
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
@@ -741,6 +741,7 @@ namespace pathCam {
     jobCount--;
     if (jobCount == 0) {
       parent->composite_thread.wakeUp();
+      int k = 0;
     }
   }
 

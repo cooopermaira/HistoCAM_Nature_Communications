@@ -25,7 +25,7 @@ namespace pathCam {
                                                            component_mutex(new Poco::FastMutex()),
                                                            resize_buffer_mutex(new Poco::FastMutex()){
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(1, 1);
+    JobQ = new JobQueue(10, 10);
     reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
     reg_results[0].index = 0;
     //variancesForDebug.resize(2266);

@@ -150,7 +150,7 @@ void FileStream::run(){
   
   parent->IOlogger.information("*** FILE IO ***");
   
-  Poco::Thread::sleep(50);
+  Poco::Thread::sleep(200);
 
   interrupt = false;
   
@@ -174,6 +174,8 @@ void FileStream::run(){
     parent->caputure_set_mutex.unlock();
     image_path.append(Poco::Path(name));
     image->set_disk_file(image_path);
+
+    std::string test = image_path.toString();
     
     //std::cout << image_path.toString() << "\n";
     /*
@@ -493,6 +495,10 @@ int SpinPath::run(){
   int result = spinUpCamera();
   
   if(result != -1){
+      Poco::Path root_path = Poco::Path("D:/front_end_test");
+
+      setRootPath(root_path);
+      newCaptureSet();
     cameraStream = new CameraStream(this);
     fileStream =  new FileStream(this);
     processStream = new ProcessStream(this);

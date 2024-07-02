@@ -104,13 +104,19 @@ public:
   int run();
   void stopCamera();
 
-  void set_MainComponent_reference(MainComponent* parent) { sCam->set_MainComponent_reference(parent); };
+  //void set_MainComponent_reference(MainComponent* parent) { sCam->set_MainComponent_reference(parent); };
   void newCaptureSet();
   
   void setRootPath(Poco::Path _root_path){ root_path = _root_path; }
   Poco::Path getRootPath(){ return root_path; }
   
   void interruptCapture(){ interrupt = true; }
+
+  void add_observer(DataObserver* new_observer) {
+      sCam->add_observer(new_observer);
+  }
+
+  std::shared_ptr < MRTiledImageSet > get_image_reference() { return sCam->get_image_reference(); }
   
 private:
   
