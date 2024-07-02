@@ -23,10 +23,6 @@ namespace pathCam {
       return;
     }
 
-    double blurVal = image->check_blur();
-    parent->debugImageBlur.push_back(blurVal);
-    parent->debugImageBlurWithNames.push_back({image->image_file.getFileName(), blurVal});
-
     image->find_label();
 
     if (image->is_good()) {
@@ -77,7 +73,8 @@ namespace pathCam {
         return;
       }
 
-      //unsigned long image_index = parent->add_image(image);
+      image->release_reg_image();
+
       unsigned long image_index = sort_order;
       image->index = image_index;
       parent->add_image(image, image_index);

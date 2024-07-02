@@ -281,6 +281,21 @@ public:
       return (image->keypoints.size() > 0);
       
   }
+
+  inline bool detect_and_compute_multilevel(Image *image){
+    if(use_FREAK){
+      detector->detect(image->get_reg_image(),image->keypointsMultilevel);
+      extractor->compute( image->get_reg_image(), image->keypointsMultilevel, image->descriptors  );
+    }else{
+      detector->detectAndCompute(image->get_reg_image(),
+                                 noArray(), image->keypointsMultilevel,
+                                 image->descriptors );
+    }
+
+    return (image->keypoints.size() > 0);
+
+  }
+
   
   
 };

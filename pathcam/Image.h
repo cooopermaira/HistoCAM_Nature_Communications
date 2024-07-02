@@ -22,6 +22,7 @@ namespace pathCam {
     Poco::FastMutex buffer_mutex;
 
     std::vector<cv::KeyPoint> keypoints;
+    std::vector<cv::KeyPoint> keypointsMultilevel;
     cv::Mat descriptors;
 
     Image(MemoryPool *mempool = 0);
@@ -132,6 +133,8 @@ namespace pathCam {
     inline bool in_memory() { return (raw_buffer != 0); }
 
     inline double get_reg_scale() { return reg_scale; }
+
+    inline void release_reg_image() { reg_image.release(); }
 
     inline void free_memory_RAW(bool force = false) {
       buffer_mutex.lock();

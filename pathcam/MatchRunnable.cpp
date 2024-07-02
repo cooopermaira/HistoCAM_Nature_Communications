@@ -106,9 +106,7 @@ namespace pathCam {
     parent->composites[component_membership]->matchableCount--;
   }
 
-  void XCompRunnable::run() {
-    //extract multilevel features from self image
-    pathCam::Image *image = parent->get_image_ref(image_idx);
+  void XCompRunnable::extract_multilevel_keypoints(pathCam::Image *image) {
     auto *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
     switch (parent->feature_type) {
@@ -129,10 +127,23 @@ namespace pathCam {
         detector->ORB_params.nlevels = 8;
         break;
     }
-    //detector->detect_and_compute_multilevel(image);
+
+    image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
+                            parent->real);
+
+    detector->detect_and_compute_multilevel(image);
+
+    image->release_reg_image();
 
     delete detector;
-    //
+  }
+
+  void XCompRunnable::run() {
+    //extract multilevel features from self image
+    pathCam::Image *image = parent->get_image_ref(image_idx);
+    extract_multilevel_keypoints(image);
+
+
   }
 
   SingleMatchRunnable::SingleMatchRunnable(StreamCam *parent, unsigned long image_idx1, unsigned long image_idx2,

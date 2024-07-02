@@ -177,6 +177,7 @@ namespace pathCam {
     unsigned int componentMembershipMatchTo;
 
     virtual void run();
+    void extract_multilevel_keypoints(Image* image);
   };
 
 
