@@ -71,11 +71,12 @@ namespace pathCam {
             return;
         }
 
-        //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
         cv::Size image_size(image->width, image->height);
         Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
 
+        image->free_memory_RAW();
+        
         Poco::Path o = outfile;
         o.append(image->image_file.getFileName());
         o.setExtension("png");
