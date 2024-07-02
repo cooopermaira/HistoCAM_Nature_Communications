@@ -22,7 +22,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
     StringArray& iconNames,
     OwnedArray<Drawable>& iconsFromZipFile, Poco::Util::LayeredConfiguration::Ptr config,
     MainComponent* parent) : config(config), parent(parent),
-ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false) {
+ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false), simulating(false) {
     
 #ifdef WITH_SPINNAKER
     bcam.reset(new pathCam::SpinPath(config));
@@ -34,9 +34,9 @@ ImageViewComponent(view, iconNames, iconsFromZipFile), recording(false) {
     parent->MRimage = bcam->get_image_reference();
     captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
     addAndMakeVisible(captureOverlay.get());
-
-
 }
+
+
 void CaptureComponent::startRecording() {
     recording = true;
 
@@ -51,5 +51,32 @@ void CaptureComponent::startRecording() {
 
     //(new bcamThread("bcam Thread", parent, bcam))->run();
     repaint();
+}
+
+void CaptureComponent::startSimulating() {
+    simulating = true;
+    //TODO
+    repaint();
+}
+
+
+void CaptureComponent::stop(){
+  if(recording){ stopRecording();}
+  if(simulating){ stopSimulating();}
+}
+
+void CaptureComponent::stopRecording(){
+#ifdef WITH_SPINNAKER
+      bcam->stopCamera();
+#endif
+
+      recording = false;
+      repaint();
+}
+
+void CaptureComponent::stopSimulating(){
+      simulating = false;
+      //TODO
+      repaint();
 }
 

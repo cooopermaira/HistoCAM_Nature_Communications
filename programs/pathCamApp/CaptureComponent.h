@@ -18,6 +18,9 @@ class StreamCam;
 
 
 class CaptureComponent : public ImageViewComponent {
+  
+  friend class CaptureOverlay;
+  
 public:
     CaptureComponent(std::shared_ptr<fRectangle> view,
         StringArray& iconNames,
@@ -55,22 +58,21 @@ public:
         if (!isVisible()) { return false; }
 
         if (key.getKeyCode() == KeyPress::spaceKey) {
-            if (recording) { stopRecording(); } else { startRecording(); }
+          if (recording || simulating) { stop(); }
         }
         return false;  // Key press not handled
     }
 
     void startRecording();
+  
+    void startSimulating();
 
-    void stopRecording() {
-        
-#ifdef WITH_SPINNAKER
-        bcam->stopCamera();
-#endif
+    void stop();
+  
+    void stopRecording();
+  
+    void stopSimulating();
 
-        recording = false;
-        repaint();
-    }
 
     void paint(juce::Graphics &g) {
         ImageViewComponent::paint(g);
@@ -91,6 +93,7 @@ private:
     std::unique_ptr<CaptureOverlay> captureOverlay;
     Poco::Thread bcamThread;
     bool recording;
+    bool simulating;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CaptureComponent)
 };

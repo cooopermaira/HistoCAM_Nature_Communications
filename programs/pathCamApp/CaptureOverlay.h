@@ -36,6 +36,12 @@ public:
         addAndMakeVisible(*stopButton);
       }
       
+      if(iconNames[i] == "simulate.svg"){
+        simulateButton.reset( new SvgButton ("simulate", iconsFromZipFile[i]) );
+        simulateButton->addListener(this);
+        addAndMakeVisible(*simulateButton);
+      }
+      
     }
   
 
@@ -46,12 +52,7 @@ public:
 
   }
   
-  void resized() override
-  {
-    auto area = getLocalBounds().reduced (4);
-    stopButton->setBounds(area.removeFromRight(100).reduced(20,0));
-    recordButton->setBounds(area.removeFromRight(100).reduced(20,0));
-  }
+  void resized() override;
   
 private:
   
@@ -59,6 +60,7 @@ private:
   
   std::unique_ptr < SvgButton > recordButton;
   std::unique_ptr < SvgButton > stopButton;
+  std::unique_ptr < SvgButton > simulateButton;
   
   CaptureComponent* parent;
     
