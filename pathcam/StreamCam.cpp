@@ -19,7 +19,7 @@ namespace pathCam {
 
 
   StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config), buffer_mutex(new Poco::FastMutex()),
-                                                           image_mutex(new Poco::FastMutex()),
+                                                           image_mutex(new Poco::RWLock()),
                                                            resize_mmatch_mutex(new Poco::FastMutex()),
                                                            compositeQ_mutex(new Poco::FastMutex()),
                                                            component_mutex(new Poco::FastMutex()),
@@ -83,18 +83,36 @@ namespace pathCam {
   }
 
   void StreamCam::add_image(Image *image, unsigned long index) {
-    image_mutex->lock();
+    image_mutex->writeLock();
     unsigned long size = images.size();
     if (index >= size) {
       images.resize(index + 100);
       resize_mmatch_mutex->lock();
       matchM.resize(index + 100);
       reg_results.resize(index + 100, RegInfo());
-      visited.resize(index + 100, false);
+      //visited.resize(index + 100, false);
       resize_mmatch_mutex->unlock();
     }
     images[index] = image;
     image_mutex->unlock();
+  }
+
+
+  unsigned long int StreamCam::add_image(Image *image) {
+    unsigned long int index;
+    image_mutex->writeLock();
+    images.push_back(image);
+    index = images.size() - 1;
+
+    if (index % 100 == 0) {
+      resize_mmatch_mutex->lock();
+      matchM.resize(index + 100);
+      reg_results.resize(index + 100, RegInfo());
+      //visited.resize(index + 100, false);
+      resize_mmatch_mutex->unlock();
+    }
+    image_mutex->unlock();
+    return index;
   }
 
   unsigned int StreamCam::get_last_active_component(unsigned long image_index) {
@@ -105,27 +123,10 @@ namespace pathCam {
     }
   }
 
-  unsigned long int StreamCam::add_image(Image *image) {
-    unsigned long int index;
-    image_mutex->lock();
-    images.push_back(image);
-    index = images.size() - 1;
-
-    if (index % 100 == 0) {
-      resize_mmatch_mutex->lock();
-      matchM.resize(index + 100);
-      reg_results.resize(index + 100, RegInfo());
-      visited.resize(index + 100, false);
-      resize_mmatch_mutex->unlock();
-    }
-    image_mutex->unlock();
-    return index;
-  }
-
   std::vector<Image *> StreamCam::get_image_refs(std::vector<unsigned long int> indexes) {
     std::vector<Image *> temp;
 
-    image_mutex->lock();
+    image_mutex->readLock();
     for (unsigned int i = 0; i < indexes.size(); i++) {
       temp.push_back(images[indexes[i]]);
     }
@@ -136,7 +137,7 @@ namespace pathCam {
 
   Image *StreamCam::get_image_ref(unsigned long int index) {
     Image *temp;
-    image_mutex->lock();
+    image_mutex->readLock();
     temp = images[index];
     image_mutex->unlock();
     return temp;
@@ -147,7 +148,7 @@ namespace pathCam {
     reg_results[image_index] = RegInfo(true, Vec2(0.0, 0.0), true, component_index);
     reg_results[image_index].index = image_index;
     reg_results[image_index].resolved = true;
-    reg_results[image_index].matchedTo = image_index;
+    reg_results[image_index].matchedTo = image_index; //this is a root image, it has no match
 
     //delete these pointers when destroyed
     auto *temp = new CompositeVoronoi(this, image_size, component_index);

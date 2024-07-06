@@ -24,6 +24,7 @@
 #endif
 
 #include "Poco/Mutex.h"
+#include "Poco/RWLock.h"
 #include "Poco/Runnable.h"
 #include "Poco/Thread.h"
 #include "Poco/MemoryPool.h"

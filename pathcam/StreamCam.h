@@ -56,7 +56,7 @@ public:
   Poco::FastMutex *resize_mmatch_mutex;
   Poco::FastMutex *resize_buffer_mutex;
   Poco::FastMutex *buffer_mutex;
-  Poco::FastMutex *image_mutex;
+  Poco::RWLock *image_mutex;
   Poco::FastMutex *compositeQ_mutex;
   Poco::FastMutex *component_mutex;
 
