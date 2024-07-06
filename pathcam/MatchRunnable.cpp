@@ -50,10 +50,9 @@ namespace pathCam {
           tempReg.matchedTo = prev_idx;
           tempReg.relativeCoords.x = parent->matchM.match[image_idx][prev_idx]->t_x;
           tempReg.relativeCoords.y = parent->matchM.match[image_idx][prev_idx]->t_y;
-          parent->reg_results[image_idx] = tempReg;
+          parent->add_registration(tempReg);
           successful = true;
           auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
-          parent->regCount++;
           parent->JobQ->add_runnable(rj);
           break;
         } else {

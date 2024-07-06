@@ -20,6 +20,7 @@ namespace pathCam {
 
   StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config), buffer_mutex(new Poco::FastMutex()),
                                                            image_mutex(new Poco::RWLock()),
+                                                           reg_results_mutex(new Poco::RWLock),
                                                            resize_mmatch_mutex(new Poco::FastMutex()),
                                                            compositeQ_mutex(new Poco::FastMutex()),
                                                            component_mutex(new Poco::FastMutex()),
@@ -87,32 +88,25 @@ namespace pathCam {
     unsigned long size = images.size();
     if (index >= size) {
       images.resize(index + 100);
+
       resize_mmatch_mutex->lock();
       matchM.resize(index + 100);
-      reg_results.resize(index + 100, RegInfo());
-      //visited.resize(index + 100, false);
       resize_mmatch_mutex->unlock();
+
+      reg_results_mutex->writeLock();
+      reg_results.resize(index + 100, RegInfo());
+      reg_results_mutex->unlock();
     }
     images[index] = image;
     image_mutex->unlock();
   }
 
-
-  unsigned long int StreamCam::add_image(Image *image) {
-    unsigned long int index;
-    image_mutex->writeLock();
-    images.push_back(image);
-    index = images.size() - 1;
-
-    if (index % 100 == 0) {
-      resize_mmatch_mutex->lock();
-      matchM.resize(index + 100);
-      reg_results.resize(index + 100, RegInfo());
-      //visited.resize(index + 100, false);
-      resize_mmatch_mutex->unlock();
-    }
-    image_mutex->unlock();
-    return index;
+  void StreamCam::add_registration(pathCam::RegInfo regInfo) {
+    reg_results_mutex->writeLock();
+    auto index = regInfo.index;
+    reg_results[index]=regInfo;
+    reg_results_mutex->unlock();
+    regCount++;
   }
 
   unsigned int StreamCam::get_last_active_component(unsigned long image_index) {
