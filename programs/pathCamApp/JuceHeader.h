@@ -75,6 +75,7 @@ cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
  #error "This project was last saved using an outdated version of the Projucer! Re-save this project with the latest version to fix this error."
 #endif
 
+#define JUCE_APP_CONFIG_HEADER "JuceHeader.h"
 
 #if ! JUCE_DONT_DECLARE_PROJECTINFO
 namespace ProjectInfo

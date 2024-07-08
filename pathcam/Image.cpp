@@ -3,9 +3,10 @@
 using namespace cv;
 
 namespace pathCam {
+    
 
-  Image::Image(MemoryPool *mempool) : width(6464), height(4852), label(_NOLABEL), mempool(mempool), raw_buffer(0),
-                                      reference_count(0), image_file(Poco::Path()), variance(0) {};
+    Image::Image(unsigned int width, unsigned int height, MemoryPool* mempool) : width(width), height(height), label(_NOLABEL), mempool(mempool), raw_buffer(0),
+                                        reference_count(0), image_file(Poco::Path()),variance(0) {};
 
   Image::~Image() {
     free_memory_RAW(true);

@@ -9,7 +9,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
     ss << PROJECT_SOURCE_DIR << "/resources/hud_icons.zip";
 
     ZipFile icons(File(ss.str().c_str()));
-
+    
     for (int i = 0; i < icons.getNumEntries(); ++i) {
         std::unique_ptr<InputStream> svgFileStream(icons.createStreamForEntry(i));
 

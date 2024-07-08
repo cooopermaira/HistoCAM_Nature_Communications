@@ -28,7 +28,7 @@ namespace pathCam {
             parent->JobQ->add_runnable(ds);
             sort_order += 10;
              */
-            Image* image = new Image();
+            Image* image = new Image(parent->image_width, parent->image_height);
             image->set_disk_file(imageFile);
             parent->pass_image(image, sort_order);
             sort_order++;
@@ -48,11 +48,12 @@ namespace pathCam {
         if (imageFile.empty()) { return; }
         std::ifstream stream;
         stream.open(imageFile, std::ios::binary);
+        unsigned int height = parent->image_height;
+        unsigned int width = parent->image_width;
+        char *raw_image_data = new char[width * height];
+        stream.read(raw_image_data, width * height);
 
-        char *raw_image_data = new char[6464 * 4852];
-        stream.read(raw_image_data, 6464 * 4852);
-
-        Image *image = new Image();
+        Image *image = new Image(width, height);
         image->copy_in(raw_image_data);
         image->set_disk_file(imageFile);
         delete [] raw_image_data;

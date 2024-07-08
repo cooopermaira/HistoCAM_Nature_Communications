@@ -39,6 +39,8 @@ protected:
   bool real;
   int interpolation;
   int feature_type;
+  unsigned int image_width;
+  unsigned int image_height;
   bool use_FREAK;
   cv::DescriptorMatcher::MatcherType matcher_type;
   int estimator_type;

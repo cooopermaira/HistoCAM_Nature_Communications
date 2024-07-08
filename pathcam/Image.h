@@ -25,7 +25,7 @@ namespace pathCam {
     std::vector<cv::KeyPoint> keypointsMultilevel;
     cv::Mat descriptors;
 
-    Image(MemoryPool *mempool = 0);
+    Image(unsigned int width, unsigned int height, MemoryPool* mempool = 0);
 
     ~Image();
 
@@ -152,7 +152,7 @@ namespace pathCam {
       buffer_mutex.unlock();
     }
 
-
+    
     Poco::Path image_file;
   private:
 

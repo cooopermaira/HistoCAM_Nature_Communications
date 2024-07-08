@@ -328,28 +328,49 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
     
     if(pConf->has("registration.image")){
       
-      if(pConf->has("registration.image.crop")){
-        double temp = crop_factor;
-        try {
-          crop_factor = pConf->getDouble("registration.image.crop");
-        }catch(std::string bad_input){
-          logger->warning("Bad input for crop: " + bad_input + ".");
-          crop_factor = temp;
+        if (pConf->has("registration.image.crop")) {
+            double temp = crop_factor;
+            try {
+                crop_factor = pConf->getDouble("registration.image.crop");
+            }
+            catch (std::string bad_input) {
+                logger->warning("Bad input for crop: " + bad_input + ".");
+                crop_factor = temp;
+            }
+            if (crop_factor < 0.0 || crop_factor > 1.0) {
+                logger->warning("Bad crop factor given defaulting to 1.0");
+                crop_factor = 1.0;
+            }
         }
-        if(crop_factor < 0.0 || crop_factor > 1.0){
-          logger->warning("Bad crop factor given defaulting to 1.0");
-          crop_factor = 1.0;
-        }
+      if(pConf->has("registration.image.width")){
+		unsigned int temp = image_width;
+		try {
+		  image_width = pConf->getUInt("registration.image.width");
+		}catch(std::string bad_input){
+		  logger->warning("Bad input for width: " + bad_input + "." );
+		  image_width = temp;
+		}
       }
+      if(pConf->has("registration.image.height")){
+          unsigned int temp = image_height;
+          try {
+			image_height = pConf->getUInt("registration.image.height");
+          }catch(std::string bad_input){
+			logger->warning("Bad input for height: " + bad_input + "." );
+			image_height = temp;
+		  }
+	  }
       
-      if(pConf->has("registration.image.scale")){
-        double temp = scale_factor;
-        try {
-          scale_factor = pConf->getDouble("registration.image.scale");
-        }catch(std::string bad_input){
-          logger->warning("Bad input for scale: " + bad_input + ".");
-          scale_factor = temp;
-        }
+      if (pConf->has("registration.image.scale")) {
+          double temp = scale_factor;
+          try {
+              scale_factor = pConf->getDouble("registration.image.scale");
+          }
+          catch (std::string bad_input) {
+              logger->warning("Bad input for scale: " + bad_input + ".");
+              scale_factor = temp;
+          }
+      
         if(scale_factor < 0.0 || scale_factor > 1.0){
           logger->warning("Bad scale factor given defaulting to 1.0");
           scale_factor = 1.0;
@@ -444,7 +465,7 @@ bool BatchCam::loadFileList(){
   
   while (infile >>imageFile){
     if(imageFile.size() == 0){ continue;}
-    pathCam::Image *image = new pathCam::Image();
+    pathCam::Image *image = new pathCam::Image(image_width,image_height);
     image->set_disk_file(imageFile);
     images.push_back(image);
   }
