@@ -71,11 +71,11 @@ namespace pathCam {
 
     ~StreamCam() { delete buffer_mutex, delete image_mutex; }
 
-    Poco::FastMutex *resize_mmatch_mutex;
-    Poco::FastMutex *resize_buffer_mutex;
-    Poco::FastMutex *buffer_mutex;
     Poco::RWLock *image_mutex;
     Poco::RWLock *reg_results_mutex;
+    Poco::RWLock *resize_mmatch_mutex;
+    Poco::FastMutex *resize_buffer_mutex;
+    Poco::FastMutex *buffer_mutex;
     Poco::FastMutex *compositeQ_mutex;
     Poco::FastMutex *component_mutex;
 
@@ -121,6 +121,8 @@ namespace pathCam {
     Image *get_image_ref(unsigned long int);
 
     std::vector<Image *> get_image_refs(std::vector<unsigned long int>);
+
+    std::vector<Image *> get_component_image_refs(unsigned long component);
 
     std::vector<RegInfo> get_Q_front();
 

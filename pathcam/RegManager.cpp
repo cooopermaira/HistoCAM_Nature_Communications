@@ -38,12 +38,15 @@ namespace pathCam {
     parent->reg_results_mutex->unlock();
 
     if (!reginfo.successful) {
+      //this image does not have relative coords yet. original job must be thrown back in Q.
       return std::pair<bool, Vec2>(false, Vec2(0.0, 0.0));
 
     } else if (reginfo.resolved) {
+      //this image has relative coords and absolute coords
       return std::pair<bool, Vec2>(true, reginfo.absoluteCoords);
 
     } else {
+      //this image has relative coords but not absolute coords. We attempt to get absolute coords thru recursive call
       Vec2 returnCoords(0,0);
       auto temp = trace_to_root(reginfo.matchedTo);
       if (temp.first) {

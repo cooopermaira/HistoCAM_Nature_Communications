@@ -37,24 +37,7 @@ namespace pathCam {
       image_file = _image_file;
     }
 
-    void load_raw_from_disk() {
-      buffer_mutex.lock();
-      if (raw_buffer == 0) {
-        if (image_file.toString() != "") {
-          std::ifstream stream;
-          stream.open(image_file.toString(), std::ios::binary);
-          allocate_memory_RAW();
-          stream.read(raw_buffer, width * height);
-          stream.close();
-        } else {
-          std::cerr << "Loading from disk with no path\n";
-          buffer_mutex.unlock();
-          return;
-        }
-      }
-      reference_count++;
-      buffer_mutex.unlock();
-    }
+    void load_raw_from_disk();
 
     void increment_smart_pointer() { reference_count++; }
 

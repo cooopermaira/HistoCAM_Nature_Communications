@@ -727,7 +727,11 @@ double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Ma
 
     subdiv.getEdgeList(edges);
     matchedEdges.resize(edges.size(), {-1, -1}); //preallocated to avoid mutex
-    parent->resize_mmatch_mutex->lock();
+
+    //this mutex is locked here because each job created in the following loop needs this mutex to be read locked.
+    //They will not cause a reallocation because these images have already had initial matches, meaning the match
+    //matrix has already been resized to accommodate them. Its unlocked at end of loop
+    parent->resize_mmatch_mutex->readLock();
 
     //collect list of all vertices that share an edge
     int count = 0;
@@ -778,7 +782,6 @@ double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Ma
     while (matchableCount > 0) {
       Poco::Thread::sleep(100);
     }
-
     parent->resize_mmatch_mutex->unlock();
 
     //give each frame index a linear system index.
@@ -966,14 +969,17 @@ double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Ma
     }
 */
     auto start = std::chrono::high_resolution_clock::now();
+
     self_reset();
-    parent->resize_mmatch_mutex->lock();
+
+    parent->reg_results_mutex->readLock();
     std::vector<RegInfo> newinfo;
     for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
       parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.x = xac.at<double>(i);
       parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.y = yac.at<double>(i);
       newinfo.push_back(parent->reg_results[systemIndexToFrameIndex[i]]);
     }
+    parent->reg_results_mutex->unlock();
 
     update(newinfo);
     auto stop = std::chrono::high_resolution_clock::now();
