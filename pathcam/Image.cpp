@@ -155,7 +155,9 @@ namespace pathCam {
     }
 
     if (raw_buffer == 0) {
+      buffer_mutex.unlock();
       load_raw_from_disk();
+      buffer_mutex.lock();
       release = true;
     }
 
@@ -167,6 +169,7 @@ namespace pathCam {
     //this should be redone, this extra copy is unnecessary and is a significant inefficiency
     cv::Mat temp = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
     temp.copyTo(reg_image);
+    buffer_mutex.unlock();
 
     if(release){free_memory_RAW();}
 
@@ -189,9 +192,26 @@ namespace pathCam {
       reg_image = reg_image(myROI);
     }
 
-    buffer_mutex.unlock();
-
   };
+
+  void Image::load_raw_from_disk() {
+    buffer_mutex.lock();
+    if (raw_buffer == 0) {
+      if (image_file.toString() != "") {
+        std::ifstream stream;
+        stream.open(image_file.toString(), std::ios::binary);
+        allocate_memory_RAW();
+        stream.read(raw_buffer, width * height);
+        stream.close();
+      } else {
+        std::cerr << "Loading from disk with no path\n";
+        buffer_mutex.unlock();
+        return;
+      }
+    }
+    reference_count++;
+    buffer_mutex.unlock();
+  }
 
 }
 

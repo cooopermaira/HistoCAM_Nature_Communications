@@ -21,7 +21,7 @@ namespace pathCam {
   StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config), buffer_mutex(new Poco::FastMutex()),
                                                            image_mutex(new Poco::RWLock()),
                                                            reg_results_mutex(new Poco::RWLock),
-                                                           resize_mmatch_mutex(new Poco::FastMutex()),
+                                                           resize_mmatch_mutex(new Poco::RWLock()),
                                                            compositeQ_mutex(new Poco::FastMutex()),
                                                            component_mutex(new Poco::FastMutex()),
                                                            resize_buffer_mutex(new Poco::FastMutex()){
@@ -35,7 +35,7 @@ namespace pathCam {
 
 
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx) {
-    resize_mmatch_mutex->lock();
+    resize_mmatch_mutex->writeLock();
     matchM.match[image_idx][prev_idx] = new Match(matchM.match[prev_idx][image_idx]);
     resize_mmatch_mutex->unlock();
   }
@@ -89,7 +89,7 @@ namespace pathCam {
     if (index >= size) {
       images.resize(index + 100);
 
-      resize_mmatch_mutex->lock();
+      resize_mmatch_mutex->writeLock();
       matchM.resize(index + 100);
       resize_mmatch_mutex->unlock();
 
@@ -139,10 +139,12 @@ namespace pathCam {
 
   void StreamCam::add_new_component(unsigned long image_index, cv::Size image_size) {
     auto component_index = increment_and_get_components();
+    reg_results_mutex->writeLock();
     reg_results[image_index] = RegInfo(true, Vec2(0.0, 0.0), true, component_index);
     reg_results[image_index].index = image_index;
     reg_results[image_index].resolved = true;
     reg_results[image_index].matchedTo = image_index; //this is a root image, it has no match
+    reg_results_mutex->unlock();
 
     //delete these pointers when destroyed
     auto *temp = new CompositeVoronoi(this, image_size, component_index);
@@ -151,12 +153,25 @@ namespace pathCam {
     if (composites.size() == 1) {
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
-    } /*else {
+    } else {
+      temp->imagePyramid->set_scale(0);
+      temp->imagePyramid->set_offset(Point2f(0,0));
       auto xcm = new XCompRunnable(this,image_index,component_index, get_last_active_component(image_index));
       JobQ->add_runnable(xcm);
-    }*/
+    }
     component_mutex->unlock();
     temp->update(std::vector<RegInfo>{reg_results[image_index]});
+  }
+
+  std::vector<Image *> StreamCam::get_component_image_refs(unsigned long component) {
+    auto dm = composites[component]->delaunayMembers;
+    std::vector<unsigned long> res(dm.size());
+    int i = 0;
+    for (auto [key,value] : dm){
+      res[i] = dm[key];
+      i++;
+    }
+    return get_image_refs(res);
   }
 
   std::vector<RegInfo> StreamCam::get_Q_front() {

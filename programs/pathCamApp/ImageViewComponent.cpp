@@ -129,6 +129,7 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRa
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
   
   for(unsigned int i=0; i < MRImage->images.size(); i++){
+    if(MRImage->images[i]->scale == 0){continue;}
     std::vector<TileQuery> tiles = MRImage->images[i]->getTiles(RectJtoC(*view), RectJtoC(getLocalBounds()));
     for (unsigned int t = 0; t < tiles.size(); t++) {
       cv::Mat tile = tiles[t].image;

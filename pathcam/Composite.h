@@ -78,8 +78,6 @@ namespace pathCam {
     Subdiv2D subdiv;
     cv::Size image_size;
     std::vector<Mat> channels;
-    std::vector<std::pair<std::string, bool>> memberImages;
-    std::map<int, unsigned long> delaunayMembers;
     std::vector<Point2i> imageBoundsAsPolygon;
     std::atomic<unsigned int> jobCount = 0;
     unsigned int componentIndex;
@@ -119,8 +117,9 @@ namespace pathCam {
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
     std::atomic<unsigned int> matchableCount = 0;
-
     std::vector<std::pair<long, long>> matchedEdges;
+    std::vector<std::pair<std::string, bool>> memberImages;
+    std::map<int, unsigned long> delaunayMembers;
 
     void update(std::vector<RegInfo> new_info);
 

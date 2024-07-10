@@ -36,8 +36,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::self_reset() {
-    imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),
-                                          Point2i(max_offset.x, max_offset.y));
+    //imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),Point2i(max_offset.x, max_offset.y));
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
     composite.release();
@@ -423,10 +422,10 @@ namespace pathCam {
         auto br = topLevelBeforeAdding->getIJ(Point2f(max_offset.x, max_offset.y));
         for (int x = tl.x; x <= br.x; x++) {
           for (int y = tl.y; y <= br.y; y++) {
-            if (topLevelBeforeAdding->tiles(x, y).data) {
+            if (topLevelBeforeAdding->tiles(x, y) != nullptr) {
               auto tile = Point2i(x, y);
               auto myLevelRegion = cv::Rect_<float>(tile.x * tile_size, tile.y * tile_size, tile_size, tile_size);
-              topLevelBeforeAdding->tileUpwards(tile, myLevelRegion, topLevelBeforeAdding->tiles(tile.x, tile.y));
+              topLevelBeforeAdding->tileUpwards(tile, myLevelRegion, *topLevelBeforeAdding->tiles(tile.x, tile.y));
             }
           }
         }
@@ -694,28 +693,27 @@ namespace pathCam {
   }
 
 
+  double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon) {
+    cv::Mat ATranspose = A.t();
+    cv::Mat ATA = ATranspose * A;
+    cv::Mat ATb = ATranspose * b;
 
-double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon) {
-  cv::Mat ATranspose = A.t();
-  cv::Mat ATA = ATranspose * A;
-  cv::Mat ATb = ATranspose * b;
+    cv::Mat r = ATb - (ATA * x);
+    cv::Mat p = r.clone();
 
-  cv::Mat r = ATb - (ATA * x);
-  cv::Mat p = r.clone();
-
-  for (int i = 0; i < steps; i++) {
-    auto stepSize = r.dot(r) / (p.dot(ATA * p));
-    x += stepSize * p;
-    double denom = r.dot(r);
-    r -= stepSize * ATA * p;
-    double adjustment = r.dot(r) / denom;
-    p = r + adjustment * p;
-    if (cv::norm(r) < epsilon) {
-      break;
+    for (int i = 0; i < steps; i++) {
+      auto stepSize = r.dot(r) / (p.dot(ATA * p));
+      x += stepSize * p;
+      double denom = r.dot(r);
+      r -= stepSize * ATA * p;
+      double adjustment = r.dot(r) / denom;
+      p = r + adjustment * p;
+      if (cv::norm(r) < epsilon) {
+        break;
+      }
     }
+    return cv::norm(A * x - b);
   }
-  return cv::norm(A * x - b);
-}
 
 
   void CompositeVoronoi::perform_global_alignment() {
@@ -727,7 +725,11 @@ double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Ma
 
     subdiv.getEdgeList(edges);
     matchedEdges.resize(edges.size(), {-1, -1}); //preallocated to avoid mutex
-    parent->resize_mmatch_mutex->lock();
+
+    //this mutex is locked here because each job created in the following loop needs this mutex to be read locked.
+    //They will not cause a reallocation because these images have already had initial matches, meaning the match
+    //matrix has already been resized to accommodate them. Its unlocked at end of loop
+    parent->resize_mmatch_mutex->readLock();
 
     //collect list of all vertices that share an edge
     int count = 0;
@@ -778,7 +780,6 @@ double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Ma
     while (matchableCount > 0) {
       Poco::Thread::sleep(100);
     }
-
     parent->resize_mmatch_mutex->unlock();
 
     //give each frame index a linear system index.
@@ -966,14 +967,17 @@ double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Ma
     }
 */
     auto start = std::chrono::high_resolution_clock::now();
+
     self_reset();
-    parent->resize_mmatch_mutex->lock();
+
+    parent->reg_results_mutex->readLock();
     std::vector<RegInfo> newinfo;
     for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
       parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.x = xac.at<double>(i);
       parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.y = yac.at<double>(i);
       newinfo.push_back(parent->reg_results[systemIndexToFrameIndex[i]]);
     }
+    parent->reg_results_mutex->unlock();
 
     update(newinfo);
     auto stop = std::chrono::high_resolution_clock::now();

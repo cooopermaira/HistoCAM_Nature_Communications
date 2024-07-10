@@ -19,7 +19,7 @@ inline cv::Rect_<T> RecMult(cv::Rect_<T> r, T scalar) {
 template<typename T>
 class Dense2DArray {
 public:
-  Dense2DArray(int minX = -4000, int maxX = 4000, int minY = -4000, int maxY = 4000)
+  Dense2DArray(int minX = -2048, int maxX = 2048, int minY = -2048, int maxY = 2048)
       : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
     data.resize(width * height);
   }
@@ -67,17 +67,14 @@ private:
   std::shared_ptr<MRTiledImage> parent;
   unsigned int tile_size;
   unsigned int logic_size;
+  float logicRatio;
 
 public:
-  Dense2DArray<cv::Mat> tiles;
+  Dense2DArray<Mat*> tiles;
   cv::Rect_<float> bounds;
-  std::vector<Point2i> tilesWithData;
-  //Mat holdingMatrix;
 
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 512,
-             unsigned int logic_size = 512, int levelWithinPyramid = 0) :
-      tile_size(tile_size), logic_size(logic_size), levelWithinPyramid(levelWithinPyramid), parent(parent) {
-  };
+             unsigned int logic_size = 512, int levelWithinPyramid = 0);
 
   ~TiledImage() {};
 
@@ -99,7 +96,7 @@ public:
 
   void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
 
-  inline cv::Mat getTile(int i, int j) { return tiles(i, j); }
+  Mat getTile(int x, int y);
 
   inline Point2i getIJ(Point2f p) {
     Point2i ij = Point2i(p.x / (int) logic_size, p.y / (int) logic_size);
@@ -124,20 +121,8 @@ private:
                    Point2f offset, cv::Rect_<float> image_box,
                    cv::Rect_<float> tile_box);
 
-  void matToImage(const cv::Mat mat, int x, int y, Point2f rootOffset,
-                  cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
 
-  bool tileToDisk(const cv::Mat *image, const std::string &filePath) {
-    return false;
-    //        juce::File file(filePath);
-    //        auto outputStream = file.createOutputStream();
-    //        if (!outputStream) return false;
-    //
-    //        juce::PNGImageFormat pngFormat;
-    //        bool success = pngFormat.writeImageToStream(*image, *outputStream);
-    //        return success;
-  }
 
 
 };

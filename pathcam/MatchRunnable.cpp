@@ -15,6 +15,31 @@ namespace pathCam {
                                                            successful(false) {
   };
 
+  void XCompRunnable::run() {
+    //extract multilevel features from self image
+    pathCam::Image *image = parent->get_image_ref(image_idx);
+    extract_multilevel_keypoints(image);
+
+    //get references to other component images
+    auto otherCompImages = parent->get_component_image_refs(componentMembershipMatchTo);
+
+    //loop through and get homography
+    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
+    pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
+    for (auto img: otherCompImages) {
+      parent->resize_mmatch_mutex->readLock();
+      parent->matchM.match[img->index][image_idx] = new Match(img, image);
+      Match *m = parent->matchM.match[img->index][image_idx];
+      parent->resize_mmatch_mutex->unlock();
+
+      matcher->match(m);
+      int result = motion_est->findHomography(m, parent->estimator_type);
+      parent->set_match(image->index, img->index);
+    }
+    int k = 0;
+
+
+  }
 
   void MatchRunnable::run() {
     pathCam::Image *image = parent->get_image_ref(image_idx);
@@ -35,32 +60,42 @@ namespace pathCam {
       }
 
       if (!previous->is_good()) { continue; }
+
+      parent->resize_mmatch_mutex->readLock();
       parent->matchM.match[prev_idx][image_idx] = new Match(previous, image);
       Match *m = parent->matchM.match[prev_idx][image_idx];
+      parent->resize_mmatch_mutex->unlock();
+
       matcher->match(m);
       int result = motion_est->findHomography(m, parent->estimator_type);
       if (result == 1) {
-        if (std::abs(parent->matchM.match[prev_idx][image_idx]->t_x) < image->width / 2 && std::abs(
-            parent->matchM.match[prev_idx][image_idx]->t_y) < image->height / 2) {
+        if (std::abs(m->t_x) < image->width / 2 && std::abs(
+            m->t_y) < image->height / 2) {
           //parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
           parent->set_match(image_idx, prev_idx);
           auto tempReg = RegInfo(true, Vec2(0.0, 0.0), false, 0);
           tempReg.index = image_idx;
           tempReg.resolved = false;
           tempReg.matchedTo = prev_idx;
-          tempReg.relativeCoords.x = parent->matchM.match[image_idx][prev_idx]->t_x;
-          tempReg.relativeCoords.y = parent->matchM.match[image_idx][prev_idx]->t_y;
+          tempReg.relativeCoords.x = -1 * m->t_x;
+          tempReg.relativeCoords.y = -1 * m->t_y;
           parent->add_registration(tempReg);
           successful = true;
           auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
           parent->JobQ->add_runnable(rj);
           break;
         } else {
+            parent->resize_mmatch_mutex->readLock();
           parent->matchM.match[prev_idx][image_idx] = nullptr;
+          parent->resize_mmatch_mutex->unlock();
         }
       } else {
         // if(result == -1 || result == -2){
+          parent->resize_mmatch_mutex->readLock();
+
         parent->matchM.match[prev_idx][image_idx] = nullptr;
+        parent->resize_mmatch_mutex->unlock();
+
       }
       delete m;
     }
@@ -84,6 +119,9 @@ namespace pathCam {
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
 
     parent->matchM.match[image_idx2][image_idx1] = new Match(image2, image1);
+
+    //it's ok to set this match directly without the mutex because the mutex is already locked in
+    //perform global alighnment, and all image_idx values are less than matchM.match size
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
     int result = motion_est->findHomography(m, parent->estimator_type);
@@ -137,13 +175,6 @@ namespace pathCam {
     delete detector;
   }
 
-  void XCompRunnable::run() {
-    //extract multilevel features from self image
-    pathCam::Image *image = parent->get_image_ref(image_idx);
-    extract_multilevel_keypoints(image);
-
-
-  }
 
   SingleMatchRunnable::SingleMatchRunnable(StreamCam *parent, unsigned long image_idx1, unsigned long image_idx2,
                                            unsigned int component_membership, int edgeNumber,
