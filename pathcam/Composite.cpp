@@ -36,8 +36,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::self_reset() {
-    imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),
-                                          Point2i(max_offset.x, max_offset.y));
+    //imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),Point2i(max_offset.x, max_offset.y));
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
     composite.release();
@@ -423,10 +422,10 @@ namespace pathCam {
         auto br = topLevelBeforeAdding->getIJ(Point2f(max_offset.x, max_offset.y));
         for (int x = tl.x; x <= br.x; x++) {
           for (int y = tl.y; y <= br.y; y++) {
-            if (topLevelBeforeAdding->tiles(x, y).data) {
+            if (topLevelBeforeAdding->tiles(x, y) != nullptr) {
               auto tile = Point2i(x, y);
               auto myLevelRegion = cv::Rect_<float>(tile.x * tile_size, tile.y * tile_size, tile_size, tile_size);
-              topLevelBeforeAdding->tileUpwards(tile, myLevelRegion, topLevelBeforeAdding->tiles(tile.x, tile.y));
+              topLevelBeforeAdding->tileUpwards(tile, myLevelRegion, *topLevelBeforeAdding->tiles(tile.x, tile.y));
             }
           }
         }
@@ -694,28 +693,27 @@ namespace pathCam {
   }
 
 
+  double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon) {
+    cv::Mat ATranspose = A.t();
+    cv::Mat ATA = ATranspose * A;
+    cv::Mat ATb = ATranspose * b;
 
-double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon) {
-  cv::Mat ATranspose = A.t();
-  cv::Mat ATA = ATranspose * A;
-  cv::Mat ATb = ATranspose * b;
+    cv::Mat r = ATb - (ATA * x);
+    cv::Mat p = r.clone();
 
-  cv::Mat r = ATb - (ATA * x);
-  cv::Mat p = r.clone();
-
-  for (int i = 0; i < steps; i++) {
-    auto stepSize = r.dot(r) / (p.dot(ATA * p));
-    x += stepSize * p;
-    double denom = r.dot(r);
-    r -= stepSize * ATA * p;
-    double adjustment = r.dot(r) / denom;
-    p = r + adjustment * p;
-    if (cv::norm(r) < epsilon) {
-      break;
+    for (int i = 0; i < steps; i++) {
+      auto stepSize = r.dot(r) / (p.dot(ATA * p));
+      x += stepSize * p;
+      double denom = r.dot(r);
+      r -= stepSize * ATA * p;
+      double adjustment = r.dot(r) / denom;
+      p = r + adjustment * p;
+      if (cv::norm(r) < epsilon) {
+        break;
+      }
     }
+    return cv::norm(A * x - b);
   }
-  return cv::norm(A * x - b);
-}
 
 
   void CompositeVoronoi::perform_global_alignment() {
