@@ -85,11 +85,17 @@ namespace pathCam {
           parent->JobQ->add_runnable(rj);
           break;
         } else {
+            parent->resize_mmatch_mutex->readLock();
           parent->matchM.match[prev_idx][image_idx] = nullptr;
+          parent->resize_mmatch_mutex->unlock();
         }
       } else {
         // if(result == -1 || result == -2){
+          parent->resize_mmatch_mutex->readLock();
+
         parent->matchM.match[prev_idx][image_idx] = nullptr;
+        parent->resize_mmatch_mutex->unlock();
+
       }
       delete m;
     }
