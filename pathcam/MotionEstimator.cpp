@@ -35,8 +35,12 @@ int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type,
   if(m->H.empty()){
     return -2;
   }
-  m->t_x = m->H.at<double>(0,0)*m->H.at<double>(0,2)*(1.0/m->image_2->get_reg_scale());
-  m->t_y = m->H.at<double>(1,1)*m->H.at<double>(1,2)*(1.0/m->image_2->get_reg_scale());
+  auto a = m->H.at<double>(0,0);
+  auto d = m->H.at<double>(1,1);
+  auto a2 = m->H.at<double>(0,2);
+  auto d2 = m->H.at<double>(1,2);
+  m->t_x = a*a2*(1.0/m->image_2->get_reg_scale());
+  m->t_y = d*d2*(1.0/m->image_2->get_reg_scale());
   
   return 1;
 }

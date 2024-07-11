@@ -34,7 +34,7 @@ namespace pathCam {
 
       matcher->match(m);
       int result = motion_est->findHomography(m, parent->estimator_type);
-      parent->set_match(image->index, img->index);
+
     }
     int k = 0;
 

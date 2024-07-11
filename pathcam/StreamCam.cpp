@@ -35,21 +35,20 @@ namespace pathCam {
 
 
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx) {
-    resize_mmatch_mutex->writeLock();
+    resize_mmatch_mutex->readLock();
     matchM.match[image_idx][prev_idx] = new Match(matchM.match[prev_idx][image_idx]);
     resize_mmatch_mutex->unlock();
   }
 
 
   bool StreamCam::spin_run() {
-    Poco::Thread Q_thread, composite_thread;
 
     std::cout << "spin_run started " << std::endl;
 
-    QManager *qm = new QManager(this);
+    auto *qm = new QManager(this);
     Q_thread.start(qm);
 
-    CompositeManager *cm = new CompositeManager(this);
+    auto *cm = new CompositeManager(this);
     composite_thread.start(cm);
 
     Q_thread.join();
@@ -61,19 +60,18 @@ namespace pathCam {
   }
 
   bool StreamCam::run() {
-
-    auto ds = new DiskReader(this);
-    stream_thread.start(ds);
-
     auto start = std::chrono::high_resolution_clock::now();
 
-    QManager *qm = new QManager(this);
+    auto dr = new DiskReader(this);
+    disk_thread.start(dr);
+
+    auto *qm = new QManager(this);
     Q_thread.start(qm);
 
-    CompositeManager *cm = new CompositeManager(this);
+    auto *cm = new CompositeManager(this);
     composite_thread.start(cm);
 
-    stream_thread.join();
+    disk_thread.join();
     Q_thread.join();
     composite_thread.join();
 
