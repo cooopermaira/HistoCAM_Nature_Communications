@@ -85,14 +85,13 @@ namespace pathCam {
           parent->JobQ->add_runnable(rj);
           break;
         } else {
-            parent->resize_mmatch_mutex->readLock();
+          parent->resize_mmatch_mutex->readLock();
           parent->matchM.match[prev_idx][image_idx] = nullptr;
           parent->resize_mmatch_mutex->unlock();
         }
       } else {
         // if(result == -1 || result == -2){
-          parent->resize_mmatch_mutex->readLock();
-
+        parent->resize_mmatch_mutex->readLock();
         parent->matchM.match[prev_idx][image_idx] = nullptr;
         parent->resize_mmatch_mutex->unlock();
 
@@ -121,7 +120,7 @@ namespace pathCam {
     parent->matchM.match[image_idx2][image_idx1] = new Match(image2, image1);
 
     //it's ok to set this match directly without the mutex because the mutex is already locked in
-    //perform global alighnment, and all image_idx values are less than matchM.match size
+    //perform_global_alignment() and all image_idx values are less than matchM.match size
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
     int result = motion_est->findHomography(m, parent->estimator_type);
