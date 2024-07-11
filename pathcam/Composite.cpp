@@ -130,10 +130,10 @@ namespace pathCam {
       //contributing less than x% of its pixels, revert and don't bother loading from disk
       subdiv = tempSubdiv;
       _image->free_memory_RAW();
-      memberImages.push_back({_image->image_file.getFileName(), false});
+      memberImages.push_back({_image, false});
       return -1;
     }
-    memberImages.push_back({_image->image_file.getFileName(), true});
+    memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
   }
@@ -189,16 +189,8 @@ namespace pathCam {
 
       //wait till jobs have processed
       wakeEvent.wait();
-      /*
-      if (wakeEvent.tryWait(100000)) {
-        throw std::invalid_argument("tile jobs not processing");
-      }
-       */
-      /*
-      if (Poco::Thread::trySleep(100000)) {
-        throw std::invalid_argument("tile jobs not processing");
-      }
-       */
+
+      //update pyramid bounds and observer, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
       parent->update_observers();
       freshMask.copyTo(polyMaskOutput);

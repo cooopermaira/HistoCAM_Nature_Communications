@@ -118,7 +118,7 @@ namespace pathCam {
 
     std::atomic<unsigned int> matchableCount = 0;
     std::vector<std::pair<long, long>> matchedEdges;
-    std::vector<std::pair<std::string, bool>> memberImages;
+    std::vector<std::pair<Image*, bool>> memberImages;
     std::map<int, unsigned long> delaunayMembers;
 
     void update(std::vector<RegInfo> new_info);

@@ -32,9 +32,9 @@ public:
     
 #ifdef WITH_SPINNAKER
     std::shared_ptr<pathCam::SpinPath> bcam;
-#else
-    std::shared_ptr<pathCam::StreamCam> sCam;
 #endif
+
+    std::shared_ptr<pathCam::StreamCam> sCam;
 
     MainComponent *parent;
 

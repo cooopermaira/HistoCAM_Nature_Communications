@@ -52,11 +52,16 @@ namespace pathCam {
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
 
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
-
+    int mostMatches = 0;
+    long bestMatch = -1;
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       pathCam::Image *previous = parent->get_image_ref(prev_idx);
       if (previous == nullptr) {
-        continue;
+          if (max(5, int(image_idx)) <= prev_idx + 5) {
+              auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
+              waitFor->jobComplete.wait();
+              previous = parent->get_image_ref(prev_idx);
+          } else {continue;}
       }
 
       if (!previous->is_good()) { continue; }
@@ -68,6 +73,10 @@ namespace pathCam {
 
       matcher->match(m);
       int result = motion_est->findHomography(m, parent->estimator_type);
+      if (m->good_matches.size() > mostMatches){
+          mostMatches = m->good_matches.size();
+          bestMatch = prev_idx;
+      }
       if (result == 1) {
         if (std::abs(m->t_x) < image->width / 2 && std::abs(
             m->t_y) < image->height / 2) {
@@ -82,7 +91,7 @@ namespace pathCam {
           parent->add_registration(tempReg);
           successful = true;
           auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
-          parent->JobQ->add_runnable(rj);
+          parent->JobQ->add_runnable(rj,(sort_order - 20) * 3 + 2);
           break;
         } else {
           parent->resize_mmatch_mutex->readLock();
@@ -107,6 +116,7 @@ namespace pathCam {
     delete matcher;
     delete motion_est;
     parent->matchableCount--;
+    jobComplete.set();
   } //end run
 
   void SingleMatchRunnable::run() {

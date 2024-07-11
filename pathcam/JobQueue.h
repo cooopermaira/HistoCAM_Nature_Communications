@@ -17,6 +17,7 @@ class JobQueue{
   friend class QManager;
 public:
   static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
+  std::vector<RunnableIntermediate*> jobRefs;
 
 protected:
     struct CompareRunnable {
@@ -26,12 +27,12 @@ protected:
   Poco::ThreadPool *pool;
   //std::deque < RunnableIntermediate *> jobQueue;
 std::priority_queue<RunnableIntermediate*,std::deque<RunnableIntermediate*>,CompareRunnable> jobQueue;
-  
+
   
 public:
   JobQueue(int min_threads, int max_threads);
   
-  void add_runnable(RunnableIntermediate *job);
+  void add_runnable(RunnableIntermediate *job, int index = -1);
   bool run_jobs(bool join_all);
   bool run_jobs(std::vector < Poco::Runnable * > jobs);
   bool is_empty(){return jobQueue.empty();}

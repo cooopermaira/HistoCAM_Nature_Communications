@@ -191,7 +191,7 @@ namespace pathCam {
   void StreamCam::pass_image(Image *image, unsigned long sort_order) {
     LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, sort_order);
     loaderCount++;
-    JobQ->add_runnable(llr);
+    JobQ->add_runnable(llr,sort_order * 3);
   }
 
   void StreamCam::push_compositeQ(RegInfo index) {

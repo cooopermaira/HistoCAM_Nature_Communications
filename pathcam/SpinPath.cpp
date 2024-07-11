@@ -77,7 +77,7 @@ void CameraStream::run(){
       
       interrupt = false;
       
-      unsigned long i = 1;
+      unsigned long i = 0;
       
       //Will run until killed
       while (!interrupt){
@@ -100,7 +100,7 @@ void CameraStream::run(){
             image->copy_in(pResultImage->GetData());
             image->increment_smart_pointer();
             parent->sCam->pass_image(image,i);
-            i+=10;
+            i++;
             Poco::DateTime time = Poco::DateTime();
             std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i");
 
