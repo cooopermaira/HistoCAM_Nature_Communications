@@ -213,4 +213,10 @@ namespace pathCam {
   std::shared_ptr<MRTiledImageSet> StreamCam::get_image_reference() {
     return MRimage;
   }
+
+  void RunnableIntermediate::waitOnThisGuy() {
+    someoneWaitingOnJobCompleteEvent = true;
+    jobComplete.wait();
+    someoneWaitingOnJobCompleteEvent = false;
+  }
 }

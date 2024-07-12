@@ -57,11 +57,15 @@ namespace pathCam {
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       pathCam::Image *previous = parent->get_image_ref(prev_idx);
       if (previous == nullptr) {
-          if (max(5, int(image_idx)) <= prev_idx + 5) {
-              auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
-              waitFor->jobComplete.wait();
-              previous = parent->get_image_ref(prev_idx);
-          } else {continue;}
+        if (max(5, int(image_idx)) <= prev_idx + 5) {
+          auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
+          parent->JobQ->pool->addCapacity(1);
+          waitFor->waitOnThisGuy();
+          parent->JobQ->pool->addCapacity(-1);
+          previous = parent->get_image_ref(prev_idx);
+          //could remain null if !image->isGood()
+          //assert(previous != NULL);
+        } else { continue; }
       }
 
       if (!previous->is_good()) { continue; }
@@ -73,9 +77,9 @@ namespace pathCam {
 
       matcher->match(m);
       int result = motion_est->findHomography(m, parent->estimator_type);
-      if (m->good_matches.size() > mostMatches){
-          mostMatches = m->good_matches.size();
-          bestMatch = prev_idx;
+      if (m->good_matches.size() > mostMatches) {
+        mostMatches = m->good_matches.size();
+        bestMatch = prev_idx;
       }
       if (result == 1) {
         if (std::abs(m->t_x) < image->width / 2 && std::abs(
@@ -91,7 +95,7 @@ namespace pathCam {
           parent->add_registration(tempReg);
           successful = true;
           auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
-          parent->JobQ->add_runnable(rj,(sort_order - 20) * 3 + 2);
+          parent->JobQ->add_runnable(rj, (sort_order - 20) * 3 + 2);
           break;
         } else {
           parent->resize_mmatch_mutex->readLock();

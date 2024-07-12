@@ -15,6 +15,7 @@ namespace pathCam{
 
 class JobQueue{
   friend class QManager;
+  friend class MatchRunnable;
 public:
   static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
   std::vector<RunnableIntermediate*> jobRefs;

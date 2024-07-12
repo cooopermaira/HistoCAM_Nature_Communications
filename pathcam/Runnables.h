@@ -17,10 +17,12 @@ namespace pathCam {
 
   class RunnableIntermediate : public Poco::Runnable {
   public:
-    RunnableIntermediate(unsigned long sort_order) : sort_order(sort_order), jobComplete(false) {
+    RunnableIntermediate(unsigned long sort_order) : sort_order(sort_order), jobComplete(false),someoneWaitingOnJobCompleteEvent(false) {
     }
     Poco::Event jobComplete;
+    bool someoneWaitingOnJobCompleteEvent;
     unsigned long sort_order = 0;
+    void waitOnThisGuy();
   };
 
   class DebayerRunnable : public pathCam::RunnableIntermediate {
@@ -46,6 +48,8 @@ namespace pathCam {
     virtual void run();
 
     void perform_global_alignment();
+
+    void save_components_to_disk();
   };
 
   class RegistrationRunnable : public RunnableIntermediate {

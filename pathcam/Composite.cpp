@@ -197,6 +197,13 @@ namespace pathCam {
     }
   }
 
+  void CompositeVoronoi::save_pyramid_as_image() {
+    auto rootoffsetPoint = Point2f(root_offset.x,root_offset.y);
+    auto maxOffsetPoint = Point2f(max_offset.x,max_offset.y);
+    auto ul = imagePyramid->level[0]->getIJ(rootoffsetPoint);
+    auto lr = imagePyramid->level[0]->getIJ(maxOffsetPoint);
+    int k = 0;
+  }
 
   void CompositeVoronoi::add_images(std::vector<RegInfo> new_info) {
 
