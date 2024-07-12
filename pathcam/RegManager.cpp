@@ -52,7 +52,7 @@ namespace pathCam {
       Vec2 returnCoords(0,0);
       auto temp = trace_to_root(reginfo.matchedTo);
       if (temp.first) {
-        parent->reg_results_mutex->readLock();
+        parent->reg_results_mutex->writeLock();
         parent->reg_results[index].absoluteCoords.x = parent->reg_results[index].relativeCoords.x + temp.second.x;
         parent->reg_results[index].absoluteCoords.y = parent->reg_results[index].relativeCoords.y + temp.second.y;
         parent->reg_results[index].component_membership = parent->reg_results[parent->reg_results[index].matchedTo].component_membership;

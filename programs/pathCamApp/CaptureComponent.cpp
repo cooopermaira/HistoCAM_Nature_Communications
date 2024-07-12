@@ -40,12 +40,12 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 #ifdef WITH_SPINNAKER
   bcam.reset(new pathCam::SpinPath(config));
   bcam->add_observer(parent);
-  parent->MRimage = bcam->get_image_reference();
+  
 #endif
 
   sCam.reset(new pathCam::StreamCam(config));
   sCam->add_observer(parent);
-  parent->MRimage = sCam->get_image_reference();
+  
 
   captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
   addAndMakeVisible(captureOverlay.get());
@@ -54,7 +54,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 
 void CaptureComponent::startRecording() {
   recording = true;
-
+  parent->MRimage = bcam->get_image_reference();
   //bcam->run();
   parent->imageview->setImage(parent->MRimage);
   parent->capture->setImage(parent->MRimage);
@@ -69,7 +69,7 @@ void CaptureComponent::startRecording() {
 
 void CaptureComponent::startSimulating() {
   simulating = true;
-
+  parent->MRimage = sCam->get_image_reference();
   parent->imageview->setImage(parent->MRimage);
   parent->capture->setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);

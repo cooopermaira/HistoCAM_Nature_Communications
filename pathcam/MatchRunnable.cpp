@@ -59,10 +59,12 @@ namespace pathCam {
       if (previous == nullptr) {
         if (max(5, int(image_idx)) <= prev_idx + 5) {
           auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
+          //if(waitFor)
           parent->JobQ->pool->addCapacity(1);
           waitFor->waitOnThisGuy();
           parent->JobQ->pool->addCapacity(-1);
           previous = parent->get_image_ref(prev_idx);
+          if (previous == nullptr) { continue; }
           //could remain null if !image->isGood()
           //assert(previous != NULL);
         } else { continue; }

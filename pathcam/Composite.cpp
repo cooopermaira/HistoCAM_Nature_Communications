@@ -678,14 +678,20 @@ namespace pathCam {
 
 
   void ImageToTileCopyRunnable::run() {
-    auto composite = parent->composites[component_membership];
-    auto mask = composite->polyMaskOutput;
-    auto imageMat = composite->fourChannelPreallocated;
-    auto tileSize = composite->imagePyramid->level[0]->getTileSize();
-    auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
-    auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
+ 
+          auto composite = parent->composites[component_membership];
+          try {
+          auto mask = composite->polyMaskOutput;
+          auto imageMat = composite->fourChannelPreallocated;
+          auto tileSize = composite->imagePyramid->level[0]->getTileSize();
+          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
+          auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
 
-    composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+          composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, { tile });
+      }
+      catch (cv::Exception& e) {
+          int k = 0;
+      }
 
     composite->notify_job_complete();
 

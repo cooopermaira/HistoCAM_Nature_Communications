@@ -187,7 +187,7 @@ void FileStream::run(){
     std::fstream myfile;
     myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
     if (myfile.fail()) {
-        std::cout << strerror(errno);
+        throw new exception;
     }
     myfile.write(image->get_Raw(), image_bytes);
     image->free_memory_RAW();

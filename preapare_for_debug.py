@@ -8,7 +8,7 @@ import sys
 import os
 import xml.etree.cElementTree as ET
 
-directory = "D:\\front_end_test\\2024711177695" ## sys.argv[1]
+directory = "D:\\front_end_test\\20247121728844" ## sys.argv[1]
 print(directory)
 #build input
 k = []
