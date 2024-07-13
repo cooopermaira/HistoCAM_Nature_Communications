@@ -54,7 +54,10 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 
 void CaptureComponent::startRecording() {
   recording = true;
+#ifdef WITH_SPINNAKER
   parent->MRimage = bcam->get_image_reference();
+#endif
+
   //bcam->run();
   parent->imageview->setImage(parent->MRimage);
   parent->capture->setImage(parent->MRimage);
