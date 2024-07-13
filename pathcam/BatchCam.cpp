@@ -360,6 +360,16 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
 			image_height = temp;
 		  }
 	  }
+      if (pConf->has("registration.image.scope_radius")) {
+          unsigned int temp = scope_radius;
+          try {
+              scope_radius = pConf->getUInt("registration.image.scope_radius");
+          }
+          catch (std::string bad_input) {
+              logger->warning("Bad input for scope radius: " + bad_input + ".");
+              scope_radius = temp;
+          }
+      }
       
       if (pConf->has("registration.image.scale")) {
           double temp = scale_factor;
@@ -465,7 +475,7 @@ bool BatchCam::loadFileList(){
   
   while (infile >>imageFile){
     if(imageFile.size() == 0){ continue;}
-    pathCam::Image *image = new pathCam::Image(image_width,image_height);
+    pathCam::Image *image = new pathCam::Image(image_width,image_height, scope_radius);
     image->set_disk_file(imageFile);
     images.push_back(image);
   }
@@ -856,7 +866,7 @@ bool BatchCam::compositing(){
   
   Mat combined_z_buffer = cv::Mat::zeros(cv::Size(combined.cols, combined.rows), CV_8U);
   
-  Mat quality_score = pathCam::dome_score_image(images[0]->height,images[0]->width,2190);
+  Mat quality_score = pathCam::dome_score_image(images[0]->height,images[0]->width,scope_radius);
   
   Mat flat_field;
   
@@ -872,7 +882,7 @@ bool BatchCam::compositing(){
   cv::Size image_size(images[0]->width,images[0]->height);
   Mat mask = cv::Mat::zeros(cv::Size(image_size.width, image_size.height), CV_8U);
   
-  circle(mask, cv::Point(image_size.width/2, image_size.height/2), 2190, cv::Scalar(255), -1);
+  circle(mask, cv::Point(image_size.width/2, image_size.height/2), scope_radius, cv::Scalar(255), -1);
   
   unsigned int k = 0;
   for(unsigned int i=0; i < images.size(); i++){

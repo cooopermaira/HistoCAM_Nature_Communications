@@ -9,7 +9,7 @@
 
 namespace pathCam{
 
-  bool ImageList::loadFileList(std::string filelist, unsigned int image_width, unsigned int image_height){
+  bool ImageList::loadFileList(std::string filelist, unsigned int image_width, unsigned int image_height, unsigned int scope_radius){
     
     std::ifstream infile(filelist.c_str());
     
@@ -22,7 +22,7 @@ namespace pathCam{
     
     while (infile >>imageFile){
       if(imageFile.size() == 0){ continue;}
-      pathCam::Image *image = new pathCam::Image(image_width, image_height);
+      pathCam::Image *image = new pathCam::Image(image_width, image_height, scope_radius);
       image->set_disk_file(imageFile);
       images.push_back(image);
     }

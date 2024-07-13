@@ -23,7 +23,7 @@ namespace pathCam {
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
 
     circleMask = cv::Mat::zeros(image_size, CV_8U);
-    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), 2190, cv::Scalar(1), -1);
+    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius, cv::Scalar(1), -1);
 
     channels.resize(2);
 
@@ -121,7 +121,7 @@ namespace pathCam {
     int nonzeroMin;
     if (_image->label == Image::_2X) {
       polyMaskOutput = polyMaskOutput.mul(circleMask);
-      nonzeroMin = 2190 * 2190 * 3.14 * 0.20;
+      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.20;
     } else {
       nonzeroMin = _image->width * _image->height * 0.1;
     }
@@ -644,7 +644,7 @@ namespace pathCam {
     }
     Mat mask = cv::Mat::zeros(cv::Size(img.cols, img.rows), CV_16U);
 
-    circle(mask, cv::Point(img.cols / 2, img.rows / 2), 2190, cv::Scalar(1), -1);
+    circle(mask, cv::Point(img.cols / 2, img.rows / 2), parent->scope_radius, cv::Scalar(1), -1);
     cv::Mat temp = mask.mul(img);
     imwrite("mask.png", temp);
     //imwrite("img.png", img);

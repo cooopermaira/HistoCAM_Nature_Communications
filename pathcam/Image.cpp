@@ -5,7 +5,7 @@ using namespace cv;
 namespace pathCam {
     
 
-    Image::Image(unsigned int width, unsigned int height, MemoryPool* mempool) : width(width), height(height), label(_NOLABEL), mempool(mempool), raw_buffer(0),
+    Image::Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool) : width(width), height(height),scope_radius(scope_radius), label(_NOLABEL), mempool(mempool), raw_buffer(0),
                                         reference_count(0), image_file(Poco::Path()),variance(0) {};
 
   Image::~Image() {
@@ -16,11 +16,10 @@ namespace pathCam {
     float threshold_value = 20.f;
     int checkPoints = 40;
     float countBlack = 0;
-    float radius = 2190;
     float tooBlack = 0.2 * float(checkPoints);
     for (int i = 0; i < checkPoints; i++) {
-      int x = width / 2 + (radius - 200.f) * cos(float(i) / float(checkPoints) * 2.f * 3.14f);
-      int y = height / 2 + (radius - 200.f) * sin(float(i) / float(checkPoints) * 2.f * 3.14f);
+      int x = width / 2 + (scope_radius - 200.f) * cos(float(i) / float(checkPoints) * 2.f * 3.14f);
+      int y = height / 2 + (scope_radius - 200.f) * sin(float(i) / float(checkPoints) * 2.f * 3.14f);
       float val = debayer(x, y);
       if (val < threshold_value) { countBlack++; }
       if (countBlack > tooBlack) {
@@ -33,11 +32,10 @@ namespace pathCam {
   double Image::check_blur() {
     cv::Mat temp = cv::Mat(Size(width, height), CV_8UC1, raw_buffer, Mat::AUTO_STEP);
     int steps = 4;
-    int radius = 2190;
     double tempVariance = 0;
     for (int i = 0; i < steps; i++) {
-      int xloc = width / 2 + (radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
-      int yloc = height / 2 + (radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
+      int xloc = width / 2 + (scope_radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
+      int yloc = height / 2 + (scope_radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
       cv::Rect rectROI(xloc - 64, yloc - 164, 128, 128);
       Mat ROI = temp(rectROI).clone();
       Mat laplacian;

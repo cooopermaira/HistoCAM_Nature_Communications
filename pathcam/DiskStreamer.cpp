@@ -28,7 +28,7 @@ namespace pathCam {
             parent->JobQ->add_runnable(ds);
             sort_order += 10;
              */
-            Image* image = new Image(parent->image_width, parent->image_height);
+            Image* image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
             image->set_disk_file(imageFile);
             parent->pass_image(image, sort_order);
             sort_order++;
@@ -53,7 +53,7 @@ namespace pathCam {
         char *raw_image_data = new char[width * height];
         stream.read(raw_image_data, width * height);
 
-        Image *image = new Image(width, height);
+        Image *image = new Image(width, height, parent->scope_radius);
         image->copy_in(raw_image_data);
         image->set_disk_file(imageFile);
         delete [] raw_image_data;

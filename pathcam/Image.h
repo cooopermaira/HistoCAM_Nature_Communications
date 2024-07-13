@@ -10,6 +10,7 @@ namespace pathCam {
   class Image {
   public:
     unsigned int width, height;
+    unsigned int scope_radius;
     std::atomic<unsigned int> reference_count;
     unsigned long index;
     enum {
@@ -25,7 +26,7 @@ namespace pathCam {
     std::vector<cv::KeyPoint> keypointsMultilevel;
     cv::Mat descriptors;
 
-    Image(unsigned int width, unsigned int height, MemoryPool* mempool = 0);
+    Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 
     ~Image();
 

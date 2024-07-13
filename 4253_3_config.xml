@@ -4,11 +4,11 @@
   
   <io>
   
-    <input_images>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/4253_3_input.txt</input_images>
-    <output_log>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/log_new.txt</output_log>
-    <output_image>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/result.png</output_image>
+    <input_images>C:/Users/jonat/Box/PathCam/4253_3/4253_3_input.txt</input_images>
+    <output_log>C:/Users/jonat/Box/PathCam/4253_3/log_new.txt</output_log>
+    <output_image>C:/Users/jonat/Box/PathCam/4253_3/result.png</output_image>
     <flat_field_images>
-      <twoX>/Users/coopermaira/Desktop/pathcam_image_data/4253_3/2x_wb.tif</twoX>
+      <twoX>C:/Users/jonat/Box/PathCam/4253_3/2x_wb.tif</twoX>
     </flat_field_images>
 
   </io>
@@ -30,6 +30,9 @@
       <interpolation>CUBIC</interpolation>
       <real>false</real>
       <debayer>true</debayer>
+      <width>6464</width>
+      <height>4852</height>
+      <scope_radius>2190</scope_radius>
     </image>
     
     <matcher>BRUTEFORCE_HAMMING</matcher>

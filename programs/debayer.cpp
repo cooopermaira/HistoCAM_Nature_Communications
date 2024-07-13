@@ -21,22 +21,26 @@ int main(int argc, char *argv[]) {
 
     auto inFile = Poco::Path(argv[1]);
     auto outFile = Poco::Path(argv[2]);
-    //Add in argument to specify size of output image in format widthXheight default value is 6464x4852
+    //Add in argument to specify size of output image in format widthXheightxradius default value is 6464x4852X2190
     unsigned int width;
     unsigned int height;
-
+    unsigned int scope_radius;
+    //TODO: find where debayer is being called in command line and add in arguments for width, height, and radius, values will still be hardcoded at lines 57, 58, and 59 until then
     if (argc == 4) {
         std::string sizeArg = argv[3];
         size_t xPos = sizeArg.find('x');
         if (xPos != std::string::npos) {
             std::string widthStr = sizeArg.substr(0, xPos);
             std::string heightStr = sizeArg.substr(xPos + 1);
+            xPos = heightStr.find('x');
+            std:: string radiusStr = sizeArg.substr(xPos + 1);
             try {
                 width = std::stoul(widthStr);
                 height = std::stoul(heightStr);
+                scope_radius = std::stoul(radiusStr);
             }
             catch (const std::invalid_argument& e) {
-                std::cout << "Invalid size format. Use widthXheight.\n";
+                std::cout << "Invalid size format. Use widthXheightXradius.\n";
                 return -1;
             }
             catch (const std::out_of_range& e) {
@@ -45,13 +49,14 @@ int main(int argc, char *argv[]) {
             }
         }
         else {
-            std::cout << "Invalid size format. Use widthXheight.\n";
+            std::cout << "Invalid size format. Use widthXheightXradius.\n";
             return -1;
         }
     }
     else {
         width = 6464;
         height = 4852;
+        scope_radius = 2190;
     }
 
     if (!(inFile.isDirectory() == outFile.isDirectory())) {
@@ -73,7 +78,7 @@ int main(int argc, char *argv[]) {
             if (p.getExtension() == "Raw") {
                 //std::cout << "read:" << p.toString() << "\n";
                 
-                auto *image = new pathCam::Image(width, height);
+                auto *image = new pathCam::Image(width, height, scope_radius);
 
                 image->set_disk_file(p);
                 auto *dr = new pathCam::DebayerRunnable(image, outFile);
@@ -91,7 +96,7 @@ int main(int argc, char *argv[]) {
 
         std::cout << "Processing File\n";
 
-        pathCam::Image* image = new pathCam::Image(width, height);
+        pathCam::Image* image = new pathCam::Image(width, height, scope_radius);
 
         image->set_disk_file(inFile);
         image->load_raw_from_disk();
