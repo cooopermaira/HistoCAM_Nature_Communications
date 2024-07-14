@@ -35,21 +35,20 @@ namespace pathCam {
 
 
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx) {
-    resize_mmatch_mutex->writeLock();
+    resize_mmatch_mutex->readLock();
     matchM.match[image_idx][prev_idx] = new Match(matchM.match[prev_idx][image_idx]);
     resize_mmatch_mutex->unlock();
   }
 
 
   bool StreamCam::spin_run() {
-    Poco::Thread Q_thread, composite_thread;
 
     std::cout << "spin_run started " << std::endl;
 
-    QManager *qm = new QManager(this);
+    auto *qm = new QManager(this);
     Q_thread.start(qm);
 
-    CompositeManager *cm = new CompositeManager(this);
+    auto *cm = new CompositeManager(this);
     composite_thread.start(cm);
 
     Q_thread.join();
@@ -61,19 +60,18 @@ namespace pathCam {
   }
 
   bool StreamCam::run() {
-
-    auto ds = new DiskReader(this);
-    stream_thread.start(ds);
-
     auto start = std::chrono::high_resolution_clock::now();
 
-    QManager *qm = new QManager(this);
+    auto dr = new DiskReader(this);
+    disk_thread.start(dr);
+
+    auto *qm = new QManager(this);
     Q_thread.start(qm);
 
-    CompositeManager *cm = new CompositeManager(this);
+    auto *cm = new CompositeManager(this);
     composite_thread.start(cm);
 
-    stream_thread.join();
+    disk_thread.join();
     Q_thread.join();
     composite_thread.join();
 
@@ -156,8 +154,8 @@ namespace pathCam {
     } else {
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0,0));
-      auto xcm = new XCompRunnable(this,image_index,component_index, get_last_active_component(image_index));
-      JobQ->add_runnable(xcm);
+      //auto xcm = new XCompRunnable(this,image_index,component_index, get_last_active_component(image_index));
+      //JobQ->add_runnable(xcm);
     }
     component_mutex->unlock();
     temp->update(std::vector<RegInfo>{reg_results[image_index]});
@@ -193,7 +191,7 @@ namespace pathCam {
   void StreamCam::pass_image(Image *image, unsigned long sort_order) {
     LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, sort_order);
     loaderCount++;
-    JobQ->add_runnable(llr);
+    JobQ->add_runnable(llr,sort_order * 3);
   }
 
   void StreamCam::push_compositeQ(RegInfo index) {
@@ -214,5 +212,11 @@ namespace pathCam {
 
   std::shared_ptr<MRTiledImageSet> StreamCam::get_image_reference() {
     return MRimage;
+  }
+
+  void RunnableIntermediate::waitOnThisGuy() {
+    someoneWaitingOnJobCompleteEvent = true;
+    jobComplete.wait();
+    someoneWaitingOnJobCompleteEvent = false;
   }
 }

@@ -18,7 +18,11 @@ void CaptureOverlay::resized()
     stopButton->setBounds(area.removeFromRight(100).reduced(20,0));
   }else{
     simulateButton->setVisible(true);
+#ifdef WITH_SPINNAKER
     recordButton->setVisible(true);
+#else
+    recordButton->setVisible(false);
+#endif
     stopButton->setVisible(false);
     simulateButton->setBounds(area.removeFromRight(100).reduced(20,0));
     recordButton->setBounds(area.removeFromRight(100).reduced(20,0));

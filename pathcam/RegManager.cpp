@@ -24,10 +24,12 @@ namespace pathCam {
     if (!reginfo.resolved) {
       sort_order += 10;
       parent->JobQ->add_runnable(this);
+      //this should be changed to wait on correct jobComplete event rather than re entered into job queue. 
     } else {
       parent->regCount--;
       parent->push_compositeQ(reginfo);
     }
+    jobComplete.set();
   }
 
 
@@ -50,7 +52,7 @@ namespace pathCam {
       Vec2 returnCoords(0,0);
       auto temp = trace_to_root(reginfo.matchedTo);
       if (temp.first) {
-        parent->reg_results_mutex->readLock();
+        parent->reg_results_mutex->writeLock();
         parent->reg_results[index].absoluteCoords.x = parent->reg_results[index].relativeCoords.x + temp.second.x;
         parent->reg_results[index].absoluteCoords.y = parent->reg_results[index].relativeCoords.y + temp.second.y;
         parent->reg_results[index].component_membership = parent->reg_results[parent->reg_results[index].matchedTo].component_membership;

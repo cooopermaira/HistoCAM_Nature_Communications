@@ -69,13 +69,20 @@ namespace pathCam {
         */
 
       perform_global_alignment();
+
       parent->compositing = false;
     }
 
   void CompositeManager::perform_global_alignment() {
-    for (auto &i: parent->composites) {
+    for (auto i: parent->composites) {
       i->perform_global_alignment();
     }
   }
+
+  void CompositeManager::save_components_to_disk() {
+      for (auto i : parent->composites){
+        i->save_pyramid_as_image();
+      }
+    }
 
 }

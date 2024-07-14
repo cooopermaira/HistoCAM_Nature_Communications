@@ -159,7 +159,7 @@ namespace pathCam {
 
     std::vector<DataObserver *> observers;
 
-    Poco::Thread stream_thread, Q_thread, composite_thread;
+    Poco::Thread disk_thread, Q_thread, composite_thread;
 
   };
 

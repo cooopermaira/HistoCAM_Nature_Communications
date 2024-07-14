@@ -32,9 +32,9 @@ public:
     
 #ifdef WITH_SPINNAKER
     std::shared_ptr<pathCam::SpinPath> bcam;
-#else
-    std::shared_ptr<pathCam::StreamCam> bcam;
 #endif
+
+    std::shared_ptr<pathCam::StreamCam> sCam;
 
     MainComponent *parent;
 
@@ -91,7 +91,7 @@ public:
 
 private:
     std::unique_ptr<CaptureOverlay> captureOverlay;
-    Poco::Thread bcamThread;
+    Poco::Thread compositeThread;
     bool recording;
     bool simulating;
 

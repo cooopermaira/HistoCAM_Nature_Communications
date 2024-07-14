@@ -13,8 +13,14 @@ namespace pathCam {
                 pool = new Poco::ThreadPool(min_threads, max_threads, 60, POCO_THREAD_STACK_SIZE);
     }
 
-    void JobQueue::add_runnable(RunnableIntermediate *job) {
+    void JobQueue::add_runnable(RunnableIntermediate *job, int index) {
         queue_mutex->lock();
+        if (index >= 0) {
+            if (jobRefs.size() <= index) {
+                jobRefs.resize(index + 400);
+            }
+            jobRefs[index] = job;
+        }
         jobQueue.push(job);
         queue_mutex->unlock();
     };

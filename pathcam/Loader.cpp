@@ -80,11 +80,13 @@ namespace pathCam {
       parent->add_image(image, image_index);
       auto matchjob = new MatchRunnable(parent, image_index, sort_order + 20);
       parent->matchableCount++;
-      parent->JobQ->add_runnable(matchjob);
+      parent->JobQ->add_runnable(matchjob,sort_order * 3 + 1);
     } else {
       image->free_memory_RAW();
     }
 
     parent->loaderCount--;
+    jobComplete.set();
+    successful = true;
   }
 }

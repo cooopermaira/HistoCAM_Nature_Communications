@@ -130,10 +130,10 @@ namespace pathCam {
       //contributing less than x% of its pixels, revert and don't bother loading from disk
       subdiv = tempSubdiv;
       _image->free_memory_RAW();
-      memberImages.push_back({_image->image_file.getFileName(), false});
+      memberImages.push_back({_image, false});
       return -1;
     }
-    memberImages.push_back({_image->image_file.getFileName(), true});
+    memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
   }
@@ -189,22 +189,21 @@ namespace pathCam {
 
       //wait till jobs have processed
       wakeEvent.wait();
-      /*
-      if (wakeEvent.tryWait(100000)) {
-        throw std::invalid_argument("tile jobs not processing");
-      }
-       */
-      /*
-      if (Poco::Thread::trySleep(100000)) {
-        throw std::invalid_argument("tile jobs not processing");
-      }
-       */
+
+      //update pyramid bounds and observer, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
       parent->update_observers();
       freshMask.copyTo(polyMaskOutput);
     }
   }
 
+  void CompositeVoronoi::save_pyramid_as_image() {
+    auto rootoffsetPoint = Point2f(root_offset.x,root_offset.y);
+    auto maxOffsetPoint = Point2f(max_offset.x,max_offset.y);
+    auto ul = imagePyramid->level[0]->getIJ(rootoffsetPoint);
+    auto lr = imagePyramid->level[0]->getIJ(maxOffsetPoint);
+    int k = 0;
+  }
 
   void CompositeVoronoi::add_images(std::vector<RegInfo> new_info) {
 
@@ -679,14 +678,20 @@ namespace pathCam {
 
 
   void ImageToTileCopyRunnable::run() {
-    auto composite = parent->composites[component_membership];
-    auto mask = composite->polyMaskOutput;
-    auto imageMat = composite->fourChannelPreallocated;
-    auto tileSize = composite->imagePyramid->level[0]->getTileSize();
-    auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
-    auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
+ 
+          auto composite = parent->composites[component_membership];
+          try {
+          auto mask = composite->polyMaskOutput;
+          auto imageMat = composite->fourChannelPreallocated;
+          auto tileSize = composite->imagePyramid->level[0]->getTileSize();
+          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
+          auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
 
-    composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+          composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, { tile });
+      }
+      catch (cv::Exception& e) {
+          int k = 0;
+      }
 
     composite->notify_job_complete();
 

@@ -8,12 +8,12 @@ import sys
 import os
 import xml.etree.cElementTree as ET
 
-directory = "D:\\sim\\ColoredFrames Panel1-Case1155" ## sys.argv[1]
+directory = "D:\\front_end_test\\20247121728844" ## sys.argv[1]
 print(directory)
 #build input
 k = []
 for file in os.listdir(directory):
-    if file.endswith('.tif'):
+    if file.endswith('.Raw'):
         k.append(file)
 
 k.sort(key = lambda x:(int(x.split('.')[0][8:10]) , int(x.split('.')[0][10:])))

@@ -34,7 +34,7 @@ namespace pathCam {
 
       matcher->match(m);
       int result = motion_est->findHomography(m, parent->estimator_type);
-      parent->set_match(image->index, img->index);
+
     }
     int k = 0;
 
@@ -52,11 +52,22 @@ namespace pathCam {
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
 
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
-
+    int mostMatches = 0;
+    long bestMatch = -1;
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       pathCam::Image *previous = parent->get_image_ref(prev_idx);
       if (previous == nullptr) {
-        continue;
+        if (max(5, int(image_idx)) <= prev_idx + 5) {
+          auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
+          //if(waitFor)
+          parent->JobQ->pool->addCapacity(1);
+          waitFor->waitOnThisGuy();
+          parent->JobQ->pool->addCapacity(-1);
+          previous = parent->get_image_ref(prev_idx);
+          if (previous == nullptr) { continue; }
+          //could remain null if !image->isGood()
+          //assert(previous != NULL);
+        } else { continue; }
       }
 
       if (!previous->is_good()) { continue; }
@@ -68,6 +79,10 @@ namespace pathCam {
 
       matcher->match(m);
       int result = motion_est->findHomography(m, parent->estimator_type);
+      if (m->good_matches.size() > mostMatches) {
+        mostMatches = m->good_matches.size();
+        bestMatch = prev_idx;
+      }
       if (result == 1) {
         if (std::abs(m->t_x) < image->width / 2 && std::abs(
             m->t_y) < image->height / 2) {
@@ -82,17 +97,16 @@ namespace pathCam {
           parent->add_registration(tempReg);
           successful = true;
           auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
-          parent->JobQ->add_runnable(rj);
+          parent->JobQ->add_runnable(rj, (sort_order - 20) * 3 + 2);
           break;
         } else {
-            parent->resize_mmatch_mutex->readLock();
+          parent->resize_mmatch_mutex->readLock();
           parent->matchM.match[prev_idx][image_idx] = nullptr;
           parent->resize_mmatch_mutex->unlock();
         }
       } else {
         // if(result == -1 || result == -2){
-          parent->resize_mmatch_mutex->readLock();
-
+        parent->resize_mmatch_mutex->readLock();
         parent->matchM.match[prev_idx][image_idx] = nullptr;
         parent->resize_mmatch_mutex->unlock();
 
@@ -108,6 +122,7 @@ namespace pathCam {
     delete matcher;
     delete motion_est;
     parent->matchableCount--;
+    jobComplete.set();
   } //end run
 
   void SingleMatchRunnable::run() {
@@ -121,7 +136,7 @@ namespace pathCam {
     parent->matchM.match[image_idx2][image_idx1] = new Match(image2, image1);
 
     //it's ok to set this match directly without the mutex because the mutex is already locked in
-    //perform global alighnment, and all image_idx values are less than matchM.match size
+    //perform_global_alignment() and all image_idx values are less than matchM.match size
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
     int result = motion_est->findHomography(m, parent->estimator_type);

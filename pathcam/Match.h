@@ -18,6 +18,9 @@ class Match{
 public:
   Image * image_1;
   Image * image_2;
+
+  int mostMatches = 0;
+  
   
   std::vector<DMatch> good_matches;
   

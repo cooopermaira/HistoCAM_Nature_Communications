@@ -97,6 +97,8 @@ namespace pathCam {
 
     void reset_image_as_polygon();
 
+    void save_pyramid_as_image();
+
     void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
 
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
@@ -118,7 +120,7 @@ namespace pathCam {
 
     std::atomic<unsigned int> matchableCount = 0;
     std::vector<std::pair<long, long>> matchedEdges;
-    std::vector<std::pair<std::string, bool>> memberImages;
+    std::vector<std::pair<Image*, bool>> memberImages;
     std::map<int, unsigned long> delaunayMembers;
 
     void update(std::vector<RegInfo> new_info);
