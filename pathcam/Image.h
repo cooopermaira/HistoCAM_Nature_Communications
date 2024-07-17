@@ -25,6 +25,7 @@ namespace pathCam {
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::KeyPoint> keypointsMultilevel;
     cv::Mat descriptors;
+    cv::Mat descriptorsMultilevel;
 
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 

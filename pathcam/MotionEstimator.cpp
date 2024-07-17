@@ -10,21 +10,29 @@
 
 namespace pathCam{
 
-int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type,
+int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type, int requiredGoodMatches, int flag,
                                      double ransacReprojThreshold,
                                      int maxIters, double confidence){
   
   //-- Localize the object
   std::vector<Point2f> image_1_pts;
   std::vector<Point2f> image_2_pts;
-  for( size_t i = 0; i < m->good_matches.size(); i++ )
-  {
-    //-- Get the keypoints from the good matches
-    image_1_pts.push_back( m->image_1->keypoints[ m->good_matches[i].queryIdx ].pt );
-    image_2_pts.push_back( m->image_2->keypoints[ m->good_matches[i].trainIdx ].pt );
+  if(flag == 0) {
+    for (size_t i = 0; i < m->good_matches.size(); i++) {
+      //-- Get the keypoints from the good matches
+      image_1_pts.push_back(m->image_1->keypoints[m->good_matches[i].queryIdx].pt);
+      image_2_pts.push_back(m->image_2->keypoints[m->good_matches[i].trainIdx].pt);
+    }
+  }
+  else if(flag == 1){
+    for (size_t i = 0; i < m->good_matches.size(); i++) {
+      //-- Get the keypoints from the good matches
+      image_1_pts.push_back(m->image_1->keypointsMultilevel[m->good_matches[i].queryIdx].pt);
+      image_2_pts.push_back(m->image_2->keypointsMultilevel[m->good_matches[i].trainIdx].pt);
+    }
   }
   
-  if(image_1_pts.size() < 100 || image_2_pts.size() < 100){
+  if(image_1_pts.size() < requiredGoodMatches || image_2_pts.size() < requiredGoodMatches){
     return -1;
   }
   
@@ -34,6 +42,13 @@ int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type,
 
   if(m->H.empty()){
     return -2;
+  }
+  if(flag == 1){
+    for (int i = 0; i < m->H.rows;i++){
+      for (int j = 0; j < m->H.cols; j++){
+        std::cout<<std::to_string(i)+" "+std::to_string(j)+" "+std::to_string(m->H.at<double>(i,j))<<std::endl;
+      }
+    }
   }
   auto a = m->H.at<double>(0,0);
   auto d = m->H.at<double>(1,1);

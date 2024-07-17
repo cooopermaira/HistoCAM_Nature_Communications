@@ -17,7 +17,7 @@ public:
   
   MotionEstimator(){};
   
-  int findHomography(pathCam::Match *m, int estimator_type,
+  int findHomography(pathCam::Match *m, int estimator_type, int requiredGoodMatches, int flag,
                      double ransacReprojThreshold = 3, int maxIters = 2000,
                      double confidence = 0.995);
   

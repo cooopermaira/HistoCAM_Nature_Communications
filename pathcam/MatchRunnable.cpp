@@ -21,20 +21,22 @@ namespace pathCam {
     extract_multilevel_keypoints(image);
 
     //get references to other component images
-    auto otherCompImages = parent->get_component_image_refs(componentMembershipMatchTo);
+    auto otherCompImages = parent->get_image_refs({567});
 
     //loop through and get homography
-    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
+    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(cv::DescriptorMatcher::MatcherType::BRUTEFORCE);
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
-    for (auto img: otherCompImages) {
+    for (int ii = otherCompImages.size() - 1; ii >=0; ii--) {
+      auto imgCompare = otherCompImages[ii];
+      extract_multilevel_keypoints(imgCompare);
       parent->resize_mmatch_mutex->readLock();
-      parent->matchM.match[img->index][image_idx] = new Match(img, image);
-      Match *m = parent->matchM.match[img->index][image_idx];
+      parent->matchM.match[imgCompare->index][image_idx] = new Match(imgCompare, image);
+      Match *m = parent->matchM.match[imgCompare->index][image_idx];
       parent->resize_mmatch_mutex->unlock();
 
-      matcher->match(m);
-      int result = motion_est->findHomography(m, parent->estimator_type);
-
+      matcher->match(m, 1);
+      int result = motion_est->findHomography(m, parent->estimator_type,4,1);
+      int kk = 0;
     }
     int k = 0;
 
@@ -78,7 +80,7 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m);
-      int result = motion_est->findHomography(m, parent->estimator_type);
+      int result = motion_est->findHomography(m, parent->estimator_type,100,0);
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
         bestMatch = prev_idx;
@@ -139,7 +141,7 @@ namespace pathCam {
     //perform_global_alignment() and all image_idx values are less than matchM.match size
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
-    int result = motion_est->findHomography(m, parent->estimator_type);
+    int result = motion_est->findHomography(m, parent->estimator_type,100,0);
     if (result == 1) {
       if (std::abs(parent->matchM.match[image_idx2][image_idx1]->t_x) < image1->width / 2 && std::abs(
           parent->matchM.match[image_idx2][image_idx1]->t_y) < image1->height / 2) {
@@ -159,11 +161,12 @@ namespace pathCam {
   }
 
   void XCompRunnable::extract_multilevel_keypoints(pathCam::Image *image) {
-    auto *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
-    switch (parent->feature_type) {
+    auto *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
+
+    switch (7) {
       case _SIFT:
-        detector->set_SIFT_params(parent->SIFT_params);
+        //detector->set_SIFT_params();
         break;
       case _SURF:
         detector->set_SURF_params(parent->SURF_params);
@@ -175,8 +178,8 @@ namespace pathCam {
         detector->set_BRISK_params(parent->BRISK_params);
         break;
       case _ORB:
-        detector->set_ORB_params(parent->ORB_params);
-        detector->ORB_params.nlevels = 8;
+        detector->set_ORB_params();
+        //detector->ORB_params.nlevels = 8;
         break;
     }
 

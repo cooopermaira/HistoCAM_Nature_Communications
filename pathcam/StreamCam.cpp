@@ -154,8 +154,8 @@ namespace pathCam {
     } else {
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0,0));
-      //auto xcm = new XCompRunnable(this,image_index,component_index, get_last_active_component(image_index));
-      //JobQ->add_runnable(xcm);
+      auto xcm = new XCompRunnable(this,image_index,component_index, get_last_active_component(image_index));
+      JobQ->add_runnable(xcm);
     }
     component_mutex->unlock();
     temp->update(std::vector<RegInfo>{reg_results[image_index]});

@@ -591,7 +591,7 @@ public:
       pathCam::Match *m = parent->matchM.match[last_index][i+1];
       matcher->match(m);
       
-      int result = mot->findHomography(m, parent->estimator_type);
+      int result = mot->findHomography(m, parent->estimator_type,100,0);
       
       auto end = std::chrono::high_resolution_clock::now();
       auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin);
