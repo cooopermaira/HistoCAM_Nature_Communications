@@ -70,7 +70,7 @@ void ImageViewComponent::mouseDown(const juce::MouseEvent &event) {
 void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
     if (event.mods.isLeftButtonDown()) {
         juce::Point<int> idelta = event.getPosition() - lastMousePosition;
-        fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale();
+        fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
         translate(-delta);
         lastMousePosition = event.getPosition();
         repaint();
@@ -130,11 +130,14 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
   
   for(unsigned int i=0; i < MRImage->images.size(); i++){
     if(MRImage->images[i]->scale == 0){continue;}
-    std::vector<TileQuery> tiles = MRImage->images[i]->getTiles(RectJtoC(*view), RectJtoC(getLocalBounds()));
+    auto imageview = *view;
+    imageview *= 1.0/MRImage->images[i]->scale;
+    imageview -= fPoint(MRImage->images[i]->offset.x, MRImage->images[i]->offset.y);
+    std::vector<TileQuery> tiles = MRImage->images[i]->getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
     for (unsigned int t = 0; t < tiles.size(); t++) {
       cv::Mat tile = tiles[t].image;
       auto bounds = RectCtoJ < float >(tiles[t].bounds);
-      bounds *= view2screenScale() * scale;
+      bounds *= view2screenScale(imageview) * scale;
       bounds.expand(0.5, 0.5);
       tiles[t].bounds = RectJtoC <float> (bounds);
       if (tile.data) {

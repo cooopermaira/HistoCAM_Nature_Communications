@@ -101,26 +101,26 @@ protected:
   }
   
 protected:
-  inline fPoint screen2viewScale(){
+  inline fPoint screen2viewScale(fRectangle myview){
     if(!MRImage){ return fPoint(); }
-    return fPoint(view->getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
-                  view->getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
+    return fPoint(myview.getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
+                  myview.getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
-  inline fPoint view2screenScale(){
+  inline fPoint view2screenScale(fRectangle myview){
     if(!MRImage){ return fPoint(); }
-    return fPoint(getLocalBounds().getHorizontalRange().getLength()/view->getHorizontalRange().getLength(),
-                  getLocalBounds().getVerticalRange().getLength()/view->getVerticalRange().getLength());
+    return fPoint(getLocalBounds().getHorizontalRange().getLength()/myview.getHorizontalRange().getLength(),
+                  getLocalBounds().getVerticalRange().getLength()/myview.getVerticalRange().getLength());
   }
   
-  inline fPoint screen2view(fPoint p){
+  inline fPoint screen2view(fPoint p, fRectangle myview){
     if(!MRImage){ return p; }
-    return p*screen2viewScale()+view->getPosition();
+    return p*screen2viewScale(myview) + myview.getPosition();
   }
   
-  inline fPoint view2screen(fPoint p){
+  inline fPoint view2screen(fPoint p, fRectangle myview){
     if(!MRImage){ return p; }
-    return (p-view->getPosition())*view2screenScale();
+    return (p-myview.getPosition())*view2screenScale(myview);
   }
   
   
