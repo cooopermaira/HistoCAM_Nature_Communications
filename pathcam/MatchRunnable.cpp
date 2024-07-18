@@ -21,12 +21,20 @@ namespace pathCam {
     extract_multilevel_keypoints(image);
 
     //get references to other component images
-    auto otherCompImages = parent->get_image_refs({567});
+    std::vector<unsigned long> indexes(image_idx);
+    for (long i = image_idx - 1; i >= 0; i--) {
+      indexes[i] = (unsigned long) i;
+    }
+    auto otherCompImages = parent->get_image_refs(indexes);
+    unsigned long matchedTo;
+    double scale;
+    Point2f offset;
 
     //loop through and get homography
-    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(cv::DescriptorMatcher::MatcherType::BRUTEFORCE);
+    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
+        cv::DescriptorMatcher::MatcherType::BRUTEFORCE);
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
-    for (int ii = otherCompImages.size() - 1; ii >=0; ii--) {
+    for (int ii = otherCompImages.size() - 1; ii >= 0; ii--) {
       auto imgCompare = otherCompImages[ii];
       extract_multilevel_keypoints(imgCompare);
       parent->resize_mmatch_mutex->readLock();
@@ -35,11 +43,33 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m, 1);
-      int result = motion_est->findHomography(m, parent->estimator_type,4,1);
-      int kk = 0;
-    }
-    int k = 0;
+      int result = motion_est->findHomography(m, parent->estimator_type, 4, 1);
+      if(m->good_matches.size() > 100){
+        matchedTo = ii;
+        parent->reg_results_mutex->readLock();
+        auto regInfo = parent->reg_results[matchedTo];
+        parent->reg_results_mutex->unlock();
 
+        if(!regInfo.resolved){
+          parent->JobQ->jobRefs[matchedTo * 3 + 2]->waitOnThisGuy();
+          parent->reg_results_mutex->readLock();
+          auto regInfo = parent->reg_results[matchedTo];
+          parent->reg_results_mutex->unlock();
+          if(!regInfo.resolved){
+            continue;
+          }
+        }
+        scale = (m->H.at<double>(0,0) + m->H.at<double>(1,1)) / 2.0;
+        offset = Point2f(-1*m->t_x,-1*m->t_y);
+        break;
+      }
+
+    }
+
+    parent->composites[componentMembership]->imagePyramid->set_scale(1.0/scale);
+    parent->composites[componentMembership]->imagePyramid->set_offset(offset);
+
+    int k = 0;
 
   }
 
@@ -80,7 +110,7 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m);
-      int result = motion_est->findHomography(m, parent->estimator_type,100,0);
+      int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
         bestMatch = prev_idx;
@@ -98,6 +128,8 @@ namespace pathCam {
           tempReg.relativeCoords.y = -1 * m->t_y;
           parent->add_registration(tempReg);
           successful = true;
+          //this sort order to image index or sort order to job index is a nightmare that needs to be formalized
+          //as a function that takes image index, job type and returns sort order and job index
           auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
           parent->JobQ->add_runnable(rj, (sort_order - 20) * 3 + 2);
           break;
@@ -141,7 +173,7 @@ namespace pathCam {
     //perform_global_alignment() and all image_idx values are less than matchM.match size
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
-    int result = motion_est->findHomography(m, parent->estimator_type,100,0);
+    int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
     if (result == 1) {
       if (std::abs(parent->matchM.match[image_idx2][image_idx1]->t_x) < image1->width / 2 && std::abs(
           parent->matchM.match[image_idx2][image_idx1]->t_y) < image1->height / 2) {

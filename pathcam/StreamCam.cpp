@@ -120,6 +120,7 @@ namespace pathCam {
 
     image_mutex->readLock();
     for (unsigned int i = 0; i < indexes.size(); i++) {
+      if(images[indexes[i]] == nullptr){ continue; }
       temp.push_back(images[indexes[i]]);
     }
     image_mutex->unlock();
@@ -154,7 +155,7 @@ namespace pathCam {
     } else {
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0,0));
-      auto xcm = new XCompRunnable(this,image_index,component_index, get_last_active_component(image_index));
+      auto xcm = new XCompRunnable(this,image_index,component_index);
       JobQ->add_runnable(xcm);
     }
     component_mutex->unlock();

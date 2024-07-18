@@ -161,19 +161,14 @@ namespace pathCam {
 
   class XCompRunnable : public RunnableIntermediate {
   public:
-    XCompRunnable(StreamCam *parent, unsigned long image_idx, unsigned int componentMembershipSelf,
-                  unsigned int componentMembershipMatchTo) : image_idx(image_idx),
-                                                                                componentMembershipSelf(
+    XCompRunnable(StreamCam *parent, unsigned long image_idx, unsigned int componentMembershipSelf) : image_idx(image_idx),
+                                                                                                      componentMembership(
                                                                                     componentMembershipSelf),
-                                                                                componentMembershipMatchTo(
-                                                                                    componentMembershipMatchTo),
-                                                                                parent(parent),
-                                                                                RunnableIntermediate(0) {};
+                                                                                                      parent(parent),
+                                                                                                      RunnableIntermediate(0) {};
     StreamCam *parent;
     unsigned long image_idx;
-    unsigned int componentMembershipSelf;
-    //grab this value from back() of compositeQ when job is launched
-    unsigned int componentMembershipMatchTo;
+    unsigned int componentMembership;
 
     virtual void run();
     void extract_multilevel_keypoints(Image* image);

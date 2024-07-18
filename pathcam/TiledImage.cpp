@@ -130,7 +130,7 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
                          matROI.rows);
       matROI.copyTo(temp(tileROI), mask(ROIrect));
 
-      assert(tiles(x, y)->rows == 512 && tiles(x, y)->cols == 512);
+      assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
     }
     catch (cv::Exception &e) {
       int k = 0;
