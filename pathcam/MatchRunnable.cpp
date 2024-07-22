@@ -43,8 +43,8 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m, 1);
-      int result = motion_est->findHomography(m, parent->estimator_type, 4, 1);
-      if(m->good_matches.size() > 100){
+      int result = motion_est->findHomography(m, parent->estimator_type, 100, 1);
+      if(result == 1){
         matchedTo = ii;
         parent->reg_results_mutex->readLock();
         auto regInfo = parent->reg_results[matchedTo];
@@ -60,7 +60,8 @@ namespace pathCam {
           }
         }
         scale = (m->H.at<double>(0,0) + m->H.at<double>(1,1)) / 2.0;
-        offset = Point2f(-1*m->t_x,-1*m->t_y);
+        //scale = 2.0139375;
+        offset = Point2f(-1*m->t_x + regInfo.absoluteCoords.x * scale,-1*m->t_y + regInfo.absoluteCoords.y * scale);
         break;
       }
 
@@ -92,9 +93,19 @@ namespace pathCam {
         if (max(5, int(image_idx)) <= prev_idx + 5) {
           auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
           //if(waitFor)
-          parent->JobQ->pool->addCapacity(1);
+//          try {
+//            parent->JobQ->pool->addCapacity(1);
+//          }
+//          catch(Poco::Exception &e){
+//            int k = 0;
+//          }
           waitFor->waitOnThisGuy();
-          parent->JobQ->pool->addCapacity(-1);
+//          try {
+//            parent->JobQ->pool->addCapacity(-1);
+//          }
+//          catch(Poco::Exception &e){
+//            int k = 0;
+//          }
           previous = parent->get_image_ref(prev_idx);
           if (previous == nullptr) { continue; }
           //could remain null if !image->isGood()

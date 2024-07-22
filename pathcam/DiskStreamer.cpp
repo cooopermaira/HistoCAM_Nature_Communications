@@ -22,12 +22,7 @@ namespace pathCam {
         std::string imageFile;
         unsigned long sort_order = 0;
         while (infile >> imageFile) {
-            /*
-            auto ds = new DiskStreamer(parent, imageFile, sort_order);
-            parent->diskCount++;
-            parent->JobQ->add_runnable(ds);
-            sort_order += 10;
-             */
+
             Image* image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
             image->set_disk_file(imageFile);
             parent->pass_image(image, sort_order);

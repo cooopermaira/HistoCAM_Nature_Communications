@@ -20,7 +20,14 @@ void QManager::run(){
 
     while(jq->pool->available() && !jq->jobQueue.empty()){
       jq->queue_mutex->lock();
-      jq->pool->start(*jq->jobQueue.top());
+
+      try {
+        jq->pool->start(*jq->jobQueue.top());
+      }
+      catch(Poco::Exception &e){
+        int k = 0;
+      }
+
       jq->jobQueue.pop();
       jq->queue_mutex->unlock();
     }

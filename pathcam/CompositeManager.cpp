@@ -15,19 +15,30 @@ namespace pathCam {
     void CompositeManager::run() {
 
         while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
-               parent->matchableCount > 0 || !parent->compositeQ_empty()) {
-            while(!parent->newComponentQ.empty()){
-              auto res = parent->newComponentQ.front();
-              parent->newComponentQ.pop();
-              parent->add_new_component(res.first,res.second);
+               parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
+            std::pair<unsigned long, cv::Size> newComp;
+            bool isNewComp = false;
+            if(!parent->newComponentQ.empty()){
+              newComp = parent->newComponentQ.front();
+              isNewComp = true;
             }
             //if nothing in the Q but termination condition not met, wait
             if (parent->compositeQ_empty()) {
+                if(isNewComp){
+                  parent->newComponentQ.pop();
+                  parent->add_new_component(newComp.first,newComp.second);
+                }
                 Poco::Thread::sleep(100);
 
             } else {
 
                 std::vector<RegInfo> indexes = parent->get_Q_front();
+                if(isNewComp){
+                  if(indexes.front().index > newComp.first){
+                    parent->newComponentQ.pop();
+                    parent->add_new_component(newComp.first,newComp.second);
+                  }
+                }
                 std::sort(indexes.begin(), indexes.end());
 
                 while (parent->composites.size() <= indexes.back().component_membership) {
@@ -68,7 +79,7 @@ namespace pathCam {
         }
         */
 
-      perform_global_alignment();
+      //perform_global_alignment();
 
       parent->compositing = false;
     }
