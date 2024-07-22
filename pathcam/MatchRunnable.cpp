@@ -100,6 +100,7 @@ namespace pathCam {
 //            int k = 0;
 //          }
           waitFor->waitOnThisGuy();
+          parent->debugMatchSuspendThread++;
 //          try {
 //            parent->JobQ->pool->addCapacity(-1);
 //          }

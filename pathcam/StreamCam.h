@@ -155,6 +155,8 @@ namespace pathCam {
     std::atomic<unsigned int> matchableCount = 0;
     std::atomic<unsigned int> regCount = 0;
 
+    std::atomic<int> debugMatchSuspendThread = 0;
+
     pathCam::ConsecQ RegistrationConsecQ;
 
     std::vector<DataObserver *> observers;
