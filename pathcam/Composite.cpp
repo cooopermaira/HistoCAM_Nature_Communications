@@ -868,6 +868,9 @@ namespace pathCam {
         auto y1 = subdiv_Bbox.max_y;
         auto y2 = subdiv_Bbox.min_y;
 
+        if(i==10){
+          int kk = 0;
+        }
         //make sure edge ends are within bounding box
         if (ep[0] < x1 && ep[0] > x2 && ep[1] < y1 && ep[1] > y2 && ep[2] < x1 && ep[2] > x2 && ep[3] < y1 &&
             ep[3] > y2) {
@@ -883,14 +886,11 @@ namespace pathCam {
           if (val1 > 0 && val2 > 0) {
             auto image_idx1 = delaunayMembers[vertId1];
             auto image_idx2 = delaunayMembers[vertId2];
-            if (vertId1 == vertId2) {
-              int k = 0;
-            }
+
             //if match is already made, don't run job to calculate it
             if (parent->matchM.match[image_idx1][image_idx2] != nullptr) {
               matchedEdges[i].first = image_idx1;
               matchedEdges[i].second = image_idx2;
-
             } else {
               //create matchable job
               matchableCount++;
@@ -1012,10 +1012,13 @@ namespace pathCam {
     std::cout << duration.count() << std::endl;
      */
 
+    auto testValBefore = norm(A*xac - xpr);
     //solve problem for x and y
     coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001);
     coopers_conjugate_gradient(A, ypr, yac, 100, 0.0001);
 
+    auto testValAfter = norm(A*xac - xpr);
+    int k = 0;
     /*
     //for debug, test for change in error
     double valtest2 = 0;
@@ -1041,6 +1044,7 @@ namespace pathCam {
       }
 
     }
+
  //compute LP problem to minimize inf norm instead of 2 norm
     Mat c = Mat::zeros(A.cols + 1, 1, CV_64FC1);
     c.at<double>(A.cols) = -1.0;
@@ -1112,7 +1116,7 @@ namespace pathCam {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << duration.count() << std::endl;
-    int k = 0;
+
   }
 
 }
