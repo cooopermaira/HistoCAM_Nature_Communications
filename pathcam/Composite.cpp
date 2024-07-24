@@ -35,6 +35,22 @@ namespace pathCam {
     freshMask = polyMaskOutput.clone();
   }
 
+  void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
+    update_mutex->lock();
+
+    if (new_info.size() > 1){
+      // this shuffle is very important for reducing image count in the DT.
+      auto rng = std::default_random_engine {};
+      std::shuffle(std::begin(new_info),std::end(new_info),rng);
+    }
+
+    update_Bbox_no_composite(new_info);
+    expand_subdiv(new_info);
+    add_images_no_composite(new_info);
+
+    update_mutex->unlock();
+  }
+
 
   void CompositeVoronoi::self_reset() {
     //imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),Point2i(max_offset.x, max_offset.y));
@@ -77,21 +93,6 @@ namespace pathCam {
     }
   }
 
-  void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
-    update_mutex->lock();
-
-    if (new_info.size() > 1){
-      // this shuffle is very important for reducing image count in the DT.
-      auto rng = std::default_random_engine {};
-      std::shuffle(std::begin(new_info),std::end(new_info),rng);
-    }
-
-    update_Bbox_no_composite(new_info);
-    expand_subdiv(new_info);
-    add_images_multithread(new_info);
-
-    update_mutex->unlock();
-  }
 
   void CompositeVoronoi::notify_job_complete() {
     jobCount--;
@@ -187,32 +188,22 @@ namespace pathCam {
       channels[1] = polyMaskOutput;           //alpha channel
       merge(channels, fourChannelPreallocated);
 
-//      for (auto tile : effectedTiles){
-//        auto composite = parent->composites[component_membership];
-//        try {
-//          auto mask = composite->polyMaskOutput;
-//          auto imageMat = composite->fourChannelPreallocated;
-//          auto tileSize = composite->imagePyramid->level[0]->getTileSize();
-//          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
-//          auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
-//
-//          composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
-//        }
-//        catch (cv::Exception &e) {
-//          int k = 0;
-//        }
-//
-//      }
+      for (auto tile : effectedTiles){
+        try {
+          auto mask = polyMaskOutput;
+          auto imageMat = fourChannelPreallocated;
+          auto tileSize = imagePyramid->level[0]->getTileSize();
+          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
+          auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width, images[i]->height);
 
-      //build and run copy runnable
-      for (auto tile: effectedTiles) {
-        jobCount++;
-        auto cr = new ImageToTileCopyRunnable(parent, images[i], componentIndex, tile, 0);
-        parent->JobQ->add_runnable(cr);
+          imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+        }
+        catch (cv::Exception &e) {
+          int k = 0;
+        }
+
       }
 
-      //wait till jobs have processed
-      wakeEvent.wait();
 
       //update pyramid bounds and observer, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
@@ -868,9 +859,7 @@ namespace pathCam {
         auto y1 = subdiv_Bbox.max_y;
         auto y2 = subdiv_Bbox.min_y;
 
-        if(i==10){
-          int kk = 0;
-        }
+
         //make sure edge ends are within bounding box
         if (ep[0] < x1 && ep[0] > x2 && ep[1] < y1 && ep[1] > y2 && ep[2] < x1 && ep[2] > x2 && ep[3] < y1 &&
             ep[3] > y2) {
@@ -887,17 +876,12 @@ namespace pathCam {
             auto image_idx1 = delaunayMembers[vertId1];
             auto image_idx2 = delaunayMembers[vertId2];
 
-            //if match is already made, don't run job to calculate it
-            if (parent->matchM.match[image_idx1][image_idx2] != nullptr) {
-              matchedEdges[i].first = image_idx1;
-              matchedEdges[i].second = image_idx2;
-            } else {
               //create matchable job
               matchableCount++;
               auto sm = new SingleMatchRunnable(parent, delaunayMembers[vertId1], delaunayMembers[vertId2],
                                                 componentIndex, i, 0);
               parent->JobQ->add_runnable(sm);
-            }
+
           }
         }
       }
@@ -972,6 +956,7 @@ namespace pathCam {
       auto verify1 = parent->reg_results[matchedEdges[i].first].absoluteCoords;
       auto verify2 = parent->reg_results[matchedEdges[i].second].absoluteCoords;
       auto val = abs(verify1.x - verify2.x - pwr->t_x);
+
       if (val > valtest1) {
         valtest1 = val;
       }

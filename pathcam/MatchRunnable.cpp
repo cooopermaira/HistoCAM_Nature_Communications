@@ -16,7 +16,7 @@ namespace pathCam {
   };
 
   bool XCompRunnable::match_to_images(Image* selfImage, std::vector<Image *> otherCompImages) {
-    unsigned long matchedTo;
+    Image* matchedTo;
     double scale = 0;
     Point2f offset;
 
@@ -33,17 +33,19 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m, 1);
-      int result = motion_est->findHomography(m, parent->estimator_type, 100, 1);
+      int result = motion_est->findHomography(m, parent->estimator_type, 500, 1);
       if(result == 1){
-        matchedTo = ii;
+//        if (std::abs(m->t_x) < image->width / 2 && std::abs(
+//            m->t_y) < image->height / 2) {
+        matchedTo = otherCompImages[ii];
         parent->reg_results_mutex->readLock();
-        auto regInfo = parent->reg_results[matchedTo];
+        auto regInfo = parent->reg_results[matchedTo->index];
         parent->reg_results_mutex->unlock();
 
         if(!regInfo.resolved){
-          parent->JobQ->jobRefs[matchedTo * 3 + 2]->waitOnThisGuy();
+          parent->JobQ->jobRefs[matchedTo->index * 3 + 2]->waitOnThisGuy();
           parent->reg_results_mutex->readLock();
-          auto regInfo = parent->reg_results[matchedTo];
+          auto regInfo = parent->reg_results[matchedTo->index];
           parent->reg_results_mutex->unlock();
           if(!regInfo.resolved){
             continue;
@@ -51,7 +53,7 @@ namespace pathCam {
         }
         scale = (m->H.at<double>(0,0) + m->H.at<double>(1,1)) / 2.0;
         //scale = 2.0139375;
-        offset = Point2f(-1*m->t_x + regInfo.absoluteCoords.x * scale,-1*m->t_y + regInfo.absoluteCoords.y * scale);
+        offset = Point2f(m->t_x + regInfo.absoluteCoords.x * scale,m->t_y + regInfo.absoluteCoords.y * scale);
         break;
       }
 
@@ -70,10 +72,18 @@ namespace pathCam {
     extract_multilevel_keypoints(image);
 
     //get references to other component images
-    std::vector<unsigned long> indexes(image_idx);
-    for (long i = image_idx - 1; i >= 0; i--) {
-      indexes[i] = (unsigned long) i;
+    std::vector<unsigned long> indexes;
+//    for (long i = image_idx - 1; i >= 0; i--) {
+//      indexes[i] = (unsigned long) i;
+//    }
+    for(int i = 0; i < parent->composites.size(); i++){
+      if (parent->composites[i]->componentIndex != componentMembership){
+        for (auto item : parent->composites[i]->delaunayMembers){
+          indexes.push_back(item.second);
+        }
+      }
     }
+
     auto otherCompImages = parent->get_image_refs(indexes);
     auto success = match_to_images(image, otherCompImages);
 
@@ -98,25 +108,15 @@ namespace pathCam {
       if (previous == nullptr) {
         if (max(5, int(image_idx)) <= prev_idx + 5) {
           auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
-          //if(waitFor)
-//          try {
-//            parent->JobQ->pool->addCapacity(1);
-//          }
-//          catch(Poco::Exception &e){
-//            int k = 0;
-//          }
+
           waitFor->waitOnThisGuy();
           parent->debugMatchSuspendThread++;
-//          try {
-//            parent->JobQ->pool->addCapacity(-1);
-//          }
-//          catch(Poco::Exception &e){
-//            int k = 0;
-//          }
+
           previous = parent->get_image_ref(prev_idx);
           if (previous == nullptr) { continue; }
+
           //could remain null if !image->isGood()
-          //assert(previous != NULL);
+
         } else { continue; }
       }
 
@@ -233,8 +233,9 @@ namespace pathCam {
         break;
     }
 
-    image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
+    image->create_reg_image(parent->scale_factor, 1, parent->debayer, parent->interpolation,
                             parent->real);
+
 
     detector->detect_and_compute_multilevel(image);
 
