@@ -25,6 +25,7 @@ namespace pathCam {
             //if nothing in the Q but termination condition not met, wait
             if (parent->compositeQ_empty()) {
                 if(isNewComp){
+                  perform_global_alignment();
                   parent->newComponentQ.pop();
                   parent->add_new_component(newComp.first,newComp.second);
                 }
@@ -35,6 +36,7 @@ namespace pathCam {
                 std::vector<RegInfo> indexes = parent->get_Q_front();
                 if(isNewComp){
                   if(indexes.front().index > newComp.first){
+                    perform_global_alignment();
                     parent->newComponentQ.pop();
                     parent->add_new_component(newComp.first,newComp.second);
                   }
@@ -79,14 +81,16 @@ namespace pathCam {
         }
         */
 
-      //perform_global_alignment();
+      perform_global_alignment();
+      perform_global_alignment();
+      perform_global_alignment();
 
       parent->compositing = false;
     }
 
   void CompositeManager::perform_global_alignment() {
     for (auto i: parent->composites) {
-      i->perform_global_alignment();
+      i->perform_global_alignment(0,0.2);
     }
   }
 

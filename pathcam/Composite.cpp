@@ -23,7 +23,8 @@ namespace pathCam {
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
 
     circleMask = cv::Mat::zeros(image_size, CV_8U);
-    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius, cv::Scalar(1), -1);
+    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius, cv::Scalar(1),
+               -1);
 
     channels.resize(2);
 
@@ -40,6 +41,8 @@ namespace pathCam {
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
     composite.release();
+    memberImages.clear();
+    matchedEdges.clear();
     delaunayMembers.clear();
     root_offset = Vec2(0, 0);
     max_offset = Vec2(0, 0);
@@ -76,18 +79,24 @@ namespace pathCam {
 
   void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
     update_mutex->lock();
+
+    if (new_info.size() > 1){
+      // this shuffle is very important for reducing image count in the DT.
+      auto rng = std::default_random_engine {};
+      std::shuffle(std::begin(new_info),std::end(new_info),rng);
+    }
+
     update_Bbox_no_composite(new_info);
     expand_subdiv(new_info);
     add_images_multithread(new_info);
+
     update_mutex->unlock();
   }
 
   void CompositeVoronoi::notify_job_complete() {
     jobCount--;
     if (jobCount == 0) {
-      //parent->composite_thread.wakeUp();
       wakeEvent.set();
-      int k = 0;
     }
   }
 
@@ -108,9 +117,9 @@ namespace pathCam {
     //shift and recast
     for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
       ii.x -= centers[0].x;
-      ii.x += 6464 / 2;
+      ii.x += image_size.width / 2;
       ii.y -= centers[0].y;
-      ii.y += 4852 / 2;
+      ii.y += image_size.height / 2;
       _face.push_back((Point2i) ii);
     }
 
@@ -138,6 +147,79 @@ namespace pathCam {
     return vertxId;
   }
 
+  void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo> new_info) {
+    // get a copy of references to all images at once so that only one mutex lock is needed
+    std::vector<unsigned long> indexes;
+    for (int i = 0; i < new_info.size(); i++) {
+      indexes.push_back(new_info[i].index);
+    }
+    std::vector<Image *> images = parent->get_image_refs(indexes);
+
+    for (int i = 0; i < images.size(); i++) {
+
+      //add point to delaunay triangulation
+      std::vector<Point2i> face;
+      auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
+      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face);
+
+      //res is {vertexId,maskId}
+      if (res == -1) { continue; }
+      images[i]->vertexId = res;
+      images[i]->absoluteCoords = new_info[i].absoluteCoords;
+
+      //calculate effected tiles
+      std::vector<Point2i> effectedTiles;
+      calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
+
+      //build image with alpha channel
+
+      images[i]->load_raw_from_disk();
+      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+
+      images[i]->free_memory_RAW();
+
+      if (images[i]->label == Image::_2X) {//flat field correction if needed
+        cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
+      }
+
+      channels[0] = threeChannelPreallocated; //3 channel
+      channels[1] = polyMaskOutput;           //alpha channel
+      merge(channels, fourChannelPreallocated);
+
+//      for (auto tile : effectedTiles){
+//        auto composite = parent->composites[component_membership];
+//        try {
+//          auto mask = composite->polyMaskOutput;
+//          auto imageMat = composite->fourChannelPreallocated;
+//          auto tileSize = composite->imagePyramid->level[0]->getTileSize();
+//          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
+//          auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
+//
+//          composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+//        }
+//        catch (cv::Exception &e) {
+//          int k = 0;
+//        }
+//
+//      }
+
+      //build and run copy runnable
+      for (auto tile: effectedTiles) {
+        jobCount++;
+        auto cr = new ImageToTileCopyRunnable(parent, images[i], componentIndex, tile, 0);
+        parent->JobQ->add_runnable(cr);
+      }
+
+      //wait till jobs have processed
+      wakeEvent.wait();
+
+      //update pyramid bounds and observer, reset mask
+      imagePyramid->bounds = imagePyramid->level[0]->bounds;
+      parent->update_observers();
+      freshMask.copyTo(polyMaskOutput);
+    }
+  }
 
   void CompositeVoronoi::add_images_multithread(std::vector<RegInfo> new_info) {
 
@@ -198,14 +280,14 @@ namespace pathCam {
   }
 
   void CompositeVoronoi::save_pyramid_as_image() {
-    auto rootoffsetPoint = Point2f(root_offset.x,root_offset.y);
-    auto maxOffsetPoint = Point2f(max_offset.x,max_offset.y);
+    auto rootoffsetPoint = Point2f(root_offset.x, root_offset.y);
+    auto maxOffsetPoint = Point2f(max_offset.x, max_offset.y);
     auto ul = imagePyramid->level[0]->getIJ(rootoffsetPoint);
     auto lr = imagePyramid->level[0]->getIJ(maxOffsetPoint);
     int k = 0;
   }
 
-  void CompositeVoronoi::add_images(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo> new_info) {
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
@@ -678,20 +760,20 @@ namespace pathCam {
 
 
   void ImageToTileCopyRunnable::run() {
- 
-          auto composite = parent->composites[component_membership];
-          try {
-          auto mask = composite->polyMaskOutput;
-          auto imageMat = composite->fourChannelPreallocated;
-          auto tileSize = composite->imagePyramid->level[0]->getTileSize();
-          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
-          auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
 
-          composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, { tile });
-      }
-      catch (cv::Exception& e) {
-          int k = 0;
-      }
+    auto composite = parent->composites[component_membership];
+    try {
+      auto mask = composite->polyMaskOutput;
+      auto imageMat = composite->fourChannelPreallocated;
+      auto tileSize = composite->imagePyramid->level[0]->getTileSize();
+      auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
+      auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
+
+      composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+    }
+    catch (cv::Exception &e) {
+      int k = 0;
+    }
 
     composite->notify_job_complete();
 
@@ -721,71 +803,113 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::perform_global_alignment() {
+  void CompositeVoronoi::perform_global_alignment(unsigned int flag, double closenessFactor) {
+    //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
 
-    //collect list of all edges.
-    std::vector<Vec4f> edges;
-    std::vector<Vec2i> verticePairs;
-    std::vector<Point2f> coords;
+    if(flag == 1) {
+      std::vector<std::tuple<unsigned long, unsigned long, int, bool>> indexIndexEdgenumJobneeded;
+      int edgeNumber = 0;
+      for (int i = 0; i < memberImages.size() - 1; i++) {
+        for (int j = i + 1; j < memberImages.size(); j++) {
+          auto image1 = memberImages[j].first;
+          auto image2 = memberImages[i].first;
 
-    subdiv.getEdgeList(edges);
-    matchedEdges.resize(edges.size(), {-1, -1}); //preallocated to avoid mutex
-
-    //this mutex is locked here because each job created in the following loop needs this mutex to be read locked.
-    //They will not cause a reallocation because these images have already had initial matches, meaning the match
-    //matrix has already been resized to accommodate them. Its unlocked at end of loop
-    parent->resize_mmatch_mutex->readLock();
-
-    //collect list of all vertices that share an edge
-    int count = 0;
-    for (int i = 0; i < edges.size(); i++) {
-      //set point to shorten if statement
-      auto ep = edges[i];
-      auto x1 = subdiv_Bbox.max_x;
-      auto x2 = subdiv_Bbox.min_x;
-      auto y1 = subdiv_Bbox.max_y;
-      auto y2 = subdiv_Bbox.min_y;
-
-      //make sure edge ends are within bounding box
-      if (ep[0] < x1 && ep[0] > x2 && ep[1] < y1 && ep[1] > y2 && ep[2] < x1 && ep[2] > x2 && ep[3] < y1 &&
-          ep[3] > y2) {
-
-        //find vertex IDs
-        int vertId1 = subdiv.findNearest({ep[0], ep[1]});
-        int vertId2 = subdiv.findNearest({ep[2], ep[3]});
-
-        //verify vertices correspond to images added to composite
-        auto val1 = delaunayMembers.count(vertId1);
-        auto val2 = delaunayMembers.count(vertId2);
-
-        if (val1 > 0 && val2 > 0) {
-          auto image_idx1 = delaunayMembers[vertId1];
-          auto image_idx2 = delaunayMembers[vertId2];
-          if (vertId1 == vertId2) {
-            int k = 0;
-          }
-          //if match is already made, don't run job to calculate it
-          if (parent->matchM.match[image_idx1][image_idx2] != nullptr) {
-            matchedEdges[i].first = image_idx1;
-            matchedEdges[i].second = image_idx2;
-
-          } else {
-            //create matchable job
-            matchableCount++;
-            count++;
-            auto sm = new SingleMatchRunnable(parent, delaunayMembers[vertId1], delaunayMembers[vertId2],
-                                              componentIndex, i, 0);
-            parent->JobQ->add_runnable(sm);
+          if (abs(image2->absoluteCoords.x - image1->absoluteCoords.x) < closenessFactor * image_size.width &&
+              abs(image2->absoluteCoords.y - image1->absoluteCoords.y) < closenessFactor * image_size.height) {
+            if (parent->matchM.match[image1->index][image2->index] != nullptr) {
+              indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, false});
+            } else {
+              indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, true});
+            }
           }
         }
       }
+
+      parent->resize_mmatch_mutex->readLock();
+      matchedEdges.resize(indexIndexEdgenumJobneeded.size(), {-1, -1});
+
+      for (int i = 0; i < indexIndexEdgenumJobneeded.size(); i++) {
+        auto edge = indexIndexEdgenumJobneeded[i];
+        auto idx1 = std::get<0>(edge);
+        auto idx2 = std::get<1>(edge);
+
+        if (std::get<3>(edge)) {
+          auto sm = new SingleMatchRunnable(parent, idx1, idx2, componentIndex, i, 0);
+          matchableCount++;
+          parent->JobQ->add_runnable(sm);
+        } else {
+          matchedEdges[i].first = idx1;
+          matchedEdges[i].second = idx2;
+        }
+      }
     }
+    else if(flag == 0) {
+
+      //collect list of all edges.
+      std::vector<Vec4f> edges;
+      std::vector<Vec2i> verticePairs;
+      std::vector<Point2f> coords;
+
+      subdiv.getEdgeList(edges);
+      matchedEdges.resize(edges.size(), {-1, -1}); //preallocated to avoid mutex
+
+      //this mutex is locked here because each job created in the following loop needs this mutex to be read locked.
+      //They will not cause a reallocation because these images have already had initial matches, meaning the match
+      //matrix has already been resized to accommodate them. Its unlocked at end of loop
+      parent->resize_mmatch_mutex->readLock();
+
+      //collect list of all vertices that share an edge
+      int count = 0;
+      for (int i = 0; i < edges.size(); i++) {
+        //set point to shorten if statement
+        auto ep = edges[i];
+        auto x1 = subdiv_Bbox.max_x;
+        auto x2 = subdiv_Bbox.min_x;
+        auto y1 = subdiv_Bbox.max_y;
+        auto y2 = subdiv_Bbox.min_y;
+
+        //make sure edge ends are within bounding box
+        if (ep[0] < x1 && ep[0] > x2 && ep[1] < y1 && ep[1] > y2 && ep[2] < x1 && ep[2] > x2 && ep[3] < y1 &&
+            ep[3] > y2) {
+
+          //find vertex IDs
+          int vertId1 = subdiv.findNearest({ep[0], ep[1]});
+          int vertId2 = subdiv.findNearest({ep[2], ep[3]});
+
+          //verify vertices correspond to images added to composite
+          auto val1 = delaunayMembers.count(vertId1);
+          auto val2 = delaunayMembers.count(vertId2);
+
+          if (val1 > 0 && val2 > 0) {
+            auto image_idx1 = delaunayMembers[vertId1];
+            auto image_idx2 = delaunayMembers[vertId2];
+            if (vertId1 == vertId2) {
+              int k = 0;
+            }
+            //if match is already made, don't run job to calculate it
+            if (parent->matchM.match[image_idx1][image_idx2] != nullptr) {
+              matchedEdges[i].first = image_idx1;
+              matchedEdges[i].second = image_idx2;
+
+            } else {
+              //create matchable job
+              matchableCount++;
+              auto sm = new SingleMatchRunnable(parent, delaunayMembers[vertId1], delaunayMembers[vertId2],
+                                                componentIndex, i, 0);
+              parent->JobQ->add_runnable(sm);
+            }
+          }
+        }
+      }
+
+    } //end edge type job assignment
 
     //wait until these jobs have completed
     while (matchableCount > 0) {
       Poco::Thread::sleep(100);
     }
     parent->resize_mmatch_mutex->unlock();
+
 
     //give each frame index a linear system index.
     std::map<long, long> frameIndexToSystemIndex;
@@ -876,7 +1000,7 @@ namespace pathCam {
 
     /*some comments:
      * Because of the geometry of the delaunay triangulation, A^T * A is guaranteed to be symmetric positive definite.
-     * For this reason, minimizing the norm of Ax-b is well suited for conjugate gradient. I have written my own
+     * For this reason, minimizing the 2norm of Ax-b is well suited for conjugate gradient. I have written my own
      * easy implementation and compared it in time trials to calculating the moore-pemrose inverse. for 100 iterations,
      * CG takes 3 miliseconds while the MP inverse takes 11. Results are comparable.
      *

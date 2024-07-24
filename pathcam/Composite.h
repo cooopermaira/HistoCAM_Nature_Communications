@@ -9,6 +9,7 @@
 #define Composite_h
 
 #include <stdio.h>
+#include <random>
 #include "pathCam.h"
 //#include "TiledImage.h"
 
@@ -87,7 +88,9 @@ namespace pathCam {
 
     long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
 
-    void add_images(std::vector<RegInfo> new_info);
+    void add_images_with_composite(std::vector<RegInfo> new_info);
+
+    void add_images_no_composite(std::vector<RegInfo> new_info);
 
     void add_images_multithread(std::vector<RegInfo> new_info);
 
@@ -103,9 +106,6 @@ namespace pathCam {
 
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
                                             std::vector<Point2i> &_face);
-
-    std::pair<int,unsigned int> add_point_to_DT_multithread(cv::Point2f _point, pathCam::Image *_image,
-                                                            std::vector<Point2i> &_face);
 
     void expand_subdiv(std::vector<RegInfo> new_info);
 
@@ -127,7 +127,7 @@ namespace pathCam {
 
     void update_Bbox_no_composite(std::vector<RegInfo> new_info);
 
-    void perform_global_alignment();
+    void perform_global_alignment(unsigned int flag, double closenessFactor);
 
   protected:
     std::priority_queue<unsigned int> freeMasks;

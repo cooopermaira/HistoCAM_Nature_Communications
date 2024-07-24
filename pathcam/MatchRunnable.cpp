@@ -15,19 +15,9 @@ namespace pathCam {
                                                            successful(false) {
   };
 
-  void XCompRunnable::run() {
-    //extract multilevel features from self image
-    pathCam::Image *image = parent->get_image_ref(image_idx);
-    extract_multilevel_keypoints(image);
-
-    //get references to other component images
-    std::vector<unsigned long> indexes(image_idx);
-    for (long i = image_idx - 1; i >= 0; i--) {
-      indexes[i] = (unsigned long) i;
-    }
-    auto otherCompImages = parent->get_image_refs(indexes);
+  bool XCompRunnable::match_to_images(Image* selfImage, std::vector<Image *> otherCompImages) {
     unsigned long matchedTo;
-    double scale;
+    double scale = 0;
     Point2f offset;
 
     //loop through and get homography
@@ -38,7 +28,7 @@ namespace pathCam {
       auto imgCompare = otherCompImages[ii];
       extract_multilevel_keypoints(imgCompare);
       parent->resize_mmatch_mutex->readLock();
-      parent->matchM.match[imgCompare->index][image_idx] = new Match(imgCompare, image);
+      parent->matchM.match[imgCompare->index][image_idx] = new Match(imgCompare, selfImage);
       Match *m = parent->matchM.match[imgCompare->index][image_idx];
       parent->resize_mmatch_mutex->unlock();
 
@@ -66,12 +56,28 @@ namespace pathCam {
       }
 
     }
+    if (scale > 0) {
+      parent->composites[componentMembership]->imagePyramid->set_scale(1.0 / scale);
+      parent->composites[componentMembership]->imagePyramid->set_offset(offset);
+      return true;
+    }
+    return false;
+  }
 
-    parent->composites[componentMembership]->imagePyramid->set_scale(1.0/scale);
-    parent->composites[componentMembership]->imagePyramid->set_offset(offset);
+  void XCompRunnable::run() {
+    //extract multilevel features from self image
+    pathCam::Image* image = parent->get_image_ref(image_idx);
+    extract_multilevel_keypoints(image);
+
+    //get references to other component images
+    std::vector<unsigned long> indexes(image_idx);
+    for (long i = image_idx - 1; i >= 0; i--) {
+      indexes[i] = (unsigned long) i;
+    }
+    auto otherCompImages = parent->get_image_refs(indexes);
+    auto success = match_to_images(image, otherCompImages);
 
     int k = 0;
-
   }
 
   void MatchRunnable::run() {

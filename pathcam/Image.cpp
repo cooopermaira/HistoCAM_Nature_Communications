@@ -97,7 +97,7 @@ namespace pathCam {
   }
 
   bool Image::is_good() {
-    //return label == _2X;
+    return label == _2X;
     if (label == _UNDEREXP) {
       return false;
     }

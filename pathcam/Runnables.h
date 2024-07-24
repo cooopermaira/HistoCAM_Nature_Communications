@@ -171,6 +171,7 @@ namespace pathCam {
     unsigned int componentMembership;
 
     virtual void run();
+    bool match_to_images(Image* selfImage, std::vector<Image*> images);
     void extract_multilevel_keypoints(Image* image);
   };
 
