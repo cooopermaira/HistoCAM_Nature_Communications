@@ -53,7 +53,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::self_reset() {
-    //imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),Point2i(max_offset.x, max_offset.y));
+    imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),Point2i(max_offset.x, max_offset.y));
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
     composite.release();
@@ -271,11 +271,36 @@ namespace pathCam {
   }
 
   void CompositeVoronoi::save_pyramid_as_image() {
-    auto rootoffsetPoint = Point2f(root_offset.x, root_offset.y);
-    auto maxOffsetPoint = Point2f(max_offset.x, max_offset.y);
+    auto rootoffsetPoint = Point2f(root_offset.x,root_offset.y);
+    auto maxOffsetPoint = Point2f(max_offset.x,max_offset.y);
+    auto level = imagePyramid->level[0];
     auto ul = imagePyramid->level[0]->getIJ(rootoffsetPoint);
     auto lr = imagePyramid->level[0]->getIJ(maxOffsetPoint);
-    int k = 0;
+    int tile_size = level->getTileSize();
+    int width = (lr.x+1 - ul.x)*tile_size;
+    width = std::abs(width);
+    int height = (lr.y+1 - ul.y)*tile_size;
+    height = std::abs(height);
+    Size pyramidSize = Size(width, height);
+    Mat pyramidImage = Mat(pyramidSize, CV_8UC4);
+    //we need to shift the x and y tiles so the we aren't writing to negtive coordinates
+    int x_offset = -ul.x;
+    int y_offset = -ul.y;
+    //for removing excess empty pixels around edge tiles
+    int left_offset = std::abs(ul.x * tile_size - rootoffsetPoint.x);
+    int top_offset = std::abs(ul.y * tile_size - rootoffsetPoint.y);
+    int right_offset = std::abs(lr.x * tile_size - maxOffsetPoint.x);
+    int bottom_offset = std::abs(lr.y * tile_size - maxOffsetPoint.y);
+    for (int i = ul.x; i <= lr.x; i++) {
+      for (int j = ul.y; j <= lr.y; j++) {
+        Mat tile = level->getTile(i,j);
+        tile.copyTo(pyramidImage(Rect((i+x_offset)*tile.cols,(j+y_offset)*tile.rows,tile.cols,tile.rows)));
+      }
+    }
+    //currently hardcoded, maybe add an output directory in config?
+    String path = "pyramidImage"+std::to_string(componentIndex)+".png";
+    //only write pixels with information
+    imwrite (path,pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
   }
 
   void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo> new_info) {

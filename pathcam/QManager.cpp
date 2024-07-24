@@ -17,21 +17,18 @@ void QManager::run(){
   Poco::Thread::sleep(200);
   while(parent->compositing){
     //jq->run_jobs(false);
-
-    while(jq->pool->available() && !jq->jobQueue.empty()){
-      jq->queue_mutex->lock();
-
-      try {
+    if (jq->pool->available()){
+      if (!jq->is_empty())
+      {
+        jq->queue_mutex->lock();
         jq->pool->start(*jq->jobQueue.top());
+        jq->jobQueue.pop();
+        jq->queue_mutex->unlock();
       }
-      catch(Poco::Exception &e){
-        int k = 0;
-      }
-
-      jq->jobQueue.pop();
-      jq->queue_mutex->unlock();
     }
-
+    else {
+      jq->pool->threadAvailableEvent->wait();
+    }
   }
 }
 

@@ -97,7 +97,7 @@ namespace pathCam {
   }
 
   bool Image::is_good() {
-    return label == _2X;
+    //return label == _2X;
     if (label == _UNDEREXP) {
       return false;
     }
@@ -141,6 +141,15 @@ namespace pathCam {
 
     label = _UNKNOWN;
     return;
+  }
+
+  cv::Mat Image::full_image_asMat() {
+    load_raw_from_disk();
+    Mat image_Mat = cv::Mat(width,height, CV_8U, get_Raw(), Mat::AUTO_STEP);
+    cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+
+    free_memory_RAW();
+    return image_Mat;
   }
 
   void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real) {

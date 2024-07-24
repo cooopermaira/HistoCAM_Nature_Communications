@@ -82,8 +82,6 @@ namespace pathCam {
         */
 
       perform_global_alignment();
-      perform_global_alignment();
-      perform_global_alignment();
 
       parent->compositing = false;
     }

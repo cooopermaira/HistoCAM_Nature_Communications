@@ -41,6 +41,8 @@ namespace pathCam {
 
     void load_raw_from_disk();
 
+    cv::Mat full_image_asMat();
+
     void increment_smart_pointer() { reference_count++; }
 
     void copy_in(void *buffer) {
@@ -102,7 +104,8 @@ namespace pathCam {
         case _LENS_CHANGE:
           return "Lens Change";
       }
-
+label = _NOLABEL;
+      return "No label";
 
     }
 

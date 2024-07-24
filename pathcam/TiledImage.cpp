@@ -208,28 +208,27 @@ void TiledImage::matToImage2(const cv::Mat mat, cv::Mat image,
 void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
   auto tL = getIJ(topLeft);
   auto bR = getIJ(bottomRight);
-  std::vector<Point2i> edgeTiles;
-  bool escape = false;
-  for (int x = tL.x; x <= bR.x; x++) {
-    for (int y = tL.y; y <= bR.y; y++) {
-      for (int i = -1; i <= 1; i++) {
-        for (int j = -1; j <= 1; j++) {
-          if (tiles(x + i, y + j) == nullptr && tiles(x, y) != nullptr) {
-            edgeTiles.push_back(Point2i(x, y));
-            escape = true;
-            break;
-          }
-        }
-        if (escape) {
-          escape = false;
-          break;
-        }
+  for (int x = tL.x + 1; x < bR.x; x++) {
+    for (int y = tL.y + 1; y < bR.y; y++) {
+      //get tile
+      Mat tile = getTile(x, y);
+      //create vector of all 4 channes R, G, B and alpha
+      std::vector<Mat> individualChannels(4);
+      //split the tile into the 4 channels
+      split(tile, individualChannels);
+      //if the number of nonzero alphachannels is not the same as the number of channels, the tile needs to be removed
+      if (countNonZero(individualChannels[3]) != tile.rows * tile.cols)
+      {
+        //remove the tile and replce with empty mat
+        //tiles(x,y)->release();
+        //*tiles(x,y) = Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
+        *tiles(x,y) = Mat::zeros(tile_size, tile_size, CV_8UC4);
+        //update the image pyramid
+        Point_ loc = Point2i(x, y);
+        Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size,tile_size);
+        tileUpwards(loc, levelRegion, *tiles(x,y));
       }
     }
-  }
-  for (int i = 0; i < edgeTiles.size(); i++) {
-    tiles(edgeTiles[i].x, edgeTiles[i].y)->release();
-    delete tiles(edgeTiles[i].x, edgeTiles[i].y);
   }
 }
 
