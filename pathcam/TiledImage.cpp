@@ -208,8 +208,8 @@ void TiledImage::matToImage2(const cv::Mat mat, cv::Mat image,
 void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
   auto tL = getIJ(topLeft);
   auto bR = getIJ(bottomRight);
-  for (int x = tL.x + 1; x < bR.x; x++) {
-    for (int y = tL.y + 1; y < bR.y; y++) {
+  for (int x = tL.x; x <= bR.x; x++) {
+    for (int y = tL.y; y <= bR.y; y++) {
       //get tile
       Mat tile = getTile(x, y);
       //create vector of all 4 channes R, G, B and alpha

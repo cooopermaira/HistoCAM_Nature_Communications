@@ -11,9 +11,7 @@
 namespace pathCam {
 
   CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int component_index) : Composite(
-      parent), componentIndex(component_index), wakeEvent(true),
-                                                                                                             image_size(
-                                                                                                                 image_size) {
+      parent), componentIndex(component_index), wakeEvent(true), image_size(image_size) {
     imagePyramid.reset(new MRTiledImage);
     std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid);
     imagePyramid->level.push_back(current);
@@ -38,10 +36,10 @@ namespace pathCam {
   void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
     update_mutex->lock();
 
-    if (new_info.size() > 1){
+    if (new_info.size() > 1) {
       // this shuffle is very important for reducing image count in the DT.
-      auto rng = std::default_random_engine {};
-      std::shuffle(std::begin(new_info),std::end(new_info),rng);
+      auto rng = std::default_random_engine{};
+      std::shuffle(std::begin(new_info), std::end(new_info), rng);
     }
 
     update_Bbox_no_composite(new_info);
@@ -53,7 +51,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::self_reset() {
-    imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y),Point2i(max_offset.x, max_offset.y));
+    imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y), Point2i(max_offset.x, max_offset.y));
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
     composite.release();
@@ -188,13 +186,14 @@ namespace pathCam {
       channels[1] = polyMaskOutput;           //alpha channel
       merge(channels, fourChannelPreallocated);
 
-      for (auto tile : effectedTiles){
+      for (auto tile: effectedTiles) {
         try {
           auto mask = polyMaskOutput;
           auto imageMat = fourChannelPreallocated;
           auto tileSize = imagePyramid->level[0]->getTileSize();
           auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
-          auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width, images[i]->height);
+          auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
+                                           images[i]->height);
 
           imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
         }
@@ -271,15 +270,15 @@ namespace pathCam {
   }
 
   void CompositeVoronoi::save_pyramid_as_image() {
-    auto rootoffsetPoint = Point2f(root_offset.x,root_offset.y);
-    auto maxOffsetPoint = Point2f(max_offset.x,max_offset.y);
+    auto rootoffsetPoint = Point2f(root_offset.x, root_offset.y);
+    auto maxOffsetPoint = Point2f(max_offset.x, max_offset.y);
     auto level = imagePyramid->level[0];
     auto ul = imagePyramid->level[0]->getIJ(rootoffsetPoint);
     auto lr = imagePyramid->level[0]->getIJ(maxOffsetPoint);
     int tile_size = level->getTileSize();
-    int width = (lr.x+1 - ul.x)*tile_size;
+    int width = (lr.x + 1 - ul.x) * tile_size;
     width = std::abs(width);
-    int height = (lr.y+1 - ul.y)*tile_size;
+    int height = (lr.y + 1 - ul.y) * tile_size;
     height = std::abs(height);
     Size pyramidSize = Size(width, height);
     Mat pyramidImage = Mat(pyramidSize, CV_8UC4);
@@ -293,14 +292,15 @@ namespace pathCam {
     int bottom_offset = std::abs(lr.y * tile_size - maxOffsetPoint.y);
     for (int i = ul.x; i <= lr.x; i++) {
       for (int j = ul.y; j <= lr.y; j++) {
-        Mat tile = level->getTile(i,j);
-        tile.copyTo(pyramidImage(Rect((i+x_offset)*tile.cols,(j+y_offset)*tile.rows,tile.cols,tile.rows)));
+        Mat tile = level->getTile(i, j);
+        tile.copyTo(pyramidImage(Rect((i + x_offset) * tile.cols, (j + y_offset) * tile.rows, tile.cols, tile.rows)));
       }
     }
     //currently hardcoded, maybe add an output directory in config?
-    String path = "pyramidImage"+std::to_string(componentIndex)+".png";
+    String path = "pyramidImage" + std::to_string(componentIndex) + ".png";
     //only write pixels with information
-    imwrite (path,pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
+    imwrite(path, pyramidImage(
+        Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
   }
 
   void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo> new_info) {
@@ -362,6 +362,29 @@ namespace pathCam {
     parent->update_observers();
   }
 
+  bool CompositeVoronoi::exclude_for_blur(pathCam::Image *image) {
+    auto val = image->check_blur();
+    bool excludeImage;
+
+    if(blurVals.size() > 0) {
+      double sum = std::accumulate(std::begin(blurVals), std::end(blurVals), 0.0);
+      double m = sum / blurVals.size();
+
+      double accum = 0.0;
+      std::for_each(std::begin(blurVals), std::end(blurVals), [&](const double d) {
+        accum += (d - m) * (d - m);
+      });
+
+      double stdev = sqrt(accum / (blurVals.size() - 1));
+    }else{
+      excludeImage = false;
+    }
+    if(blurVals.size() < 5){
+      blurVals.push_back(val);
+    }else{
+
+    }
+  }
 
   void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                   Vec2 absCoord) {
@@ -796,33 +819,88 @@ namespace pathCam {
   }
 
 
-  double CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon) {
+  std::vector<long> CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
+                                                      bool shouldCleanData, double epsilonClean,
+                                                      std::map<long, long> systemIndexToFrameIndex) {
+    std::vector<long> indexesRemoved;
     cv::Mat ATranspose = A.t();
     cv::Mat ATA = ATranspose * A;
     cv::Mat ATb = ATranspose * b;
 
     cv::Mat r = ATb - (ATA * x);
     cv::Mat p = r.clone();
-
+    cv::Mat n0 = A*x - b;
+    cv::Mat n1;
     for (int i = 0; i < steps; i++) {
-      auto stepSize = r.dot(r) / (p.dot(ATA * p));
+      double rdr = r.dot(r);
+      Mat ATAp = ATA * p;
+      double stepSize = rdr / (p.dot(ATAp));
       x += stepSize * p;
-      double denom = r.dot(r);
-      r -= stepSize * ATA * p;
-      double adjustment = r.dot(r) / denom;
+      n1 = A*x - b;
+      r -= stepSize * ATAp;
+      double adjustment = r.dot(r) / rdr;
       p = r + adjustment * p;
-      if (cv::norm(r) < epsilon) {
+
+      std::cout<<std::to_string(cv::norm(n0 - n1))<<std::endl;
+      std::cout<<std::to_string(cv::norm(n1))<<std::endl;
+      if (shouldCleanData && cv::norm(n0 - n1) < cv::norm(n1)/ 10){
+        auto res = clean_data(A,b,x,systemIndexToFrameIndex);
+        if (res >= 0){
+          indexesRemoved.push_back(res);
+        }
+      }
+
+      if (cv::norm(n0 - n1) < epsilon) {
         break;
       }
+
+
+      n0 = n1.clone();
     }
-    return cv::norm(A * x - b);
+    return indexesRemoved;
+  }
+
+
+  long CompositeVoronoi::clean_data(cv::Mat A, cv::Mat b, cv::Mat x, std::map<long, long> systemIndexToFrameIndex) {
+    long indexRemoved = -1;
+    Mat r = A * x - b;
+    Mat e = r.mul(r);
+    Mat bins = Mat::zeros(x.rows,1,CV_64FC1);
+    for (int i = 0; i < A.cols; i++){
+      for (int j = 0; j < A.rows; j++){
+        if (A.at<double>(j,i) != 0){
+          bins.at<double>(i) += e.at<double>(j);
+        }
+      }
+    }
+    double minVal;
+    double maxVal;
+    Point minLoc;
+    Point maxLoc;
+    minMaxLoc( bins, &minVal, &maxVal, &minLoc, &maxLoc );
+    std::cout << std::to_string(maxVal)+" "+std::to_string(pow(cv::norm(r),2)) << std::endl;
+
+    if(maxVal > 0.01 * pow(cv::norm(r),2) ){
+      removeCount++;
+      indexRemoved = maxLoc.y;
+      for (int i = 0; i < A.rows; i++){
+        if(A.at<double>(i,maxLoc.y) != 0){
+          b.at<double>(i) = 0;
+          for (int ii = 0; ii < A.cols; ii++){
+            A.at<double>(i,ii) = 0;
+          }
+          systemIndexToFrameIndex.erase(maxLoc.y);
+        }
+      }
+    }
+    return indexRemoved;
   }
 
 
   void CompositeVoronoi::perform_global_alignment(unsigned int flag, double closenessFactor) {
     //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
 
-    if(flag == 1) {
+    if (flag == 1) {
       std::vector<std::tuple<unsigned long, unsigned long, int, bool>> indexIndexEdgenumJobneeded;
       int edgeNumber = 0;
       for (int i = 0; i < memberImages.size() - 1; i++) {
@@ -858,8 +936,7 @@ namespace pathCam {
           matchedEdges[i].second = idx2;
         }
       }
-    }
-    else if(flag == 0) {
+    } else if (flag == 0) {
 
       //collect list of all edges.
       std::vector<Vec4f> edges;
@@ -901,11 +978,11 @@ namespace pathCam {
             auto image_idx1 = delaunayMembers[vertId1];
             auto image_idx2 = delaunayMembers[vertId2];
 
-              //create matchable job
-              matchableCount++;
-              auto sm = new SingleMatchRunnable(parent, delaunayMembers[vertId1], delaunayMembers[vertId2],
-                                                componentIndex, i, 0);
-              parent->JobQ->add_runnable(sm);
+            //create matchable job
+            matchableCount++;
+            auto sm = new SingleMatchRunnable(parent, delaunayMembers[vertId1], delaunayMembers[vertId2],
+                                              componentIndex, i, 0);
+            parent->JobQ->add_runnable(sm);
 
           }
         }
@@ -947,6 +1024,8 @@ namespace pathCam {
       }
       i++;
     }
+    //no constraints means no linear system to minimize
+    if (matchedEdges.size() == 0) { return; }
 
     //minimize norm2(Ax-b).
     Mat A = Mat::zeros(matchedEdges.size(), frameIndexToSystemIndex.size(), CV_64FC1);
@@ -1022,12 +1101,20 @@ namespace pathCam {
     std::cout << duration.count() << std::endl;
      */
 
-    auto testValBefore = norm(A*xac - xpr);
+    auto testValBefore = norm(A * xac - xpr);
     //solve problem for x and y
-    coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001);
-    coopers_conjugate_gradient(A, ypr, yac, 100, 0.0001);
+    auto testA = A.clone();
+    coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001,false);
+    auto res = coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001,true,0.9,systemIndexToFrameIndex);
+    auto normA = cv::norm(testA - A);
 
-    auto testValAfter = norm(A*xac - xpr);
+    for (auto loc : res){
+      ypr.at<double>(loc) = 0;
+    }
+
+    coopers_conjugate_gradient(A, ypr, yac, 100, 0.0001,true,0.9,systemIndexToFrameIndex);
+
+    auto testValAfter = norm(A * xac - xpr);
     int k = 0;
     /*
     //for debug, test for change in error

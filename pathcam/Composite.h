@@ -80,6 +80,8 @@ namespace pathCam {
     cv::Size image_size;
     std::vector<Mat> channels;
     std::vector<Point2i> imageBoundsAsPolygon;
+    std::vector<double> blurVals;
+    int blurValIndex = 0;
     std::atomic<unsigned int> jobCount = 0;
     Bbox subdiv_Bbox;
     Poco::Event wakeEvent;
@@ -103,15 +105,18 @@ namespace pathCam {
 
     void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
 
-    int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
-                                            std::vector<Point2i> &_face);
-
     void expand_subdiv(std::vector<RegInfo> new_info);
 
     void self_reset();
-    
-    double coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon);
 
+    bool exclude_for_blur(Image* image);
+
+    int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
+                                            std::vector<Point2i> &_face);
+    
+    std::vector<long> coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon, bool shouldCleanData, double epsilonClean = 0, std::map<long, long> systemIndexToFrameIndex = {});
+
+    long clean_data(cv::Mat A, cv::Mat b, cv::Mat x, std::map<long, long> systemIndexToFrameIndex);
 
   public:
 
@@ -135,6 +140,7 @@ namespace pathCam {
     std::vector<Mat> threeChanPreals;
     std::vector<Mat> fourChanPreals;
     void notify_job_complete();
+    int removeCount = 0;
   };
 }
 

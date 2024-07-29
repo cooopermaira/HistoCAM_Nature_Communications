@@ -32,21 +32,29 @@ namespace pathCam {
   double Image::check_blur() {
     cv::Mat temp = cv::Mat(Size(width, height), CV_8UC1, raw_buffer, Mat::AUTO_STEP);
     int steps = 4;
+    int radius = 2190;
     double tempVariance = 0;
     for (int i = 0; i < steps; i++) {
-      int xloc = width / 2 + (scope_radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
-      int yloc = height / 2 + (scope_radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
+      int xloc = width / 2 + (radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
+      int yloc = height / 2 + (radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
       cv::Rect rectROI(xloc - 64, yloc - 164, 128, 128);
       Mat ROI = temp(rectROI).clone();
-      Mat laplacian;
+      /*Mat laplacian;
       cv::Laplacian(ROI, laplacian, CV_64F);
       cv::Scalar mean, stddev;
-      cv::meanStdDev(laplacian, mean, stddev);
+      cv::meanStdDev(laplacian, mean, stddev); */
+      cv::Mat grad_x, grad_y;
+      Sobel(ROI, grad_x, CV_64F, 1, 0, 3);
+      Sobel(ROI, grad_y, CV_64F, 0, 1, 3);
+      cv::Mat grad_magnitude;
+      magnitude(grad_x, grad_y, grad_magnitude);
+      cv::Scalar mean, stddev;
+      cv::meanStdDev(grad_magnitude, mean, stddev);
       double tempVariance = std::pow(stddev[0], 2);
+
       if (variance < tempVariance) {
         variance = tempVariance;
       }
-
     }
 
     return variance;
@@ -97,7 +105,7 @@ namespace pathCam {
   }
 
   bool Image::is_good() {
-    //return label == _2X;
+    return label == _2X;
     if (label == _UNDEREXP) {
       return false;
     }

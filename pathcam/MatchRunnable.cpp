@@ -18,7 +18,7 @@ namespace pathCam {
   bool XCompRunnable::match_to_images(Image* selfImage, std::vector<Image *> otherCompImages) {
     Image* matchedTo;
     double scale = 0;
-    Point2f offset;
+    Point2f offset,offset2;
 
     //loop through and get homography
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
@@ -28,15 +28,14 @@ namespace pathCam {
       auto imgCompare = otherCompImages[ii];
       extract_multilevel_keypoints(imgCompare);
       parent->resize_mmatch_mutex->readLock();
-      parent->matchM.match[imgCompare->index][image_idx] = new Match(imgCompare, selfImage);
-      Match *m = parent->matchM.match[imgCompare->index][image_idx];
+      parent->matchM.match[image_idx][imgCompare->index] = new Match(selfImage, imgCompare);
+      Match *m = parent->matchM.match[image_idx][imgCompare->index];
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m, 1);
       int result = motion_est->findHomography(m, parent->estimator_type, 500, 1);
       if(result == 1){
-//        if (std::abs(m->t_x) < image->width / 2 && std::abs(
-//            m->t_y) < image->height / 2) {
+
         matchedTo = otherCompImages[ii];
         parent->reg_results_mutex->readLock();
         auto regInfo = parent->reg_results[matchedTo->index];
@@ -53,13 +52,15 @@ namespace pathCam {
         }
         scale = (m->H.at<double>(0,0) + m->H.at<double>(1,1)) / 2.0;
         //scale = 2.0139375;
-        offset = Point2f(m->t_x + regInfo.absoluteCoords.x * scale,m->t_y + regInfo.absoluteCoords.y * scale);
+        offset = Point2f(m->t_x / pow(scale,2) + regInfo.absoluteCoords.x / scale,m->t_y / pow(scale,2) + regInfo.absoluteCoords.y / scale );
+        offset2 =  Point2f(m->t_x / parent->scale_factor + regInfo.absoluteCoords.x / scale,m->t_y / parent->scale_factor + regInfo.absoluteCoords.y / scale );
+
         break;
       }
 
     }
     if (scale > 0) {
-      parent->composites[componentMembership]->imagePyramid->set_scale(1.0 / scale);
+      parent->composites[componentMembership]->imagePyramid->set_scale(scale);
       parent->composites[componentMembership]->imagePyramid->set_offset(offset);
       return true;
     }

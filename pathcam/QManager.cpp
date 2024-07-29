@@ -26,9 +26,11 @@ void QManager::run(){
         jq->queue_mutex->unlock();
       }
     }
+      /*
     else {
       jq->pool->threadAvailableEvent->wait();
     }
+       */
   }
 }
 
