@@ -26,7 +26,7 @@ namespace pathCam {
                                                            component_mutex(new Poco::FastMutex()),
                                                            resize_buffer_mutex(new Poco::FastMutex()){
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(1, 1);
+    JobQ = new JobQueue(10, 10);
     reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
     reg_results[0].index = 0;
     //variancesForDebug.resize(2266);
@@ -138,12 +138,12 @@ namespace pathCam {
 
   void StreamCam::add_new_component(unsigned long image_index, cv::Size image_size) {
     auto component_index = increment_and_get_components();
-    reg_results_mutex->writeLock();
-    reg_results[image_index] = RegInfo(true, Vec2(0.0, 0.0), true, component_index);
-    reg_results[image_index].index = image_index;
-    reg_results[image_index].resolved = true;
-    reg_results[image_index].matchedTo = image_index; //this is a root image, it has no match
-    reg_results_mutex->unlock();
+    auto ri = RegInfo(true, Vec2(0.0, 0.0), true, component_index);
+    ri.index = image_index;
+    ri.resolved = true;
+    ri.matchedTo = image_index; //this is a root image, it has no match
+    add_registration(ri);
+
 
     //delete these pointers when destroyed
     auto *temp = new CompositeVoronoi(this, image_size, component_index);
@@ -189,10 +189,10 @@ namespace pathCam {
     return temp;
   }
 
-  void StreamCam::pass_image(Image *image, unsigned long sort_order) {
-    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, sort_order);
+  void StreamCam::pass_image(Image *image, unsigned long _image_index) {
+    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index);
     loaderCount++;
-    JobQ->add_runnable(llr,sort_order * 3);
+    JobQ->add_runnable(llr);
   }
 
   void StreamCam::push_compositeQ(RegInfo index) {
@@ -217,7 +217,9 @@ namespace pathCam {
 
   void RunnableIntermediate::waitOnThisGuy() {
     someoneWaitingOnJobCompleteEvent = true;
-    jobComplete.wait();
+    if(!successful) {
+      jobComplete.wait();
+    }
     someoneWaitingOnJobCompleteEvent = false;
   }
 }

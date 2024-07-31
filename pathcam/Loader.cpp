@@ -20,6 +20,7 @@ namespace pathCam {
       image->label = Image::_BAD_FILE;
       std::cout << "Image failed to load" << std::endl;
       parent->loaderCount--;
+      jobComplete.set();
       return;
     }
 
@@ -28,14 +29,14 @@ namespace pathCam {
     if (image->is_good()) {
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
-      /*
-      double blurVal = image->check_blur();
-      parent->variancesForDebug[sort_order] = blurVal;
-      if(blurVal < 5000.0){
-          parent->loaderCount--;
-          return;
-      }
-       */
+
+//      if (image->check_blur() < 800.0) {
+//        successful = true;
+//        parent->loaderCount--;
+//        jobComplete.set();
+//        return;
+//      }
+
       image->free_memory_RAW();
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
@@ -67,20 +68,20 @@ namespace pathCam {
       delete detector;
 
       if (image->keypoints.size() < 200) {
-        successful = false;
+        successful = true;
         image->label = Image::_LOWFEAT;
         parent->loaderCount--;
+        jobComplete.set();
         return;
       }
 
       image->release_reg_image();
 
-      unsigned long image_index = sort_order;
       image->index = image_index;
       parent->add_image(image, image_index);
-      auto matchjob = new MatchRunnable(parent, image_index, sort_order + 20);
+      auto matchjob = new MatchRunnable(parent, image_index);
       parent->matchableCount++;
-      parent->JobQ->add_runnable(matchjob,sort_order * 3 + 1);
+      parent->JobQ->add_runnable(matchjob);
     } else {
       image->free_memory_RAW();
     }

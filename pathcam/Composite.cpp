@@ -31,7 +31,74 @@ namespace pathCam {
 
     polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
     freshMask = polyMaskOutput.clone();
+
+    //testing conjugate gradient data cleaner
+    Mat A = Mat::zeros(8, 4, CV_64FC1);
+
+    Mat bx = Mat::zeros(8, 1, CV_64FC1);
+    Mat by = bx.clone();
+
+    Mat x = Mat::zeros(4, 1, CV_64FC1);
+    Mat y = x.clone();
+
+    A.at<double>(0, 0) = 1;
+    A.at<double>(1, 0) = -1;
+    A.at<double>(1, 1) = 1;
+    A.at<double>(2, 1) = 1;
+    A.at<double>(3, 2) = 1;
+    A.at<double>(4, 1) = -1;
+    A.at<double>(4, 2) = 1;
+    A.at<double>(5, 3) = 1;
+    A.at<double>(6, 3) = 1;
+    A.at<double>(6, 1) = -1;
+    A.at<double>(7, 3) = 1;
+    A.at<double>(7, 0) = -1;
+
+    bx.at<double>(0) = 2;
+    bx.at<double>(1) = 2;
+    bx.at<double>(2) = 4;
+    bx.at<double>(3) = 5;
+    bx.at<double>(4) = 1;
+    bx.at<double>(5) = 4;
+    bx.at<double>(6) = 1;
+    bx.at<double>(7) = 1;
+
+    by.at<double>(0) = -1;
+    by.at<double>(1) = 1.01;
+    by.at<double>(2) = 0;
+    by.at<double>(3) = -2;
+    by.at<double>(4) = -1.95;
+    by.at<double>(5) = 4;
+    by.at<double>(6) = 5;
+    by.at<double>(7) = 4;
+
+    x.at<double>(0) = 2;
+    x.at<double>(1) = 4;
+    x.at<double>(2) = 5;
+    x.at<double>(3) = 3;
+
+    y.at<double>(0) = -1.5;
+    y.at<double>(1) = .5;
+    y.at<double>(2) = -2;
+    y.at<double>(3) = 4;
+
+
+    std::map<long, long> systemMap;
+    for (long i = 0; i < x.rows; i++) {
+      systemMap[i] = i;
+    }
+
+    //coopers_conjugate_gradient(A, bx, x, 100, 0.00001, true, 0.05, systemMap,by);
+
+
+
+    //coopers_conjugate_gradient(A, by, y, 100, 0.00001, true, 0.05, systemMap,bx);
+    int k = 0;
   }
+
+
+
+
 
   void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
     update_mutex->lock();
@@ -179,7 +246,9 @@ namespace pathCam {
       images[i]->free_memory_RAW();
 
       if (images[i]->label == Image::_2X) {//flat field correction if needed
-        cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
+        auto center = Point2i(image_size.width / 2,image_size.height / 2);
+        auto bb = Rect(center.x - parent->scope_radius - 10, center.y - parent->scope_radius - 10,2 * parent->scope_radius + 20,2 * parent->scope_radius + 20);
+        cv::divide(threeChannelPreallocated(bb), flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
       }
 
       channels[0] = threeChannelPreallocated; //3 channel
@@ -366,7 +435,7 @@ namespace pathCam {
     auto val = image->check_blur();
     bool excludeImage;
 
-    if(blurVals.size() > 0) {
+    if (blurVals.size() > 0) {
       double sum = std::accumulate(std::begin(blurVals), std::end(blurVals), 0.0);
       double m = sum / blurVals.size();
 
@@ -376,12 +445,12 @@ namespace pathCam {
       });
 
       double stdev = sqrt(accum / (blurVals.size() - 1));
-    }else{
+    } else {
       excludeImage = false;
     }
-    if(blurVals.size() < 5){
+    if (blurVals.size() < 5) {
       blurVals.push_back(val);
-    }else{
+    } else {
 
     }
   }
@@ -819,84 +888,6 @@ namespace pathCam {
   }
 
 
-  std::vector<long> CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
-                                                      bool shouldCleanData, double epsilonClean,
-                                                      std::map<long, long> systemIndexToFrameIndex) {
-    std::vector<long> indexesRemoved;
-    cv::Mat ATranspose = A.t();
-    cv::Mat ATA = ATranspose * A;
-    cv::Mat ATb = ATranspose * b;
-
-    cv::Mat r = ATb - (ATA * x);
-    cv::Mat p = r.clone();
-    cv::Mat n0 = A*x - b;
-    cv::Mat n1;
-    for (int i = 0; i < steps; i++) {
-      double rdr = r.dot(r);
-      Mat ATAp = ATA * p;
-      double stepSize = rdr / (p.dot(ATAp));
-      x += stepSize * p;
-      n1 = A*x - b;
-      r -= stepSize * ATAp;
-      double adjustment = r.dot(r) / rdr;
-      p = r + adjustment * p;
-
-      std::cout<<std::to_string(cv::norm(n0 - n1))<<std::endl;
-      std::cout<<std::to_string(cv::norm(n1))<<std::endl;
-      if (shouldCleanData && cv::norm(n0 - n1) < cv::norm(n1)/ 10){
-        auto res = clean_data(A,b,x,systemIndexToFrameIndex);
-        if (res >= 0){
-          indexesRemoved.push_back(res);
-        }
-      }
-
-      if (cv::norm(n0 - n1) < epsilon) {
-        break;
-      }
-
-
-      n0 = n1.clone();
-    }
-    return indexesRemoved;
-  }
-
-
-  long CompositeVoronoi::clean_data(cv::Mat A, cv::Mat b, cv::Mat x, std::map<long, long> systemIndexToFrameIndex) {
-    long indexRemoved = -1;
-    Mat r = A * x - b;
-    Mat e = r.mul(r);
-    Mat bins = Mat::zeros(x.rows,1,CV_64FC1);
-    for (int i = 0; i < A.cols; i++){
-      for (int j = 0; j < A.rows; j++){
-        if (A.at<double>(j,i) != 0){
-          bins.at<double>(i) += e.at<double>(j);
-        }
-      }
-    }
-    double minVal;
-    double maxVal;
-    Point minLoc;
-    Point maxLoc;
-    minMaxLoc( bins, &minVal, &maxVal, &minLoc, &maxLoc );
-    std::cout << std::to_string(maxVal)+" "+std::to_string(pow(cv::norm(r),2)) << std::endl;
-
-    if(maxVal > 0.01 * pow(cv::norm(r),2) ){
-      removeCount++;
-      indexRemoved = maxLoc.y;
-      for (int i = 0; i < A.rows; i++){
-        if(A.at<double>(i,maxLoc.y) != 0){
-          b.at<double>(i) = 0;
-          for (int ii = 0; ii < A.cols; ii++){
-            A.at<double>(i,ii) = 0;
-          }
-          systemIndexToFrameIndex.erase(maxLoc.y);
-        }
-      }
-    }
-    return indexRemoved;
-  }
-
-
   void CompositeVoronoi::perform_global_alignment(unsigned int flag, double closenessFactor) {
     //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
 
@@ -910,11 +901,11 @@ namespace pathCam {
 
           if (abs(image2->absoluteCoords.x - image1->absoluteCoords.x) < closenessFactor * image_size.width &&
               abs(image2->absoluteCoords.y - image1->absoluteCoords.y) < closenessFactor * image_size.height) {
-            if (parent->matchM.match[image1->index][image2->index] != nullptr) {
-              indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, false});
-            } else {
+//            if (parent->matchM.match[image1->index][image2->index] != nullptr) {
+//              indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, false});
+//            } else {
               indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, true});
-            }
+            //}
           }
         }
       }
@@ -1104,15 +1095,14 @@ namespace pathCam {
     auto testValBefore = norm(A * xac - xpr);
     //solve problem for x and y
     auto testA = A.clone();
-    coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001,false);
-    auto res = coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001,true,0.9,systemIndexToFrameIndex);
+    std::map<long,long>temp;
+    //coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001, false,temp);
+    coopers_conjugate_gradient(A, xpr, xac, 400, 0.0000001, true,  systemIndexToFrameIndex,0.05,ypr);
     auto normA = cv::norm(testA - A);
 
-    for (auto loc : res){
-      ypr.at<double>(loc) = 0;
-    }
 
-    coopers_conjugate_gradient(A, ypr, yac, 100, 0.0001,true,0.9,systemIndexToFrameIndex);
+
+    coopers_conjugate_gradient(A, ypr, yac, 400, 0.0000001, true,  systemIndexToFrameIndex,0.05,xpr);
 
     auto testValAfter = norm(A * xac - xpr);
     int k = 0;
@@ -1202,7 +1192,7 @@ namespace pathCam {
 
     parent->reg_results_mutex->readLock();
     std::vector<RegInfo> newinfo;
-    for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
+    for (auto [i,elm] : systemIndexToFrameIndex) {
       parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.x = xac.at<double>(i);
       parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.y = yac.at<double>(i);
       newinfo.push_back(parent->reg_results[systemIndexToFrameIndex[i]]);
@@ -1216,5 +1206,137 @@ namespace pathCam {
 
   }
 
+  void CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
+                                               bool shouldCleanData,
+                                               std::map<long, long> &systemIndexToFrameIndex, double epsilonClean, cv::Mat bOther) {
+    std::vector<long> indexesRemoved;
+    cv::Mat ATranspose = A.t();
+    cv::Mat ATA = ATranspose * A;
+    cv::Mat ATb = ATranspose * b;
+
+    cv::Mat r = ATb - (ATA * x);
+    cv::Mat p = r.clone();
+    double n0 = cv::norm(A * x - b);
+    double n1;
+    for (int i = 0; i < steps; i++) {
+
+      double rdr = r.dot(r);
+      Mat ATAp = ATA * p;
+      double stepSize = rdr / (p.dot(ATAp));
+
+//      std::cout << "x before" << std::endl;
+//      for (int i = 0; i < x.rows; i++) {
+//        std::cout << std::to_string(x.at<double>(i)) << std::endl;
+//      }
+      x += stepSize * p;
+//      std::cout << std::endl;
+
+//      std::cout << "x after" << std::endl;
+//      for (int i = 0; i < x.rows; i++) {
+//        std::cout << std::to_string(x.at<double>(i)) << std::endl;
+//      }
+//      std::cout << std::endl;
+      n1 = cv::norm(A * x - b);
+
+      r -= stepSize * ATAp;
+      double adjustment = r.dot(r) / rdr;
+      p = r + adjustment * p;
+
+      std::cout << "step " + std::to_string(i) + "   norm difference " + std::to_string(abs(n0 - n1)) +
+                   "   norm of residual " + std::to_string(abs(n1)) << std::endl;
+
+      if (shouldCleanData && abs(n0 - n1) < cv::norm(n1) * epsilonClean) {
+
+
+        clean_data(A, b, bOther, x, systemIndexToFrameIndex);
+        ATA = A.t() * A;
+        r = A.t() * b - (ATA * x);
+        p = r.clone();
+      }
+
+      if (abs(n0 - n1) < epsilon || n1 < epsilon) {
+        break;
+      }
+
+      n0 = n1;
+    }
+  }
+
+
+  void CompositeVoronoi::clean_data(cv::Mat A, cv::Mat b,cv::Mat bOther, cv::Mat x, std::map<long, long> &systemIndexToFrameIndex) {
+    Mat r = A * x - b;
+    Mat e = r.mul(r);
+    Mat bins = Mat::zeros(x.rows, 1, CV_64FC1);
+    for (int i = 0; i < A.cols; i++) {
+      for (int j = 0; j < A.rows; j++) {
+        if (A.at<double>(j, i) != 0) {
+          bins.at<double>(i) += e.at<double>(j);
+        }
+      }
+    }
+//
+//    for(int i = 0; i < bins.rows; i++){
+//      std::cout<<std::to_string(bins.at<double>(i))<<std::endl;
+//    }
+
+    double minVal;
+    double maxVal;
+    Point minLoc;
+    Point maxLoc;
+    minMaxLoc(bins, &minVal, &maxVal, &minLoc, &maxLoc);
+    std::cout << std::to_string(maxVal) + " " + std::to_string(pow(cv::norm(r), 2)) << std::endl;
+
+    std::vector<double> bins2(bins.rows);
+    for (int i = 0; i < bins.rows; i++) {
+      bins2[i] = bins.at<double>(i);
+    }
+
+    double sum = std::accumulate(std::begin(bins2), std::end(bins2), 0.0);
+    double m = sum / bins2.size();
+
+    double accum = 0.0;
+    std::for_each(std::begin(bins2), std::end(bins2), [&](const double d) {
+      accum += (d - m) * (d - m);
+    });
+
+    double stdev = sqrt(accum / (bins2.size() - 1));
+    double distFromMean = (maxVal - m) / stdev;
+    std::cout << "distance from mean " + std::to_string(distFromMean) << std::endl;
+    //if(distFromMean > 4){
+    removeCount++;
+    long indexRemoved = maxLoc.y;
+
+//    for (int i = 0; i < A.rows; i++) {
+//      for (int j = 0; j < A.cols; j++) {
+//        std::cout << std::to_string(A.at<double>(i, j)) + " ";
+//      }
+//      std::cout << "        " + std::to_string(b.at<double>(i)) << std::endl;
+//    }
+
+    for (int i = 0; i < A.rows; i++) {
+      if (A.at<double>(i, indexRemoved) != 0) {
+        b.at<double>(i) = 0;
+        if(bOther.rows > 0){
+          bOther.at<double>(i) = 0;
+        }
+        for (int ii = 0; ii < A.cols; ii++) {
+          A.at<double>(i, ii) = 0;
+        }
+        systemIndexToFrameIndex.erase(indexRemoved);
+      }
+    }
+//    std::cout << std::endl;
+//    for (int i = 0; i < A.rows; i++) {
+//      for (int j = 0; j < A.cols; j++) {
+//        std::cout << std::to_string(A.at<double>(i, j)) + " ";
+//      }
+//      std::cout << "       " + std::to_string(b.at<double>(i)) << std::endl;
+//    }
+
+
+    int k = 0;
+
+    //}
+  }
 }
 

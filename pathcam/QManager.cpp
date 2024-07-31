@@ -21,16 +21,17 @@ void QManager::run(){
       if (!jq->is_empty())
       {
         jq->queue_mutex->lock();
+        auto j = jq->jobQueue.top();
         jq->pool->start(*jq->jobQueue.top());
         jq->jobQueue.pop();
         jq->queue_mutex->unlock();
       }
     }
-      /*
-    else {
-      jq->pool->threadAvailableEvent->wait();
-    }
-       */
+
+//    else {
+//      jq->pool->threadAvailableEvent->wait();
+//    }
+
   }
 }
 

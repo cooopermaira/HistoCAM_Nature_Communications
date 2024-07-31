@@ -114,9 +114,9 @@ namespace pathCam {
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
                                             std::vector<Point2i> &_face);
     
-    std::vector<long> coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon, bool shouldCleanData, double epsilonClean = 0, std::map<long, long> systemIndexToFrameIndex = {});
+    void coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon, bool shouldCleanData, std::map<long, long>& systemIndexToFrameIndex, double epsilonClean = 0, cv::Mat bOther = cv::Mat());
 
-    long clean_data(cv::Mat A, cv::Mat b, cv::Mat x, std::map<long, long> systemIndexToFrameIndex);
+    void clean_data(cv::Mat A, cv::Mat b, cv::Mat bOther, cv::Mat x, std::map<long, long> &systemIndexToFrameIndex);
 
   public:
 

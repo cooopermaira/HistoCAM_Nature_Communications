@@ -160,7 +160,7 @@ label = _NOLABEL;
     cv::Mat reg_image;
     double reg_scale;
     double reg_crop;
-    double variance;
+    double blurVariance;
 
 
   };

@@ -5,8 +5,8 @@ using namespace cv;
 namespace pathCam {
     
 
-    Image::Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool) : width(width), height(height),scope_radius(scope_radius), label(_NOLABEL), mempool(mempool), raw_buffer(0),
-                                        reference_count(0), image_file(Poco::Path()),variance(0) {};
+    Image::Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool) : width(width), height(height), scope_radius(scope_radius), label(_NOLABEL), mempool(mempool), raw_buffer(0),
+                                                                                                           reference_count(0), image_file(Poco::Path()), blurVariance(0) {};
 
   Image::~Image() {
     free_memory_RAW(true);
@@ -52,12 +52,12 @@ namespace pathCam {
       cv::meanStdDev(grad_magnitude, mean, stddev);
       double tempVariance = std::pow(stddev[0], 2);
 
-      if (variance < tempVariance) {
-        variance = tempVariance;
+      if (blurVariance < tempVariance) {
+        blurVariance = tempVariance;
       }
     }
 
-    return variance;
+    return blurVariance;
   }
 
 
@@ -105,7 +105,7 @@ namespace pathCam {
   }
 
   bool Image::is_good() {
-    return label == _2X;
+    //return label == _2X;
     if (label == _UNDEREXP) {
       return false;
     }

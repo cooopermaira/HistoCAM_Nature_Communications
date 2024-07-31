@@ -9,16 +9,14 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  MatchRunnable::MatchRunnable(StreamCam *parent, unsigned long image_idx,
-                               unsigned long sort_order) : RunnableIntermediate(sort_order), parent(parent),
-                                                           image_idx(image_idx),
-                                                           successful(false) {
-  };
+  MatchRunnable::MatchRunnable(StreamCam *parent, unsigned long image_idx) : RunnableIntermediate(image_idx, 2),
+                                                                             parent(parent),
+                                                                             image_idx(image_idx){};
 
-  bool XCompRunnable::match_to_images(Image* selfImage, std::vector<Image *> otherCompImages) {
-    Image* matchedTo;
+  bool XCompRunnable::match_to_images(Image *selfImage, std::vector<Image *> otherCompImages) {
+    Image *matchedTo;
     double scale = 0;
-    Point2f offset,offset2;
+    Point2f offset, offset2;
 
     //loop through and get homography
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
@@ -34,26 +32,28 @@ namespace pathCam {
 
       matcher->match(m, 1);
       int result = motion_est->findHomography(m, parent->estimator_type, 500, 1);
-      if(result == 1){
+      if (result == 1) {
 
         matchedTo = otherCompImages[ii];
         parent->reg_results_mutex->readLock();
         auto regInfo = parent->reg_results[matchedTo->index];
         parent->reg_results_mutex->unlock();
 
-        if(!regInfo.resolved){
+        if (!regInfo.resolved) {
           parent->JobQ->jobRefs[matchedTo->index * 3 + 2]->waitOnThisGuy();
           parent->reg_results_mutex->readLock();
           auto regInfo = parent->reg_results[matchedTo->index];
           parent->reg_results_mutex->unlock();
-          if(!regInfo.resolved){
+          if (!regInfo.resolved) {
             continue;
           }
         }
-        scale = (m->H.at<double>(0,0) + m->H.at<double>(1,1)) / 2.0;
+        scale = (m->H.at<double>(0, 0) + m->H.at<double>(1, 1)) / 2.0;
         //scale = 2.0139375;
-        offset = Point2f(m->t_x / pow(scale,2) + regInfo.absoluteCoords.x / scale,m->t_y / pow(scale,2) + regInfo.absoluteCoords.y / scale );
-        offset2 =  Point2f(m->t_x / parent->scale_factor + regInfo.absoluteCoords.x / scale,m->t_y / parent->scale_factor + regInfo.absoluteCoords.y / scale );
+        offset = Point2f(m->t_x / pow(scale, 2) + regInfo.absoluteCoords.x / scale,
+                         m->t_y / pow(scale, 2) + regInfo.absoluteCoords.y / scale);
+        offset2 = Point2f(m->t_x / parent->scale_factor + regInfo.absoluteCoords.x / scale,
+                          m->t_y / parent->scale_factor + regInfo.absoluteCoords.y / scale);
 
         break;
       }
@@ -69,7 +69,7 @@ namespace pathCam {
 
   void XCompRunnable::run() {
     //extract multilevel features from self image
-    pathCam::Image* image = parent->get_image_ref(image_idx);
+    pathCam::Image *image = parent->get_image_ref(image_idx);
     extract_multilevel_keypoints(image);
 
     //get references to other component images
@@ -77,9 +77,9 @@ namespace pathCam {
 //    for (long i = image_idx - 1; i >= 0; i--) {
 //      indexes[i] = (unsigned long) i;
 //    }
-    for(int i = 0; i < parent->composites.size(); i++){
-      if (parent->composites[i]->componentIndex != componentMembership){
-        for (auto item : parent->composites[i]->delaunayMembers){
+    for (int i = 0; i < parent->composites.size(); i++) {
+      if (parent->composites[i]->componentIndex != componentMembership) {
+        for (auto item: parent->composites[i]->delaunayMembers) {
           indexes.push_back(item.second);
         }
       }
@@ -104,15 +104,16 @@ namespace pathCam {
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
     int mostMatches = 0;
     long bestMatch = -1;
+    bool tryWaiting = true;
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       pathCam::Image *previous = parent->get_image_ref(prev_idx);
       if (previous == nullptr) {
-        if (max(5, int(image_idx)) <= prev_idx + 5) {
-          auto waitFor = parent->JobQ->jobRefs[3 * prev_idx];
-
+        if (max(5, int(image_idx)) <= prev_idx + 5 && tryWaiting) {
+          auto res = parent->JobQ->getSortOrderAndJobRefs(1,prev_idx);
+          auto waitFor = parent->JobQ->jobRefs[res.first];
           waitFor->waitOnThisGuy();
           parent->debugMatchSuspendThread++;
-
+          tryWaiting = false;
           previous = parent->get_image_ref(prev_idx);
           if (previous == nullptr) { continue; }
 
@@ -146,11 +147,10 @@ namespace pathCam {
           tempReg.relativeCoords.x = -1 * m->t_x;
           tempReg.relativeCoords.y = -1 * m->t_y;
           parent->add_registration(tempReg);
+
+          auto rj = new RegistrationRunnable(parent, image_idx);
+          parent->JobQ->add_runnable(rj);
           successful = true;
-          //this sort order to image index or sort order to job index is a nightmare that needs to be formalized
-          //as a function that takes image index, job type and returns sort order and job index
-          auto rj = new RegistrationRunnable(parent, image_idx, sort_order + 20);
-          parent->JobQ->add_runnable(rj, (sort_order - 20) * 3 + 2);
           break;
         } else {
           parent->resize_mmatch_mutex->readLock();
@@ -176,6 +176,7 @@ namespace pathCam {
     delete motion_est;
     parent->matchableCount--;
     jobComplete.set();
+    successful = true;
   } //end run
 
   void SingleMatchRunnable::run() {
@@ -248,7 +249,7 @@ namespace pathCam {
 
   SingleMatchRunnable::SingleMatchRunnable(StreamCam *parent, unsigned long image_idx1, unsigned long image_idx2,
                                            unsigned int component_membership, int edgeNumber,
-                                           unsigned long sort_order) : RunnableIntermediate(sort_order), parent(parent),
+                                           unsigned long sort_order) : RunnableIntermediate(sort_order, 0), parent(parent),
                                                                        image_idx1(image_idx1), image_idx2(image_idx2),
                                                                        component_membership(component_membership),
                                                                        edgeNumber(edgeNumber) {

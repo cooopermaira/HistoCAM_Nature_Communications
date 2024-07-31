@@ -17,18 +17,21 @@ namespace pathCam {
 
   class RunnableIntermediate : public Poco::Runnable {
   public:
-    RunnableIntermediate(unsigned long sort_order) : sort_order(sort_order), jobComplete(false),someoneWaitingOnJobCompleteEvent(false) {
-    }
+    RunnableIntermediate(unsigned long image_index, int jobTypeFlag) : image_index(image_index),jobTypeFlag(jobTypeFlag), jobComplete(false),someoneWaitingOnJobCompleteEvent(false) {}
     Poco::Event jobComplete;
     bool someoneWaitingOnJobCompleteEvent;
     unsigned long sort_order = 0;
+    int jobTypeFlag = 0;
+    unsigned long image_index;
+    int jobRefNumber = 0;
+    std::atomic<bool> successful = false;
     void waitOnThisGuy();
   };
 
   class DebayerRunnable : public pathCam::RunnableIntermediate {
   public:
     explicit DebayerRunnable(pathCam::Image *image, Poco::Path outfile) : image(image), outfile(outfile),
-                                                                          RunnableIntermediate(0) {}
+                                                                          RunnableIntermediate(0, 0) {}
 
     Poco::Path outfile;
     pathCam::Image *image;
@@ -57,11 +60,10 @@ namespace pathCam {
     StreamCam *parent;
     unsigned long index;
   public:
-    RegistrationRunnable(StreamCam *parent, unsigned long index, unsigned long sort_order) : parent(parent),
-                                                                                             index(index),
-                                                                                             RunnableIntermediate(
-                                                                                                 sort_order) {
-    };
+    RegistrationRunnable(StreamCam *parent, unsigned long index) :
+        parent(parent),
+        index(index),
+        RunnableIntermediate(index, 3) {};
 
     virtual void run();
 
@@ -76,12 +78,10 @@ namespace pathCam {
     Image *image;
 
   public:
-    bool successful;
 
-    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long sort_order) : image(image), parent(parent),
-                                                                                     successful(false),
-                                                                                     RunnableIntermediate(
-                                                                                         sort_order) {
+    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx) : image(image), parent(parent),
+                                                                                    RunnableIntermediate(
+                                                                                        image_idx, 1) {
     };
 
     virtual void run();
@@ -103,7 +103,6 @@ namespace pathCam {
     StreamCam *parent;
 
   public:
-    bool successful;
 
     DiskReader(StreamCam *parent);
 
@@ -116,7 +115,6 @@ namespace pathCam {
     std::string imageFile;
 
   public:
-    bool successful;
 
     DiskStreamer(StreamCam *parent, std::string file, unsigned long sort_order);
 
@@ -135,11 +133,11 @@ namespace pathCam {
 
   public:
     ImageToTileCopyRunnable(StreamCam *parent, Image *image, unsigned int component_membership,
-                            Point2i tile,unsigned long sort_order) : RunnableIntermediate(sort_order),
-                                                                  parent(parent),
-                                                                  image(image),
-                                                                  tile(tile),
-                                                                  component_membership(component_membership) {};
+                            Point2i tile,unsigned long sort_order) : RunnableIntermediate(sort_order,0),
+                                                                     parent(parent),
+                                                                     image(image),
+                                                                     tile(tile),
+                                                                     component_membership(component_membership) {};
     virtual void run();
   };
 
@@ -163,9 +161,9 @@ namespace pathCam {
   public:
     XCompRunnable(StreamCam *parent, unsigned long image_idx, unsigned int componentMembershipSelf) : image_idx(image_idx),
                                                                                                       componentMembership(
-                                                                                    componentMembershipSelf),
+                                                                                                          componentMembershipSelf),
                                                                                                       parent(parent),
-                                                                                                      RunnableIntermediate(0) {};
+                                                                                                      RunnableIntermediate(image_idx, 0) {};
     StreamCam *parent;
     unsigned long image_idx;
     unsigned int componentMembership;
@@ -182,9 +180,8 @@ namespace pathCam {
     unsigned long image_idx;
 
   public:
-    bool successful;
 
-    MatchRunnable(StreamCam *parent, unsigned long image_idx, unsigned long sort_order);
+    MatchRunnable(StreamCam *parent, unsigned long image_idx);
 
     virtual void run();
   };
