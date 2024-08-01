@@ -147,7 +147,7 @@ namespace pathCam {
           tempReg.relativeCoords.x = -1 * m->t_x;
           tempReg.relativeCoords.y = -1 * m->t_y;
           parent->add_registration(tempReg);
-
+          parent->regCount++;
           auto rj = new RegistrationRunnable(parent, image_idx);
           parent->JobQ->add_runnable(rj);
           successful = true;
@@ -194,6 +194,8 @@ namespace pathCam {
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
     int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
+//    m->t_x *= image1->get_reg_scale();
+//    m->t_y *= image2->get_reg_scale();
     if (result == 1) {
       if (std::abs(parent->matchM.match[image_idx2][image_idx1]->t_x) < image1->width / 2 && std::abs(
           parent->matchM.match[image_idx2][image_idx1]->t_y) < image1->height / 2) {
@@ -239,7 +241,7 @@ namespace pathCam {
                             parent->real);
 
 
-    detector->detect_and_compute_multilevel(image);
+    detector->detect_and_compute(image,1);
 
     image->release_reg_image();
 

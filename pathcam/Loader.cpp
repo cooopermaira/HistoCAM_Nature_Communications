@@ -27,17 +27,15 @@ namespace pathCam {
     image->find_label();
 
     if (image->is_good()) {
+
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
+      image->reg_scale_initial = parent->scale_factor;
+      image->reg_crop_initial = parent->crop_factor;
 
-//      if (image->check_blur() < 800.0) {
-//        successful = true;
-//        parent->loaderCount--;
-//        jobComplete.set();
-//        return;
-//      }
+      image->check_blur();
 
-      image->free_memory_RAW();
+      //image->free_memory_RAW();
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
       switch (parent->feature_type) {
@@ -58,14 +56,14 @@ namespace pathCam {
           break;
       }
 
-      detector->detect_and_compute(image);
+      detector->detect_and_compute(image,0);
 
       if (image->keypoints.size() < 200) {
         detector->set_ORB_params();
-        detector->detect_and_compute(image);
+        detector->detect_and_compute(image,0);
       }
 
-      delete detector;
+
 
       if (image->keypoints.size() < 200) {
         successful = true;
@@ -77,6 +75,16 @@ namespace pathCam {
 
       image->release_reg_image();
 
+      if(additionalFullReg){
+        image->create_reg_image(1,1,parent->debayer, parent->interpolation, parent->real);
+        image->reg_scale_full = 1;
+        image->reg_crop_full = 1;
+        detector->detect_and_compute(image,2);
+        image->release_reg_image();
+      }
+      image->free_memory_RAW();
+
+      delete detector;
       image->index = image_index;
       parent->add_image(image, image_index);
       auto matchjob = new MatchRunnable(parent, image_index);

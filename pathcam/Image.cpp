@@ -176,8 +176,8 @@ namespace pathCam {
       release = true;
     }
 
-    reg_scale = _reg_scale;
-    reg_crop = _reg_crop;
+//    reg_scale_initial = _reg_scale;
+//    reg_crop_initial = _reg_crop;
 
     Size image_size = Size(width, height);
 
@@ -194,13 +194,13 @@ namespace pathCam {
     if (real) {
       reg_image.convertTo(reg_image, CV_32FC1);
     }
-    if (reg_scale != 1.0) {
-      image_size = Size(image_size.width * reg_scale, image_size.height * reg_scale);
+    if (_reg_scale != 1.0) {
+      image_size = Size(image_size.width * _reg_scale, image_size.height * _reg_scale);
       cv::resize(reg_image, reg_image, image_size);
     }
-    if (reg_crop != 1.0) {
+    if (_reg_crop != 1.0) {
       Size old_image_size = image_size;
-      image_size = Size(image_size.width * reg_crop, image_size.height * reg_crop);
+      image_size = Size(image_size.width * _reg_crop, image_size.height * _reg_crop);
       cv::Rect myROI((old_image_size.width / 2) - (image_size.width / 2),
                      (old_image_size.height / 2) - image_size.height / 2,
                      image_size.width, image_size.height);

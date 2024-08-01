@@ -24,7 +24,7 @@ namespace pathCam {
                                                            resize_mmatch_mutex(new Poco::RWLock()),
                                                            compositeQ_mutex(new Poco::FastMutex()),
                                                            component_mutex(new Poco::FastMutex()),
-                                                           resize_buffer_mutex(new Poco::FastMutex()){
+                                                           resize_buffer_mutex(new Poco::FastMutex()) {
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(10, 10);
     reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
@@ -33,6 +33,44 @@ namespace pathCam {
 
   }
 
+  bool StreamCam::check_blur(unsigned long image_idx, double myBlurVal) {
+    std::vector<unsigned long> indexes(image_idx);
+
+    for (int i = 0; i < image_idx; i++) {
+      indexes[i] = i;
+    }
+    auto imagesLocal = get_image_refs(indexes);
+    if (imagesLocal.size() <= 1) { return true; }
+    std::vector<double> blurVals;
+
+    for (auto img: imagesLocal) {
+      blurVals.push_back(img->blurVariance);
+    }
+
+
+    double sum = std::accumulate(std::begin(blurVals), std::end(blurVals), 0.0);
+    double m = sum / blurVals.size();
+
+    double accum = 0.0;
+    std::for_each(std::begin(blurVals), std::end(blurVals), [&](const double d) {
+      accum += (d - m) * (d - m);
+    });
+
+    if(image_idx == 209 || image_idx == 149){
+      int k = 0;
+    }
+
+    double stdev = sqrt(accum / (blurVals.size() - 1));
+    double howMany = abs(m - myBlurVal) / stdev;
+    double v1 = min((double)blurVals.size()+1,(double) 100.0) / 100.0;
+    double v2 = (m - 2.5 * stdev - 300);
+    double threshold = v1 * v2 + 300;
+    if (threshold < myBlurVal) {
+      return true;
+    } else {
+      return false;
+    }
+  }
 
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx) {
     resize_mmatch_mutex->readLock();
@@ -102,15 +140,14 @@ namespace pathCam {
   void StreamCam::add_registration(pathCam::RegInfo regInfo) {
     reg_results_mutex->writeLock();
     auto index = regInfo.index;
-    reg_results[index]=regInfo;
+    reg_results[index] = regInfo;
     reg_results_mutex->unlock();
-    regCount++;
   }
 
   unsigned int StreamCam::get_last_active_component(unsigned long image_index) {
     for (unsigned long i = image_index; i > 0; i--) {
-      if (reg_results[i-1].component_membership != reg_results[image_index].component_membership){
-        return reg_results[i-1].component_membership;
+      if (reg_results[i - 1].component_membership != reg_results[image_index].component_membership) {
+        return reg_results[i - 1].component_membership;
       }
     }
   }
@@ -120,7 +157,7 @@ namespace pathCam {
 
     image_mutex->readLock();
     for (unsigned int i = 0; i < indexes.size(); i++) {
-      if(images[indexes[i]] == nullptr){ continue; }
+      if (images[indexes[i]] == nullptr) { continue; }
       temp.push_back(images[indexes[i]]);
     }
     image_mutex->unlock();
@@ -154,8 +191,8 @@ namespace pathCam {
       temp->imagePyramid->set_offset(Point2f(0, 0));
     } else {
       temp->imagePyramid->set_scale(0);
-      temp->imagePyramid->set_offset(Point2f(0,0));
-      auto xcm = new XCompRunnable(this,image_index,component_index);
+      temp->imagePyramid->set_offset(Point2f(0, 0));
+      auto xcm = new XCompRunnable(this, image_index, component_index);
       JobQ->add_runnable(xcm);
     }
     component_mutex->unlock();
@@ -166,7 +203,7 @@ namespace pathCam {
     auto dm = composites[component]->delaunayMembers;
     std::vector<unsigned long> res(dm.size());
     int i = 0;
-    for (auto [key,value] : dm){
+    for (auto [key, value]: dm) {
       res[i] = dm[key];
       i++;
     }
@@ -181,7 +218,7 @@ namespace pathCam {
     return temp;
   }
 
-  Image* StreamCam::get_Q_front_Spin() {
+  Image *StreamCam::get_Q_front_Spin() {
     resize_buffer_mutex->lock();
     Image *temp = spin_image_buffer.front();
     spin_image_buffer.pop();
@@ -190,7 +227,7 @@ namespace pathCam {
   }
 
   void StreamCam::pass_image(Image *image, unsigned long _image_index) {
-    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index);
+    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true);
     loaderCount++;
     JobQ->add_runnable(llr);
   }
@@ -217,7 +254,7 @@ namespace pathCam {
 
   void RunnableIntermediate::waitOnThisGuy() {
     someoneWaitingOnJobCompleteEvent = true;
-    if(!successful) {
+    if (!successful) {
       jobComplete.wait();
     }
     someoneWaitingOnJobCompleteEvent = false;

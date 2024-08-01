@@ -23,13 +23,14 @@ namespace pathCam {
 
     if (!reginfo.resolved) {
       sort_order += 10;
-      parent->JobQ->add_runnable(this);
+      parent->JobQ->add_runnable(this,sort_order);
       //this should be changed to wait on correct jobComplete event rather than re entered into job queue. 
     } else {
       parent->regCount--;
       parent->push_compositeQ(reginfo);
     }
     jobComplete.set();
+    jobComplete.reset();
   }
 
 

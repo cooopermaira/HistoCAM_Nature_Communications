@@ -88,6 +88,8 @@ namespace pathCam {
 
     bool spin_run();
 
+    bool check_blur(unsigned long image_idx, double myBlurVal);
+
     void pass_image(Image *, unsigned long _image_index = 0);
 
     void set_match(unsigned long image_idx, unsigned long prev_idx);

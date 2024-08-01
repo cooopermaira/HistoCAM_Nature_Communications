@@ -109,7 +109,7 @@ namespace pathCam {
 
     void self_reset();
 
-    bool exclude_for_blur(Image* image);
+    void exclude_for_blur();
 
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
                                             std::vector<Point2i> &_face);

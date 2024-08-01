@@ -570,15 +570,15 @@ public:
       next_image->create_reg_image(parent->scale_factor,parent->crop_factor,parent->debayer,parent->interpolation, parent->real);
       
       
-      detector->detect_and_compute(last_registered);
-      detector->detect_and_compute(next_image);
-      
-      if(last_registered->keypoints.size() < 200 || next_image->keypoints.size() < 200){
-        detector->set_ORB_params();
-        detector->detect_and_compute(last_registered);
-        detector->detect_and_compute(next_image);
-        detector->set_ORB_params(parent->ORB_params);
-      }
+//      detector->detect_and_compute(last_registered);
+//      detector->detect_and_compute(next_image);
+//
+//      if(last_registered->keypoints.size() < 200 || next_image->keypoints.size() < 200){
+//        detector->set_ORB_params();
+//        detector->detect_and_compute(last_registered);
+//        detector->detect_and_compute(next_image);
+//        detector->set_ORB_params(parent->ORB_params);
+//      }
       
       if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
         if(parent->results_logger){  parent->results_logger->information(outfile + "failed. Not enough keypoints"); }

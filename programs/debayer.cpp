@@ -12,108 +12,79 @@ using Poco::DirectoryIterator;
 
 int main(int argc, char *argv[]) {
 
-    //Should probably add fancier command line parsing
-    if (argc < 3) {
-        std::cout << "Missing input. Use:\n";
-        std::cout << "debayer <path to input image> <path to output image>\n";
-        return -1;
+  //Should probably add fancier command line parsing
+  if (argc < 3) {
+    std::cout << "Missing input. Use:\n";
+    std::cout << "debayer <path to input image> <path to output image>\n";
+    return -1;
+  }
+
+  auto inFile = Poco::Path(argv[1]);
+  auto outFile = Poco::Path(argv[2]);
+
+  if (!(inFile.isDirectory() == outFile.isDirectory())) {
+    std::cout << "Input needs to be both directories or files.\n";
+    return -1;
+  }
+
+  if (inFile.isDirectory()) {
+    std::vector<double> *blur = new std::vector<double>;
+    std::vector<std::string>* names = new std::vector<std::string>;
+
+    blur->resize(3000);
+    names->resize(3000);
+
+    std::cout << "Processing Directories\n";
+    auto jq = pathCam::JobQueue(20, 20);
+
+    Poco::DirectoryIterator it(inFile);
+    Poco::DirectoryIterator end;
+    int num = 0;
+    while (it != end) {
+
+      Poco::Path p(it.path());
+
+      if (p.getExtension() == "Raw") {
+        //std::cout << "read:" << p.toString() << "\n";
+
+        auto *image = new pathCam::Image(6464,4852,2190);
+
+        image->set_disk_file(p);
+        auto *dr = new pathCam::DebayerRunnable(image, outFile,blur,names,num);
+        jq.add_runnable(dr,num);
+
+      }
+      num++;
+      ++it;
+    }
+    while (!jq.is_empty()) {
+      jq.run_jobs(false);
+    }
+    int k = 0;
+
+
+  } else {
+
+    std::cout << "Processing File\n";
+
+    pathCam::Image *image = new pathCam::Image(6464,4852,2190);
+
+    image->set_disk_file(inFile);
+    image->load_raw_from_disk();
+
+
+    if (!image->in_memory()) {
+      std::cout << "Issue loading image.\n";
+      return -1;
     }
 
-    auto inFile = Poco::Path(argv[1]);
-    auto outFile = Poco::Path(argv[2]);
-    //Add in argument to specify size of output image in format widthXheightxradius default value is 6464x4852X2190
-    unsigned int width;
-    unsigned int height;
-    unsigned int scope_radius;
-    //TODO: find where debayer is being called in command line and add in arguments for width, height, and radius, values will still be hardcoded at lines 57, 58, and 59 until then
-    if (argc == 4) {
-        std::string sizeArg = argv[3];
-        size_t xPos = sizeArg.find('x');
-        if (xPos != std::string::npos) {
-            std::string widthStr = sizeArg.substr(0, xPos);
-            std::string heightStr = sizeArg.substr(xPos + 1);
-            xPos = heightStr.find('x');
-            std:: string radiusStr = sizeArg.substr(xPos + 1);
-            try {
-                width = std::stoul(widthStr);
-                height = std::stoul(heightStr);
-                scope_radius = std::stoul(radiusStr);
-            }
-            catch (const std::invalid_argument& e) {
-                std::cout << "Invalid size format. Use widthXheightXradius.\n";
-                return -1;
-            }
-            catch (const std::out_of_range& e) {
-                std::cout << "Size value out of range.\n";
-                return -1;
-            }
-        }
-        else {
-            std::cout << "Invalid size format. Use widthXheightXradius.\n";
-            return -1;
-        }
-    }
-    else {
-        width = 6464;
-        height = 4852;
-        scope_radius = 2190;
-    }
+    image->create_reg_image(1.0, 1.0, true, cv::INTER_CUBIC, false);
 
-    if (!(inFile.isDirectory() == outFile.isDirectory())) {
-        std::cout << "Input needs to be both directories or files.\n";
-        return -1;
-    }
+    imwrite(outFile.toString(), image->get_reg_image());
 
-    if (inFile.isDirectory()) {
+    delete image;
+  }
 
-        std::cout << "Processing Directories\n";
-        auto jq = pathCam::JobQueue(20, 20);
-
-        Poco::DirectoryIterator it(inFile);
-        Poco::DirectoryIterator end;
-        while (it != end) {
-
-            Poco::Path p(it.path());
-
-            if (p.getExtension() == "Raw") {
-                //std::cout << "read:" << p.toString() << "\n";
-                
-                auto *image = new pathCam::Image(width, height, scope_radius);
-
-                image->set_disk_file(p);
-                auto *dr = new pathCam::DebayerRunnable(image, outFile);
-                jq.add_runnable(dr);
-
-            }
-            ++it;
-        }
-        while (!jq.is_empty()) {
-          jq.run_jobs(false);
-        }
-
-
-    } else {
-
-        std::cout << "Processing File\n";
-
-        pathCam::Image* image = new pathCam::Image(width, height, scope_radius);
-
-        image->set_disk_file(inFile);
-        image->load_raw_from_disk();
-
-
-        if (!image->in_memory()) {
-            std::cout << "Issue loading image.\n";
-            return -1;
-        }
-
-        image->create_reg_image(1.0, 1.0, true, cv::INTER_CUBIC, false);
-
-        imwrite(outFile.toString(), image->get_reg_image());
-
-        delete image;
-    }
-
-    return 0;
+  return 0;
 
 }

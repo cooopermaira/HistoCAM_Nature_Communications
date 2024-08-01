@@ -431,29 +431,6 @@ namespace pathCam {
     parent->update_observers();
   }
 
-  bool CompositeVoronoi::exclude_for_blur(pathCam::Image *image) {
-    auto val = image->check_blur();
-    bool excludeImage;
-
-    if (blurVals.size() > 0) {
-      double sum = std::accumulate(std::begin(blurVals), std::end(blurVals), 0.0);
-      double m = sum / blurVals.size();
-
-      double accum = 0.0;
-      std::for_each(std::begin(blurVals), std::end(blurVals), [&](const double d) {
-        accum += (d - m) * (d - m);
-      });
-
-      double stdev = sqrt(accum / (blurVals.size() - 1));
-    } else {
-      excludeImage = false;
-    }
-    if (blurVals.size() < 5) {
-      blurVals.push_back(val);
-    } else {
-
-    }
-  }
 
   void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                   Vec2 absCoord) {
@@ -887,6 +864,53 @@ namespace pathCam {
 
   }
 
+  void
+  CompositeVoronoi::exclude_for_blur() {
+    Subdiv2D dt;
+    std::map<int,unsigned long> dtMembers;
+
+    std::vector<unsigned long> image_indexes(delaunayMembers.size());
+    int i = 0;
+    for (auto item : delaunayMembers){
+      image_indexes[i] = item.second;
+      i++;
+    }
+
+    auto images = parent->get_image_refs(image_indexes);
+    blurVals.clear();
+    blurVals.resize(images.size());
+    for (int i = 0; i < images.size(); i++){
+      blurVals[i] = images[i]->blurVariance;
+    }
+
+    if (blurVals.size() > 0) {
+      double sum = std::accumulate(std::begin(blurVals), std::end(blurVals), 0.0);
+      double m = sum / blurVals.size();
+
+      double accum = 0.0;
+      std::for_each(std::begin(blurVals), std::end(blurVals), [&](const double d) {
+        accum += (d - m) * (d - m);
+      });
+
+      double stdev = sqrt(accum / (blurVals.size() - 1));
+      std::vector<Image*> res, rej;
+      for(auto img : images){
+        if (img->blurVariance > m - stdev){
+          res.push_back(img);
+        }
+//        else{
+//          rej.push_back(img->index);
+//        }
+      }
+      dt.initDelaunay(subdiv_Bbox.as_cvRect());
+      for (auto i : res){
+        dtMembers[dt.insert(Point2f(i->absoluteCoords.x,i->absoluteCoords.y))] = i->index;
+      }
+      subdiv = dt;
+      delaunayMembers = dtMembers;
+    }
+  }
+
 
   void CompositeVoronoi::perform_global_alignment(unsigned int flag, double closenessFactor) {
     //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
@@ -929,6 +953,7 @@ namespace pathCam {
       }
     } else if (flag == 0) {
 
+      exclude_for_blur();
       //collect list of all edges.
       std::vector<Vec4f> edges;
       std::vector<Vec2i> verticePairs;
@@ -1016,7 +1041,9 @@ namespace pathCam {
       i++;
     }
     //no constraints means no linear system to minimize
-    if (matchedEdges.size() == 0) { return; }
+    if (matchedEdges.size() == 0) {
+      return;
+    }
 
     //minimize norm2(Ax-b).
     Mat A = Mat::zeros(matchedEdges.size(), frameIndexToSystemIndex.size(), CV_64FC1);
@@ -1094,15 +1121,10 @@ namespace pathCam {
 
     auto testValBefore = norm(A * xac - xpr);
     //solve problem for x and y
-    auto testA = A.clone();
     std::map<long,long>temp;
-    //coopers_conjugate_gradient(A, xpr, xac, 100, 0.0001, false,temp);
-    coopers_conjugate_gradient(A, xpr, xac, 400, 0.0000001, true,  systemIndexToFrameIndex,0.05,ypr);
-    auto normA = cv::norm(testA - A);
 
-
-
-    coopers_conjugate_gradient(A, ypr, yac, 400, 0.0000001, true,  systemIndexToFrameIndex,0.05,xpr);
+    coopers_conjugate_gradient(A, xpr, xac, 400, 0.0000001, false,  systemIndexToFrameIndex,0.05,ypr);
+    coopers_conjugate_gradient(A, ypr, yac, 400, 0.0000001, false,  systemIndexToFrameIndex,0.05,xpr);
 
     auto testValAfter = norm(A * xac - xpr);
     int k = 0;
@@ -1205,6 +1227,7 @@ namespace pathCam {
     std::cout << duration.count() << std::endl;
 
   }
+
 
   void CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
                                                bool shouldCleanData,

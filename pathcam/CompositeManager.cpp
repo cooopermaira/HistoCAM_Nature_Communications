@@ -10,67 +10,68 @@
 
 namespace pathCam {
 
-    CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false) {};
+  CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false) {};
 
-    void CompositeManager::run() {
+  void CompositeManager::run() {
 
-        while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
-               parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
-            std::pair<unsigned long, cv::Size> newComp;
-            bool isNewComp = false;
-            if(!parent->newComponentQ.empty()){
-              newComp = parent->newComponentQ.front();
-              isNewComp = true;
-            }
-            //if nothing in the Q but termination condition not met, wait
-            if (parent->compositeQ_empty()) {
-                if(isNewComp){
-                  perform_global_alignment();
-                  parent->newComponentQ.pop();
-                  parent->add_new_component(newComp.first,newComp.second);
-                }
-                Poco::Thread::sleep(100);
+    while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
+           parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
+      std::pair<unsigned long, cv::Size> newComp;
+      bool isNewComp = false;
+      if (!parent->newComponentQ.empty()) {
+        newComp = parent->newComponentQ.front();
+        isNewComp = true;
+      }
+      //if nothing in the Q but termination condition not met, wait
+      if (parent->compositeQ_empty()) {
+        if (isNewComp) {
+          parent->newComponentQ.pop();
+          perform_global_alignment();
+          parent->add_new_component(newComp.first, newComp.second);
 
-            } else {
+        }
+        Poco::Thread::sleep(100);
 
-                std::vector<RegInfo> indexes = parent->get_Q_front();
-                if(isNewComp){
-                  if(indexes.front().index > newComp.first){
-                    perform_global_alignment();
-                    parent->newComponentQ.pop();
-                    parent->add_new_component(newComp.first,newComp.second);
-                  }
-                }
-                std::sort(indexes.begin(), indexes.end());
+      } else {
 
-                while (parent->composites.size() <= indexes.back().component_membership) {
-                    //Because of the multithreading, this place in the code can be reached before a new component object has been instantiated and added to the vector. If this happens, wait.
-                    Poco::Thread::sleep(100);
-                }
+        std::vector<RegInfo> indexes = parent->get_Q_front();
+        if (isNewComp) {
+          if (indexes.front().index > newComp.first) {
+            parent->newComponentQ.pop();
+            perform_global_alignment();
+            parent->add_new_component(newComp.first, newComp.second);
+          }
+        }
+        std::sort(indexes.begin(), indexes.end());
 
-                unsigned int current_component = indexes[0].component_membership;
-                std::vector<RegInfo> new_info;
-
-                //sort the new frames by component and pass them to their respective components for compositing.
-                for (int i = 0; i < indexes.size(); i++) {
-
-                    if (current_component == indexes[i].component_membership) {
-                        new_info.push_back(indexes[i]);
-                    } else {
-                        parent->composites[current_component]->update(new_info);
-                        current_component = indexes[i].component_membership;
-                        new_info.clear();
-                    }
-                }
-
-                parent->composites[current_component]->update(new_info);
-              if(parent->regCount == 0 && parent->loaderCount == 0 && parent->matchableCount == 0){
-                int k = 0;
-              }
-            }
+        while (parent->composites.size() <= indexes.back().component_membership) {
+          //Because of the multithreading, this place in the code can be reached before a new component object has been instantiated and added to the vector. If this happens, wait.
+          Poco::Thread::sleep(100);
         }
 
-        
+        unsigned int current_component = indexes[0].component_membership;
+        std::vector<RegInfo> new_info;
+
+        //sort the new frames by component and pass them to their respective components for compositing.
+        for (int i = 0; i < indexes.size(); i++) {
+
+          if (current_component == indexes[i].component_membership) {
+            new_info.push_back(indexes[i]);
+          } else {
+            parent->composites[current_component]->update(new_info);
+            current_component = indexes[i].component_membership;
+            new_info.clear();
+          }
+        }
+
+        parent->composites[current_component]->update(new_info);
+        if (parent->regCount == 0 && parent->loaderCount == 0 && parent->matchableCount == 0) {
+          int k = 0;
+        }
+      }
+    }
+
+
 
 /*
         for (int i = 0; i < parent->composites.size(); i++){
@@ -84,21 +85,21 @@ namespace pathCam {
         */
 
 
-      perform_global_alignment();
+    perform_global_alignment();
 
-      parent->compositing = false;
-    }
+    parent->compositing = false;
+  }
 
   void CompositeManager::perform_global_alignment() {
     for (auto i: parent->composites) {
-      i->perform_global_alignment(0,0.2);
+      i->perform_global_alignment(0, 0.2);
     }
   }
 
   void CompositeManager::save_components_to_disk() {
-      for (auto i : parent->composites){
-        i->save_pyramid_as_image();
-      }
+    for (auto i: parent->composites) {
+      i->save_pyramid_as_image();
     }
+  }
 
 }

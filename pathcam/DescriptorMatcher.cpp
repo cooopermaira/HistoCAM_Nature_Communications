@@ -24,6 +24,9 @@ void DescriptorMatcher::match(Match *match, int flag){
   else if(flag == 1){
     matcher->knnMatch(match->image_1->descriptorsMultilevel, match->image_2->descriptorsMultilevel, knn_matches, 2);
   }
+  else if(flag == 2){
+    matcher->knnMatch(match->image_1->descriptorsFull, match->image_2->descriptorsFull, knn_matches, 2);
+  }
   //-- Filter matches using the Lowe's ratio test
   for (size_t i = 0; i < knn_matches.size(); i++)
   {

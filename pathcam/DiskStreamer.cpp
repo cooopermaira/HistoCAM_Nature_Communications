@@ -65,7 +65,11 @@ namespace pathCam {
       std::cout << "Issue loading image.\n";
       return;
     }
+    auto val = image->check_blur();
+    blur->at(sort_order) = val;
+    names->at(sort_order) = image->get_ImageFile().getFileName();
 
+    //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
     cv::Size image_size(image->width, image->height);
     Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
     cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
@@ -76,6 +80,7 @@ namespace pathCam {
     o.append(image->image_file.getFileName());
     o.setExtension("png");
 
-    imwrite(o.toString(), image_Mat);
+
+    //imwrite(o.toString(), image_Mat);
   }
 }

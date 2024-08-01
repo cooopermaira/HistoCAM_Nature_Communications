@@ -9,10 +9,13 @@ namespace pathCam {
 
   class Image {
   public:
+    double blurVariance;
     unsigned int width, height;
     unsigned int scope_radius;
     std::atomic<unsigned int> reference_count;
     unsigned long index;
+    double reg_scale_initial,reg_scale_full;
+    double reg_crop_initial,reg_crop_full;
     enum {
       _NOLABEL = 0, _2X, _4X, _10x, _20x, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _LENS_CHANGE
     };
@@ -24,8 +27,10 @@ namespace pathCam {
 
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::KeyPoint> keypointsMultilevel;
+    std::vector<cv::KeyPoint> keypointsFull;
     cv::Mat descriptors;
     cv::Mat descriptorsMultilevel;
+    cv::Mat descriptorsFull;
 
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 
@@ -120,7 +125,7 @@ label = _NOLABEL;
 
     inline bool in_memory() { return (raw_buffer != 0); }
 
-    inline double get_reg_scale() { return reg_scale; }
+    inline double get_reg_scale() { return reg_scale_initial; }
 
     inline void release_reg_image() { reg_image.release(); }
 
@@ -158,9 +163,7 @@ label = _NOLABEL;
 
     char *raw_buffer;
     cv::Mat reg_image;
-    double reg_scale;
-    double reg_crop;
-    double blurVariance;
+
 
 
   };
