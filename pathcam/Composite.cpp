@@ -914,7 +914,7 @@ namespace pathCam {
       double stdev = sqrt(accum / (blurVals.size() - 1));
       std::vector<Image *> res, rej;
       for (auto img: images) {
-        if (img->blurVariance > m - 1.5 * stdev) {
+        if (img->blurVariance > m - 1.0 * stdev) {
           res.push_back(img);
         }
 //        else{

@@ -60,10 +60,11 @@ namespace pathCam {
         auto mtoOffset = parent->composites[matchedTo->component_membership]->imagePyramid->offset;
         scale = (m->H.at<double>(0, 0) + m->H.at<double>(1, 1)) / 2.0;
         //scale = 2.0139375;
-        offset = Point2f((((m->t_x / scale + regInfo.absoluteCoords.x) / scale) / mtoScale + mtoOffset.x) / mtoScale,
-                         (((m->t_y / scale + regInfo.absoluteCoords.y) / scale) / mtoScale + mtoOffset.y) / mtoScale);
-        offset2 = Point2f(m->t_x / parent->scale_factor + regInfo.absoluteCoords.x / scale,
-                          m->t_y / parent->scale_factor + regInfo.absoluteCoords.y / scale);
+//        offset = Point2f((((m->t_x / scale + regInfo.absoluteCoords.x) / scale) / mtoScale + mtoOffset.x) / mtoScale,
+//                         (((m->t_y / scale + regInfo.absoluteCoords.y) / scale) / mtoScale + mtoOffset.y) / mtoScale);
+
+        offset = Point2f((m->t_x / scale + regInfo.absoluteCoords.x + mtoOffset.x) / scale ,
+                         (m->t_y / scale + regInfo.absoluteCoords.y + mtoOffset.y) / scale) ;
 
         break;
       }

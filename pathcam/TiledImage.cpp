@@ -17,8 +17,8 @@ TiledImage::TiledImage(std::shared_ptr<MRTiledImage> parent, unsigned int tile_s
                                                  logic_size(logic_size),
                                                  logicRatio((float) tile_size / (float) logic_size),
                                                  levelWithinPyramid(levelWithinPyramid),
-                                                 tiles(-2048 * logicRatio, 2048 * logicRatio, -2048 * logicRatio,
-                                                       2048 * logicRatio),
+                                                 tiles(-4096 * logicRatio, 4096 * logicRatio, -4096 * logicRatio,
+                                                       4096 * logicRatio),
                                                  parent(parent) {};
 
 void TiledImage::inserTileAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
