@@ -21,6 +21,7 @@
 #include "opencv2/imgproc.hpp"
 #include "opencv2/features2d.hpp"
 #include "opencv2/xfeatures2d.hpp"
+#include "opencv2/xphoto/white_balance.hpp"
 #endif
 
 #include "Poco/Mutex.h"

@@ -26,7 +26,7 @@ namespace pathCam {
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
           parent->newComponentQ.pop();
-          perform_global_alignment();
+          //perform_global_alignment();
           parent->add_new_component(newComp.first, newComp.second);
 
         }
@@ -38,7 +38,7 @@ namespace pathCam {
         if (isNewComp) {
           if (indexes.front().index > newComp.first) {
             parent->newComponentQ.pop();
-            perform_global_alignment();
+            //perform_global_alignment();
             parent->add_new_component(newComp.first, newComp.second);
           }
         }

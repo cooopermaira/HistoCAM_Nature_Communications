@@ -12,6 +12,7 @@ namespace pathCam {
     double blurVariance;
     unsigned int width, height;
     unsigned int scope_radius;
+    unsigned int component_membership;
     std::atomic<unsigned int> reference_count;
     unsigned long index;
     double reg_scale_initial,reg_scale_full;

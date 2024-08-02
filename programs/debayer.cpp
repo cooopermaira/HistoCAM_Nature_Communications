@@ -11,7 +11,10 @@
 using Poco::DirectoryIterator;
 
 int main(int argc, char *argv[]) {
-
+  Mat flat_field;
+  flat_field = cv::imread("/Users/coopermaira/Desktop/pathcam_data/2x_wb.tif");
+  flat_field.convertTo(flat_field, CV_32F);
+  flat_field *= 1 / 170.0;
   //Should probably add fancier command line parsing
   if (argc < 3) {
     std::cout << "Missing input. Use:\n";
@@ -35,7 +38,7 @@ int main(int argc, char *argv[]) {
     names->resize(3000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(20, 20);
+    auto jq = pathCam::JobQueue(1, 1);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
@@ -50,7 +53,7 @@ int main(int argc, char *argv[]) {
         auto *image = new pathCam::Image(6464,4852,2190);
 
         image->set_disk_file(p);
-        auto *dr = new pathCam::DebayerRunnable(image, outFile,blur,names,num);
+        auto *dr = new pathCam::DebayerRunnable(image, flat_field, outFile,blur,names,num);
         jq.add_runnable(dr,num);
 
       }

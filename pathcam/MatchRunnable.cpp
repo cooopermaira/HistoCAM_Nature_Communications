@@ -16,6 +16,7 @@ namespace pathCam {
   bool XCompRunnable::match_to_images(Image *selfImage, std::vector<Image *> otherCompImages) {
     Image *matchedTo;
     double scale = 0;
+    double mtoScale = 0;
     Point2f offset, offset2;
 
     //loop through and get homography
@@ -48,10 +49,19 @@ namespace pathCam {
             continue;
           }
         }
+
+        mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
+        if (mtoScale == 0 ){
+          parent->composites[matchedTo->component_membership]->imagePyramid->scaleSet.wait();
+          mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
+        }
+        assert(mtoScale != 0);
+
+        auto mtoOffset = parent->composites[matchedTo->component_membership]->imagePyramid->offset;
         scale = (m->H.at<double>(0, 0) + m->H.at<double>(1, 1)) / 2.0;
         //scale = 2.0139375;
-        offset = Point2f(m->t_x / pow(scale, 2) + regInfo.absoluteCoords.x / scale,
-                         m->t_y / pow(scale, 2) + regInfo.absoluteCoords.y / scale);
+        offset = Point2f((((m->t_x / scale + regInfo.absoluteCoords.x) / scale) / mtoScale + mtoOffset.x) / mtoScale,
+                         (((m->t_y / scale + regInfo.absoluteCoords.y) / scale) / mtoScale + mtoOffset.y) / mtoScale);
         offset2 = Point2f(m->t_x / parent->scale_factor + regInfo.absoluteCoords.x / scale,
                           m->t_y / parent->scale_factor + regInfo.absoluteCoords.y / scale);
 
@@ -60,8 +70,9 @@ namespace pathCam {
 
     }
     if (scale > 0) {
-      parent->composites[componentMembership]->imagePyramid->set_scale(scale);
+      parent->composites[componentMembership]->imagePyramid->set_scale(scale * mtoScale);
       parent->composites[componentMembership]->imagePyramid->set_offset(offset);
+      parent->composites[componentMembership]->imagePyramid->scaleSet.set();
       return true;
     }
     return false;
@@ -74,9 +85,7 @@ namespace pathCam {
 
     //get references to other component images
     std::vector<unsigned long> indexes;
-//    for (long i = image_idx - 1; i >= 0; i--) {
-//      indexes[i] = (unsigned long) i;
-//    }
+
     for (int i = 0; i < parent->composites.size(); i++) {
       if (parent->composites[i]->componentIndex != componentMembership) {
         for (auto item: parent->composites[i]->delaunayMembers) {
@@ -85,8 +94,15 @@ namespace pathCam {
       }
     }
 
-    auto otherCompImages = parent->get_image_refs(indexes);
-    auto success = match_to_images(image, otherCompImages);
+    auto otherImages = parent->get_image_refs(indexes);
+    if(!match_to_images(image, otherImages)){
+      indexes.clear();
+      for (int i = 0; i < image->index; i++){
+        indexes.push_back((unsigned long) i);
+      }
+      auto secondTry = parent->get_image_refs(indexes);
+      assert(match_to_images(image,secondTry));
+    }
 
     int k = 0;
   }

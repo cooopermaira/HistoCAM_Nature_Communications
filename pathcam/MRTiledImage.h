@@ -20,9 +20,10 @@ public:
   unsigned int tile_size;
   double scale;
   Point2f offset;
+  Poco::Event scaleSet;
  
   
-  MRTiledImage(unsigned int tile_size=512):tile_size(tile_size){};
+  MRTiledImage(unsigned int tile_size=512):tile_size(tile_size), scaleSet(false){};
   ~MRTiledImage(){ level.clear(); };
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);

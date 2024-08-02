@@ -93,6 +93,8 @@ namespace pathCam {
 
     void add_images_no_composite(std::vector<RegInfo> new_info);
 
+    void rebuild_DT_elementwise(std::vector<RegInfo> new_info);
+
     void add_images_multithread(std::vector<RegInfo> new_info);
 
     void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord);
@@ -123,6 +125,7 @@ namespace pathCam {
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
     unsigned int componentIndex;
+    bool needsAlignment = false;
     std::atomic<unsigned int> matchableCount = 0;
     std::vector<std::pair<long, long>> matchedEdges;
     std::vector<std::pair<Image*, bool>> memberImages;

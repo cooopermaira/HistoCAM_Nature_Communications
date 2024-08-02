@@ -34,14 +34,14 @@ namespace pathCam {
 
   class DebayerRunnable : public pathCam::RunnableIntermediate {
   public:
-    explicit DebayerRunnable(pathCam::Image *image, Poco::Path outfile, std::vector<double> *_blur,
-                             std::vector<std::string> *_names, unsigned long _sort_order) : image(image),
+    explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<double> *_blur,
+                             std::vector<std::string> *_names, unsigned long _sort_order) : image(image),flatfield(flat_field),
                                                                                             outfile(outfile),
                                                                                             RunnableIntermediate(
                                                                                                 _sort_order, 0),
                                                                                             blur(_blur),
                                                                                             names(_names) {}
-
+    Mat flatfield;
     std::vector<double> *blur;
     std::vector<std::string> *names;
     Poco::Path outfile;
