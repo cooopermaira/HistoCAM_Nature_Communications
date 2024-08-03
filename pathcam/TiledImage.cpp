@@ -212,6 +212,11 @@ void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
     for (int y = tL.y; y <= bR.y; y++) {
       //get tile
       Mat tile = getTile(x, y);
+      *tiles(x,y) = Mat::zeros(tile_size, tile_size, CV_8UC4);
+      Point_ loc = Point2i(x, y);
+      Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size,tile_size);
+      tileUpwards(loc, levelRegion, *tiles(x,y));
+      /*
       //create vector of all 4 channes R, G, B and alpha
       std::vector<Mat> individualChannels(4);
       //split the tile into the 4 channels
@@ -228,6 +233,7 @@ void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
         Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size,tile_size);
         tileUpwards(loc, levelRegion, *tiles(x,y));
       }
+       */
     }
   }
 }

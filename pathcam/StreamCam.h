@@ -25,7 +25,11 @@ namespace pathCam {
 
   class CompositeManager;
 
+  class QManager;
+
   class JobQueue;
+
+  class DiskReader;
 
 
   class StreamCam : public BatchCam {
@@ -62,6 +66,8 @@ namespace pathCam {
 
     friend class ImageToTileCopyRunnable;
 
+    friend class RebuildRunnable;
+
   private:
     std::queue<std::vector<RegInfo> > compositeBatch;
 
@@ -83,6 +89,9 @@ namespace pathCam {
 
     std::vector<std::pair<std::string, double>> debugImageBlurWithNames;
     std::vector<double> debugImageBlur;
+    CompositeManager* cm;
+    QManager* qm;
+    DiskReader* dr;
 
     bool run();
 
@@ -138,6 +147,9 @@ namespace pathCam {
     void add_new_component(unsigned long image_index, cv::Size image_size);
 
     void add_new_component_Q(unsigned long image_index, cv::Size image_size) {
+      reg_results_mutex->writeLock();
+      reg_results[image_index].matchedTo = image_index;
+      reg_results_mutex->unlock();
       newComponentQ.push({image_index, image_size});
     }
 

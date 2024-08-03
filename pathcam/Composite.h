@@ -36,6 +36,7 @@ namespace pathCam {
 
   class Composite {
     friend class CompositeManager;
+    friend class RebuildRunnable;
 
   protected:
     StreamCam *parent;
@@ -70,6 +71,7 @@ namespace pathCam {
   class CompositeVoronoi : public Composite {
     friend class ImageToTileCopyRunnable;
     friend class CompositeManager;
+    friend class RebuildRunnable;
   private:
     Mat circleMask;
     Mat polyMaskOutput;
@@ -94,6 +96,8 @@ namespace pathCam {
     void add_images_no_composite(std::vector<RegInfo> new_info);
 
     void rebuild_DT_elementwise(std::vector<RegInfo> new_info);
+
+    void create_and_submit_rebuild_jobs();
 
     void add_images_multithread(std::vector<RegInfo> new_info);
 

@@ -24,9 +24,12 @@ namespace pathCam {
                                                            resize_mmatch_mutex(new Poco::RWLock()),
                                                            compositeQ_mutex(new Poco::FastMutex()),
                                                            component_mutex(new Poco::FastMutex()),
-                                                           resize_buffer_mutex(new Poco::FastMutex()) {
+                                                           resize_buffer_mutex(new Poco::FastMutex()),
+                                                           cm(new CompositeManager(this)),
+                                                           qm(new QManager(this)),
+                                                           dr(new DiskReader(this)){
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(10, 10);
+    JobQ = new JobQueue(1, 1);
     reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
     reg_results[0].index = 0;
     //variancesForDebug.resize(2266);
@@ -83,10 +86,8 @@ namespace pathCam {
 
     std::cout << "spin_run started " << std::endl;
 
-    auto *qm = new QManager(this);
-    Q_thread.start(qm);
 
-    auto *cm = new CompositeManager(this);
+    Q_thread.start(qm);
     composite_thread.start(cm);
 
     Q_thread.join();
@@ -100,13 +101,9 @@ namespace pathCam {
   bool StreamCam::run() {
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto dr = new DiskReader(this);
+
     disk_thread.start(dr);
-
-    auto *qm = new QManager(this);
     Q_thread.start(qm);
-
-    auto *cm = new CompositeManager(this);
     composite_thread.start(cm);
 
     disk_thread.join();

@@ -50,6 +50,9 @@ namespace pathCam {
 
     } else {
       //this image has relative coords but not absolute coords. We attempt to get absolute coords thru recursive call
+      if (reginfo.matchedTo == index){
+        return std::pair<bool, Vec2>(false, Vec2(0.0, 0.0));
+      }
       Vec2 returnCoords(0,0);
       auto temp = trace_to_root(reginfo.matchedTo);
       if (temp.first) {

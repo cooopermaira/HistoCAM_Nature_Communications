@@ -174,6 +174,7 @@ namespace pathCam {
       std::vector<Point2i> face;
       auto fShift = Point2f(ni.absoluteCoords.x, ni.absoluteCoords.y);
       auto img = parent->get_image_ref(ni.index);
+      img->absoluteCoords = ni.absoluteCoords;
       auto res = add_point_to_delaunay_triangulation(fShift, img, face);
       freshMask.copyTo(polyMaskOutput);
     }
@@ -225,6 +226,14 @@ namespace pathCam {
     memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
+  }
+
+  void CompositeVoronoi::create_and_submit_rebuild_jobs() {
+    for (auto el : delaunayMembers){
+      auto rr = new RebuildRunnable(this,el.first,el.second);
+      parent->cm->rebuildJobsOutstanding++;
+      parent->JobQ->add_runnable(rr);
+    }
   }
 
   void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo> new_info) {
@@ -369,7 +378,7 @@ namespace pathCam {
     height = std::abs(height);
     Size pyramidSize = Size(width, height);
     Mat pyramidImage = Mat(pyramidSize, CV_8UC4);
-    //we need to shift the x and y tiles so the we aren't writing to negtive coordinates
+    //we need to shift the x and y tiles so we aren't writing to negtive coordinates
     int x_offset = -ul.x;
     int y_offset = -ul.y;
     //for removing excess empty pixels around edge tiles
@@ -933,6 +942,9 @@ namespace pathCam {
 
   void CompositeVoronoi::perform_global_alignment(unsigned int flag, double closenessFactor) {
     //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
+    if(delaunayMembers.size() < 10){
+      return;
+    }
     if (!needsAlignment) {
       return;
     }
@@ -1234,7 +1246,7 @@ namespace pathCam {
     auto start = std::chrono::high_resolution_clock::now();
 
     self_reset();
-
+    parent->update_observers();
     parent->reg_results_mutex->readLock();
     std::vector<RegInfo> newinfo;
     for (auto [i, elm]: systemIndexToFrameIndex) {
@@ -1246,6 +1258,8 @@ namespace pathCam {
 
     //update(newinfo);
     rebuild_DT_elementwise(newinfo);
+    create_and_submit_rebuild_jobs();
+
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);

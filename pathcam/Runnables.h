@@ -32,6 +32,17 @@ namespace pathCam {
     void waitOnThisGuy();
   };
 
+  class RebuildRunnable : public RunnableIntermediate{
+  public:
+    int dtVertex;
+    unsigned long imageIndex;
+    CompositeVoronoi* composite;
+    CompositeManager* cm;
+
+    RebuildRunnable(CompositeVoronoi* _composite, int _dtVertex, unsigned long _imageIndex);
+    virtual void run();
+  };
+
   class DebayerRunnable : public pathCam::RunnableIntermediate {
   public:
     explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<double> *_blur,
@@ -58,6 +69,9 @@ namespace pathCam {
   public:
     bool successful;
 
+    std::atomic<int> rebuildJobsOutstanding = 0;
+    Poco::Event rebuildJobsComplete;
+
     CompositeManager(StreamCam *parent);
 
     virtual void run();
@@ -65,6 +79,8 @@ namespace pathCam {
     void perform_global_alignment();
 
     void save_components_to_disk();
+
+    void decrement_rebuild_jobs_outstanding();
   };
 
   class RegistrationRunnable : public RunnableIntermediate {
