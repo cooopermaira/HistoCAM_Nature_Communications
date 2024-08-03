@@ -282,6 +282,8 @@ namespace pathCam {
       channels[1] = polyMaskOutput;           //alpha channel
       merge(channels, fourChannelPreallocated);
 
+      //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
+      int k = 0;
       for (auto tile: effectedTiles) {
         try {
           auto mask = polyMaskOutput;
@@ -851,7 +853,7 @@ namespace pathCam {
     k = 512 - k % 512;
     if (k < 0) { k = abs(k); }
     Mat debugmat = Mat::zeros(4852, 6464, CV_8UC4);
-    img.copyTo(img, mask);
+    img.copyTo(debugmat, mask);
     for (int m = k; m < debugmat.cols; m += 512) {
       cv::line(debugmat, cv::Point(m, 0), cv::Point(m, 4852), Scalar(0, 0, 255, 255));
       cv::line(debugmat, cv::Point(m + 1, 0), cv::Point(m + 1, 4852), Scalar(0, 0, 255, 255));

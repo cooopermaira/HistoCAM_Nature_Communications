@@ -142,7 +142,7 @@ namespace pathCam {
     //build polygon mask for new point
     cv::fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
 
-    image->load_raw_from_disk();
+    //image->load_raw_from_disk();
     Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
     Mat3b threeChannelPreallocated;
     Mat4b fourChannelPreallocated;
@@ -165,7 +165,7 @@ namespace pathCam {
 
     std::vector<Point2i> effectedTiles;
     composite->calculate_effected_tiles(face, effectedTiles, image->absoluteCoords);
-
+    //imwrite("test.png",polyMaskOutput);
     Mat mask(composite->image_size,CV_8U,Scalar(255));
     for (auto tile : effectedTiles){
       Point2i adjustedPoint;
