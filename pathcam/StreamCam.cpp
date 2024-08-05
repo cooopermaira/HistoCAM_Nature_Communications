@@ -35,6 +35,10 @@ namespace pathCam {
     reg_results[0].index = 0;
     lastFrame = Rect(0,0,image_width,image_height);
 
+    flat_field2X = cv::imread(flat_field_file.toString());
+    flat_field2X.convertTo(flat_field2X, CV_32F);
+    flat_field2X *= 1 / 170.0;
+
     //variancesForDebug.resize(2266);
 
   }

@@ -89,6 +89,8 @@ namespace pathCam {
     cv::Rect_<float> lastFrame;
     bool showAsCircle;
 
+    Mat flat_field2X;
+
     std::shared_ptr<MRTiledImageSet> MRimage;
 
     std::vector<std::pair<std::string, double>> debugImageBlurWithNames;

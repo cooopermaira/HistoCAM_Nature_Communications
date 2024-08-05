@@ -268,7 +268,6 @@ namespace pathCam {
       images[i]->load_raw_from_disk();
       Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
-
       images[i]->free_memory_RAW();
 
       if (images[i]->label == Image::_2X) {//flat field correction if needed
@@ -573,9 +572,7 @@ namespace pathCam {
 
   Composite::Composite(StreamCam *parent) : update_mutex(new Poco::FastMutex()), parent(parent), root_offset(0.0, 0.0),
                                             max_offset(0.0, 0.0) {
-    flat_field = cv::imread(parent->flat_field_file.toString());
-    flat_field.convertTo(flat_field, CV_32F);
-    flat_field *= 1 / 170.0;
+    flat_field = parent->flat_field2X;
 
     //local_quality_score = score_image_2X(4852,6464,2190);
   }

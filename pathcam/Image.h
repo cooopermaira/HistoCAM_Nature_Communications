@@ -32,6 +32,8 @@ namespace pathCam {
     cv::Mat descriptors;
     cv::Mat descriptorsMultilevel;
     cv::Mat descriptorsFull;
+    cv::Mat3f wb;
+    cv::Mat wbMask;
 
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 
@@ -44,6 +46,8 @@ namespace pathCam {
     void set_disk_file(Poco::Path _image_file) {
       image_file = _image_file;
     }
+
+    void build_whitebalance_Mat(cv::Mat flat_field);
 
     void load_raw_from_disk();
 
