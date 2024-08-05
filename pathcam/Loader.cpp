@@ -33,7 +33,12 @@ namespace pathCam {
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
-      image->check_blur();
+      if(image->check_blur() < 200){
+        successful = true;
+        parent->loaderCount--;
+        jobComplete.set();
+        return;
+      }
 
       //image->free_memory_RAW();
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);

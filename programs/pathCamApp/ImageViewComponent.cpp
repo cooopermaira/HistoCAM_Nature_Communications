@@ -221,6 +221,22 @@ void ImageViewComponent::resized() {
 
 }
 
+void ImageViewComponent::zoomAndCenter() {
+  if(!MRImage || !isVisible()){ return; }
+  juce::Rectangle<int> b = getLocalBounds();
+  *view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
+  //view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
+  view->setCentre(RectCtoJ(MRImage->bounds).getCentre());
+
+  float scale = max((float)MRImage->bounds.width/
+                    (float)view->getHorizontalRange().getLength(),
+                    (float)MRImage->bounds.height/
+                    (float)view->getVerticalRange().getLength());
+
+  scaleCenter(fPoint(scale,scale));
+
+}
+
 juce::Image ImageViewComponent::createCheckerboardImage(int width,
                                                         int height,
                                                         int squareSize,

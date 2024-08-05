@@ -26,22 +26,22 @@ namespace pathCam {
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
           parent->newComponentQ.pop();
-          perform_global_alignment();
+          //perform_global_alignment();
           if(rebuildJobsOutstanding > 0) {
             rebuildJobsComplete.wait();
           }
           parent->add_new_component(newComp.first, newComp.second);
 
-        }
+        }else{
         Poco::Thread::sleep(100);
-
+        }
       } else {
 
         std::vector<RegInfo> indexes = parent->get_Q_front();
         if (isNewComp) {
           if (indexes.front().index > newComp.first) {
             parent->newComponentQ.pop();
-            perform_global_alignment();
+            //perform_global_alignment();
             if(rebuildJobsOutstanding > 0) {
               rebuildJobsComplete.wait();
             }
@@ -91,8 +91,8 @@ namespace pathCam {
         */
 
 
-    perform_global_alignment();
-
+    //perform_global_alignment();
+    //save_components_to_disk();
     parent->compositing = false;
   }
 

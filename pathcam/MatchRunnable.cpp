@@ -17,7 +17,7 @@ namespace pathCam {
     Image *matchedTo;
     double scale = 0;
     double mtoScale = 0;
-    Point2f offset, offset2;
+    Point2f offset;
 
     //loop through and get homography
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
@@ -89,11 +89,15 @@ namespace pathCam {
 
     for (int i = 0; i < parent->composites.size(); i++) {
       if (parent->composites[i]->componentIndex != componentMembership) {
-        for (auto item: parent->composites[i]->delaunayMembers) {
-          indexes.push_back(item.second);
+        for(int ii = max(0,(int)parent->composites[i]->memberImages.size() - 5); ii < parent->composites[i]->memberImages.size(); ii++){
+          indexes.push_back(parent->composites[i]->memberImages[ii].first->index);
         }
+//        for (auto item: parent->composites[i]->delaunayMembers) {
+//          indexes.push_back(item.second);
+//        }
       }
     }
+    std::sort(indexes.begin(), indexes.end());
 
     auto otherImages = parent->get_image_refs(indexes);
     if(!match_to_images(image, otherImages)){

@@ -303,6 +303,11 @@ namespace pathCam {
 
 
       //update pyramid bounds and observer, reset mask
+//      auto pb = imagePyramid->level[0]->bounds;
+//      pb.x *= imagePyramid->scale;
+//      pb.y *= imagePyramid->scale;
+//      pb.height *= imagePyramid->scale;
+//      pb.width *= imagePyramid->scale;
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
       parent->update_observers();
       freshMask.copyTo(polyMaskOutput);
@@ -391,15 +396,15 @@ namespace pathCam {
     for (int i = ul.x; i <= lr.x; i++) {
       for (int j = ul.y; j <= lr.y; j++) {
         Mat tile = level->getTile(i, j);
-        imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
+        //imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
         tile.copyTo(pyramidImage(Rect((i + x_offset) * tile.cols, (j + y_offset) * tile.rows, tile.cols, tile.rows)));
       }
     }
     //currently hardcoded, maybe add an output directory in config?
-    String path = "pyramidImage" + std::to_string(componentIndex) + ".png";
+    String path = "pyramidImage" + std::to_string(componentIndex) + "_"+std::to_string(imagePyramid->scale)+ ".png";
     //only write pixels with information
-    imwrite(path, pyramidImage(
-        Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
+    //imwrite(path, pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
+    imwrite(path,pyramidImage);
   }
 
   void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo> new_info) {
@@ -1258,9 +1263,9 @@ namespace pathCam {
     }
     parent->reg_results_mutex->unlock();
 
-    //update(newinfo);
-    rebuild_DT_elementwise(newinfo);
-    create_and_submit_rebuild_jobs();
+    update(newinfo);
+    //rebuild_DT_elementwise(newinfo);
+    //create_and_submit_rebuild_jobs();
 
 
     auto stop = std::chrono::high_resolution_clock::now();
