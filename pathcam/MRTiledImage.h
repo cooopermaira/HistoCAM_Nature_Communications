@@ -65,6 +65,7 @@ private:
 class MRTiledImageSet{
   
   friend class ImageViewComponent;
+  friend class CaptureComponent;
   
 public:
   cv::Rect_<float> bounds;
@@ -74,6 +75,8 @@ public:
   void add(std::shared_ptr<MRTiledImage> image){
     images.push_back(image);
   }
+  
+  bool empty(){ return images.empty(); }
   
   void update_bounds();
 

@@ -73,8 +73,25 @@ public:
   
     void stopSimulating();
 
+    void drawSlide(juce::Graphics& g, float scale) override{
+      ImageViewComponent::drawSlide(g, scale);
+      
+      if(view->isEmpty() || MRImage->empty()){ return; }
+      
+      cv::Rect_<float> frameBox;
+      bool showAsCircle;
+      sCam->get_last_frame(frameBox, showAsCircle);
 
-    void paint(juce::Graphics &g) {
+      auto bounds = RectCtoJ < float >(frameBox);
+
+      bounds *= view2screenScale(*view) * scale;
+      
+      g.setColour(juce::Colours::red);
+      g.drawRect(bounds, 3);
+    }
+
+
+    void paint(juce::Graphics &g) override {
         ImageViewComponent::paint(g);
 
         if (recording) {
@@ -99,3 +116,4 @@ private:
 };
 
 #endif /* CaptureComponent_h */
+

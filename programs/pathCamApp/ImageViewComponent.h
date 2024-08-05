@@ -13,6 +13,7 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
   
   friend class ImageViewOverlay;
   
+  
 public:
   //==============================================================================
   ImageViewComponent(std::shared_ptr < fRectangle > view,
@@ -22,7 +23,7 @@ public:
   
   //==============================================================================
   void paint (juce::Graphics& g) override;
-  void drawSlide(juce::Graphics& g, float scale);
+  virtual void drawSlide(juce::Graphics& g, float scale);
   void resized() override;
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
