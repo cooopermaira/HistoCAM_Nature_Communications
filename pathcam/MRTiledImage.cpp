@@ -10,8 +10,6 @@
 std::vector < TileQuery > MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect_<int> screen){
   
   if(level.size() == 0){ return std::vector<TileQuery>(); }
-//  float scale = max(view.getHorizontalRange().getLength()/float(screen.getHorizontalRange().getLength()),
-//                    view.getVerticalRange().getLength()/float(screen.getVerticalRange().getLength()));  
   float scale = max(view.width/float(screen.width),
                     view.height/float(screen.height));
 
