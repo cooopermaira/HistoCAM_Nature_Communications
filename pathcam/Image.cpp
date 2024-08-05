@@ -67,17 +67,13 @@ namespace pathCam {
     cvtColor(image_Mat,gry,COLOR_BayerBG2GRAY);
     cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
     divide(image_Mat,flat_field,image_Mat,1,CV_8U);
-    auto adj = Mat3f(height,width,Vec3f(0.67,0.75,0.67));
+    auto adj = Mat3f(height,width,Vec3f(0.92,1.08,0.92));
     Mat locations = gry > 240;
-    imwrite("before.png",image_Mat);
-    //locations /= 255;
     image_Mat.copyTo(sbt,locations);
     image_Mat -= sbt;
     cv::multiply(sbt,adj,sbt,1,CV_8U);
     image_Mat += sbt;
-    imwrite("after.png",image_Mat);
-
-    int k = 0;
+    readyImage = image_Mat;
   }
 
   bool Image::is_mostly_white(Mat ROI) {

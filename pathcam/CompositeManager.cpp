@@ -89,7 +89,8 @@ namespace pathCam {
         */
 
 
-    //perform_global_alignment();
+//    perform_global_alignment();
+//    rebuildJobsComplete.wait();
     //save_components_to_disk();
     parent->compositing = false;
   }
@@ -136,11 +137,9 @@ namespace pathCam {
       ii.y += composite->image_size.height / 2;
       face.push_back((Point2i) ii);
     }
-
     //build polygon mask for new point
     cv::fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
-
-    //image->load_raw_from_disk();
+    image->load_raw_from_disk();
     Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
     Mat3b threeChannelPreallocated;
     Mat4b fourChannelPreallocated;
@@ -156,46 +155,43 @@ namespace pathCam {
                      2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
       cv::divide(threeChannelPreallocated(bb), composite->flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
     }
-    std::vector<Mat> channels(2);
-    channels[0] = threeChannelPreallocated; //3 channel
-    channels[1] = polyMaskOutput;           //alpha channel
-    merge(channels, fourChannelPreallocated);
-
     std::vector<Point2i> effectedTiles;
     composite->calculate_effected_tiles(face, effectedTiles, image->absoluteCoords);
-    //imwrite("test.png",polyMaskOutput);
-    Mat mask(composite->image_size,CV_8U,Scalar(255));
+    Mat tile_mask = Mat::zeros(composite->image_size.height,composite->image_size.width,CV_8U);
+    //Vector containing the tiles where their center
+    std::vector<Point2i> center_in_poly_mask;
     for (auto tile : effectedTiles){
       Point2i adjustedPoint;
       auto ul = Point2i((tile.x + 0.5) * composite->imagePyramid->tile_size,(tile.y + 0.5)* composite->imagePyramid->tile_size);
       adjustedPoint.x = ul.x - image->absoluteCoords.x;
       adjustedPoint.y = ul.y - image->absoluteCoords.y;
+      if(adjustedPoint.x < 0 || adjustedPoint.x > image->width || adjustedPoint.y < 0 || adjustedPoint.y > image->height){
+        continue;
+      }
       uint8_t pixelVal;
-      try{
+      try {
         pixelVal = polyMaskOutput.at<uint8_t>(adjustedPoint);
       }
       catch(cv::Exception e){
         int k = 0;
       }
-      if(pixelVal > 0){
-        try {
-
-          auto imageMat = fourChannelPreallocated;
-          auto tileSize = composite->imagePyramid->level[0]->getTileSize();
-          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
-          auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width,
-                                           image->height);
-
-          composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
-        }
-        catch (cv::Exception &e) {
-          int k = 0;
-        }
+      if(pixelVal > 0) {
+        auto tileSize = composite->imagePyramid->level[0]->getTileSize();
+        auto tileBox = cv::Rect_<float>(tileSize * tile.x - image->absoluteCoords.x, tileSize * tile.y - image->absoluteCoords.y, tileSize, tileSize);
+        tile_mask(tileBox).setTo(255);
+        center_in_poly_mask.push_back(tile);
       }
-
     }
-
+    std::vector<Mat> channels(2);
+    channels[0] = threeChannelPreallocated; //3 channel
+    channels[1] = tile_mask;           //alpha channel
+    merge(channels, fourChannelPreallocated);
+    Mat imageMat;
+    fourChannelPreallocated.copyTo(imageMat);
+    auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
+    composite->imagePyramid->level[0]->inserTileAtBase(imageMat, tile_mask, imageBox, center_in_poly_mask);
     cm->decrement_rebuild_jobs_outstanding();
+    int k = 0;
   }
 
 }

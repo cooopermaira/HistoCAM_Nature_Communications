@@ -32,8 +32,7 @@ namespace pathCam {
     cv::Mat descriptors;
     cv::Mat descriptorsMultilevel;
     cv::Mat descriptorsFull;
-    cv::Mat3f wb;
-    cv::Mat wbMask;
+    cv::Mat readyImage;
 
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 

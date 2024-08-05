@@ -264,20 +264,24 @@ namespace pathCam {
       calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
 
       //build image with alpha channel
+      if (images[i]->readyImage.data){
+        channels[0] = images[i]->readyImage;
 
-      images[i]->load_raw_from_disk();
-      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
-      images[i]->free_memory_RAW();
+      }else {
+        images[i]->load_raw_from_disk();
+        Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+        cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+        images[i]->free_memory_RAW();
 
-      if (images[i]->label == Image::_2X) {//flat field correction if needed
-        auto center = Point2i(image_size.width / 2, image_size.height / 2);
-        auto bb = Rect(center.x - parent->scope_radius - 10, center.y - parent->scope_radius - 10,
-                       2 * parent->scope_radius + 20, 2 * parent->scope_radius + 20);
-        cv::divide(threeChannelPreallocated(bb), flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
+        if (images[i]->label == Image::_2X) {//flat field correction if needed
+          auto center = Point2i(image_size.width / 2, image_size.height / 2);
+          auto bb = Rect(center.x - parent->scope_radius - 10, center.y - parent->scope_radius - 10,
+                         2 * parent->scope_radius + 20, 2 * parent->scope_radius + 20);
+          cv::divide(threeChannelPreallocated(bb), flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
+        }
+        channels[0] = threeChannelPreallocated; //3 channel
       }
 
-      channels[0] = threeChannelPreallocated; //3 channel
       channels[1] = polyMaskOutput;           //alpha channel
       merge(channels, fourChannelPreallocated);
 
@@ -1264,9 +1268,9 @@ namespace pathCam {
     }
     parent->reg_results_mutex->unlock();
 
-    update(newinfo);
-    //rebuild_DT_elementwise(newinfo);
-    //create_and_submit_rebuild_jobs();
+    //update(newinfo);
+    rebuild_DT_elementwise(newinfo);
+    create_and_submit_rebuild_jobs();
 
 
     auto stop = std::chrono::high_resolution_clock::now();
