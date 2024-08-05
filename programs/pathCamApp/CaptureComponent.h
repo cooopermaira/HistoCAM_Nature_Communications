@@ -87,7 +87,16 @@ public:
       bounds *= view2screenScale(*view) * scale;
       
       g.setColour(juce::Colours::red);
-      g.drawRect(bounds, 3);
+//      if(false){
+        auto center = bounds.getCentre();
+        fPoint radius = sCam->get_scope_radius() * view2screenScale(*view) * scale;;
+        center -= radius/2.0;
+        g.drawEllipse (center.getX(), center.getY(), radius.getX(), radius.getY(), 3);
+
+//      }else{
+        g.drawRect(bounds, 3);
+//      }
+
     }
 
 

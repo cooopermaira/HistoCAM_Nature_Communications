@@ -81,6 +81,8 @@ public:
   
   virtual bool run();
   
+  float get_scope_radius(){ return scope_radius;}
+  
 protected:
   bool parseConfig(Poco::Util::LayeredConfiguration::Ptr pConf);
   bool loadFileList();
