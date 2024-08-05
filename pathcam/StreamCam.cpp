@@ -25,6 +25,7 @@ namespace pathCam {
                                                            compositeQ_mutex(new Poco::FastMutex()),
                                                            component_mutex(new Poco::FastMutex()),
                                                            resize_buffer_mutex(new Poco::FastMutex()),
+                                                           lastFrameMutex(new Poco::FastMutex()),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)){
@@ -32,8 +33,24 @@ namespace pathCam {
     JobQ = new JobQueue(1, 1);
     reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
     reg_results[0].index = 0;
+    lastFrame = Rect(0,0,image_width,image_height);
+
     //variancesForDebug.resize(2266);
 
+  }
+
+  void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle) {
+    lastFrameMutex->lock();
+    lastFrame = _rectInScale1Space;
+    showAsCircle = _showAsCircle;
+    lastFrameMutex->unlock();
+  }
+
+  void StreamCam::get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &_showAsCircle) {
+    lastFrameMutex->lock();
+    _showAsCircle = showAsCircle;
+    _rectInScale1Space = lastFrame;
+    lastFrameMutex->unlock();
   }
 
   bool StreamCam::check_blur(unsigned long image_idx, double myBlurVal) {

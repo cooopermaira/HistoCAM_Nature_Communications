@@ -71,9 +71,7 @@ namespace pathCam {
         }
 
         parent->composites[current_component]->update(new_info);
-        if (parent->regCount == 0 && parent->loaderCount == 0 && parent->matchableCount == 0) {
-          int k = 0;
-        }
+
       }
     }
 

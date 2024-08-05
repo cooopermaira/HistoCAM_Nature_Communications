@@ -303,12 +303,16 @@ namespace pathCam {
 
 
       //update pyramid bounds and observer, reset mask
-//      auto pb = imagePyramid->level[0]->bounds;
-//      pb.x *= imagePyramid->scale;
-//      pb.y *= imagePyramid->scale;
-//      pb.height *= imagePyramid->scale;
-//      pb.width *= imagePyramid->scale;
+
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
+      if(imagePyramid->scale > 0){
+        float x = (imagePyramid->offset.x + new_info.back().absoluteCoords.x) * imagePyramid->scale;
+        float y = (imagePyramid->offset.y + new_info.back().absoluteCoords.y) * imagePyramid->scale;
+        float w = parent->image_width * imagePyramid->scale;
+        float h = parent->image_height * imagePyramid->scale;
+
+        parent->update_last_frame(Rect_<float>(x,y,w,h),images.back()->label == Image::_2X);
+      }
       parent->update_observers();
       freshMask.copyTo(polyMaskOutput);
     }

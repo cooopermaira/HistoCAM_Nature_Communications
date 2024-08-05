@@ -84,6 +84,10 @@ namespace pathCam {
     Poco::FastMutex *buffer_mutex;
     Poco::FastMutex *compositeQ_mutex;
     Poco::FastMutex *component_mutex;
+    Poco::FastMutex *lastFrameMutex;
+
+    cv::Rect_<float> lastFrame;
+    bool showAsCircle;
 
     std::shared_ptr<MRTiledImageSet> MRimage;
 
@@ -98,6 +102,10 @@ namespace pathCam {
     bool spin_run();
 
     bool check_blur(unsigned long image_idx, double myBlurVal);
+
+    void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle);
+
+    void get_last_frame(cv::Rect_<float>& _rectInScale1Space, bool& showAsCircle);
 
     void pass_image(Image *, unsigned long _image_index = 0);
 
