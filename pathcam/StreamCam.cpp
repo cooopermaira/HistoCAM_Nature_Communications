@@ -26,11 +26,12 @@ namespace pathCam {
                                                            component_mutex(new Poco::FastMutex()),
                                                            resize_buffer_mutex(new Poco::FastMutex()),
                                                            lastFrameMutex(new Poco::FastMutex()),
+                                                           scaleRepoMutex(new Poco::FastMutex()),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)){
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(2, 2);
+    JobQ = new JobQueue(10, 10);
     reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
     reg_results[0].index = 0;
     lastFrame = Rect(0,0,image_width,image_height);
@@ -57,44 +58,7 @@ namespace pathCam {
     lastFrameMutex->unlock();
   }
 
-  bool StreamCam::check_blur(unsigned long image_idx, double myBlurVal) {
-    std::vector<unsigned long> indexes(image_idx);
 
-    for (int i = 0; i < image_idx; i++) {
-      indexes[i] = i;
-    }
-    auto imagesLocal = get_image_refs(indexes);
-    if (imagesLocal.size() <= 1) { return true; }
-    std::vector<double> blurVals;
-
-    for (auto img: imagesLocal) {
-      blurVals.push_back(img->blurVariance);
-    }
-
-
-    double sum = std::accumulate(std::begin(blurVals), std::end(blurVals), 0.0);
-    double m = sum / blurVals.size();
-
-    double accum = 0.0;
-    std::for_each(std::begin(blurVals), std::end(blurVals), [&](const double d) {
-      accum += (d - m) * (d - m);
-    });
-
-    if(image_idx == 209 || image_idx == 149){
-      int k = 0;
-    }
-
-    double stdev = sqrt(accum / (blurVals.size() - 1));
-    double howMany = abs(m - myBlurVal) / stdev;
-    double v1 = min((double)blurVals.size()+1,(double) 100.0) / 100.0;
-    double v2 = (m - 2.5 * stdev - 300);
-    double threshold = v1 * v2 + 300;
-    if (threshold < myBlurVal) {
-      return true;
-    } else {
-      return false;
-    }
-  }
 
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx) {
     resize_mmatch_mutex->readLock();
@@ -162,13 +126,6 @@ namespace pathCam {
     reg_results_mutex->unlock();
   }
 
-  unsigned int StreamCam::get_last_active_component(unsigned long image_index) {
-    for (unsigned long i = image_index; i > 0; i--) {
-      if (reg_results[i - 1].component_membership != reg_results[image_index].component_membership) {
-        return reg_results[i - 1].component_membership;
-      }
-    }
-  }
 
   std::vector<Image *> StreamCam::get_image_refs(std::vector<unsigned long int> indexes) {
     std::vector<Image *> temp;
@@ -191,8 +148,22 @@ namespace pathCam {
     return temp;
   }
 
-  void StreamCam::add_new_component(unsigned long image_index, cv::Size image_size) {
+  void StreamCam::add_new_component_Q(unsigned long image_index, cv::Size image_size)  {
+    reg_results_mutex->writeLock();
+    reg_results[image_index].matchedTo = image_index;
+    reg_results_mutex->unlock();
     auto component_index = increment_and_get_components();
+    if(composites.size() != 0){
+      //start job to find scale and offset
+      auto xcm = new XCompRunnable(this, image_index, component_index);
+      JobQ->add_runnable(xcm);
+    }
+    newComponentQ.push({image_index, image_size, component_index});
+
+  }
+
+
+  void StreamCam::add_new_component(unsigned long image_index, cv::Size image_size, unsigned int component_index) {
     auto ri = RegInfo(true, Vec2(0.0, 0.0), true, component_index);
     ri.index = image_index;
     ri.resolved = true;
@@ -210,8 +181,6 @@ namespace pathCam {
     } else {
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0, 0));
-      auto xcm = new XCompRunnable(this, image_index, component_index);
-      JobQ->add_runnable(xcm);
     }
     component_mutex->unlock();
     temp->update(std::vector<RegInfo>{reg_results[image_index]});
@@ -257,6 +226,18 @@ namespace pathCam {
     }
     compositeBatch.back().push_back(index);
     compositeQ_mutex->unlock();
+  }
+
+  bool StreamCam::get_scale_and_offset(unsigned int component_index, double &_scale, cv::Point2f &_offset) {
+    scaleRepoMutex->lock();
+    if (scaleRepo.find(component_index) == scaleRepo.end()) {
+      return false;
+    }
+
+    auto res = scaleRepo[component_index];
+    _scale = res.first;
+    _offset = res.second;
+    return true;
   }
 
   bool StreamCam::compositeQ_empty() {

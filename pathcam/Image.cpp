@@ -3,10 +3,24 @@
 using namespace cv;
 
 namespace pathCam {
-    
 
-    Image::Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool) : width(width), height(height), scope_radius(scope_radius), label(_NOLABEL), mempool(mempool), raw_buffer(0),
-                                                                                                           reference_count(0), image_file(Poco::Path()), blurVariance(0) {};
+
+  Image::Image(unsigned int width, unsigned int height, unsigned int scope_radius, MemoryPool *mempool) : width(width),
+                                                                                                          height(
+                                                                                                              height),
+                                                                                                          scope_radius(
+                                                                                                              scope_radius),
+                                                                                                          label(
+                                                                                                              _NOLABEL),
+                                                                                                          mempool(
+                                                                                                              mempool),
+                                                                                                          raw_buffer(0),
+                                                                                                          reference_count(
+                                                                                                              0),
+                                                                                                          image_file(
+                                                                                                              Poco::Path()),
+                                                                                                          blurVariance(
+                                                                                                              0) {};
 
   Image::~Image() {
     free_memory_RAW(true);
@@ -30,6 +44,10 @@ namespace pathCam {
   }
 
   double Image::check_blur() {
+    if (!in_memory()) {
+      throw std::invalid_argument("Image not in memory during blur check");
+    }
+
     cv::Mat temp = cv::Mat(Size(width, height), CV_8UC1, raw_buffer, Mat::AUTO_STEP);
     int steps = 4;
     int radius = 2190;
@@ -37,8 +55,11 @@ namespace pathCam {
     for (int i = 0; i < steps; i++) {
       int xloc = width / 2 + (radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
       int yloc = height / 2 + (radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
-      cv::Rect rectROI(xloc - 64, yloc - 164, 128, 128);
+      xloc += xloc % 2;
+      yloc += yloc % 2;
+      cv::Rect rectROI(xloc - 64, yloc - 64, 128, 128);
       Mat ROI = temp(rectROI).clone();
+      cvtColor(ROI, ROI, COLOR_BayerBG2GRAY);
       /*Mat laplacian;
       cv::Laplacian(ROI, laplacian, CV_64F);
       cv::Scalar mean, stddev;
@@ -61,17 +82,17 @@ namespace pathCam {
   }
 
   void Image::build_whitebalance_Mat(cv::Mat flat_field) {
-    Mat image_Mat = cv::Mat(height,width, CV_8U, get_Raw(), Mat::AUTO_STEP);
+    Mat image_Mat = cv::Mat(height, width, CV_8U, get_Raw(), Mat::AUTO_STEP);
     Mat gry;
     Mat sbt;
-    cvtColor(image_Mat,gry,COLOR_BayerBG2GRAY);
-    cvtColor(image_Mat,image_Mat,COLOR_BayerBG2BGR);
-    divide(image_Mat,flat_field,image_Mat,1,CV_8U);
-    auto adj = Mat3f(height,width,Vec3f(0.92,1.08,0.92));
+    cvtColor(image_Mat, gry, COLOR_BayerBG2GRAY);
+    cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+    divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
+    auto adj = Mat3f(height, width, Vec3f(0.92, 1.08, 0.92));
     Mat locations = gry > 240;
-    image_Mat.copyTo(sbt,locations);
+    image_Mat.copyTo(sbt, locations);
     image_Mat -= sbt;
-    cv::multiply(sbt,adj,sbt,1,CV_8U);
+    cv::multiply(sbt, adj, sbt, 1, CV_8U);
     image_Mat += sbt;
     readyImage = image_Mat;
   }
@@ -101,7 +122,44 @@ namespace pathCam {
     return 0.30 * red + 0.59 * green + 0.11 * blue;
   }
 
+  bool Image::is_4x() {
+    if (!in_memory()) {
+      throw std::invalid_argument("Image not in memory during 4x check");
+    }
+    buffer_mutex.lock();
+    auto corner1 = Rect(0, 0, 64, 64);
+    auto corner2 = Rect(width - 64, 0, 64, 64);
+    auto corner3 = Rect(width - 64, height - 64, 64, 64);
+    auto corner4 = Rect(0, height - 64, 64, 64);
+
+    Mat image = cv::Mat(height, width, CV_8U, get_Raw(), Mat::AUTO_STEP);
+    Mat roi1, roi2, roi3, roi4;
+
+    cvtColor(image(corner1), roi1, COLOR_BayerBG2GRAY);
+    cvtColor(image(corner2), roi2, COLOR_BayerBG2GRAY);
+    cvtColor(image(corner3), roi3, COLOR_BayerBG2GRAY);
+    cvtColor(image(corner4), roi4, COLOR_BayerBG2GRAY);
+
+    auto centerRect = Rect(width / 2 - 128, height / 2 - 128, 256, 256);
+    Mat centerRoi;
+    cvtColor(image(centerRect), centerRoi, COLOR_BayerBG2GRAY);
+    buffer_mutex.unlock();
+
+    auto val = cv::mean(roi1);
+    val += cv::mean(roi2);
+    val += cv::mean(roi3);
+    val += cv::mean(roi4);
+    val /= 4.0;
+
+
+    auto difference = (cv::mean(centerRoi) - val)[0];
+    return difference >= 120.0;
+  }
+
   bool Image::is_2x() {
+    if (!in_memory()) {
+      throw std::invalid_argument("Image not in memory during 2x check");
+    }
     buffer_mutex.lock();
     float center = 0.f;
     int steps = 20;
@@ -162,13 +220,37 @@ namespace pathCam {
       return;
     }
 
+    if (is_4x()) {
+      label = _4X;
+      return;
+    }
+
     label = _UNKNOWN;
     return;
   }
 
+  bool Image::decide_label_and_blur() {
+    //this function will return false if image fails PRELIMINARY blur test. Image might still be blurry
+    if (!in_memory()) {
+      throw std::invalid_argument("image not in memory during decide_label_and_blur()");
+    }
+
+    if (check_blur() < 200) {
+      return false;
+    }
+
+    find_label();
+
+    if (label == _2X || label == _4X){
+      return blurVariance > 500.0;
+    }
+
+    return true;
+  }
+
   cv::Mat Image::full_image_asMat() {
     load_raw_from_disk();
-    Mat image_Mat = cv::Mat(width,height, CV_8U, get_Raw(), Mat::AUTO_STEP);
+    Mat image_Mat = cv::Mat(width, height, CV_8U, get_Raw(), Mat::AUTO_STEP);
     cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
 
     free_memory_RAW();
@@ -201,7 +283,7 @@ namespace pathCam {
     temp.copyTo(reg_image);
     buffer_mutex.unlock();
 
-    if(release){free_memory_RAW();}
+    if (release) { free_memory_RAW(); }
 
     if (convert) {
       cvtColor(reg_image, reg_image, COLOR_BayerBG2GRAY);

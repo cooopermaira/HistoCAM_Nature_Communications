@@ -61,43 +61,40 @@ namespace pathCam {
   void DebayerRunnable::run() {
     image->load_raw_from_disk();
 
+    bool convertAndSave = true;
+
     if(!image->in_memory() ){
       std::cout << "Issue loading image.\n";
       return;
     }
-    auto val = image->check_blur();
-    blur->at(sort_order) = val;
-    names->at(sort_order) = image->get_ImageFile().getFileName();
+//    auto val = image->check_blur();
+//    blur->at(sort_order) = val;
+//    names->at(sort_order) = image->get_ImageFile().getFileName();
 
+    if(convertAndSave) {
     //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
     cv::Size image_size(image->width, image->height);
     Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
 
-    //*ic.step
-    //cvtColor(image_Mat,image_grey,COLOR_BayerBG2GRAY);
 
-    cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-    cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
-//    Rect roi = Rect(100,100,150,150);
-//    Mat k2 = image_Mat(roi);
-//    Mat ic;
-//    ic.datastart = image_Mat.datastart+2;
-//    *ic.size.p = 4852;
+      cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+      //cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
 
-    Ptr<xphoto::WhiteBalancer> wb = xphoto::createSimpleWB();
-    float p = 0.40;
-    dynamic_cast<xphoto::SimpleWB*>(wb.get())->setInputMin(val);
-    dynamic_cast<xphoto::SimpleWB*>(wb.get())->setInputMin(1.f - p);
-    wb->balanceWhite(image_Mat,image_Mat);
+//    Ptr<xphoto::WhiteBalancer> wb = xphoto::createSimpleWB();
+//    float p = 0.40;
+//    dynamic_cast<xphoto::SimpleWB*>(wb.get())->setInputMin(val);
+//    dynamic_cast<xphoto::SimpleWB*>(wb.get())->setInputMin(1.f - p);
+//    wb->balanceWhite(image_Mat,image_Mat);
 
-    image->free_memory_RAW();
+      image->free_memory_RAW();
 
-    Poco::Path o = outfile;
-    o.append(image->image_file.getFileName());
-    o.setExtension("png");
+      Poco::Path o = outfile;
+      o.append(image->image_file.getFileName());
+      o.setExtension("png");
 
 
-    imwrite(o.toString(), image_Mat);
+      imwrite(o.toString(), image_Mat);
+    }
     int k = 0;
   }
 }

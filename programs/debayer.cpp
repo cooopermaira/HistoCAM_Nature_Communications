@@ -10,6 +10,46 @@
 
 using Poco::DirectoryIterator;
 
+unsigned long extractSortableValue(const std::string &str) {
+  if (str.size() <= 4) {
+    // Handle cases where the string is too short
+    return 0;
+  }
+  std::string substr = str.substr(0, str.size() - 4);
+  return std::stoul(substr);
+}
+
+int extractSortableValue2(const std::string &str) {
+  size_t firstDash = str.find('-');
+  if (firstDash == std::string::npos) {
+    throw std::invalid_argument("doesn't have a dash");
+  }
+
+  size_t secondDash = str.find('-', firstDash + 1);
+  if (secondDash == std::string::npos) {
+    throw std::invalid_argument("doesn't have a second dash");
+  }
+
+  size_t period = str.find('.', secondDash + 1);
+  if (period == std::string::npos) {
+    throw std::invalid_argument("doesn't have a period");
+  }
+
+  return std::stoi(str.substr(secondDash + 1, period - secondDash - 1));
+}
+
+bool customComparator2(const pathCam::Image *lhs, const pathCam::Image *rhs) {
+  unsigned long lhsVal = extractSortableValue2(lhs->image_file.getFileName());
+  unsigned long rhsVal = extractSortableValue2(rhs->image_file.getFileName());
+  return lhsVal < rhsVal;
+}
+
+bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
+  unsigned long lhsVal = extractSortableValue(lhs->image_file.getFileName());
+  unsigned long rhsVal = extractSortableValue(rhs->image_file.getFileName());
+  return lhsVal < rhsVal;
+}
+
 int main(int argc, char *argv[]) {
   Mat flat_field;
   flat_field = cv::imread("/Users/coopermaira/Desktop/pathcam_data/2x_wb.tif");
@@ -32,34 +72,52 @@ int main(int argc, char *argv[]) {
 
   if (inFile.isDirectory()) {
     std::vector<double> *blur = new std::vector<double>;
-    std::vector<std::string>* names = new std::vector<std::string>;
+    std::vector<std::string> *names = new std::vector<std::string>;
 
-    blur->resize(3000);
+    blur->resize(3000, 0);
     names->resize(3000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(1, 1);
+    auto jq = pathCam::JobQueue(10, 10);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
-    int num = 0;
+    std::vector<pathCam::Image *> images;
     while (it != end) {
 
       Poco::Path p(it.path());
 
+
       if (p.getExtension() == "Raw") {
         //std::cout << "read:" << p.toString() << "\n";
 
-        auto *image = new pathCam::Image(6464,4852,2190);
-
+        auto *image = new pathCam::Image(6464, 4852, 2190);
         image->set_disk_file(p);
-        auto *dr = new pathCam::DebayerRunnable(image, flat_field, outFile,blur,names,num);
-        jq.add_runnable(dr,num);
+        images.push_back(image);
 
       }
-      num++;
       ++it;
     }
+    std::sort(images.begin(), images.end(), customComparator);
+
+
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/raw2to40run/input.txt";
+    std::ofstream outputFile(outputfilepath);
+
+    for (int i = 0; i < images.size(); i++) {
+//      Poco::File currentFile(images[i]->image_file);
+//      if(currentFile.isFile()){
+//        std::string newName = std::to_string(i)+".Raw";
+//        Poco::Path newfilepath = Poco::Path(argv[1]);
+//        newfilepath.setFileName(newName);
+//        currentFile.renameTo(newfilepath.toString());
+//        int k = 0;
+//      }
+      outputFile << images[i]->image_file.toString()<<std::endl;
+//      auto *dr = new pathCam::DebayerRunnable(images[i], flat_field, outFile, blur, names, i);
+//      jq.add_runnable(dr, i);
+    }
+    outputFile.close();
     while (!jq.is_empty()) {
       jq.run_jobs(false);
     }
@@ -70,7 +128,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Processing File\n";
 
-    pathCam::Image *image = new pathCam::Image(6464,4852,2190);
+    pathCam::Image *image = new pathCam::Image(6464, 4852, 2190);
 
     image->set_disk_file(inFile);
     image->load_raw_from_disk();
@@ -91,3 +149,5 @@ int main(int argc, char *argv[]) {
   return 0;
 
 }
+
+

@@ -106,10 +106,18 @@ namespace pathCam {
       std::shuffle(std::begin(new_info), std::end(new_info), rng);
     }
 
+    if(imagePyramid->scale == 0){
+      double scale;
+      Point2f offset;
+      if(parent->get_scale_and_offset(componentIndex,scale,offset)){
+        imagePyramid->set_scale(scale);
+        imagePyramid->set_offset(offset);
+      }
+    }
+
     update_Bbox_no_composite(new_info);
     expand_subdiv(new_info);
     add_images_no_composite(new_info);
-
     update_mutex->unlock();
   }
 
@@ -284,7 +292,7 @@ namespace pathCam {
 
       channels[1] = polyMaskOutput;           //alpha channel
       merge(channels, fourChannelPreallocated);
-
+      images[i]->readyImage.release();
       //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
       int k = 0;
       for (auto tile: effectedTiles) {
@@ -1268,9 +1276,9 @@ namespace pathCam {
     }
     parent->reg_results_mutex->unlock();
 
-    //update(newinfo);
-    rebuild_DT_elementwise(newinfo);
-    create_and_submit_rebuild_jobs();
+    update(newinfo);
+//    rebuild_DT_elementwise(newinfo);
+//    create_and_submit_rebuild_jobs();
 
 
     auto stop = std::chrono::high_resolution_clock::now();

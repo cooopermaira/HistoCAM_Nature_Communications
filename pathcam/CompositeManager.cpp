@@ -13,15 +13,26 @@ namespace pathCam {
   CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),rebuildJobsOutstanding(true) {};
 
   void CompositeManager::run() {
+    auto start = std::chrono::high_resolution_clock::now();
     rebuildJobsOutstanding = 0;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
-      std::pair<unsigned long, cv::Size> newComp;
+
+      auto timeCheck = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timeCheck - start);
+      if(duration.count() < 50){
+        Poco::Thread::sleep(50 - duration.count());
+      }
+      start = timeCheck;
+
+      //pull new components that might need to be processed
+      std::tuple<unsigned long, cv::Size, unsigned int> newComp;
       bool isNewComp = false;
       if (!parent->newComponentQ.empty()) {
         newComp = parent->newComponentQ.front();
         isNewComp = true;
       }
+
       //if nothing in the Q but termination condition not met, wait
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
@@ -30,7 +41,7 @@ namespace pathCam {
           if(rebuildJobsOutstanding > 0) {
             rebuildJobsComplete.wait();
           }
-          parent->add_new_component(newComp.first, newComp.second);
+          parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
 
         }else{
         Poco::Thread::sleep(100);
@@ -39,13 +50,13 @@ namespace pathCam {
 
         std::vector<RegInfo> indexes = parent->get_Q_front();
         if (isNewComp) {
-          if (indexes.front().index > newComp.first) {
+          if (indexes.front().index > std::get<0>(newComp)) {
             parent->newComponentQ.pop();
             //perform_global_alignment();
             if(rebuildJobsOutstanding > 0) {
               rebuildJobsComplete.wait();
             }
-            parent->add_new_component(newComp.first, newComp.second);
+            parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
           }
         }
         std::sort(indexes.begin(), indexes.end());
@@ -89,7 +100,7 @@ namespace pathCam {
         */
 
 
-//    perform_global_alignment();
+    perform_global_alignment();
 //    rebuildJobsComplete.wait();
     //save_components_to_disk();
     parent->compositing = false;

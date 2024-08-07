@@ -68,7 +68,11 @@ namespace pathCam {
 
     bool is_2x();
 
+    bool is_4x();
+
     void extract_features();
+
+    bool decide_label_and_blur();
 
     void find_label();
 

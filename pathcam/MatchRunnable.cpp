@@ -52,7 +52,12 @@ namespace pathCam {
 
         mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
         if (mtoScale == 0 ){
-          parent->composites[matchedTo->component_membership]->imagePyramid->scaleSet.wait();
+          //parent->composites[matchedTo->component_membership]->imagePyramid->scaleSet.wait();
+          double tempScale;
+          Point2f tempOffset;
+          while (parent->get_scale_and_offset(matchedTo->component_membership,tempScale,tempOffset)){
+            Poco::Thread::sleep(100);
+          }
           mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
         }
         assert(mtoScale != 0);
@@ -71,9 +76,10 @@ namespace pathCam {
 
     }
     if (scale > 0) {
-      parent->composites[componentMembership]->imagePyramid->set_scale(scale * mtoScale);
-      parent->composites[componentMembership]->imagePyramid->set_offset(offset);
-      parent->composites[componentMembership]->imagePyramid->scaleSet.set();
+//      parent->composites[componentMembership]->imagePyramid->set_scale(scale * mtoScale);
+//      parent->composites[componentMembership]->imagePyramid->set_offset(offset);
+      parent->set_scale_and_offset(selfImage->index, scale * mtoScale, offset);
+
       return true;
     }
     return false;
@@ -86,18 +92,20 @@ namespace pathCam {
 
     //get references to other component images
     std::vector<unsigned long> indexes;
-
-    for (int i = 0; i < parent->composites.size(); i++) {
-      if (parent->composites[i]->componentIndex != componentMembership) {
-        for(int ii = max(0,(int)parent->composites[i]->memberImages.size() - 5); ii < parent->composites[i]->memberImages.size(); ii++){
-          indexes.push_back(parent->composites[i]->memberImages[ii].first->index);
-        }
-//        for (auto item: parent->composites[i]->delaunayMembers) {
-//          indexes.push_back(item.second);
-//        }
-      }
+    for (int i = 0; i < image_idx; i++){
+      indexes.push_back(i);
     }
-    std::sort(indexes.begin(), indexes.end());
+//    for (int i = 0; i < parent->composites.size(); i++) {
+//      if (parent->composites[i]->componentIndex != componentMembership) {
+//        for(int ii = max(0,(int)parent->composites[i]->memberImages.size() - 5); ii < parent->composites[i]->memberImages.size(); ii++){
+//          indexes.push_back(parent->composites[i]->memberImages[ii].first->index);
+//        }
+////        for (auto item: parent->composites[i]->delaunayMembers) {
+////          indexes.push_back(item.second);
+////        }
+//      }
+//    }
+    //std::sort(indexes.begin(), indexes.end());
 
     auto otherImages = parent->get_image_refs(indexes);
     if(!match_to_images(image, otherImages)){
@@ -151,14 +159,18 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m);
-      int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
+
+      int result = motion_est->findHomography(m, parent->estimator_type, 20, 0);
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
         bestMatch = prev_idx;
       }
       if (result == 1) {
-        if (std::abs(m->t_x) < image->width / 2 && std::abs(
-            m->t_y) < image->height / 2) {
+        if(m->scale > 1.1 || m->scale < 0.9){
+          continue;
+        }
+        if (std::abs(m->t_x) < image->width / 1.5 && std::abs(
+            m->t_y) < image->height / 1.5) {
           //parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
           parent->set_match(image_idx, prev_idx);
           auto tempReg = RegInfo(true, Vec2(0.0, 0.0), false, 0);
@@ -214,7 +226,7 @@ namespace pathCam {
     //perform_global_alignment() and all image_idx values are less than matchM.match size
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
-    int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
+    int result = motion_est->findHomography(m, parent->estimator_type, 50, 0);
 //    m->t_x *= image1->get_reg_scale();
 //    m->t_y *= image2->get_reg_scale();
     if (result == 1) {

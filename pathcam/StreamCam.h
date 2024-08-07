@@ -85,9 +85,12 @@ namespace pathCam {
     Poco::FastMutex *compositeQ_mutex;
     Poco::FastMutex *component_mutex;
     Poco::FastMutex *lastFrameMutex;
+    Poco::FastMutex *scaleRepoMutex;
 
     cv::Rect_<float> lastFrame;
     bool showAsCircle;
+
+    std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
 
     Mat flat_field2X;
 
@@ -95,9 +98,9 @@ namespace pathCam {
 
     std::vector<std::pair<std::string, double>> debugImageBlurWithNames;
     std::vector<double> debugImageBlur;
-    CompositeManager* cm;
-    QManager* qm;
-    DiskReader* dr;
+    CompositeManager *cm;
+    QManager *qm;
+    DiskReader *dr;
 
     bool run();
 
@@ -107,11 +110,19 @@ namespace pathCam {
 
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle);
 
-    void get_last_frame(cv::Rect_<float>& _rectInScale1Space, bool& showAsCircle);
+    void get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &showAsCircle);
 
     void pass_image(Image *, unsigned long _image_index = 0);
 
     void set_match(unsigned long image_idx, unsigned long prev_idx);
+
+    void set_scale_and_offset(unsigned int component_index, double scale, Point2f offset) {
+      scaleRepoMutex->lock();
+      scaleRepo[component_index] = {scale, offset};
+      scaleRepoMutex->unlock();
+    }
+
+    bool get_scale_and_offset(unsigned int component_index, double &_scale, Point2f &_offset);
 
     bool microscopeInput;
 
@@ -129,8 +140,6 @@ namespace pathCam {
     }
 
   protected:
-    unsigned int get_last_active_component(unsigned long image_index);
-
     unsigned int increment_and_get_components() { return components++; }
 
     void add_image(Image *image, unsigned long index);
@@ -154,20 +163,15 @@ namespace pathCam {
     void push_compositeQ(RegInfo index);
 
     //void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
-    void add_new_component(unsigned long image_index, cv::Size image_size);
+    void add_new_component(unsigned long image_index, cv::Size image_size, unsigned int component_index);
 
-    void add_new_component_Q(unsigned long image_index, cv::Size image_size) {
-      reg_results_mutex->writeLock();
-      reg_results[image_index].matchedTo = image_index;
-      reg_results_mutex->unlock();
-      newComponentQ.push({image_index, image_size});
-    }
+    void add_new_component_Q(unsigned long image_index, cv::Size image_size);
 
     //std::vector < double > variancesForDebug;
     std::vector<CompositeVoronoi *> composites;
     std::vector<bool> visited;
 
-    std::queue<std::pair<unsigned long, cv::Size> > newComponentQ;
+    std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;

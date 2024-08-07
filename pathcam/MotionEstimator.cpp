@@ -14,6 +14,7 @@ namespace pathCam {
                                       double ransacReprojThreshold,
                                       int maxIters, double confidence) {
 
+
     //-- Localize the object
     std::vector<Point2f> image_1_pts;
     std::vector<Point2f> image_2_pts;
@@ -53,6 +54,7 @@ namespace pathCam {
       return -2;
     }
     if (flag == 1) {
+      int k = 0;
       for (int i = 0; i < m->H.rows; i++) {
         for (int j = 0; j < m->H.cols; j++) {
           std::cout << std::to_string(i) + " " + std::to_string(j) + " " + std::to_string(m->H.at<double>(i, j))
@@ -66,7 +68,7 @@ namespace pathCam {
     auto d2 = m->H.at<double>(1, 2);
     m->t_x = a * a2 * (1.0 / m->image_2->get_reg_scale());
     m->t_y = d * d2 * (1.0 / m->image_2->get_reg_scale());
-
+    m->scale = (a + d) / 2;
     return 1;
   }
 

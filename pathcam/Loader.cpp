@@ -23,8 +23,30 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
+    if(image->check_blur() < 200){
+      successful = true;
+      parent->loaderCount--;
+      jobComplete.set();
+      return;
+    }
 
     image->find_label();
+
+//    if (image->label == Image::_2X || image->label == Image::_4X){
+//      if (image->blurVariance < 300){
+//        successful = true;
+//        parent->loaderCount--;
+//        jobComplete.set();
+//        return;
+//      }
+//    }
+
+//    if (!image->decide_label_and_blur()){
+//      successful = true;
+//      parent->loaderCount--;
+//      jobComplete.set();
+//      return;
+//    }
 
     if (image->is_good()) {
 
@@ -37,15 +59,11 @@ namespace pathCam {
         image->build_whitebalance_Mat(parent->flat_field2X);
       }
 
-      if(image->check_blur() < 200){
-        successful = true;
-        parent->loaderCount--;
-        jobComplete.set();
-        return;
-      }
+
 
       //image->free_memory_RAW();
-      pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
+      //pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
+      pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
 
       switch (parent->feature_type) {
         case _SIFT:
