@@ -68,8 +68,16 @@ namespace pathCam {
 
     friend class RebuildRunnable;
 
+    friend class RegInfo;
+
   private:
-    std::queue<std::vector<RegInfo*> > compositeBatch;
+    struct compareCompositeQSort{
+      bool operator()(const std::vector<RegInfo*> lhs, const std::vector<RegInfo*> rhs){
+        return lhs.at(0)->index < rhs.at(0)->index;
+      };
+    };
+
+    std::priority_queue<std::vector<RegInfo*>, std::deque<std::vector<RegInfo*>>, compareCompositeQSort > compositeBatch;
 
 
   public:
@@ -142,9 +150,11 @@ namespace pathCam {
 
     void add_image(Image *image, unsigned long index);
 
-    void add_registration(RegInfo regInfo);
+    void add_registration(RegInfo* regInfo);
 
-    bool get_registration(unsigned long image_idx, RegInfo& res);
+    bool get_registration(unsigned long image_idx, RegInfo* res);
+
+    RegInfo* get_registration(unsigned long image_idx);
 
     JobQueue *JobQ;
 

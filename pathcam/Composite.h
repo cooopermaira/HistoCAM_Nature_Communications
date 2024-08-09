@@ -88,6 +88,7 @@ namespace pathCam {
     Bbox subdiv_Bbox;
     Poco::Event wakeEvent;
 
+    void check_set_render_info();
 
     long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
 
@@ -129,6 +130,7 @@ namespace pathCam {
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
     unsigned int componentIndex;
+    long firstImageIdx = -1;
     bool needsAlignment = false;
     std::atomic<unsigned int> matchableCount = 0;
     std::vector<std::pair<long, long>> matchedEdges;

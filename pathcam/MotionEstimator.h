@@ -11,6 +11,7 @@
 #include "pathCam.h"
 
 namespace pathCam{
+class StreamCam;
 
 class MotionEstimator{
 public:
@@ -29,17 +30,25 @@ public:
 
 class RegInfo{
 public:
+  StreamCam* parent;
   unsigned long int index,matchedTo;
   bool successful,root,resolved;
   unsigned int component_membership;
   Vec2 absoluteCoords;
   Vec2 relativeCoords = Vec2(0.0, 0.0);
-  Poco::FastMutex *mutex;
+  Poco::FastMutex *accessMutex;
+  std::vector<RegInfo*> callersWaiting;
+  std::vector<std::pair<unsigned int, Match*>> componentCallersWaiting;
   
-  RegInfo(bool successful=false, Vec2 absoluteCoords=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
-  successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),mutex(new Poco::FastMutex) {
-
+  RegInfo(StreamCam* parent, bool successful=false, Vec2 absoluteCoords=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
+  successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),accessMutex(new Poco::FastMutex), parent(parent) {
   };
+
+  bool get_abc(RegInfo* caller, Vec2& _absoluteCoords, unsigned int& _componentMembership);
+
+  void set_abc(Vec2 _absoluteCoords, unsigned int _componentMembership);
+
+  void set_waiting_component(unsigned int componentIndex, Match* m);
   
   // to allow for sorting of reginfo objects by component membership
   bool operator < (const RegInfo& other) const {

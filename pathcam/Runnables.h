@@ -88,14 +88,16 @@ namespace pathCam {
   class RegistrationRunnable : public RunnableIntermediate {
   private:
     StreamCam *parent;
-    unsigned long index;
+    RegInfo* regInfo;
   public:
-    RegistrationRunnable(StreamCam *parent, unsigned long index) :
+    RegistrationRunnable(StreamCam *parent, RegInfo* regInfo) :
         parent(parent),
-        index(index),
-        RunnableIntermediate(index, 3) {};
+        regInfo(regInfo),
+        RunnableIntermediate(regInfo->index, 3) {};
 
     virtual void run();
+
+
 
     std::pair<bool, Vec2> trace_to_root(unsigned long index);
   };

@@ -71,53 +71,28 @@ namespace pathCam {
       if (result == 1) {
 
         matchedTo = otherCompImages[ii];
-        parent->reg_results_mutex->readLock();
-        auto regInfo = parent->reg_results[matchedTo->index];
-        parent->reg_results_mutex->unlock();
+        auto mtoRegInfo = parent->get_registration(matchedTo->index);
 
-        if (!regInfo->resolved) {
-          parent->JobQ->jobRefs[matchedTo->index * 3 + 2]->waitOnThisGuy();
-          parent->reg_results_mutex->readLock();
-          auto regInfo = parent->reg_results[matchedTo->index];
-          parent->reg_results_mutex->unlock();
-          if (!regInfo->resolved) {
-            continue;
-          }
+        mtoRegInfo->accessMutex->lock();
+        if (!mtoRegInfo->resolved) {
+          mtoRegInfo->set_waiting_component(componentMembership,m);
+          mtoRegInfo->accessMutex->unlock();
+          return true;
         }
-        try {
-          mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
-        }
-        catch(...){}
-        if (mtoScale == 0 ){
-          //parent->composites[matchedTo->component_membership]->imagePyramid->scaleSet.wait();
-          double tempScale;
-          Point2f tempOffset;
-          while (parent->get_scale_and_offset(matchedTo->component_membership,tempScale,tempOffset)){
-            Poco::Thread::sleep(100);
-          }
-          mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
-        }
-        assert(mtoScale != 0);
+        mtoRegInfo->accessMutex->unlock();
 
-        auto mtoOffset = parent->composites[matchedTo->component_membership]->imagePyramid->offset;
+        //if the component hasnt been added yet, wait
+        Point2f mtoOffset;
+        while(parent->composites.size() <= matchedTo->component_membership || !parent->get_scale_and_offset(mtoRegInfo->component_membership,mtoScale,mtoOffset)) {
+          Poco::Thread::sleep(50);
+        }
+
         scale = (m->H.at<double>(0, 0) + m->H.at<double>(1, 1)) / 2.0;
-        //scale = 2.0139375;
-//        offset = Point2f((((m->t_x / scale + regInfo.absoluteCoords.x) / scale) / mtoScale + mtoOffset.x) / mtoScale,
-//                         (((m->t_y / scale + regInfo.absoluteCoords.y) / scale) / mtoScale + mtoOffset.y) / mtoScale);
-
-        offset = Point2f((m->t_x / scale + regInfo->absoluteCoords.x + mtoOffset.x) / scale ,
-                         (m->t_y / scale + regInfo->absoluteCoords.y + mtoOffset.y) / scale) ;
-
-        break;
+        offset = Point2f((m->t_x / scale + mtoRegInfo->absoluteCoords.x + mtoOffset.x) / scale ,
+                         (m->t_y / scale + mtoRegInfo->absoluteCoords.y + mtoOffset.y) / scale) ;
+        parent->set_scale_and_offset(componentMembership, scale * mtoScale, offset);
+        return true;
       }
-
-    }
-    if (scale > 0) {
-//      parent->composites[componentMembership]->imagePyramid->set_scale(scale * mtoScale);
-//      parent->composites[componentMembership]->imagePyramid->set_offset(offset);
-      parent->set_scale_and_offset(componentMembership, scale * mtoScale, offset);
-
-      return true;
     }
     return false;
   }
@@ -212,10 +187,10 @@ namespace pathCam {
 
         //check if scale indicates that this is not the same component
         if(m->scale > 1.1 || m->scale < 0.9){
-          RegInfo mtoReg;
+          auto mtoReg = new RegInfo(parent);
           if (parent->get_registration(prev_idx,mtoReg)){
-            if (mtoReg.resolved){
-              skipComponents.push_back(mtoReg.component_membership);
+            if (mtoReg->resolved){
+              skipComponents.push_back(mtoReg->component_membership);
             }
           }
           continue;
@@ -225,15 +200,19 @@ namespace pathCam {
             m->t_y) < image->height / 1.5) {
           //parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
           parent->set_match(image_idx, prev_idx);
-          auto tempReg = RegInfo(true, Vec2(0.0, 0.0), false, 0);
-          tempReg.index = image_idx;
-          tempReg.resolved = false;
-          tempReg.matchedTo = prev_idx;
-          tempReg.relativeCoords.x = -1 * m->t_x;
-          tempReg.relativeCoords.y = -1 * m->t_y;
-          parent->add_registration(tempReg);
+          //auto tempReg = new RegInfo(parent,true, Vec2(0.0, 0.0), false, 0);
+          auto tempReg = parent->get_registration(image_idx);
+
+          tempReg->accessMutex->lock();
+          tempReg->index = image_idx;
+          tempReg->root = false;
+          tempReg->matchedTo = prev_idx;
+          tempReg->relativeCoords.x = -1 * m->t_x;
+          tempReg->relativeCoords.y = -1 * m->t_y;
+          tempReg->accessMutex->unlock();
+
           parent->regCount++;
-          auto rj = new RegistrationRunnable(parent, image_idx);
+          auto rj = new RegistrationRunnable(parent, tempReg);
           parent->JobQ->add_runnable(rj);
           successful = true;
           break;

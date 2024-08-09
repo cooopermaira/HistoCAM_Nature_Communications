@@ -31,69 +31,6 @@ namespace pathCam {
 
     polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
     freshMask = polyMaskOutput.clone();
-
-    //testing conjugate gradient data cleaner
-    Mat A = Mat::zeros(8, 4, CV_64FC1);
-
-    Mat bx = Mat::zeros(8, 1, CV_64FC1);
-    Mat by = bx.clone();
-
-    Mat x = Mat::zeros(4, 1, CV_64FC1);
-    Mat y = x.clone();
-
-    A.at<double>(0, 0) = 1;
-    A.at<double>(1, 0) = -1;
-    A.at<double>(1, 1) = 1;
-    A.at<double>(2, 1) = 1;
-    A.at<double>(3, 2) = 1;
-    A.at<double>(4, 1) = -1;
-    A.at<double>(4, 2) = 1;
-    A.at<double>(5, 3) = 1;
-    A.at<double>(6, 3) = 1;
-    A.at<double>(6, 1) = -1;
-    A.at<double>(7, 3) = 1;
-    A.at<double>(7, 0) = -1;
-
-    bx.at<double>(0) = 2;
-    bx.at<double>(1) = 2;
-    bx.at<double>(2) = 4;
-    bx.at<double>(3) = 5;
-    bx.at<double>(4) = 1;
-    bx.at<double>(5) = 4;
-    bx.at<double>(6) = 1;
-    bx.at<double>(7) = 1;
-
-    by.at<double>(0) = -1;
-    by.at<double>(1) = 1.01;
-    by.at<double>(2) = 0;
-    by.at<double>(3) = -2;
-    by.at<double>(4) = -1.95;
-    by.at<double>(5) = 4;
-    by.at<double>(6) = 5;
-    by.at<double>(7) = 4;
-
-    x.at<double>(0) = 2;
-    x.at<double>(1) = 4;
-    x.at<double>(2) = 5;
-    x.at<double>(3) = 3;
-
-    y.at<double>(0) = -1.5;
-    y.at<double>(1) = .5;
-    y.at<double>(2) = -2;
-    y.at<double>(3) = 4;
-
-
-    std::map<long, long> systemMap;
-    for (long i = 0; i < x.rows; i++) {
-      systemMap[i] = i;
-    }
-
-    //coopers_conjugate_gradient(A, bx, x, 100, 0.00001, true, 0.05, systemMap,by);
-
-
-
-    //coopers_conjugate_gradient(A, by, y, 100, 0.00001, true, 0.05, systemMap,bx);
-    int k = 0;
   }
 
 
@@ -106,21 +43,28 @@ namespace pathCam {
       std::shuffle(std::begin(new_info), std::end(new_info), rng);
     }
 
-    if(imagePyramid->scale == 0){
-      double scale;
-      Point2f offset;
-      if(parent->get_scale_and_offset(componentIndex,scale,offset)){
-        imagePyramid->set_scale(scale);
-        imagePyramid->set_offset(offset);
-      }
-    }
-
     update_Bbox_no_composite(new_info);
     expand_subdiv(new_info);
     add_images_no_composite(new_info);
+
     update_mutex->unlock();
   }
 
+  void CompositeVoronoi::check_set_render_info() {
+    if(imagePyramid->scale == 0){
+
+      double scale;
+      Point2f offset;
+      if(parent->get_scale_and_offset(componentIndex,scale,offset)){
+
+        imagePyramid->set_scale(scale);
+        imagePyramid->set_offset(offset);
+
+        auto firstReg = parent->get_registration(memberImages[0].first->index);
+        firstReg->set_abc(Vec2(0,0),componentIndex);
+      }
+    }
+  }
 
   void CompositeVoronoi::self_reset() {
     imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y), Point2i(max_offset.x, max_offset.y));
@@ -325,7 +269,11 @@ namespace pathCam {
       float w = parent->image_width * imagePyramid->scale;
       float h = parent->image_height * imagePyramid->scale;
 
-      parent->update_last_frame(Rect_<float>(x,y,w,h),images.back()->label == Image::_2X);
+      auto showAsCircle = images.back()->label == Image::_2X;
+      if (!showAsCircle){
+        int k = 0;
+      }
+      parent->update_last_frame(Rect_<float>(x,y,w,h),showAsCircle);
     }
     parent->update_observers();
   }

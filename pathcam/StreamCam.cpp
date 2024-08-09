@@ -32,9 +32,11 @@ namespace pathCam {
                                                            dr(new DiskReader(this)){
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(10, 10);
-    reg_results.resize(1);
-    reg_results[0] = new RegInfo(true, Vec2(0, 0), true, 0);
-    reg_results[0]->index = 0;
+//    reg_results.resize(1);
+//    reg_results[0] = new RegInfo(this, true, Vec2(0, 0), true, 0);
+//    reg_results[0]->index = 0;
+//    reg_results[0]->resolved = false;
+
     lastFrame = Rect(0,0,image_width,image_height);
 
     flat_field2X = cv::imread(flat_field_file.toString());
@@ -104,36 +106,44 @@ namespace pathCam {
 
   void StreamCam::add_image(Image *image, unsigned long index) {
     image_mutex->writeLock();
+    reg_results_mutex->writeLock();
     unsigned long size = images.size();
     if (index >= size) {
       images.resize(index + 100);
+
+      reg_results.resize(index + 100);
 
       resize_mmatch_mutex->writeLock();
       matchM.resize(index + 100);
       resize_mmatch_mutex->unlock();
 
-      reg_results_mutex->writeLock();
-      reg_results.resize(index + 100, new RegInfo());
-      reg_results_mutex->unlock();
     }
+
+    reg_results[index] = new RegInfo(this, true, Vec2(0.0, 0.0), true, 0);
+    reg_results_mutex->unlock();
+
     images[index] = image;
     image_mutex->unlock();
   }
 
-  void StreamCam::add_registration(pathCam::RegInfo regInfo) {
+  void StreamCam::add_registration(pathCam::RegInfo* regInfo) {
     reg_results_mutex->writeLock();
-    auto index = regInfo.index;
-    reg_results[index] = new RegInfo(regInfo);
+    auto index = regInfo->index;
+    reg_results[index] = regInfo;
     reg_results_mutex->unlock();
+    auto image = get_image_ref(index);
+    image->regInfo = regInfo;
   }
 
-  bool StreamCam::get_registration(unsigned long image_idx, RegInfo& res) {
+  bool StreamCam::get_registration(unsigned long image_idx, RegInfo* res) {
     reg_results_mutex->readLock();
-    if (reg_results.size() <= image_idx){
+
+    if (reg_results.size() <= image_idx || reg_results[image_idx] == nullptr){
       reg_results_mutex->unlock();
       return false;
     }
-    res = reg_results[image_idx];
+
+    *res = *reg_results[image_idx];
     reg_results_mutex->unlock();
     return true;
   }
@@ -152,6 +162,14 @@ namespace pathCam {
     return temp;
   }
 
+  RegInfo *StreamCam::get_registration(unsigned long image_idx) {
+    RegInfo* temp;
+    reg_results_mutex->readLock();
+    temp = reg_results[image_idx];
+    reg_results_mutex->unlock();
+    return temp;
+  }
+
   Image *StreamCam::get_image_ref(unsigned long int index) {
     Image *temp;
     image_mutex->readLock();
@@ -161,9 +179,7 @@ namespace pathCam {
   }
 
   void StreamCam::add_new_component_Q(unsigned long image_index, cv::Size image_size)  {
-    reg_results_mutex->writeLock();
-    reg_results[image_index]->matchedTo = image_index;
-    reg_results_mutex->unlock();
+
     auto component_index = increment_and_get_components();
     if(component_index != 0){
       //start job to find scale and offset
@@ -176,18 +192,18 @@ namespace pathCam {
 
 
   void StreamCam::add_new_component(unsigned long image_index, cv::Size image_size, unsigned int component_index) {
-    auto ri = RegInfo(true, Vec2(0.0, 0.0), true, component_index);
-    ri.index = image_index;
-    ri.resolved = true;
-    ri.matchedTo = image_index; //this is a root image, it has no match
-    add_registration(ri);
-
+    auto ri = reg_results[image_index];
+    ri->component_membership = component_index;
+    ri->index = image_index;
+    ri->matchedTo = image_index; //this is a root image, it has no match
 
     //delete these pointers when destroyed
     auto *temp = new CompositeVoronoi(this, image_size, component_index);
     component_mutex->lock();
     composites.push_back(temp);
     if (composites.size() == 1) {
+      ri->set_abc(Vec2(0,0), component_index);
+      set_scale_and_offset(0,1,Point2f(0, 0));
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
     } else {
@@ -211,7 +227,7 @@ namespace pathCam {
 
   std::vector<RegInfo*> StreamCam::get_Q_front() {
     compositeQ_mutex->lock();
-    std::vector<RegInfo*> temp = compositeBatch.front();
+    std::vector<RegInfo*> temp = compositeBatch.top();
     compositeBatch.pop();
     compositeQ_mutex->unlock();
     return temp;
@@ -233,10 +249,7 @@ namespace pathCam {
 
   void StreamCam::push_compositeQ(RegInfo* index) {
     compositeQ_mutex->lock();
-    if (compositeBatch.empty() || compositeBatch.back().size() >= 1) {
-      compositeBatch.push(std::vector<RegInfo*>());
-    }
-    compositeBatch.back().push_back(index);
+    compositeBatch.push({index});
     compositeQ_mutex->unlock();
   }
 
@@ -272,4 +285,5 @@ namespace pathCam {
     }
     someoneWaitingOnJobCompleteEvent = false;
   }
+
 }

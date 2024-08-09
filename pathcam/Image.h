@@ -6,9 +6,11 @@
 namespace pathCam {
 
   using Poco::MemoryPool;
+  class RegInfo;
 
   class Image {
   public:
+    RegInfo* regInfo;
     double blurVariance;
     unsigned int width, height;
     unsigned int scope_radius;

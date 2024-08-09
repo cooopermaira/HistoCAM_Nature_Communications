@@ -14,30 +14,56 @@ namespace pathCam {
 //RegManager::RegManager(StreamCam *parent, pathCam::JobQueue *queue): parent(parent), queue(queue), successful(false){};
 
 
+//  void RegistrationRunnable::run() {
+//    trace_to_root(index);
+//
+//    parent->reg_results_mutex->readLock();
+//    auto reginfo = parent->reg_results[index];
+//    parent->reg_results_mutex->unlock();
+//
+//    if (!reginfo->resolved) {
+//      sort_order += 10;
+//      parent->JobQ->add_runnable(this,sort_order);
+//      //this should be changed to wait on correct jobComplete event rather than re entered into job queue.
+//    } else {
+//      parent->regCount--;
+//      parent->push_compositeQ(reginfo);
+//    }
+//    jobComplete.set();
+//    jobComplete.reset();
+//  }
+
+
   void RegistrationRunnable::run() {
-    trace_to_root(index);
-
-    parent->reg_results_mutex->readLock();
-    auto reginfo = parent->reg_results[index];
-    parent->reg_results_mutex->unlock();
-
-    if (!reginfo->resolved) {
-      sort_order += 10;
-      parent->JobQ->add_runnable(this,sort_order);
-      //this should be changed to wait on correct jobComplete event rather than re entered into job queue. 
-    } else {
-      parent->regCount--;
-      parent->push_compositeQ(reginfo);
+//    RegInfo* them = new RegInfo(parent);
+//
+//    if(!parent->get_registration(regInfo->matchedTo, them)){
+//      std::cout<<"recirculating job, index " + std::to_string(regInfo->index) << std::endl;
+//      sort_order += 10;
+//      parent->JobQ->add_runnable(this,sort_order);
+//      //throw std::invalid_argument("matched to registration does not exist. Caller is index "+std::to_string(regInfo->index)+" seeking index "+std::to_string(regInfo->matchedTo));
+//    }
+    auto them = parent->get_registration(regInfo->matchedTo);
+    Vec2 theirAbCs;
+    unsigned int componentMembership;
+    if(image_index == 569){
+      int k = 0;
     }
-    jobComplete.set();
-    jobComplete.reset();
+    if(them->get_abc(regInfo, theirAbCs, componentMembership)){
+      Vec2 myAbCs;
+      myAbCs.x = regInfo->relativeCoords.x + theirAbCs.x;
+      myAbCs.y = regInfo->relativeCoords.y + theirAbCs.y;
+      regInfo->set_abc(myAbCs, componentMembership);
+    }
+    int j = 0;
   }
+
 
 
   std::pair<bool, Vec2> RegistrationRunnable::trace_to_root(unsigned long index) {
 
     parent->reg_results_mutex->readLock();
-    auto reginfo = parent->reg_results[index];
+    RegInfo* reginfo = parent->reg_results[index];
     parent->reg_results_mutex->unlock();
 
     if (!reginfo->successful) {

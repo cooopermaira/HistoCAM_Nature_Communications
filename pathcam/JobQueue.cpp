@@ -37,7 +37,7 @@ namespace pathCam {
     }
     else if (jobTypeFlag == 3)
     {
-      sort_order = image_idx + 40;
+      sort_order = image_idx + 1;
       jobRefNumber = image_idx * 3 + jobTypeFlag;
     }
     else

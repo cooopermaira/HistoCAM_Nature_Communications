@@ -20,9 +20,9 @@ namespace pathCam {
 
       auto timeCheck = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timeCheck - start);
-      if(duration.count() < 100){
-        Poco::Thread::sleep(100 - duration.count());
-      }
+//      if(duration.count() < 100){
+//        Poco::Thread::sleep(100 - duration.count());
+//      }
       start = timeCheck;
 
       //pull new components that might need to be processed
@@ -82,6 +82,9 @@ namespace pathCam {
 
         parent->composites[current_component]->update(new_info);
 
+        for (auto cmp : parent->composites){
+          cmp->check_set_render_info();
+        }
       }
     }
 
