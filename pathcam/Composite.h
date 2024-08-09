@@ -54,11 +54,11 @@ namespace pathCam {
 
     Composite(StreamCam *parent);
 
-    void add_images(std::vector<RegInfo> new_info);
+    void add_images(std::vector<RegInfo*> new_info);
 
-    void update_Bbox(std::vector<RegInfo> new_info);
+    void update_Bbox(std::vector<RegInfo*> new_info);
 
-    void update(std::vector<RegInfo> new_info);
+    void update(std::vector<RegInfo*> new_info);
 
     Mat get_composite();
 
@@ -91,15 +91,15 @@ namespace pathCam {
 
     long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
 
-    void add_images_with_composite(std::vector<RegInfo> new_info);
+    void add_images_with_composite(std::vector<RegInfo*> new_info);
 
-    void add_images_no_composite(std::vector<RegInfo> new_info);
+    void add_images_no_composite(std::vector<RegInfo*> new_info);
 
-    void rebuild_DT_elementwise(std::vector<RegInfo> new_info);
+    void rebuild_DT_elementwise(std::vector<RegInfo*> new_info);
 
     void create_and_submit_rebuild_jobs();
 
-    void add_images_multithread(std::vector<RegInfo> new_info);
+    void add_images_multithread(std::vector<RegInfo*> new_info);
 
     void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord);
 
@@ -111,7 +111,7 @@ namespace pathCam {
 
     void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
 
-    void expand_subdiv(std::vector<RegInfo> new_info);
+    void expand_subdiv(std::vector<RegInfo*> new_info);
 
     void self_reset();
 
@@ -135,9 +135,9 @@ namespace pathCam {
     std::vector<std::pair<Image*, bool>> memberImages;
     std::map<int, unsigned long> delaunayMembers;
 
-    void update(std::vector<RegInfo> new_info);
+    void update(std::vector<RegInfo*> new_info);
 
-    void update_Bbox_no_composite(std::vector<RegInfo> new_info);
+    void update_Bbox_no_composite(std::vector<RegInfo*> new_info);
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
 

@@ -32,8 +32,9 @@ namespace pathCam {
                                                            dr(new DiskReader(this)){
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(10, 10);
-    reg_results.resize(1, RegInfo(true, Vec2(0, 0), true, 0));
-    reg_results[0].index = 0;
+    reg_results.resize(1);
+    reg_results[0] = new RegInfo(true, Vec2(0, 0), true, 0);
+    reg_results[0]->index = 0;
     lastFrame = Rect(0,0,image_width,image_height);
 
     flat_field2X = cv::imread(flat_field_file.toString());
@@ -112,7 +113,7 @@ namespace pathCam {
       resize_mmatch_mutex->unlock();
 
       reg_results_mutex->writeLock();
-      reg_results.resize(index + 100, RegInfo());
+      reg_results.resize(index + 100, new RegInfo());
       reg_results_mutex->unlock();
     }
     images[index] = image;
@@ -122,8 +123,19 @@ namespace pathCam {
   void StreamCam::add_registration(pathCam::RegInfo regInfo) {
     reg_results_mutex->writeLock();
     auto index = regInfo.index;
-    reg_results[index] = regInfo;
+    reg_results[index] = new RegInfo(regInfo);
     reg_results_mutex->unlock();
+  }
+
+  bool StreamCam::get_registration(unsigned long image_idx, RegInfo& res) {
+    reg_results_mutex->readLock();
+    if (reg_results.size() <= image_idx){
+      reg_results_mutex->unlock();
+      return false;
+    }
+    res = reg_results[image_idx];
+    reg_results_mutex->unlock();
+    return true;
   }
 
 
@@ -150,10 +162,10 @@ namespace pathCam {
 
   void StreamCam::add_new_component_Q(unsigned long image_index, cv::Size image_size)  {
     reg_results_mutex->writeLock();
-    reg_results[image_index].matchedTo = image_index;
+    reg_results[image_index]->matchedTo = image_index;
     reg_results_mutex->unlock();
     auto component_index = increment_and_get_components();
-    if(composites.size() != 0){
+    if(component_index != 0){
       //start job to find scale and offset
       auto xcm = new XCompRunnable(this, image_index, component_index);
       JobQ->add_runnable(xcm);
@@ -183,7 +195,7 @@ namespace pathCam {
       temp->imagePyramid->set_offset(Point2f(0, 0));
     }
     component_mutex->unlock();
-    temp->update(std::vector<RegInfo>{reg_results[image_index]});
+    temp->update(std::vector<RegInfo*>{reg_results[image_index]});
   }
 
   std::vector<Image *> StreamCam::get_component_image_refs(unsigned long component) {
@@ -197,9 +209,9 @@ namespace pathCam {
     return get_image_refs(res);
   }
 
-  std::vector<RegInfo> StreamCam::get_Q_front() {
+  std::vector<RegInfo*> StreamCam::get_Q_front() {
     compositeQ_mutex->lock();
-    std::vector<RegInfo> temp = compositeBatch.front();
+    std::vector<RegInfo*> temp = compositeBatch.front();
     compositeBatch.pop();
     compositeQ_mutex->unlock();
     return temp;
@@ -219,10 +231,10 @@ namespace pathCam {
     JobQ->add_runnable(llr);
   }
 
-  void StreamCam::push_compositeQ(RegInfo index) {
+  void StreamCam::push_compositeQ(RegInfo* index) {
     compositeQ_mutex->lock();
     if (compositeBatch.empty() || compositeBatch.back().size() >= 1) {
-      compositeBatch.push(std::vector<RegInfo>());
+      compositeBatch.push(std::vector<RegInfo*>());
     }
     compositeBatch.back().push_back(index);
     compositeQ_mutex->unlock();
@@ -231,12 +243,14 @@ namespace pathCam {
   bool StreamCam::get_scale_and_offset(unsigned int component_index, double &_scale, cv::Point2f &_offset) {
     scaleRepoMutex->lock();
     if (scaleRepo.find(component_index) == scaleRepo.end()) {
+      scaleRepoMutex->unlock();
       return false;
     }
 
     auto res = scaleRepo[component_index];
     _scale = res.first;
     _offset = res.second;
+    scaleRepoMutex->unlock();
     return true;
   }
 

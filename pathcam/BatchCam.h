@@ -54,7 +54,7 @@ protected:
 
     
   std::vector < Image *> images;
-  std::vector < RegInfo > reg_results;
+  std::vector < RegInfo *> reg_results;
   std::vector < Bbox > box;
   
   MatchMatrix matchM;

@@ -51,6 +51,10 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 }
 
 int main(int argc, char *argv[]) {
+  auto renameFiles = false;
+  auto convertImages = false;
+  bool makeInput = true;
+
   Mat flat_field;
   flat_field = cv::imread("/Users/coopermaira/Desktop/pathcam_data/2x_wb.tif");
   flat_field.convertTo(flat_field, CV_32F);
@@ -101,21 +105,32 @@ int main(int argc, char *argv[]) {
     std::sort(images.begin(), images.end(), customComparator);
 
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/raw2to40run/input.txt";
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/raw_aug7/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
-//      Poco::File currentFile(images[i]->image_file);
-//      if(currentFile.isFile()){
-//        std::string newName = std::to_string(i)+".Raw";
-//        Poco::Path newfilepath = Poco::Path(argv[1]);
-//        newfilepath.setFileName(newName);
-//        currentFile.renameTo(newfilepath.toString());
-//        int k = 0;
-//      }
-      outputFile << images[i]->image_file.toString()<<std::endl;
-//      auto *dr = new pathCam::DebayerRunnable(images[i], flat_field, outFile, blur, names, i);
-//      jq.add_runnable(dr, i);
+      if (renameFiles) {
+        Poco::File currentFile(images[i]->image_file);
+        if (currentFile.isFile()) {
+          std::string newName = std::to_string(i) + ".Raw";
+          Poco::Path newfilepath = Poco::Path(argv[1]);
+          newfilepath.setFileName(newName);
+          currentFile.renameTo(newfilepath.toString());
+          if (makeInput) {
+            outputFile << newfilepath.toString() << std::endl;
+          }
+          int k = 0;
+        }
+
+      }
+
+      if(makeInput && !renameFiles){
+        outputFile << images[i]->image_file.toString() << std::endl;
+      }
+      if (convertImages) {
+        auto *dr = new pathCam::DebayerRunnable(images[i], flat_field, outFile, blur, names, i);
+        jq.add_runnable(dr, i);
+      }
     }
     outputFile.close();
     while (!jq.is_empty()) {

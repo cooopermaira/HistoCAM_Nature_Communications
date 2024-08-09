@@ -268,44 +268,7 @@ public:
   }
 
   
-  inline bool detect_and_compute(Image *image,int flag){
-
-    std::vector<cv::KeyPoint> *points;
-    Mat descriptors;
-    switch (flag){
-      case 0:
-        points = &image->keypoints;
-        break;
-      case 1:
-        points = &image->keypointsMultilevel;
-        break;
-      case 2:
-        points = &image->keypointsFull;
-        break;
-    }
-
-    if(use_FREAK){
-      detector->detect(image->get_reg_image(), *points);
-      extractor->compute( image->get_reg_image(), *points, descriptors  );
-    }else{
-      detector->detectAndCompute(image->get_reg_image(),
-                                 noArray(), *points,
-                                 descriptors );
-    }
-    switch (flag){
-      case 0:
-        image->descriptors = descriptors;
-        break;
-      case 1:
-        image->descriptorsMultilevel = descriptors;
-        break;
-      case 2:
-        image->descriptorsFull = descriptors;
-        break;
-    }
-      return (points->size() > 0);
-      
-  }
+  bool detect_and_compute(Image *image,int flag);
 
 //  inline bool detect_and_compute_multilevel(Image *image){
 //

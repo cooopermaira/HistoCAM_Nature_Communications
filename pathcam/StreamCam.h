@@ -69,7 +69,7 @@ namespace pathCam {
     friend class RebuildRunnable;
 
   private:
-    std::queue<std::vector<RegInfo> > compositeBatch;
+    std::queue<std::vector<RegInfo*> > compositeBatch;
 
 
   public:
@@ -105,8 +105,6 @@ namespace pathCam {
     bool run();
 
     bool spin_run();
-
-    bool check_blur(unsigned long image_idx, double myBlurVal);
 
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle);
 
@@ -146,6 +144,8 @@ namespace pathCam {
 
     void add_registration(RegInfo regInfo);
 
+    bool get_registration(unsigned long image_idx, RegInfo& res);
+
     JobQueue *JobQ;
 
     Image *get_image_ref(unsigned long int);
@@ -154,13 +154,13 @@ namespace pathCam {
 
     std::vector<Image *> get_component_image_refs(unsigned long component);
 
-    std::vector<RegInfo> get_Q_front();
+    std::vector<RegInfo*> get_Q_front();
 
     Image *get_Q_front_Spin();
 
     bool compositeQ_empty();
 
-    void push_compositeQ(RegInfo index);
+    void push_compositeQ(RegInfo* index);
 
     //void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
     void add_new_component(unsigned long image_index, cv::Size image_size, unsigned int component_index);

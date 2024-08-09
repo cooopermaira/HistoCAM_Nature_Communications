@@ -23,7 +23,7 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
-    if(image->check_blur() < 200){
+    if(image->check_blur() < 100){
       successful = true;
       parent->loaderCount--;
       jobComplete.set();
@@ -62,8 +62,8 @@ namespace pathCam {
 
 
       //image->free_memory_RAW();
-      //pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
-      pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
+      pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
+      //pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
 
       switch (parent->feature_type) {
         case _SIFT:
@@ -89,8 +89,7 @@ namespace pathCam {
         detector->set_ORB_params();
         detector->detect_and_compute(image,0);
       }
-
-
+      delete detector;
 
       if (image->keypoints.size() < 200) {
         successful = true;
@@ -100,18 +99,14 @@ namespace pathCam {
         return;
       }
 
-      image->release_reg_image();
-
-      if(additionalFullReg){
-        image->create_reg_image(1,1,parent->debayer, parent->interpolation, parent->real);
-        image->reg_scale_full = 1;
-        image->reg_crop_full = 1;
-        detector->detect_and_compute(image,2);
-        image->release_reg_image();
+      if(additionalSiftReg){
+        pathCam::FeatureDetector *detector2 = new pathCam::FeatureDetector(7, parent->use_FREAK);
+        detector2->detect_and_compute(image,1);
       }
+
+      image->release_reg_image();
       image->free_memory_RAW();
 
-      delete detector;
       image->index = image_index;
       parent->add_image(image, image_index);
       auto matchjob = new MatchRunnable(parent, image_index);
@@ -124,5 +119,44 @@ namespace pathCam {
     parent->loaderCount--;
     jobComplete.set();
     successful = true;
+  }
+
+  bool FeatureDetector::detect_and_compute(pathCam::Image *image, int flag) {
+
+    std::vector<cv::KeyPoint> *points;
+    Mat descriptors;
+    switch (flag){
+      case 0:
+        points = &image->keypoints;
+        break;
+      case 1:
+        points = &image->keypointsMultilevel;
+        break;
+      case 2:
+        points = &image->keypointsFull;
+        break;
+    }
+
+    if(use_FREAK){
+      detector->detect(image->get_reg_image(), *points);
+      extractor->compute( image->get_reg_image(), *points, descriptors  );
+    }else{
+      detector->detectAndCompute(image->get_reg_image(),
+                                 noArray(), *points,
+                                 descriptors );
+    }
+    switch (flag){
+      case 0:
+        image->descriptors = descriptors;
+        break;
+      case 1:
+        image->descriptorsMultilevel = descriptors;
+        break;
+      case 2:
+        image->descriptorsFull = descriptors;
+        break;
+    }
+    return (points->size() > 0);
+
   }
 }

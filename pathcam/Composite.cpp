@@ -97,7 +97,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::update(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::update(std::vector<RegInfo*> new_info) {
     update_mutex->lock();
 
     if (new_info.size() > 1) {
@@ -130,12 +130,12 @@ namespace pathCam {
     memberImages.clear();
     matchedEdges.clear();
     delaunayMembers.clear();
-    root_offset = Vec2(0, 0);
-    max_offset = Vec2(0, 0);
+//    root_offset = Vec2(0, 0);
+//    max_offset = Vec2(0, 0);
   }
 
 
-  void CompositeVoronoi::expand_subdiv(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::expand_subdiv(std::vector<RegInfo*> new_info) {
     bool extend = false;
     if (root_offset.x < subdiv_Bbox.min_x) {
       extend = true;
@@ -171,7 +171,7 @@ namespace pathCam {
     }
   }
 
-  void CompositeVoronoi::rebuild_DT_elementwise(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::rebuild_DT_elementwise(std::vector<RegInfo*> new_info) {
     if (new_info.size() > 1) {
       // this shuffle is very important for reducing image count in the DT.
       auto rng = std::default_random_engine{};
@@ -180,9 +180,9 @@ namespace pathCam {
 
     for (auto ni: new_info) {
       std::vector<Point2i> face;
-      auto fShift = Point2f(ni.absoluteCoords.x, ni.absoluteCoords.y);
-      auto img = parent->get_image_ref(ni.index);
-      img->absoluteCoords = ni.absoluteCoords;
+      auto fShift = Point2f(ni->absoluteCoords.x, ni->absoluteCoords.y);
+      auto img = parent->get_image_ref((*ni).index);
+      img->absoluteCoords = ni->absoluteCoords;
       auto res = add_point_to_delaunay_triangulation(fShift, img, face);
       freshMask.copyTo(polyMaskOutput);
     }
@@ -244,11 +244,11 @@ namespace pathCam {
     }
   }
 
-  void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo*> new_info) {
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
     for (int i = 0; i < new_info.size(); i++) {
-      indexes.push_back(new_info[i].index);
+      indexes.push_back(new_info[i]->index);
     }
     std::vector<Image *> images = parent->get_image_refs(indexes);
 
@@ -256,20 +256,20 @@ namespace pathCam {
       images[i]->component_membership = componentIndex;
       //add point to delaunay triangulation
       std::vector<Point2i> face;
-      auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
+      auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
       auto res = add_point_to_delaunay_triangulation(fShift, images[i], face);
 
       //res is {vertexId,maskId}
       if (res == -1) { continue; }
       images[i]->vertexId = res;
-      images[i]->absoluteCoords = new_info[i].absoluteCoords;
+      images[i]->absoluteCoords = new_info[i]->absoluteCoords;
 
       //indicate that a new image has been added since last global alignment
       needsAlignment = true;
 
       //calculate effected tiles
       std::vector<Point2i> effectedTiles;
-      calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
+      calculate_effected_tiles(face, effectedTiles, new_info[i]->absoluteCoords);
 
       //build image with alpha channel
       if (images[i]->readyImage.data){
@@ -316,25 +316,26 @@ namespace pathCam {
       //update pyramid bounds and observer, reset mask
 
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
-      if(imagePyramid->scale > 0){
-        float x = (imagePyramid->offset.x + new_info.back().absoluteCoords.x) * imagePyramid->scale;
-        float y = (imagePyramid->offset.y + new_info.back().absoluteCoords.y) * imagePyramid->scale;
-        float w = parent->image_width * imagePyramid->scale;
-        float h = parent->image_height * imagePyramid->scale;
 
-        parent->update_last_frame(Rect_<float>(x,y,w,h),images.back()->label == Image::_2X);
-      }
-      parent->update_observers();
       freshMask.copyTo(polyMaskOutput);
     }
+    if(imagePyramid->scale > 0){
+      float x = (imagePyramid->offset.x + new_info.back()->absoluteCoords.x) * imagePyramid->scale;
+      float y = (imagePyramid->offset.y + new_info.back()->absoluteCoords.y) * imagePyramid->scale;
+      float w = parent->image_width * imagePyramid->scale;
+      float h = parent->image_height * imagePyramid->scale;
+
+      parent->update_last_frame(Rect_<float>(x,y,w,h),images.back()->label == Image::_2X);
+    }
+    parent->update_observers();
   }
 
-  void CompositeVoronoi::add_images_multithread(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::add_images_multithread(std::vector<RegInfo*> new_info) {
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
     for (int i = 0; i < new_info.size(); i++) {
-      indexes.push_back(new_info[i].index);
+      indexes.push_back(new_info[i]->index);
     }
     std::vector<Image *> images = parent->get_image_refs(indexes);
 
@@ -342,17 +343,17 @@ namespace pathCam {
 
       //add point to delaunay triangulation
       std::vector<Point2i> face;
-      auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
+      auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
       auto res = add_point_to_delaunay_triangulation(fShift, images[i], face);
 
       //res is {vertexId,maskId}
       if (res == -1) { continue; }
       images[i]->vertexId = res;
-      images[i]->absoluteCoords = new_info[i].absoluteCoords;
+      images[i]->absoluteCoords = new_info[i]->absoluteCoords;
 
       //calculate effected tiles
       std::vector<Point2i> effectedTiles;
-      calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
+      calculate_effected_tiles(face, effectedTiles, new_info[i]->absoluteCoords);
 
       //build image with alpha channel
 
@@ -422,12 +423,12 @@ namespace pathCam {
     imwrite(path,pyramidImage);
   }
 
-  void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo*> new_info) {
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
     for (int i = 0; i < new_info.size(); i++) {
-      indexes.push_back(new_info[i].index);
+      indexes.push_back(new_info[i]->index);
     }
     std::vector<Image *> images = parent->get_image_refs(indexes);
 
@@ -435,13 +436,13 @@ namespace pathCam {
     for (int i = 0; i < images.size(); i++) {
 
       //calculate where the new image will be copied to in the composite
-      Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x,
-                           new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
+      Rect copyzone = Rect(new_info[i]->absoluteCoords.x - root_offset.x,
+                           new_info[i]->absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
 
 
       //add point to delaunay triangulation
       std::vector<Point2i> face;
-      auto fShift = Point2f(new_info[i].absoluteCoords.x, new_info[i].absoluteCoords.y);
+      auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
 
       if (add_point_to_delaunay_triangulation(fShift, images[i], face) == -1) {
         freshMask.copyTo(polyMaskOutput);
@@ -467,7 +468,7 @@ namespace pathCam {
       images[i]->free_memory_RAW();
 
       //calculate effected tiles
-      calculate_effected_tiles(face, effectedTiles, new_info[i].absoluteCoords);
+      calculate_effected_tiles(face, effectedTiles, new_info[i]->absoluteCoords);
     }
     std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<Point2i>());
     effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<Point2i>()),
@@ -590,7 +591,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::update_Bbox_no_composite(std::vector<RegInfo> new_info) {
+  void CompositeVoronoi::update_Bbox_no_composite(std::vector<RegInfo*> new_info) {
     bool update_box = false;
 
     //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
@@ -598,22 +599,22 @@ namespace pathCam {
 
     // If any new frames extend beyond the current extent, expand cv image dimensions
     for (int i = 0; i < new_info.size(); i++) {
-      if (new_info[i].absoluteCoords.x < root_offset.x) {
+      if (new_info[i]->absoluteCoords.x < root_offset.x) {
         update_box = true;
-        root_offset.x = new_info[i].absoluteCoords.x;
+        root_offset.x = new_info[i]->absoluteCoords.x;
       }
-      if (new_info[i].absoluteCoords.y < root_offset.y) {
+      if (new_info[i]->absoluteCoords.y < root_offset.y) {
         update_box = true;
-        root_offset.y = new_info[i].absoluteCoords.y;
+        root_offset.y = new_info[i]->absoluteCoords.y;
       }
 
-      if (new_info[i].absoluteCoords.x + 6464 > max_offset.x) {
+      if (new_info[i]->absoluteCoords.x + parent->image_width > max_offset.x) {
         update_box = true;
-        max_offset.x = new_info[i].absoluteCoords.x + 6464;
+        max_offset.x = new_info[i]->absoluteCoords.x + parent->image_width;
       }
-      if (new_info[i].absoluteCoords.y + 4852 > max_offset.y) {
+      if (new_info[i]->absoluteCoords.y + parent->image_height > max_offset.y) {
         update_box = true;
-        max_offset.y = new_info[i].absoluteCoords.y + 4852;
+        max_offset.y = new_info[i]->absoluteCoords.y + parent->image_height;
       }
 
     }
@@ -648,7 +649,7 @@ namespace pathCam {
   }
 
 
-  void Composite::update_Bbox(std::vector<RegInfo> new_info) {
+  void Composite::update_Bbox(std::vector<RegInfo*> new_info) {
 
     bool update_box = false;
 
@@ -657,22 +658,22 @@ namespace pathCam {
 
     // If any new frames extend beyond the current extent, expand cv image dimensions
     for (int i = 0; i < new_info.size(); i++) {
-      if (new_info[i].absoluteCoords.x < root_offset.x) {
+      if (new_info[i]->absoluteCoords.x < root_offset.x) {
         update_box = true;
-        root_offset.x = new_info[i].absoluteCoords.x;
+        root_offset.x = new_info[i]->absoluteCoords.x;
       }
-      if (new_info[i].absoluteCoords.y < root_offset.y) {
+      if (new_info[i]->absoluteCoords.y < root_offset.y) {
         update_box = true;
-        root_offset.y = new_info[i].absoluteCoords.y;
+        root_offset.y = new_info[i]->absoluteCoords.y;
       }
 
-      if (new_info[i].absoluteCoords.x + 6464 > max_offset.x) {
+      if (new_info[i]->absoluteCoords.x + 6464 > max_offset.x) {
         update_box = true;
-        max_offset.x = new_info[i].absoluteCoords.x + 6464;
+        max_offset.x = new_info[i]->absoluteCoords.x + 6464;
       }
-      if (new_info[i].absoluteCoords.y + 4852 > max_offset.y) {
+      if (new_info[i]->absoluteCoords.y + 4852 > max_offset.y) {
         update_box = true;
-        max_offset.y = new_info[i].absoluteCoords.y + 4852;
+        max_offset.y = new_info[i]->absoluteCoords.y + 4852;
       }
 
     }
@@ -717,12 +718,12 @@ namespace pathCam {
     }
   };
 
-  void Composite::add_images(std::vector<RegInfo> new_info) {
+  void Composite::add_images(std::vector<RegInfo*> new_info) {
 
     std::vector<unsigned long int> indexes;
 
     for (int i = 0; i < new_info.size(); i++) {
-      indexes.push_back(new_info[i].index);
+      indexes.push_back(new_info[i]->index);
     }
 
     // get a copy of references to all images at once so that only one mutex lock is needed
@@ -738,8 +739,8 @@ namespace pathCam {
 
     for (int i = 0; i < images.size(); i++) {
       //calculate where the new image will be copied to in the composite
-      Rect copyzone = Rect(new_info[i].absoluteCoords.x - root_offset.x,
-                           new_info[i].absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
+      Rect copyzone = Rect(new_info[i]->absoluteCoords.x - root_offset.x,
+                           new_info[i]->absoluteCoords.y - root_offset.y, images[i]->width, images[i]->height);
 
       //calculate which pixels of the new image will be copied into the composite
       Mat use_locations = local_quality_score > composite_z_buffer(copyzone);
@@ -777,7 +778,7 @@ namespace pathCam {
     */
   }
 
-  void Composite::update(std::vector<RegInfo> new_info) {
+  void Composite::update(std::vector<RegInfo*> new_info) {
     update_Bbox(new_info);
     add_images(new_info);
   }
@@ -1130,8 +1131,8 @@ namespace pathCam {
       xprLP.at<double>(i, 0) += pwr->t_x;
       yprLP.at<double>(i, 0) += pwr->t_y;
 
-      auto verify1 = parent->reg_results[matchedEdges[i].first].absoluteCoords;
-      auto verify2 = parent->reg_results[matchedEdges[i].second].absoluteCoords;
+      auto verify1 = parent->reg_results[matchedEdges[i].first]->absoluteCoords;
+      auto verify2 = parent->reg_results[matchedEdges[i].second]->absoluteCoords;
       auto val = abs(verify1.x - verify2.x - pwr->t_x);
 
       if (val > valtest1) {
@@ -1155,7 +1156,7 @@ namespace pathCam {
     Mat yac = xac.clone();
 
     for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
-      auto coords = parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords;
+      auto coords = parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords;
       xac.at<double>(i) = coords.x;
       yac.at<double>(i) = coords.y;
     }
@@ -1268,17 +1269,17 @@ namespace pathCam {
     self_reset();
     parent->update_observers();
     parent->reg_results_mutex->readLock();
-    std::vector<RegInfo> newinfo;
+    std::vector<RegInfo*> newinfo;
     for (auto [i, elm]: systemIndexToFrameIndex) {
-      parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.x = xac.at<double>(i);
-      parent->reg_results[systemIndexToFrameIndex[i]].absoluteCoords.y = yac.at<double>(i);
+      parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords.x = xac.at<double>(i);
+      parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords.y = yac.at<double>(i);
       newinfo.push_back(parent->reg_results[systemIndexToFrameIndex[i]]);
     }
     parent->reg_results_mutex->unlock();
 
-    update(newinfo);
-//    rebuild_DT_elementwise(newinfo);
-//    create_and_submit_rebuild_jobs();
+//    update(newinfo);
+    rebuild_DT_elementwise(newinfo);
+    create_and_submit_rebuild_jobs();
 
 
     auto stop = std::chrono::high_resolution_clock::now();

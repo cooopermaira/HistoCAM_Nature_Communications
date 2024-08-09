@@ -76,6 +76,8 @@ namespace pathCam {
 
     virtual void run();
 
+    void align_new_comp();
+
     void perform_global_alignment();
 
     void save_components_to_disk();
@@ -102,14 +104,14 @@ namespace pathCam {
   //loader class takes data from disk streamer/microscope and prepares matchable jobs
   class LoaderLogicRunnable : public RunnableIntermediate {
   private:
-    bool additionalFullReg;
+    bool additionalSiftReg;
     StreamCam *parent;
     Image *image;
 
   public:
 
     LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx, bool additionalFullReg) : image(
-        image), parent(parent), additionalFullReg(additionalFullReg), RunnableIntermediate(image_idx,1) {};
+        image), parent(parent), additionalSiftReg(additionalFullReg), RunnableIntermediate(image_idx, 1) {};
 
     virtual void run();
   };

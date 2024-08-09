@@ -20,8 +20,8 @@ namespace pathCam {
 
       auto timeCheck = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timeCheck - start);
-      if(duration.count() < 50){
-        Poco::Thread::sleep(50 - duration.count());
+      if(duration.count() < 100){
+        Poco::Thread::sleep(100 - duration.count());
       }
       start = timeCheck;
 
@@ -36,47 +36,46 @@ namespace pathCam {
       //if nothing in the Q but termination condition not met, wait
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
-          parent->newComponentQ.pop();
           //perform_global_alignment();
           if(rebuildJobsOutstanding > 0) {
             rebuildJobsComplete.wait();
           }
           parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
-
+          parent->newComponentQ.pop();
         }else{
         Poco::Thread::sleep(100);
         }
       } else {
 
-        std::vector<RegInfo> indexes = parent->get_Q_front();
+        auto indexes = parent->get_Q_front();
         if (isNewComp) {
-          if (indexes.front().index > std::get<0>(newComp)) {
-            parent->newComponentQ.pop();
+          if (indexes.front()->index > std::get<0>(newComp)) {
             //perform_global_alignment();
             if(rebuildJobsOutstanding > 0) {
               rebuildJobsComplete.wait();
             }
             parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
+            parent->newComponentQ.pop();
           }
         }
         std::sort(indexes.begin(), indexes.end());
 
-        while (parent->composites.size() <= indexes.back().component_membership) {
+        while (parent->composites.size() <= indexes.back()->component_membership) {
           //Because of the multithreading, this place in the code can be reached before a new component object has been instantiated and added to the vector. If this happens, wait.
           Poco::Thread::sleep(100);
         }
 
-        unsigned int current_component = indexes[0].component_membership;
-        std::vector<RegInfo> new_info;
+        unsigned int current_component = indexes[0]->component_membership;
+        std::vector<RegInfo*> new_info;
 
         //sort the new frames by component and pass them to their respective components for compositing.
         for (int i = 0; i < indexes.size(); i++) {
 
-          if (current_component == indexes[i].component_membership) {
+          if (current_component == indexes[i]->component_membership) {
             new_info.push_back(indexes[i]);
           } else {
             parent->composites[current_component]->update(new_info);
-            current_component = indexes[i].component_membership;
+            current_component = indexes[i]->component_membership;
             new_info.clear();
           }
         }
@@ -100,8 +99,8 @@ namespace pathCam {
         */
 
 
-    perform_global_alignment();
-//    rebuildJobsComplete.wait();
+    //perform_global_alignment();
+    rebuildJobsComplete.wait();
     //save_components_to_disk();
     parent->compositing = false;
   }
@@ -115,6 +114,14 @@ namespace pathCam {
   void CompositeManager::save_components_to_disk() {
     for (auto i: parent->composites) {
       i->save_pyramid_as_image();
+    }
+  }
+
+  void CompositeManager::align_new_comp() {
+    parent->newComponentQ.pop();
+    perform_global_alignment();
+    if(rebuildJobsOutstanding > 0) {
+      rebuildJobsComplete.wait();
     }
   }
 
@@ -149,7 +156,8 @@ namespace pathCam {
       face.push_back((Point2i) ii);
     }
     //build polygon mask for new point
-    cv::fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
+    fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
+    //imwrite("polymask.png", polyMaskOutput);
     image->load_raw_from_disk();
     Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
     Mat3b threeChannelPreallocated;
@@ -159,50 +167,53 @@ namespace pathCam {
 
     image->free_memory_RAW();
 
+    std::vector<Mat> channels(2);
+    channels[0] = threeChannelPreallocated; //3 channel
+    Mat tile_mask = Mat::zeros(image->height,image->width,CV_8U);
+
     if (image->label == Image::_2X) {//flat field correction if needed
       polyMaskOutput = polyMaskOutput.mul(composite->circleMask);
       auto center = Point2i(composite->image_size.width / 2, composite->image_size.height / 2);
       auto bb = Rect(center.x - composite->parent->scope_radius - 10, center.y - composite->parent->scope_radius - 10,
                      2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
       cv::divide(threeChannelPreallocated(bb), composite->flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
+
+      channels[1] = composite->circleMask * 255;           //alpha channel
+    }else{
+      channels[1] = Mat(image->height,image->width,CV_8U,Scalar(255));
     }
     std::vector<Point2i> effectedTiles;
     composite->calculate_effected_tiles(face, effectedTiles, image->absoluteCoords);
-    Mat tile_mask = Mat::zeros(composite->image_size.height,composite->image_size.width,CV_8U);
+    int tileSize = composite->imagePyramid->level[0]->getTileSize();
+
+
     //Vector containing the tiles where their center
     std::vector<Point2i> center_in_poly_mask;
+
     for (auto tile : effectedTiles){
       Point2i adjustedPoint;
-      auto ul = Point2i((tile.x + 0.5) * composite->imagePyramid->tile_size,(tile.y + 0.5)* composite->imagePyramid->tile_size);
-      adjustedPoint.x = ul.x - image->absoluteCoords.x;
-      adjustedPoint.y = ul.y - image->absoluteCoords.y;
+      auto centerPoint = Point2i((tile.x + 0.5) * composite->imagePyramid->tile_size,(tile.y + 0.5)* composite->imagePyramid->tile_size);
+      adjustedPoint.x = centerPoint.x - image->absoluteCoords.x;
+      adjustedPoint.y = centerPoint.y - image->absoluteCoords.y;
       if(adjustedPoint.x < 0 || adjustedPoint.x > image->width || adjustedPoint.y < 0 || adjustedPoint.y > image->height){
         continue;
       }
       uint8_t pixelVal;
-      try {
-        pixelVal = polyMaskOutput.at<uint8_t>(adjustedPoint);
-      }
-      catch(cv::Exception e){
-        int k = 0;
-      }
+      pixelVal = polyMaskOutput.at<uint8_t>(adjustedPoint);
+
       if(pixelVal > 0) {
-        auto tileSize = composite->imagePyramid->level[0]->getTileSize();
-        auto tileBox = cv::Rect_<float>(tileSize * tile.x - image->absoluteCoords.x, tileSize * tile.y - image->absoluteCoords.y, tileSize, tileSize);
-        tile_mask(tileBox).setTo(255);
+        auto tileBox = Rect(tileSize * tile.x - image->absoluteCoords.x, tileSize * tile.y - image->absoluteCoords.y, tileSize, tileSize);
         center_in_poly_mask.push_back(tile);
       }
     }
-    std::vector<Mat> channels(2);
-    channels[0] = threeChannelPreallocated; //3 channel
-    channels[1] = tile_mask;           //alpha channel
+               //alpha channel
     merge(channels, fourChannelPreallocated);
-    Mat imageMat;
-    fourChannelPreallocated.copyTo(imageMat);
+    //imwrite("Tile_mask.png",tile_mask);
+    //imwrite("four_channel.png",fourChannelPreallocated);
     auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
-    composite->imagePyramid->level[0]->inserTileAtBase(imageMat, tile_mask, imageBox, center_in_poly_mask);
+    //composite->imagePyramid->level[0]->inserTileAtBase(fourChannelPreallocated, tile_mask, imageBox, center_in_poly_mask);
+    composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated,imageBox,center_in_poly_mask);
     cm->decrement_rebuild_jobs_outstanding();
-    int k = 0;
   }
 
 }

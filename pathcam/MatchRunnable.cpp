@@ -13,6 +13,41 @@ namespace pathCam {
                                                                              parent(parent),
                                                                              image_idx(image_idx){};
 
+  void XCompRunnable::extract_multilevel_keypoints(pathCam::Image *image) {
+
+    auto *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
+
+    switch (7) {
+      case _SIFT:
+        //detector->set_SIFT_params();
+        break;
+      case _SURF:
+        detector->set_SURF_params(parent->SURF_params);
+        break;
+      case _AKAZE:
+        detector->set_AKAZE_params(parent->AKAZE_params);
+        break;
+      case _BRISK:
+        detector->set_BRISK_params(parent->BRISK_params);
+        break;
+      case _ORB:
+        detector->set_ORB_params();
+        //detector->ORB_params.nlevels = 8;
+        break;
+    }
+
+    image->create_reg_image(parent->scale_factor, 1, parent->debayer, parent->interpolation,
+                            parent->real);
+
+
+    detector->detect_and_compute(image,1);
+
+    image->release_reg_image();
+
+    delete detector;
+  }
+
+
   bool XCompRunnable::match_to_images(Image *selfImage, std::vector<Image *> otherCompImages) {
     Image *matchedTo;
     double scale = 0;
@@ -25,14 +60,14 @@ namespace pathCam {
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
     for (int ii = otherCompImages.size() - 1; ii >= 0; ii--) {
       auto imgCompare = otherCompImages[ii];
-      extract_multilevel_keypoints(imgCompare);
+      //extract_multilevel_keypoints(imgCompare);
       parent->resize_mmatch_mutex->readLock();
       parent->matchM.match[image_idx][imgCompare->index] = new Match(selfImage, imgCompare);
       Match *m = parent->matchM.match[image_idx][imgCompare->index];
       parent->resize_mmatch_mutex->unlock();
 
       matcher->match(m, 1);
-      int result = motion_est->findHomography(m, parent->estimator_type, 500, 1);
+      int result = motion_est->findHomography(m, parent->estimator_type, 100, 1);
       if (result == 1) {
 
         matchedTo = otherCompImages[ii];
@@ -40,17 +75,19 @@ namespace pathCam {
         auto regInfo = parent->reg_results[matchedTo->index];
         parent->reg_results_mutex->unlock();
 
-        if (!regInfo.resolved) {
+        if (!regInfo->resolved) {
           parent->JobQ->jobRefs[matchedTo->index * 3 + 2]->waitOnThisGuy();
           parent->reg_results_mutex->readLock();
           auto regInfo = parent->reg_results[matchedTo->index];
           parent->reg_results_mutex->unlock();
-          if (!regInfo.resolved) {
+          if (!regInfo->resolved) {
             continue;
           }
         }
-
-        mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
+        try {
+          mtoScale = parent->composites[matchedTo->component_membership]->imagePyramid->scale;
+        }
+        catch(...){}
         if (mtoScale == 0 ){
           //parent->composites[matchedTo->component_membership]->imagePyramid->scaleSet.wait();
           double tempScale;
@@ -68,8 +105,8 @@ namespace pathCam {
 //        offset = Point2f((((m->t_x / scale + regInfo.absoluteCoords.x) / scale) / mtoScale + mtoOffset.x) / mtoScale,
 //                         (((m->t_y / scale + regInfo.absoluteCoords.y) / scale) / mtoScale + mtoOffset.y) / mtoScale);
 
-        offset = Point2f((m->t_x / scale + regInfo.absoluteCoords.x + mtoOffset.x) / scale ,
-                         (m->t_y / scale + regInfo.absoluteCoords.y + mtoOffset.y) / scale) ;
+        offset = Point2f((m->t_x / scale + regInfo->absoluteCoords.x + mtoOffset.x) / scale ,
+                         (m->t_y / scale + regInfo->absoluteCoords.y + mtoOffset.y) / scale) ;
 
         break;
       }
@@ -78,7 +115,7 @@ namespace pathCam {
     if (scale > 0) {
 //      parent->composites[componentMembership]->imagePyramid->set_scale(scale * mtoScale);
 //      parent->composites[componentMembership]->imagePyramid->set_offset(offset);
-      parent->set_scale_and_offset(selfImage->index, scale * mtoScale, offset);
+      parent->set_scale_and_offset(componentMembership, scale * mtoScale, offset);
 
       return true;
     }
@@ -88,7 +125,7 @@ namespace pathCam {
   void XCompRunnable::run() {
     //extract multilevel features from self image
     pathCam::Image *image = parent->get_image_ref(image_idx);
-    extract_multilevel_keypoints(image);
+    //extract_multilevel_keypoints(image);
 
     //get references to other component images
     std::vector<unsigned long> indexes;
@@ -128,14 +165,20 @@ namespace pathCam {
       return;
     }
 
-    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
-
+    //pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
+    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
+        cv::DescriptorMatcher::MatcherType::BRUTEFORCE);
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
     int mostMatches = 0;
     long bestMatch = -1;
     bool tryWaiting = true;
+    std::vector<unsigned int> skipComponents;
+
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       pathCam::Image *previous = parent->get_image_ref(prev_idx);
+      if (std::find(skipComponents.begin(), skipComponents.end(),previous->component_membership) != skipComponents.end()){
+        continue;
+      }
       if (previous == nullptr) {
         if (max(5, int(image_idx)) <= prev_idx + 5 && tryWaiting) {
           auto res = parent->JobQ->getSortOrderAndJobRefs(1,prev_idx);
@@ -166,9 +209,18 @@ namespace pathCam {
         bestMatch = prev_idx;
       }
       if (result == 1) {
+
+        //check if scale indicates that this is not the same component
         if(m->scale > 1.1 || m->scale < 0.9){
+          RegInfo mtoReg;
+          if (parent->get_registration(prev_idx,mtoReg)){
+            if (mtoReg.resolved){
+              skipComponents.push_back(mtoReg.component_membership);
+            }
+          }
           continue;
         }
+
         if (std::abs(m->t_x) < image->width / 1.5 && std::abs(
             m->t_y) < image->height / 1.5) {
           //parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
@@ -226,7 +278,7 @@ namespace pathCam {
     //perform_global_alignment() and all image_idx values are less than matchM.match size
     Match *m = parent->matchM.match[image_idx2][image_idx1];
     matcher->match(m);
-    int result = motion_est->findHomography(m, parent->estimator_type, 50, 0);
+    int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
 //    m->t_x *= image1->get_reg_scale();
 //    m->t_y *= image2->get_reg_scale();
     if (result == 1) {
@@ -247,39 +299,6 @@ namespace pathCam {
     parent->composites[component_membership]->matchableCount--;
   }
 
-  void XCompRunnable::extract_multilevel_keypoints(pathCam::Image *image) {
-
-    auto *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
-
-    switch (7) {
-      case _SIFT:
-        //detector->set_SIFT_params();
-        break;
-      case _SURF:
-        detector->set_SURF_params(parent->SURF_params);
-        break;
-      case _AKAZE:
-        detector->set_AKAZE_params(parent->AKAZE_params);
-        break;
-      case _BRISK:
-        detector->set_BRISK_params(parent->BRISK_params);
-        break;
-      case _ORB:
-        detector->set_ORB_params();
-        //detector->ORB_params.nlevels = 8;
-        break;
-    }
-
-    image->create_reg_image(parent->scale_factor, 1, parent->debayer, parent->interpolation,
-                            parent->real);
-
-
-    detector->detect_and_compute(image,1);
-
-    image->release_reg_image();
-
-    delete detector;
-  }
 
 
   SingleMatchRunnable::SingleMatchRunnable(StreamCam *parent, unsigned long image_idx1, unsigned long image_idx2,

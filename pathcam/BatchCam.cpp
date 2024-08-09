@@ -545,9 +545,9 @@ public:
 
       std::string outfile = Poco::format("%u\t", thread_id);
       
-      if(i==0){
-          parent->reg_results[0] = RegInfo(true, Vec2(0, 0));
-      }
+//      if(i==0){
+//          parent->reg_results[0] = RegInfo(true, Vec2(0, 0));
+//      }
         
       pathCam::Image * last_registered = parent->images[last_index];
       pathCam::Image * next_image = parent->images[i+1];
@@ -582,7 +582,7 @@ public:
       
       if(last_registered->keypoints.size() < 100 || next_image->keypoints.size() < 100){
         if(parent->results_logger){  parent->results_logger->information(outfile + "failed. Not enough keypoints"); }
-        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
+        //parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
         continue;
       }
       
@@ -608,7 +608,7 @@ public:
                                               Poco::format("%f\t%f\t", m->t_x, m->t_y) +
                                               Poco::format("%f", elapsed.count() * 1e-9));
         }
-        parent->reg_results[i+1] = RegInfo(true, Vec2(m->t_x, m->t_y));
+        //parent->reg_results[i+1] = RegInfo(true, Vec2(m->t_x, m->t_y));
         parent->matchM.match[i+1][last_index] = new pathCam::Match(m);
         last_index = i+1;
       }
@@ -616,7 +616,7 @@ public:
         if(parent->results_logger){
           parent->results_logger->information(outfile + "failed. Not enough matches.");
         }
-        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
+        //parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
         delete m;
         parent->matchM.match[last_index][i+1] = NULL;
       }
@@ -624,7 +624,7 @@ public:
         if(parent->results_logger){
           parent->results_logger->information(outfile + "failed. Not enough keypoints.");
         }
-        parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
+        //parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
         delete m;
         parent->matchM.match[last_index][i+1] = NULL;
       }
@@ -718,10 +718,10 @@ bool BatchCam::resolve_bboxes(){
       double t_x = 0.0;
       box[0] = Bbox(0, 0, images[0]->width, images[0]->height);
     }else{
-      if(reg_results[i].successful){
+      if(reg_results[i]->successful){
         
         int last_index = i-1;
-        while(!reg_results[last_index].successful){
+        while(!reg_results[last_index]->successful){
           last_index--;
           if(last_index < 0){
             logger->error("Cannot find a previously good registration");
@@ -729,14 +729,14 @@ bool BatchCam::resolve_bboxes(){
           }
         }
         
-        reg_results[i].absoluteCoords.x = reg_results[last_index].absoluteCoords.x-reg_results[i].absoluteCoords.x;
-        reg_results[i].absoluteCoords.y = reg_results[last_index].absoluteCoords.y-reg_results[i].absoluteCoords.y;
-        box[i] = Bbox(reg_results[i].absoluteCoords.x, reg_results[i].absoluteCoords.y, images[i]->width+reg_results[i].absoluteCoords.x, images[i]->height+reg_results[i].absoluteCoords.y);
+//        reg_results[i].absoluteCoords.x = reg_results[last_index].absoluteCoords.x-reg_results[i].absoluteCoords.x;
+//        reg_results[i].absoluteCoords.y = reg_results[last_index].absoluteCoords.y-reg_results[i].absoluteCoords.y;
+//        box[i] = Bbox(reg_results[i].absoluteCoords.x, reg_results[i].absoluteCoords.y, images[i]->width+reg_results[i].absoluteCoords.x, images[i]->height+reg_results[i].absoluteCoords.y);
       }
     }
     
     
-    if(reg_results[i].successful){
+    if(reg_results[i]->successful){
       if(box[i].min_x <  combined_box.min_x){
         combined_box.min_x = box[i].min_x;
       }
@@ -758,7 +758,7 @@ bool BatchCam::resolve_bboxes(){
   
   if(combined_box.min_x < 0.0){
     for(unsigned int i=0; i < reg_results.size(); i++){
-      if(reg_results[i].successful){
+      if(reg_results[i]->successful){
         box[i].min_x -= combined_box.min_x;
         box[i].max_x -= combined_box.min_x;
       }
@@ -769,7 +769,7 @@ bool BatchCam::resolve_bboxes(){
   
   if(combined_box.min_y < 0.0){
     for(unsigned int i=0; i < reg_results.size(); i++){
-      if(reg_results[i].successful){
+      if(reg_results[i]->successful){
         box[i].min_y -= combined_box.min_y;
         box[i].max_y -= combined_box.min_y;
       }
@@ -886,7 +886,7 @@ bool BatchCam::compositing(){
   
   unsigned int k = 0;
   for(unsigned int i=0; i < images.size(); i++){
-    if(reg_results[i].successful){
+    if(reg_results[i]->successful){
       k++;
       Mat use_locations = mask.mul(quality_score > combined_z_buffer(Rect(box[i].min_x, box[i].min_y,                                                     images[i]->width, images[i]->height)));
       if (countNonZero(use_locations) == 0){continue;}// this image is not contributing to composite
