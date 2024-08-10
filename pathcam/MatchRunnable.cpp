@@ -149,11 +149,13 @@ namespace pathCam {
     bool tryWaiting = true;
     std::vector<unsigned int> skipComponents;
 
+    if(image_idx == 568){
+      int k = 0;
+    }
+
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       pathCam::Image *previous = parent->get_image_ref(prev_idx);
-      if (std::find(skipComponents.begin(), skipComponents.end(),previous->component_membership) != skipComponents.end()){
-        continue;
-      }
+
       if (previous == nullptr) {
         if (max(5, int(image_idx)) <= prev_idx + 5 && tryWaiting) {
           auto res = parent->JobQ->getSortOrderAndJobRefs(1,prev_idx);
@@ -185,24 +187,11 @@ namespace pathCam {
       }
       if (result == 1) {
 
-        //check if scale indicates that this is not the same component
-        if(m->scale > 1.1 || m->scale < 0.9){
-          auto mtoReg = new RegInfo(parent);
-          if (parent->get_registration(prev_idx,mtoReg)){
-            if (mtoReg->resolved){
-              skipComponents.push_back(mtoReg->component_membership);
-            }
-          }
-          continue;
-        }
+        if (std::abs(m->t_x) < image->width / 1.5 && std::abs(m->t_y) < image->height / 1.5) {
 
-        if (std::abs(m->t_x) < image->width / 1.5 && std::abs(
-            m->t_y) < image->height / 1.5) {
-          //parent->matchM.match[image_idx][prev_idx] = new Match(parent->matchM.match[prev_idx][image_idx]);
           parent->set_match(image_idx, prev_idx);
-          //auto tempReg = new RegInfo(parent,true, Vec2(0.0, 0.0), false, 0);
-          auto tempReg = parent->get_registration(image_idx);
 
+          auto tempReg = parent->get_registration(image_idx);
           tempReg->accessMutex->lock();
           tempReg->index = image_idx;
           tempReg->root = false;

@@ -32,6 +32,18 @@ namespace pathCam {
     resolved = true;
     accessMutex->unlock();
 
+    if(!root) {
+    parent->push_compositeQ(this);
+    }
+
+    for (auto cw : callersWaiting){
+    auto theirRelCoords = cw->relativeCoords;
+    Vec2 theirAbCs;
+    theirAbCs.x = theirRelCoords.x + absoluteCoords.x;
+    theirAbCs.y = theirRelCoords.y + absoluteCoords.y;
+    cw->set_abc(theirAbCs, component_membership);
+    }
+
     for (auto el : componentCallersWaiting){
       double myScale;
       Point2f myOffset;
@@ -45,16 +57,6 @@ namespace pathCam {
       parent->set_scale_and_offset(el.first, theirScale * myScale, theirOffset);
     }
 
-    for (auto cw : callersWaiting){
-      auto theirRelCoords = cw->relativeCoords;
-      Vec2 theirAbCs;
-      theirAbCs.x = theirRelCoords.x + absoluteCoords.x;
-      theirAbCs.y = theirRelCoords.y + absoluteCoords.y;
-      cw->set_abc(theirAbCs, component_membership);
-    }
-    if(!root) {
-      parent->push_compositeQ(this);
-    }
   }
 
   void RegInfo::set_waiting_component(unsigned int componentIndex, Match* m) {

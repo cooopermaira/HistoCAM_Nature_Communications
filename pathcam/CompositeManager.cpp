@@ -18,6 +18,10 @@ namespace pathCam {
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
 
+      for (auto cmp : parent->composites){
+        cmp->check_set_render_info();
+      }
+
       auto timeCheck = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timeCheck - start);
 //      if(duration.count() < 100){
@@ -42,9 +46,15 @@ namespace pathCam {
           }
           parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
           parent->newComponentQ.pop();
+
         }else{
+
+        for (auto cmp : parent->composites){
+          cmp->check_set_render_info();
+        }
         Poco::Thread::sleep(100);
         }
+
       } else {
 
         auto indexes = parent->get_Q_front();
@@ -82,9 +92,6 @@ namespace pathCam {
 
         parent->composites[current_component]->update(new_info);
 
-        for (auto cmp : parent->composites){
-          cmp->check_set_render_info();
-        }
       }
     }
 

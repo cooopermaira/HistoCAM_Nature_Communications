@@ -73,7 +73,7 @@ namespace pathCam {
   private:
     struct compareCompositeQSort{
       bool operator()(const std::vector<RegInfo*> lhs, const std::vector<RegInfo*> rhs){
-        return lhs.at(0)->index < rhs.at(0)->index;
+        return lhs.at(0)->index > rhs.at(0)->index;
       };
     };
 
