@@ -90,6 +90,7 @@ namespace pathCam {
         scale = (m->H.at<double>(0, 0) + m->H.at<double>(1, 1)) / 2.0;
         offset = Point2f((m->t_x / scale + mtoRegInfo->absoluteCoords.x + mtoOffset.x) / scale ,
                          (m->t_y / scale + mtoRegInfo->absoluteCoords.y + mtoOffset.y) / scale) ;
+
         parent->set_scale_and_offset(componentMembership, scale * mtoScale, offset);
         return true;
       }
@@ -107,17 +108,6 @@ namespace pathCam {
     for (int i = 0; i < image_idx; i++){
       indexes.push_back(i);
     }
-//    for (int i = 0; i < parent->composites.size(); i++) {
-//      if (parent->composites[i]->componentIndex != componentMembership) {
-//        for(int ii = max(0,(int)parent->composites[i]->memberImages.size() - 5); ii < parent->composites[i]->memberImages.size(); ii++){
-//          indexes.push_back(parent->composites[i]->memberImages[ii].first->index);
-//        }
-////        for (auto item: parent->composites[i]->delaunayMembers) {
-////          indexes.push_back(item.second);
-////        }
-//      }
-//    }
-    //std::sort(indexes.begin(), indexes.end());
 
     auto otherImages = parent->get_image_refs(indexes);
     if(!match_to_images(image, otherImages)){
@@ -128,13 +118,10 @@ namespace pathCam {
       auto secondTry = parent->get_image_refs(indexes);
       assert(match_to_images(image,secondTry));
     }
-
-    int k = 0;
   }
 
   void MatchRunnable::run() {
     pathCam::Image *image = parent->get_image_ref(image_idx);
-
 
     if (!image->is_good()) {
       return;

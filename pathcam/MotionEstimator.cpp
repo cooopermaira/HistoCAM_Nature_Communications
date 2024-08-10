@@ -33,7 +33,7 @@ namespace pathCam {
     accessMutex->unlock();
 
     if(!root) {
-    parent->push_compositeQ(this);
+      parent->push_compositeQ(this);
     }
 
     for (auto cw : callersWaiting){
