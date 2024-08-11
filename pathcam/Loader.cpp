@@ -55,9 +55,8 @@ namespace pathCam {
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
-      if (image->label == Image::_2X) {
-        image->build_whitebalance_Mat(parent->flat_field2X);
-      }
+      image->build_whitebalance_Mat(parent);
+
 
 
 

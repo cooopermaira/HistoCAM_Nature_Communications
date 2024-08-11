@@ -42,7 +42,7 @@ namespace pathCam {
       myAbCs.y = regInfo->relativeCoords.y + theirAbCs.y;
       regInfo->set_abc(myAbCs, componentMembership);
     }
-
+    parent->regCount--;
   }
 
 

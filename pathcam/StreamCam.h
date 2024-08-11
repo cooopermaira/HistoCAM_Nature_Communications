@@ -101,6 +101,7 @@ namespace pathCam {
     std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
 
     Mat flat_field2X;
+    Mat flat_field4X;
 
     std::shared_ptr<MRTiledImageSet> MRimage;
 

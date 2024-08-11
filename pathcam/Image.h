@@ -7,7 +7,7 @@ namespace pathCam {
 
   using Poco::MemoryPool;
   class RegInfo;
-
+  class StreamCam;
   class Image {
   public:
     RegInfo* regInfo;
@@ -48,7 +48,7 @@ namespace pathCam {
       image_file = _image_file;
     }
 
-    void build_whitebalance_Mat(cv::Mat flat_field);
+    void build_whitebalance_Mat(StreamCam* parent);
 
     void load_raw_from_disk();
 

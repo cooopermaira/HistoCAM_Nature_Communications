@@ -81,19 +81,32 @@ namespace pathCam {
     return blurVariance;
   }
 
-  void Image::build_whitebalance_Mat(cv::Mat flat_field) {
+  void Image::build_whitebalance_Mat(StreamCam* parent) {
+    Mat flat_field;
+
     Mat image_Mat = cv::Mat(height, width, CV_8U, get_Raw(), Mat::AUTO_STEP);
     Mat gry;
     Mat sbt;
+    Mat adj;
+
     cvtColor(image_Mat, gry, COLOR_BayerBG2GRAY);
     cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-    divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
-    auto adj = Mat3f(height, width, Vec3f(0.92, 1.08, 0.92));
-    Mat locations = gry > 240;
-    image_Mat.copyTo(sbt, locations);
-    image_Mat -= sbt;
-    cv::multiply(sbt, adj, sbt, 1, CV_8U);
-    image_Mat += sbt;
+
+    if (label == _2X){
+      flat_field = parent->flat_field2X;
+      divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
+      adj = Mat3f(height, width, Vec3f(0.92, 1.08, 0.92));
+      Mat locations = gry > 240;
+      image_Mat.copyTo(sbt, locations);
+      image_Mat -= sbt;
+      cv::multiply(sbt, adj, sbt, 1, CV_8U);
+      image_Mat += sbt;
+    }else if(label == _4X){
+      flat_field = parent->flat_field4X;
+      divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
+      imwrite("4x.png",image_Mat);
+    }else{return;}
+
     readyImage = image_Mat;
   }
 

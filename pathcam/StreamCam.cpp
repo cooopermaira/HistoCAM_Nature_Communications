@@ -43,7 +43,9 @@ namespace pathCam {
     flat_field2X.convertTo(flat_field2X, CV_32F);
     flat_field2X *= 1 / 170.0;
 
-    //variancesForDebug.resize(2266);
+    flat_field4X = cv::imread("/Users/coopermaira/Desktop/pathcam_data/4x.tiff");
+    flat_field4X.convertTo(flat_field4X,CV_32F);
+    flat_field4X *= 1 / 170.0;
 
   }
 

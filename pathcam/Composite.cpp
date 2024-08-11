@@ -21,7 +21,7 @@ namespace pathCam {
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
 
     circleMask = cv::Mat::zeros(image_size, CV_8U);
-    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius, cv::Scalar(1),
+    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius, cv::Scalar(255),
                -1);
 
     channels.resize(2);
@@ -204,7 +204,10 @@ namespace pathCam {
       auto res = add_point_to_delaunay_triangulation(fShift, images[i], face);
 
       //res is {vertexId,maskId}
-      if (res == -1) { continue; }
+      if (res == -1) {
+        images[i]->readyImage.release();
+        continue;
+      }
       images[i]->vertexId = res;
       images[i]->absoluteCoords = new_info[i]->absoluteCoords;
 
@@ -218,7 +221,6 @@ namespace pathCam {
       //build image with alpha channel
       if (images[i]->readyImage.data){
         channels[0] = images[i]->readyImage;
-
       }else {
         images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
