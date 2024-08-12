@@ -181,13 +181,67 @@ namespace pathCam {
   }
 
   void CompositeVoronoi::create_and_submit_rebuild_jobs() {
-    for (auto el : delaunayMembers){
-      auto rr = new RebuildRunnable(this,el.first,el.second);
+    std::vector<RebuildRunnable*> runnables;
+    for (auto el : delaunayMembers)
+    {
+      auto dt = subdiv;
+      auto image = parent->get_image_ref(el.second);
+      Mat polyMaskOutput = Mat::zeros(image_size,CV_8U);
+      std::vector<Point2i> face;
+      std::vector<std::vector<Point2f>> facets;
+      std::vector<Point2f> centers;
+      dt.getVoronoiFacetList({el.first}, facets, centers);
+
+      //shift and recast
+      for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
+        ii.x -= centers[0].x;
+        ii.x += image_size.width / 2;
+        ii.y -= centers[0].y;
+        ii.y += image_size.height / 2;
+        face.push_back((Point2i) ii);
+      }
+      //build polygon mask for new point
+      if (image->label == Image::_2X)
+      {
+        polyMaskOutput = polyMaskOutput.mul(circleMask);
+      }
+      fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
+      //imwrite("polymask.png", polyMaskOutput);
+      Mat polyMaskPadded;
+      int tileSize = imagePyramid->level[0]->getTileSize();
+      copyMakeBorder(polyMaskOutput,polyMaskPadded,tileSize,tileSize,tileSize,tileSize,BORDER_CONSTANT,Scalar(0));
+      std::vector<Point2i> effectedTiles;
+      calculate_effected_tiles(face, effectedTiles, image->absoluteCoords);
+      //Vector containing the tiles where their center
+      std::vector<Point2i> rebuildTiles;
+      for (auto tile : effectedTiles){
+        auto tileBox = Rect(tileSize * tile.x - image->absoluteCoords.x + tileSize, tileSize * tile.y - image->absoluteCoords.y + tileSize, tileSize, tileSize);
+        int sum = countNonZero(polyMaskPadded(tileBox));
+        bool rebuild = rebuildTile(tile,sum);
+        if (rebuild)
+        {
+          rebuildTiles.push_back(tile);
+        }
+      }
+
+      auto rr = new RebuildRunnable(this,el.first,el.second,rebuildTiles,polyMaskOutput);
+      runnables.push_back(rr);
       parent->cm->rebuildJobsOutstanding++;
-      parent->JobQ->add_runnable(rr);
+    }
+    for (auto rr : runnables) {
+    parent->JobQ->add_runnable(rr);
     }
   }
-
+  bool CompositeVoronoi::rebuildTile(Point2i tile,int sum)
+  {
+    std::string tileStr = std::to_string(tile.x) + "_" + std::to_string(tile.y);
+    if (tileToSumNonZero[tileStr] < sum)
+    {
+      tileToSumNonZero[tileStr] = sum;
+      return true;
+    }
+    return false;
+  }
   void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo*> new_info) {
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;

@@ -163,13 +163,21 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
     if(pConf->has("io.flat_field_images")){
       if(pConf->has("io.flat_field_images.twoX")){
         std::string temp = pConf->getString("io.flat_field_images.twoX");
-        flat_field_file = Path(temp);
+        flat_field_file_2x = Path(temp);
         
-        if(flat_field_file.getExtension() != "png" && flat_field_file.getExtension() != "tif"){
+        if(flat_field_file_2x.getExtension() != "png" && flat_field_file_2x.getExtension() != "tif"){
           logger->warning("Only PNG or TIF outputs supported. No image output.");
-          flat_field_file = Path();
+          flat_field_file_2x = Path();
         }
-        
+      }
+      if(pConf->has("io.flat_field_images.fourX"))
+      {
+        std::string temp = pConf->getString("io.flat_field_images.twoX");
+        flat_field_file_4x = Path(temp);
+        if(flat_field_file_4x.getExtension() != "png" && flat_field_file_4x.getExtension() != "tif"){
+          logger->warning("Only PNG or TIF outputs supported. No image output.");
+          flat_field_file_4x = Path();
+        }
       }
     }
     
@@ -870,8 +878,8 @@ bool BatchCam::compositing(){
   
   Mat flat_field;
   
-  if(flat_field_file.toString() != ""){
-    flat_field = cv::imread(flat_field_file.toString());
+  if(flat_field_file_2x.toString() != ""){
+    flat_field = cv::imread(flat_field_file_2x.toString());
     std::cout << flat_field.cols << "\t" << flat_field.rows << "\n";
     std::cout << images[0]->width << "\t" << images[0]->height << "\n";
     

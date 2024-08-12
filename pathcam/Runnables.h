@@ -38,8 +38,10 @@ namespace pathCam {
     unsigned long imageIndex;
     CompositeVoronoi* composite;
     CompositeManager* cm;
+    Mat polyMaskOutput;
+    std::vector<Point2i> rebuildTiles;
 
-    RebuildRunnable(CompositeVoronoi* _composite, int _dtVertex, unsigned long _imageIndex);
+    RebuildRunnable(CompositeVoronoi* _composite, int _dtVertex, unsigned long _imageIndex, std::vector<Point2i> _rebuildTiles,Mat _polyMaskOutput);
     virtual void run();
   };
 

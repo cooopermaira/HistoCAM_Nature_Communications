@@ -109,7 +109,7 @@ namespace pathCam {
         */
 
 
-    //perform_global_alignment();
+    perform_global_alignment();
     rebuildJobsComplete.wait();
     //save_components_to_disk();
     parent->compositing = false;
@@ -143,31 +143,18 @@ namespace pathCam {
     }
   }
 
-  RebuildRunnable::RebuildRunnable(pathCam::CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex) : dtVertex(_dtVertex),imageIndex(_imageIndex),composite(_composite),
+  RebuildRunnable::RebuildRunnable(pathCam::CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex, std::vector<Point2i> _rebuildTiles, Mat _polyMaskOutput) :
+  dtVertex(_dtVertex),
+  imageIndex(_imageIndex),
+  composite(_composite),
+  rebuildTiles(_rebuildTiles),
+  polyMaskOutput(_polyMaskOutput),
   RunnableIntermediate(0,0){
     cm = composite->parent->cm;
   }
 
   void RebuildRunnable::run() {
-    auto dt = composite->subdiv;
     auto image = composite->parent->get_image_ref(imageIndex);
-    Mat polyMaskOutput = Mat::zeros(composite->image_size,CV_8U);
-    std::vector<Point2i> face;
-    std::vector<std::vector<Point2f>> facets;
-    std::vector<Point2f> centers;
-    dt.getVoronoiFacetList({dtVertex}, facets, centers);
-
-    //shift and recast
-    for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
-      ii.x -= centers[0].x;
-      ii.x += composite->image_size.width / 2;
-      ii.y -= centers[0].y;
-      ii.y += composite->image_size.height / 2;
-      face.push_back((Point2i) ii);
-    }
-    //build polygon mask for new point
-    fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
-    //imwrite("polymask.png", polyMaskOutput);
     image->load_raw_from_disk();
     Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
     Mat3b threeChannelPreallocated;
@@ -182,7 +169,6 @@ namespace pathCam {
     Mat tile_mask = Mat::zeros(image->height,image->width,CV_8U);
 
     if (image->label == Image::_2X) {//flat field correction if needed
-      polyMaskOutput = polyMaskOutput.mul(composite->circleMask);
       auto center = Point2i(composite->image_size.width / 2, composite->image_size.height / 2);
       auto bb = Rect(center.x - composite->parent->scope_radius - 10, center.y - composite->parent->scope_radius - 10,
                      2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
@@ -192,37 +178,10 @@ namespace pathCam {
     }else{
       channels[1] = Mat(image->height,image->width,CV_8U,Scalar(255));
     }
-    std::vector<Point2i> effectedTiles;
-    composite->calculate_effected_tiles(face, effectedTiles, image->absoluteCoords);
-    int tileSize = composite->imagePyramid->level[0]->getTileSize();
-
-
-    //Vector containing the tiles where their center
-    std::vector<Point2i> center_in_poly_mask;
-
-    for (auto tile : effectedTiles){
-      Point2i adjustedPoint;
-      auto centerPoint = Point2i((tile.x + 0.5) * composite->imagePyramid->tile_size,(tile.y + 0.5)* composite->imagePyramid->tile_size);
-      adjustedPoint.x = centerPoint.x - image->absoluteCoords.x;
-      adjustedPoint.y = centerPoint.y - image->absoluteCoords.y;
-      if(adjustedPoint.x < 0 || adjustedPoint.x > image->width || adjustedPoint.y < 0 || adjustedPoint.y > image->height){
-        continue;
-      }
-      uint8_t pixelVal;
-      pixelVal = polyMaskOutput.at<uint8_t>(adjustedPoint);
-
-      if(pixelVal > 0) {
-        auto tileBox = Rect(tileSize * tile.x - image->absoluteCoords.x, tileSize * tile.y - image->absoluteCoords.y, tileSize, tileSize);
-        center_in_poly_mask.push_back(tile);
-      }
-    }
-               //alpha channel
     merge(channels, fourChannelPreallocated);
-    //imwrite("Tile_mask.png",tile_mask);
-    //imwrite("four_channel.png",fourChannelPreallocated);
     auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
     //composite->imagePyramid->level[0]->inserTileAtBase(fourChannelPreallocated, tile_mask, imageBox, center_in_poly_mask);
-    composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated,imageBox,center_in_poly_mask);
+    composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated,imageBox,rebuildTiles);
     cm->decrement_rebuild_jobs_outstanding();
   }
 

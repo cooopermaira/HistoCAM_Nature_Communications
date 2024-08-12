@@ -29,7 +29,9 @@ protected:
   
   Poco::Path input_images;
   Poco::Path out_image;
-  Poco::Path flat_field_file;
+  Poco::Path flat_field_file_2x;
+  Poco::Path flat_field_file_4x;
+
 
   
   //Registration Params

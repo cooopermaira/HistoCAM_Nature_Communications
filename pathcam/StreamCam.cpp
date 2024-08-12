@@ -39,11 +39,11 @@ namespace pathCam {
 
     lastFrame = Rect(0,0,image_width,image_height);
 
-    flat_field2X = cv::imread(flat_field_file.toString());
+    flat_field2X = cv::imread(flat_field_file_2x.toString());
     flat_field2X.convertTo(flat_field2X, CV_32F);
     flat_field2X *= 1 / 170.0;
 
-    flat_field4X = cv::imread("/Users/coopermaira/Desktop/pathcam_data/4x.tiff");
+    flat_field4X = cv::imread(flat_field_file_4x.toString());
     flat_field4X.convertTo(flat_field4X,CV_32F);
     flat_field4X *= 1 / 170.0;
 

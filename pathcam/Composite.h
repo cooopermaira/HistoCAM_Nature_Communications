@@ -143,6 +143,9 @@ namespace pathCam {
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
 
+    std::map<std::string,int> tileToSumNonZero;
+    bool rebuildTile(Point2i tile,int sum);
+
   protected:
     std::priority_queue<unsigned int> freeMasks;
     std::vector<Mat> masks;
