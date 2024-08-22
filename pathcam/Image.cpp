@@ -104,7 +104,6 @@ namespace pathCam {
     }else if(label == _4X){
       flat_field = parent->flat_field4X;
       divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
-      imwrite("4x.png",image_Mat);
     }else{return;}
 
     readyImage = image_Mat;

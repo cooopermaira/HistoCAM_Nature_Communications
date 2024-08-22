@@ -82,6 +82,8 @@ namespace pathCam {
 
     void perform_global_alignment();
 
+    void check_render_info();
+
     void save_components_to_disk();
 
     void decrement_rebuild_jobs_outstanding();

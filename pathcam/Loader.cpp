@@ -10,6 +10,9 @@
 namespace pathCam {
   void LoaderLogicRunnable::run() {
 
+    if (image_index > 1642){
+      int k = 0;
+    }
 
     if (!image->in_memory()) {
       image->load_raw_from_disk();
@@ -55,7 +58,7 @@ namespace pathCam {
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
-      image->build_whitebalance_Mat(parent);
+//      image->build_whitebalance_Mat(parent);
 
 
 
