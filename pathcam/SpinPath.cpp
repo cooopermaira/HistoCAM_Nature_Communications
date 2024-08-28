@@ -96,7 +96,7 @@ void CameraStream::run(){
             const size_t height = pResultImage->GetHeight();
             parent->camlogger.information(Poco::format("Got image: %u %u", (unsigned int)width, (unsigned int)height));
             
-            pathCam::Image *image = new pathCam::Image();
+            pathCam::Image *image = new pathCam::Image(width, height, parent->sCam->get_scope_radius());
             image->copy_in(pResultImage->GetData());
             image->increment_smart_pointer();
             parent->sCam->pass_image(image,i);
@@ -196,7 +196,7 @@ void FileStream::run(){
     
 
   }
-
+  
 
 }
 
@@ -379,7 +379,17 @@ int SpinPath::spinUpCamera(){
       camlogger.error("Unable to get or set acquisition mode to continuous (entry retrieval). Aborting...");
       return -1;
     }
-    
+
+    // Set expsoure time to 1500 us
+    CEnumerationPtr exposureAuto = nodeMap.GetNode("ExposureAuto");
+    exposureAuto->SetIntValue(exposureAuto->GetEntryByName("Off")->GetValue());
+
+    CEnumerationPtr exposureMode = nodeMap.GetNode("ExposureMode");
+    exposureMode->SetIntValue(exposureMode->GetEntryByName("Timed")->GetValue());
+
+    CFloatPtr exposureTime = nodeMap.GetNode("ExposureTime");
+    exposureTime->SetValue(1500);
+
     // Retrieve integer value from entry node
     const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
     
@@ -509,7 +519,7 @@ int SpinPath::run(){
     thread_file.start(*fileStream);
     sCam->microscopeInput = true;
     thread_sCam.start(*processStream);
-    if (0 == 0) { int j = 0;  }
+    
   }
 
  
@@ -524,11 +534,11 @@ void SpinPath::stopCamera(){
   std::cout << "Collection complete, processing " << std::endl;
   thread_cam.join();
   thread_file.join();
-  thread_sCam.join();
+  //thread_sCam.join();
   
   delete cameraStream;
   delete fileStream;
-  delete processStream;
+  //delete processStream;
 
   spinDownCamera();
 }

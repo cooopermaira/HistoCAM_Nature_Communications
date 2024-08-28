@@ -37,24 +37,52 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
                                                             ImageViewComponent(view, iconNames, iconsFromZipFile),
                                                             recording(false), simulating(false) {
 
-#ifdef WITH_SPINNAKER
-  bcam.reset(new pathCam::SpinPath(config));
-  bcam->add_observer(parent);
-  
-#endif
-
-  sCam.reset(new pathCam::StreamCam(config));
-  sCam->add_observer(parent);
-  
 
   captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
   addAndMakeVisible(captureOverlay.get());
 }
 
+void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {
+    ImageViewComponent::drawSlide(g, scale);
+
+    if (view->isEmpty() || MRImage->empty()) { return; }
+
+    cv::Rect_<float> frameBox;
+    bool showAsCircle;
+
+    if (recording) {
+        bcam->sCam->get_last_frame(frameBox, showAsCircle);
+    }
+    if (simulating) {
+        sCam->get_last_frame(frameBox, showAsCircle);
+    }
+    auto bounds = RectCtoJ < float >(frameBox);
+    bounds.setPosition(bounds.getPosition() - view->getPosition());
+
+    bounds *= view2screenScale(*view) * scale;
+
+    g.setColour(juce::Colours::red);
+
+    if (showAsCircle) {
+        auto center = bounds.getCentre();
+        fPoint radius = scopeRadius * view2screenScale(*view) * scale;;
+        center -= radius;
+        g.drawEllipse(center.getX(), center.getY(), 2 * radius.getX(), 2 * radius.getY(), 3);
+
+    }
+    else {
+        g.drawRect(bounds, 3);
+    }
+
+}
 
 void CaptureComponent::startRecording() {
   recording = true;
 #ifdef WITH_SPINNAKER
+
+  bcam.reset(new pathCam::SpinPath(config));
+  bcam->add_observer(parent);
+  scopeRadius = bcam->sCam->get_scope_radius();
   parent->MRimage = bcam->get_image_reference();
 #endif
 
@@ -72,6 +100,11 @@ void CaptureComponent::startRecording() {
 
 void CaptureComponent::startSimulating() {
   simulating = true;
+
+  sCam.reset(new pathCam::StreamCam(config));
+  sCam->add_observer(parent);
+  scopeRadius = sCam->get_scope_radius();
+
   parent->MRimage = sCam->get_image_reference();
   parent->imageview->setImage(parent->MRimage);
   parent->capture->setImage(parent->MRimage);

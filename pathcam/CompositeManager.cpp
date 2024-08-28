@@ -97,21 +97,10 @@ namespace pathCam {
 
 
 
-/*
-        for (int i = 0; i < parent->composites.size(); i++){
-          std::cout << "Writing image of size: " << parent->composites[i]->get_composite().size() << "\n";
-          imwrite("finish" + std::to_string(i) + ".png", parent->composites[i]->get_composite());
-        }
 
-        for(int i = 0; i < parent->MRimage->level.size(); i++) {
-            cv::imwrite("test"+std::to_string(i)+".png", *parent->MRimage->level[i]->cvTiles(0, 0));
-        }
-        */
-
-
-    perform_global_alignment();
+//    perform_global_alignment();
     rebuildJobsComplete.wait();
-    //save_components_to_disk();
+    save_components_to_disk();
     parent->compositing = false;
   }
 

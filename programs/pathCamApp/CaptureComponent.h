@@ -73,32 +73,7 @@ public:
   
     void stopSimulating();
 
-    void drawSlide(juce::Graphics& g, float scale) override{
-      ImageViewComponent::drawSlide(g, scale);
-      
-      if(view->isEmpty() || MRImage->empty()){ return; }
-      
-      cv::Rect_<float> frameBox;
-      bool showAsCircle;
-      sCam->get_last_frame(frameBox, showAsCircle);
-      auto bounds = RectCtoJ < float >(frameBox);
-      bounds.setPosition(bounds.getPosition()-view->getPosition());
-      
-      bounds *= view2screenScale(*view) * scale;
-
-      g.setColour(juce::Colours::red);
-      
-      if(showAsCircle){
-        auto center = bounds.getCentre();
-        fPoint radius = sCam->get_scope_radius() * view2screenScale(*view) * scale;;
-        center -= radius;
-        g.drawEllipse (center.getX(), center.getY(), 2*radius.getX(), 2*radius.getY(), 3);
-
-      }else{
-        g.drawRect(bounds, 3);
-      }
-
-    }
+    void drawSlide(juce::Graphics& g, float scale) override;
 
 
     void paint(juce::Graphics &g) override {
@@ -121,6 +96,7 @@ private:
     Poco::Thread compositeThread;
     bool recording;
     bool simulating;
+    float scopeRadius;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CaptureComponent)
 };

@@ -55,12 +55,12 @@ namespace pathCam {
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
-      image->build_whitebalance_Mat(parent);
+      //image->build_whitebalance_Mat(parent);
 
 
 
 
-      //image->free_memory_RAW();
+      image->free_memory_RAW();
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
       //pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
 
