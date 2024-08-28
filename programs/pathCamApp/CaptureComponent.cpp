@@ -50,12 +50,16 @@ void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {
     cv::Rect_<float> frameBox;
     bool showAsCircle;
 
+#ifdef WITH_SPINNAKER
     if (recording) {
         bcam->sCam->get_last_frame(frameBox, showAsCircle);
     }
+#endif
+
     if (simulating) {
         sCam->get_last_frame(frameBox, showAsCircle);
     }
+
     auto bounds = RectCtoJ < float >(frameBox);
     bounds.setPosition(bounds.getPosition() - view->getPosition());
 
