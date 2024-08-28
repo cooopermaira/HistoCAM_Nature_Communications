@@ -66,7 +66,7 @@ private:
   CameraPtr pCam;
   SystemPtr system;
   CameraList camList;
-  StreamCam *sCam;
+  
   
   
   Poco::Path root_path;
@@ -98,7 +98,7 @@ private:
   }
   
 public:
-  
+    StreamCam* sCam;
   SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();
   int run();

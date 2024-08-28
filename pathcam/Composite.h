@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <random>
+#include <numeric>
 #include "pathCam.h"
 //#include "TiledImage.h"
 

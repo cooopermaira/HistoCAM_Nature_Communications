@@ -18,6 +18,10 @@ namespace pathCam {
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
 
+      for (auto cmp : parent->composites){
+        cmp->check_set_render_info();
+      }
+
       auto timeCheck = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timeCheck - start);
 //      if(duration.count() < 100){
@@ -42,7 +46,6 @@ namespace pathCam {
           }
           parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
           parent->newComponentQ.pop();
-          check_render_info();
 
         }else{
 
@@ -63,7 +66,6 @@ namespace pathCam {
             }
             parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
             parent->newComponentQ.pop();
-            check_render_info();
           }
         }
         std::sort(indexes.begin(), indexes.end());
@@ -89,43 +91,22 @@ namespace pathCam {
         }
 
         parent->composites[current_component]->update(new_info);
-        check_render_info();
-
 
       }
     }
 
-    check_render_info();
-
-
-/*
-        for (int i = 0; i < parent->composites.size(); i++){
-          std::cout << "Writing image of size: " << parent->composites[i]->get_composite().size() << "\n";
-          imwrite("finish" + std::to_string(i) + ".png", parent->composites[i]->get_composite());
-        }
-
-        for(int i = 0; i < parent->MRimage->level.size(); i++) {
-            cv::imwrite("test"+std::to_string(i)+".png", *parent->MRimage->level[i]->cvTiles(0, 0));
-        }
-        */
 
 
 
-    //perform_global_alignment();
+//    perform_global_alignment();
     rebuildJobsComplete.wait();
-    //save_components_to_disk();
+    save_components_to_disk();
     parent->compositing = false;
   }
 
   void CompositeManager::perform_global_alignment() {
     for (auto i: parent->composites) {
-      i->perform_global_alignment(0, 0.66);
-    }
-  }
-
-  void CompositeManager::check_render_info() {
-    for (auto cmp : parent->composites){
-      cmp->check_set_render_info();
+      i->perform_global_alignment(0, 0.2);
     }
   }
 
