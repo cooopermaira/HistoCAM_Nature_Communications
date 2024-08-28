@@ -65,9 +65,9 @@ namespace pathCam {
 
 
 
-  void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx) {
-    resize_mmatch_mutex->readLock();
-    matchM.match[image_idx][prev_idx] = new Match(matchM.match[prev_idx][image_idx]);
+  void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx, Match *m) {
+    resize_mmatch_mutex->writeLock();
+    matchM.match[image_idx][prev_idx] = new Match(m);
     resize_mmatch_mutex->unlock();
   }
 

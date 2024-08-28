@@ -97,7 +97,7 @@ namespace pathCam {
 
     void add_images_no_composite(std::vector<RegInfo*> new_info);
 
-    void rebuild_DT_elementwise(std::vector<RegInfo*> new_info);
+    void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
 
     void create_and_submit_rebuild_jobs();
 
@@ -120,9 +120,14 @@ namespace pathCam {
     void exclude_for_blur();
 
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
-                                            std::vector<Point2i> &_face);
+                                            std::vector<Point2i> &_face, bool _forceAdd);
     
     void coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon, bool shouldCleanData, std::map<long, long>& systemIndexToFrameIndex, double epsilonClean = 0, cv::Mat bOther = cv::Mat());
+
+    void coopers_conjugate_gradient2(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
+                                     bool shouldCleanData, std::map<long, long> &systemIndexToFrameIndex,
+                                     double epsilonClean, cv::Mat bOther, int flag);
+
 
     void clean_data(cv::Mat A, cv::Mat b, cv::Mat bOther, cv::Mat x, std::map<long, long> &systemIndexToFrameIndex);
 
@@ -143,6 +148,10 @@ namespace pathCam {
     void update_Bbox_no_composite(std::vector<RegInfo*> new_info);
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
+
+    void build_system_from_DT(std::map<long, long> &systemIndexToFrameIndex,
+                              std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,
+                              cv::Mat &by, cv::Mat &x, cv::Mat &y);
 
     std::map<std::string,int> tileToSumNonZero;
     bool rebuildTile(Point2i tile,int sum);

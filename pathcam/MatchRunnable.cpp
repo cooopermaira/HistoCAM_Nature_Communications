@@ -160,11 +160,7 @@ namespace pathCam {
       */
       if (!previous->is_good()) { continue; }
 
-      parent->resize_mmatch_mutex->readLock();
-      parent->matchM.match[prev_idx][image_idx] = new Match(previous, image);
-      Match *m = parent->matchM.match[prev_idx][image_idx];
-      parent->resize_mmatch_mutex->unlock();
-
+      Match *m = new Match(previous, image);
       matcher->match(m);
 
       int result = motion_est->findHomography(m, parent->estimator_type, 20, 0);
@@ -176,7 +172,7 @@ namespace pathCam {
 
         if (std::abs(m->t_x) < image->width / 1.5 && std::abs(m->t_y) < image->height / 1.5) {
 
-          parent->set_match(image_idx, prev_idx);
+          parent->set_match(image_idx, prev_idx, m);
 
           auto tempReg = parent->get_registration(image_idx);
           tempReg->accessMutex->lock();
@@ -220,6 +216,7 @@ namespace pathCam {
   } //end run
 
   void SingleMatchRunnable::run() {
+
     pathCam::Image *image1 = parent->get_image_ref(image_idx1);
     pathCam::Image *image2 = parent->get_image_ref(image_idx2);
 
@@ -227,27 +224,20 @@ namespace pathCam {
 
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
 
-    parent->matchM.match[image_idx2][image_idx1] = new Match(image2, image1);
-
-    //it's ok to set this match directly without the mutex because the mutex is already locked in
-    //perform_global_alignment() and all image_idx values are less than matchM.match size
-    Match *m = parent->matchM.match[image_idx2][image_idx1];
+    Match *m= new Match(image2, image1);
     matcher->match(m);
     int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
-//    m->t_x *= image1->get_reg_scale();
-//    m->t_y *= image2->get_reg_scale();
+
     if (result == 1) {
-      if (std::abs(parent->matchM.match[image_idx2][image_idx1]->t_x) < image1->width / 2 && std::abs(
-          parent->matchM.match[image_idx2][image_idx1]->t_y) < image1->height / 2) {
-        parent->matchM.match[image_idx1][image_idx2] = new Match(parent->matchM.match[image_idx2][image_idx1]);
+      if (std::abs(m->t_x) < image1->width / 2 && std::abs(
+          m->t_y) < image1->height / 2) {
+        parent->resize_mmatch_mutex->writeLock();
+        parent->matchM.match[image_idx1][image_idx2] = new Match(m);
+        parent->resize_mmatch_mutex->unlock();
         parent->composites[component_membership]->matchedEdges[edgeNumber] = {image_idx1, image_idx2};
-      } else {
-        parent->matchM.match[image_idx2][image_idx1] = nullptr;
       }
-    } else {
-      // if(result == -1 || result == -2){
-      parent->matchM.match[image_idx2][image_idx1] = nullptr;
     }
+
     delete m;
     delete matcher;
     delete motion_est;

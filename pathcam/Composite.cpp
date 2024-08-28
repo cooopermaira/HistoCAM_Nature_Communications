@@ -74,8 +74,8 @@ namespace pathCam {
     memberImages.clear();
     matchedEdges.clear();
     delaunayMembers.clear();
-//    root_offset = Vec2(0, 0);
-//    max_offset = Vec2(0, 0);
+    root_offset = Vec2(0, 0);
+    max_offset = Vec2(0, 0);
   }
 
 
@@ -115,8 +115,8 @@ namespace pathCam {
     }
   }
 
-  void CompositeVoronoi::rebuild_DT_elementwise(std::vector<RegInfo*> new_info) {
-    if (new_info.size() > 1) {
+  void CompositeVoronoi::rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle) {
+    if (new_info.size() > 1 && shuffle) {
       // this shuffle is very important for reducing image count in the DT.
       auto rng = std::default_random_engine{};
       std::shuffle(std::begin(new_info), std::end(new_info), rng);
@@ -127,14 +127,14 @@ namespace pathCam {
       auto fShift = Point2f(ni->absoluteCoords.x, ni->absoluteCoords.y);
       auto img = parent->get_image_ref((*ni).index);
       img->absoluteCoords = ni->absoluteCoords;
-      auto res = add_point_to_delaunay_triangulation(fShift, img, face);
+      auto res = add_point_to_delaunay_triangulation(fShift, img, face, forceAdd);
       freshMask.copyTo(polyMaskOutput);
     }
   }
 
 
   int CompositeVoronoi::add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
-                                                            std::vector<Point2i> &_face) {
+                                                            std::vector<Point2i> &_face, bool _forceAdd) {
     //make copy of subdiv incase we decide not to use new point
     Subdiv2D tempSubdiv(subdiv);
 
@@ -159,22 +159,25 @@ namespace pathCam {
     //build polygon mask for new point
     cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
 
-    //test for exclusion of frame via rollback
-    int nonzeroMin;
-    if (_image->label == Image::_2X) {
-      polyMaskOutput = polyMaskOutput.mul(circleMask);
-      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.20;
-    } else {
-      nonzeroMin = _image->width * _image->height * 0.1;
+    if(!_forceAdd) {
+      //test for exclusion of frame via rollback
+      int nonzeroMin;
+      if (_image->label == Image::_2X) {
+        polyMaskOutput = polyMaskOutput.mul(circleMask);
+        nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.20;
+      } else {
+        nonzeroMin = _image->width * _image->height * 0.1;
+      }
+
+      if (countNonZero(polyMaskOutput) <= nonzeroMin) {
+        //contributing less than x% of its pixels, revert and don't bother loading from disk
+        subdiv = tempSubdiv;
+        _image->free_memory_RAW();
+        memberImages.push_back({_image, false});
+        return -1;
+      }
     }
 
-    if (countNonZero(polyMaskOutput) <= nonzeroMin) {
-      //contributing less than x% of its pixels, revert and don't bother loading from disk
-      subdiv = tempSubdiv;
-      _image->free_memory_RAW();
-      memberImages.push_back({_image, false});
-      return -1;
-    }
     memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
@@ -255,7 +258,7 @@ namespace pathCam {
       //add point to delaunay triangulation
       std::vector<Point2i> face;
       auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
-      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face);
+      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face, false);
 
       //res is {vertexId,maskId}
       if (res == -1) {
@@ -286,6 +289,10 @@ namespace pathCam {
           auto bb = Rect(center.x - parent->scope_radius - 10, center.y - parent->scope_radius - 10,
                          2 * parent->scope_radius + 20, 2 * parent->scope_radius + 20);
           cv::divide(threeChannelPreallocated(bb), flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
+        }
+        else if (images[i]->label == Image::_4X){
+          flat_field = parent->flat_field4X;
+          divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1, CV_8U);
         }
         channels[0] = threeChannelPreallocated; //3 channel
       }
@@ -348,7 +355,7 @@ namespace pathCam {
       //add point to delaunay triangulation
       std::vector<Point2i> face;
       auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
-      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face);
+      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face, false);
 
       //res is {vertexId,maskId}
       if (res == -1) { continue; }
@@ -448,7 +455,7 @@ namespace pathCam {
       std::vector<Point2i> face;
       auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
 
-      if (add_point_to_delaunay_triangulation(fShift, images[i], face) == -1) {
+      if (add_point_to_delaunay_triangulation(fShift, images[i], face, false) == -1) {
         freshMask.copyTo(polyMaskOutput);
         continue;
       }
@@ -964,8 +971,125 @@ namespace pathCam {
     }
   }
 
+  void CompositeVoronoi::build_system_from_DT(std::map<long, long> &systemIndexToFrameIndex,
+                                              std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,
+                                              cv::Mat &by, cv::Mat &x, cv::Mat &y) {
+
+    std::vector<Vec4f> edges;
+    std::vector<Vec2i> verticePairs;
+    std::vector<Point2f> coords;
+
+    subdiv.getEdgeList(edges);
+
+    parent->resize_mmatch_mutex->readLock();
+    int count1 = 0;
+    int count2 = 0;
+    for (int i = 0; i < edges.size(); i++) {
+      //set point to shorten if statement
+      auto ep = edges[i];
+      auto x1 = subdiv_Bbox.max_x;
+      auto x2 = subdiv_Bbox.min_x;
+      auto y1 = subdiv_Bbox.max_y;
+      auto y2 = subdiv_Bbox.min_y;
+
+
+      //make sure edge ends are within bounding box
+      if (ep[0] < x1 && ep[0] > x2 && ep[1] < y1 && ep[1] > y2 && ep[2] < x1 && ep[2] > x2 && ep[3] < y1 &&
+          ep[3] > y2) {
+
+        //find vertex IDs
+        int vertId1 = subdiv.findNearest({ep[0], ep[1]});
+        int vertId2 = subdiv.findNearest({ep[2], ep[3]});
+
+        //verify vertices correspond to images added to composite
+        auto val1 = delaunayMembers.count(vertId1);
+        auto val2 = delaunayMembers.count(vertId2);
+
+        if (val1 > 0 && val2 > 0) {
+          count2++;
+          auto image_idx1 = delaunayMembers[vertId1];
+          auto image_idx2 = delaunayMembers[vertId2];
+          auto m = parent->matchM.match[image_idx1][image_idx2];
+
+          if(m == nullptr){
+            m = parent->matchM.match[image_idx2][image_idx1];
+            image_idx2 = delaunayMembers[vertId1];
+            image_idx1 = delaunayMembers[vertId2];
+          }
+
+          auto imageReg1 = parent->get_registration(image_idx1);
+          auto imageReg2 = parent->get_registration(image_idx2);
+
+          if(m != nullptr){
+
+            auto val = imageReg1->absoluteCoords.x - imageReg2->absoluteCoords.x - m->t_x;
+            auto i1 = imageReg1->absoluteCoords.x;
+            auto i2 = imageReg2->absoluteCoords.x;
+            auto i3 = m->t_x;
+
+            if(abs(val) < 200){
+              count1++;
+              matchedEdges.push_back({image_idx1,image_idx2});
+
+              if (image_idx1 != 0) {
+                if (frameIndexToSystemIndex.find(image_idx1) == frameIndexToSystemIndex.end()) {
+                  long val = frameIndexToSystemIndex.size();
+                  frameIndexToSystemIndex[image_idx1] = val;
+                  systemIndexToFrameIndex[val] = image_idx1;
+                }
+              }
+              if (image_idx2 != 0) {
+                long val = frameIndexToSystemIndex.size();
+                if (frameIndexToSystemIndex.find(image_idx2) == frameIndexToSystemIndex.end()) {
+                  frameIndexToSystemIndex[image_idx2] = val;
+                  systemIndexToFrameIndex[val] = image_idx2;
+                }
+              }
+            }
+            else{
+              int k = 0;
+            }
+          }
+        }
+      }
+    }
+    A = Mat::zeros(matchedEdges.size(), frameIndexToSystemIndex.size(), CV_64FC1);
+
+    bx = Mat::zeros(matchedEdges.size(), 1, CV_64FC1);
+    by = bx.clone();
+
+    x = Mat::zeros(systemIndexToFrameIndex.size(), 1, CV_64FC1);
+    y = x.clone();
+
+
+    for (int i = 0; i < matchedEdges.size(); i++) {
+      //build system (A in Ax - b)
+      if (matchedEdges[i].first != memberImages[0].first->index) {
+        A.at<double>(i, frameIndexToSystemIndex[matchedEdges[i].first]) = 1;
+      }
+      if (matchedEdges[i].second != memberImages[0].first->index) {
+        A.at<double>(i, frameIndexToSystemIndex[matchedEdges[i].second]) = -1;
+      }
+      //build pairwise reg vector (b in Ax - b)
+      auto pwr = parent->matchM.match[matchedEdges[i].first][matchedEdges[i].second];
+      bx.at<double>(i) = pwr->t_x;
+      by.at<double>(i) = pwr->t_y;
+
+    }
+
+    for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
+      auto coords = parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords;
+      x.at<double>(i) = coords.x;
+      y.at<double>(i) = coords.y;
+    }
+    int k = 0;
+  }
+
 
   void CompositeVoronoi::perform_global_alignment(unsigned int flag, double closenessFactor) {
+
+    //exclude_for_blur();
+
     //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
     if(delaunayMembers.size() < 10){
       return;
@@ -973,7 +1097,7 @@ namespace pathCam {
     if (!needsAlignment) {
       return;
     }
-    needsAlignment = false;
+
 
     if (flag == 1) {
       std::vector<std::tuple<unsigned long, unsigned long, int, bool>> indexIndexEdgenumJobneeded;
@@ -985,23 +1109,23 @@ namespace pathCam {
 
           if (abs(image2->absoluteCoords.x - image1->absoluteCoords.x) < closenessFactor * image_size.width &&
               abs(image2->absoluteCoords.y - image1->absoluteCoords.y) < closenessFactor * image_size.height) {
-//            if (parent->matchM.match[image1->index][image2->index] != nullptr) {
-//              indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, false});
-//            } else {
+
             indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, true});
             //}
           }
         }
       }
 
-      parent->resize_mmatch_mutex->readLock();
+
       matchedEdges.resize(indexIndexEdgenumJobneeded.size(), {-1, -1});
 
       for (int i = 0; i < indexIndexEdgenumJobneeded.size(); i++) {
         auto edge = indexIndexEdgenumJobneeded[i];
         auto idx1 = std::get<0>(edge);
         auto idx2 = std::get<1>(edge);
-
+        if((idx1 == 367 && idx2 == 412) || (idx1 == 412 && idx2 == 367)){
+          int k = 0;
+        }
         if (std::get<3>(edge)) {
           auto sm = new SingleMatchRunnable(parent, idx1, idx2, componentIndex, i, 0);
           matchableCount++;
@@ -1011,9 +1135,81 @@ namespace pathCam {
           matchedEdges[i].second = idx2;
         }
       }
-    } else if (flag == 0) {
 
-      exclude_for_blur();
+      //from this point on is experimental use of all DT edges as constraints, updating constraints when
+      //point is removed
+
+      while (matchableCount > 0) {
+        Poco::Thread::sleep(100);
+      }
+      matchedEdges.clear();
+
+      std::vector<RegInfo*> new_info(memberImages.size());
+      for (int i = 0; i < memberImages.size(); i++){
+        new_info[i] = memberImages[i].first->regInfo;
+      }
+
+      std::map<long, long> frameIndexToSystemIndex;
+      std::map<long, long> systemIndexToFrameIndex;
+
+      Mat A;
+      Mat xpr;
+      Mat ypr;
+      Mat xac;
+      Mat yac;
+
+      self_reset();
+      rebuild_DT_elementwise(new_info, true, false);
+      build_system_from_DT(systemIndexToFrameIndex,frameIndexToSystemIndex,A,xpr,ypr,xac,yac);
+
+      auto testValBefore = norm(A * xac - xpr);
+      //solve problem for x and y
+      std::map<long, long> temp;
+
+      coopers_conjugate_gradient2(A, xpr, xac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, ypr,0);
+      coopers_conjugate_gradient2(A, ypr, yac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, xpr,1);
+
+      auto testValAfter = norm(A * xac - xpr);
+
+      self_reset();
+      parent->update_observers();
+      parent->reg_results_mutex->readLock();
+      std::vector<RegInfo*> newinfo;
+      newinfo.push_back(parent->get_registration(memberImages[0].first->index));
+      double xDiff,yDiff;
+      double xDiffMax = 0;
+      double yDiffMax = 0;
+      for (auto [i, elm]: systemIndexToFrameIndex) {
+        auto ri = parent->get_registration(systemIndexToFrameIndex[i]);
+
+        xDiff = abs(ri->absoluteCoords.x - xac.at<double>(i));
+        if(xDiff > xDiffMax){
+          xDiffMax = xDiff;
+        }
+
+        yDiff = abs(ri->absoluteCoords.y - yac.at<double>(i));
+        if(yDiff > yDiffMax){
+          yDiffMax = yDiff;
+        }
+
+        //ri->absoluteCoords.x = xac.at<double>(i);
+        //ri->absoluteCoords.y = yac.at<double>(i);
+
+        newinfo.push_back(ri);
+      }
+
+      parent->reg_results_mutex->unlock();
+
+      update(newinfo);
+
+      int k = 0;
+
+      return;
+
+
+    }
+    else if (flag == 0) {
+
       //collect list of all edges.
       std::vector<Vec4f> edges;
       std::vector<Vec2i> verticePairs;
@@ -1025,7 +1221,6 @@ namespace pathCam {
       //this mutex is locked here because each job created in the following loop needs this mutex to be read locked.
       //They will not cause a reallocation because these images have already had initial matches, meaning the match
       //matrix has already been resized to accommodate them. Its unlocked at end of loop
-      parent->resize_mmatch_mutex->readLock();
 
       //collect list of all vertices that share an edge
       int count = 0;
@@ -1070,7 +1265,7 @@ namespace pathCam {
     while (matchableCount > 0) {
       Poco::Thread::sleep(100);
     }
-    parent->resize_mmatch_mutex->unlock();
+
 
 
     //give each frame index a linear system index.
@@ -1084,14 +1279,14 @@ namespace pathCam {
         matchedEdges.erase(matchedEdges.begin() + i);
         continue;
       }
-      if (matchedEdges[i].first != 0) {
+      if (matchedEdges[i].first != memberImages[0].first->index) {
         if (frameIndexToSystemIndex.find(matchedEdges[i].first) == frameIndexToSystemIndex.end()) {
           long val = frameIndexToSystemIndex.size();
           frameIndexToSystemIndex[matchedEdges[i].first] = val;
           systemIndexToFrameIndex[val] = matchedEdges[i].first;
         }
       }
-      if (matchedEdges[i].second != 0) {
+      if (matchedEdges[i].second != memberImages[0].first->index) {
         long val = frameIndexToSystemIndex.size();
         if (frameIndexToSystemIndex.find(matchedEdges[i].second) == frameIndexToSystemIndex.end()) {
           frameIndexToSystemIndex[matchedEdges[i].second] = val;
@@ -1113,6 +1308,7 @@ namespace pathCam {
     Mat yprLP = ypr.clone();
 
     double valtest1 = 0;
+    unsigned long ind1, ind2;
     std::vector<int> bins1;
     for (int i = 0; i < matchedEdges.size(); i++) {
       //build system (A in Ax - b)
@@ -1141,6 +1337,8 @@ namespace pathCam {
 
       if (val > valtest1) {
         valtest1 = val;
+        ind1 = matchedEdges[i].first;
+        ind2 = matchedEdges[i].second;
       }
       if (val > 35) {
         int k = 0;
@@ -1183,36 +1381,12 @@ namespace pathCam {
     //solve problem for x and y
     std::map<long, long> temp;
 
-    coopers_conjugate_gradient(A, xpr, xac, 400, 0.0000001, false, systemIndexToFrameIndex, 0.05, ypr);
-    coopers_conjugate_gradient(A, ypr, yac, 400, 0.0000001, false, systemIndexToFrameIndex, 0.05, xpr);
+    coopers_conjugate_gradient(A, xpr, xac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, ypr);
+    coopers_conjugate_gradient(A, ypr, yac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, xpr);
 
     auto testValAfter = norm(A * xac - xpr);
     int k = 0;
     /*
-    //for debug, test for change in error
-    double valtest2 = 0;
-    std::vector<int> bins2;
-    for (int i = 0; i < matchedEdges.size(); i++) {
-      auto pwr = parent->matchM.match[matchedEdges[i].first][matchedEdges[i].second];
-      Vec2 verify1;
-      verify1.x = xac.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
-      verify1.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
-
-      Vec2 verify2;
-      verify2.x = xac.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
-      verify2.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
-      double val = abs(verify1.x - verify2.x - pwr->t_x);
-      if (val > valtest2) {
-        valtest2 = val;
-      }
-      if ((int) val >= bins2.size()) {
-        bins2.resize((int) val + 1, 0);
-        bins2[(int) val] = 1;
-      } else {
-        bins2[(int) val]++;
-      }
-
-    }
 
  //compute LP problem to minimize inf norm instead of 2 norm
     Mat c = Mat::zeros(A.cols + 1, 1, CV_64FC1);
@@ -1239,34 +1413,6 @@ namespace pathCam {
     ypr.copyTo(hy(Rect(0,ypr.rows,1,ypr.rows)));
     hy(Rect(0,ypr.rows,1,ypr.rows)) *= -1;
 
-
-
-
-    double valtest3 = 0;
-    std::vector<int> bins3;
-    for (int i = 0; i < matchedEdges.size(); i++) {
-      auto pwr = parent->matchM.match[matchedEdges[i].first][matchedEdges[i].second];
-      Vec2 verify1;
-      verify1.x = xLP.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
-      verify1.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].first]);
-
-      Vec2 verify2;
-      verify2.x = xLP.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
-      verify2.y = yac.at<double>(frameIndexToSystemIndex[matchedEdges[i].second]);
-      double val = abs(verify1.x - verify2.x - pwr->t_x);
-      if (val > valtest3) {
-        valtest3 = val;
-      }
-
-      if ((int) val >= bins3.size()) {
-        bins3.resize((int) val + 1, 0);
-        bins3[(int) val] = 1;
-      } else {
-        bins3[(int) val]++;
-      }
-
-
-    }
 */
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -1281,49 +1427,41 @@ namespace pathCam {
     }
     parent->reg_results_mutex->unlock();
 
-//    update(newinfo);
-    rebuild_DT_elementwise(newinfo);
-    create_and_submit_rebuild_jobs();
+    update(newinfo);
+    //rebuild_DT_elementwise(newinfo, false);
+//    create_and_submit_rebuild_jobs();
 
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << duration.count() << std::endl;
-
+    needsAlignment = false;
   }
 
+  void CompositeVoronoi::coopers_conjugate_gradient2(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
+                                                     bool shouldCleanData,
+                                                     std::map<long, long> &systemIndexToFrameIndex,
+                                                     double epsilonClean, cv::Mat bOther, int flag) {
+    int maxNumberRemoved = systemIndexToFrameIndex.size() / 4;
 
-  void CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
-                                                    bool shouldCleanData,
-                                                    std::map<long, long> &systemIndexToFrameIndex, double epsilonClean,
-                                                    cv::Mat bOther) {
     std::vector<long> indexesRemoved;
     cv::Mat ATranspose = A.t();
     cv::Mat ATA = ATranspose * A;
-    cv::Mat ATb = ATranspose * b;
 
-    cv::Mat r = ATb - (ATA * x);
+    cv::Mat r = ATranspose * b - (ATA * x);
     cv::Mat p = r.clone();
     double n0 = cv::norm(A * x - b);
     double n1;
+
+    int removeCount = 0;
     for (int i = 0; i < steps; i++) {
 
       double rdr = r.dot(r);
       Mat ATAp = ATA * p;
       double stepSize = rdr / (p.dot(ATAp));
 
-//      std::cout << "x before" << std::endl;
-//      for (int i = 0; i < x.rows; i++) {
-//        std::cout << std::to_string(x.at<double>(i)) << std::endl;
-//      }
       x += stepSize * p;
-//      std::cout << std::endl;
 
-//      std::cout << "x after" << std::endl;
-//      for (int i = 0; i < x.rows; i++) {
-//        std::cout << std::to_string(x.at<double>(i)) << std::endl;
-//      }
-//      std::cout << std::endl;
       n1 = cv::norm(A * x - b);
 
       r -= stepSize * ATAp;
@@ -1333,9 +1471,119 @@ namespace pathCam {
       std::cout << "step " + std::to_string(i) + "   norm difference " + std::to_string(abs(n0 - n1)) +
                    "   norm of residual " + std::to_string(abs(n1)) << std::endl;
 
-      if (shouldCleanData && abs(n0 - n1) < cv::norm(n1) * epsilonClean) {
+      if (removeCount < maxNumberRemoved && shouldCleanData && abs(n0 - n1) < cv::norm(n1) * epsilonClean) {
+        removeCount++;
+
+        clean_data(A, b, bOther, x, systemIndexToFrameIndex);
+
+        std::vector<RegInfo*> new_info(systemIndexToFrameIndex.size() + 1);
+        new_info[0] = parent->get_registration(memberImages[0].first->index);
+        double diffmax = 0;
+        int ii = 1;
+        for(auto el : systemIndexToFrameIndex){
+          auto ni = parent->get_registration(el.second);
+          auto val = x.at<double>(el.first);
+          new_info[ii] = ni;
+          double diff;
+          if(flag == 0){//change x
+            diff = abs(new_info[ii]->absoluteCoords.x - val);
+            new_info[ii]->absoluteCoords.x = val;
+          }else{//change y
+            diff = abs(new_info[ii]->absoluteCoords.y - val);
+            new_info[ii]->absoluteCoords.y = val;
+          }
+          if(diff > diffmax){
+            diffmax = diff;
+          }
+          ii++;
+        }
+
+        //reset everything and rebuild
+        systemIndexToFrameIndex.clear();
+        auto f2s = systemIndexToFrameIndex;
+
+        A.release();
+        b.release();
+        x.release();
+        bOther.release();
+        Mat xOther;
+
+        self_reset();
+
+        rebuild_DT_elementwise(new_info, true, false);
+        build_system_from_DT(systemIndexToFrameIndex,f2s,A,b,bOther,x,xOther);
+
+        ATA = A.t() * A;
+        r = A.t() * b - (ATA * x);
+        p = r.clone();
+      }
+
+      if (abs(n0 - n1) < epsilon || n1 < epsilon) {
+        std::vector<RegInfo*> new_info(systemIndexToFrameIndex.size() + 1);
+        new_info[0] = parent->get_registration(memberImages[0].first->index);
+        double diffmax = 0;
+        int ii = 1;
+        for(auto el : systemIndexToFrameIndex){
+          auto ni = parent->get_registration(el.second);
+          auto val = x.at<double>(el.first);
+          new_info[ii] = ni;
+          double diff;
+          if(flag == 0){//change x
+            diff = abs(new_info[ii]->absoluteCoords.x - val);
+            new_info[ii]->absoluteCoords.x = val;
+          }else{//change y
+            diff = abs(new_info[ii]->absoluteCoords.y - val);
+            new_info[ii]->absoluteCoords.y = val;
+          }
+          if(diff > diffmax){
+            diffmax = diff;
+          }
+          ii++;
+        }
+        break;
+      }
+
+      n0 = n1;
+    }
+  }
 
 
+  void CompositeVoronoi::coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
+                                                    bool shouldCleanData,
+                                                    std::map<long, long> &systemIndexToFrameIndex, double epsilonClean,
+                                                    cv::Mat bOther) {
+    int maxNumberRemoved = systemIndexToFrameIndex.size() / 4;
+
+    std::vector<long> indexesRemoved;
+    cv::Mat ATranspose = A.t();
+    cv::Mat ATA = ATranspose * A;
+    cv::Mat ATb = ATranspose * b;
+
+    cv::Mat r = ATb - (ATA * x);
+    cv::Mat p = r.clone();
+    double n0 = cv::norm(A * x - b);
+    double n1;
+
+    int removeCount = 0;
+    for (int i = 0; i < steps; i++) {
+
+      double rdr = r.dot(r);
+      Mat ATAp = ATA * p;
+      double stepSize = rdr / (p.dot(ATAp));
+
+      x += stepSize * p;
+
+      n1 = cv::norm(A * x - b);
+
+      r -= stepSize * ATAp;
+      double adjustment = r.dot(r) / rdr;
+      p = r + adjustment * p;
+
+      std::cout << "step " + std::to_string(i) + "   norm difference " + std::to_string(abs(n0 - n1)) +
+                   "   norm of residual " + std::to_string(abs(n1)) << std::endl;
+
+      if (removeCount < maxNumberRemoved && shouldCleanData && abs(n0 - n1) < cv::norm(n1) * epsilonClean) {
+        removeCount++;
         clean_data(A, b, bOther, x, systemIndexToFrameIndex);
         ATA = A.t() * A;
         r = A.t() * b - (ATA * x);

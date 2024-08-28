@@ -10,10 +10,10 @@
 
 namespace pathCam {
 
-  bool RegInfo::get_abc(pathCam::RegInfo *caller, pathCam::Vec2 &_absoluteCoords, unsigned int& _componentMembership) {
+  bool RegInfo::get_abc(pathCam::RegInfo *caller, pathCam::Vec2 &_absoluteCoords, unsigned int &_componentMembership) {
     accessMutex->lock();
 
-    if (resolved){
+    if (resolved) {
       _absoluteCoords = absoluteCoords;
       _componentMembership = component_membership;
       accessMutex->unlock();
@@ -32,35 +32,38 @@ namespace pathCam {
     resolved = true;
     accessMutex->unlock();
 
-    if(!root) {
+    auto image = parent->get_image_ref(index);
+    image->regInfo = this;
+
+    if (!root) {
       parent->push_compositeQ(this);
     }
 
-    for (auto cw : callersWaiting){
-    auto theirRelCoords = cw->relativeCoords;
-    Vec2 theirAbCs;
-    theirAbCs.x = theirRelCoords.x + absoluteCoords.x;
-    theirAbCs.y = theirRelCoords.y + absoluteCoords.y;
-    cw->set_abc(theirAbCs, component_membership);
+    for (auto cw: callersWaiting) {
+      auto theirRelCoords = cw->relativeCoords;
+      Vec2 theirAbCs;
+      theirAbCs.x = theirRelCoords.x + absoluteCoords.x;
+      theirAbCs.y = theirRelCoords.y + absoluteCoords.y;
+      cw->set_abc(theirAbCs, component_membership);
     }
 
-    for (auto el : componentCallersWaiting){
+    for (auto el: componentCallersWaiting) {
       double myScale;
       Point2f myOffset;
-      while(!parent->get_scale_and_offset(component_membership,myScale,myOffset)){
+      while (!parent->get_scale_and_offset(component_membership, myScale, myOffset)) {
         Poco::Thread::sleep(50);
       }
 
       auto theirScale = (el.second->H.at<double>(0, 0) + el.second->H.at<double>(1, 1)) / 2.0;
-      auto theirOffset = Point2f((el.second->t_x / theirScale + absoluteCoords.x + myOffset.x) / theirScale ,
-                            (el.second->t_y / theirScale + absoluteCoords.y + myOffset.y) / theirScale) ;
+      auto theirOffset = Point2f((el.second->t_x / theirScale + absoluteCoords.x + myOffset.x) / theirScale,
+                                 (el.second->t_y / theirScale + absoluteCoords.y + myOffset.y) / theirScale);
       parent->set_scale_and_offset(el.first, theirScale * myScale, theirOffset);
     }
 
   }
 
-  void RegInfo::set_waiting_component(unsigned int componentIndex, Match* m) {
-    componentCallersWaiting.push_back({componentIndex,m});
+  void RegInfo::set_waiting_component(unsigned int componentIndex, Match *m) {
+    componentCallersWaiting.push_back({componentIndex, m});
   }
 
   int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type, int requiredGoodMatches, int flag,
