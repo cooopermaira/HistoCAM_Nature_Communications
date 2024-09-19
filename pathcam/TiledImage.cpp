@@ -323,6 +323,48 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
   return box_tiles;
 }
 
+void TiledImage::saveBaseTilesToDisk() {
+  int minx = 0;
+  int miny = 0;
+  for (int x = tiles.minX; x < tiles.minX + tiles.width; x++){
+    for (int y = tiles.minY; y < tiles.minY + tiles.width; y++){
+      if (tiles(x,y) != nullptr){
+        if(x < minx){
+          minx = x;
+        }
+        if(y < miny){
+          miny = y;
+        }
+      }
+    }
+  }
+
+  for (int x = tiles.minX; x < tiles.minX + tiles.width; x++){
+    for (int y = tiles.minY; y < tiles.minY + tiles.width; y++){
+      if (tiles(x,y) != nullptr){
+        assert(tile_size % 256 == 0);
+        for (int i = 0; i < pow(tile_size / 256,2); i++){
+          int xsubtile = i % (tile_size / 256);
+          int ysubtile = i / (tile_size / 256);
+          auto roi = Rect(256 * xsubtile,256 * ysubtile, 256,256);
+
+          int xloc = (x - minx) * (int)tile_size + xsubtile * 256;
+          int yloc = (y - miny) * (int)tile_size + ysubtile * 256;
+
+          Mat temp = *tiles(x,y);
+          Mat gry;
+          cvtColor(temp(roi),gry,COLOR_BGR2GRAY);
+          if (countNonZero(gry) > 0.95 * 256 * 256){
+            std::string filename = std::to_string(xloc)+"x_"+std::to_string(yloc)+"y.png";
+            cv::imwrite(filename, temp(roi));
+          }
+        }
+
+      }
+    }
+  }
+}
+
 Mat TiledImage::getTile(int x, int y) {
   makeTile(x, y);
   return *tiles(x, y);

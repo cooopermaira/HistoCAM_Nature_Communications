@@ -21,7 +21,7 @@ namespace pathCam {
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
 
     circleMask = cv::Mat::zeros(image_size, CV_8U);
-    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius, cv::Scalar(255),
+    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2 ), parent->scope_radius, cv::Scalar(255),
                -1);
 
     channels.resize(2);
@@ -128,6 +128,9 @@ namespace pathCam {
       auto img = parent->get_image_ref((*ni).index);
       img->absoluteCoords = ni->absoluteCoords;
       auto res = add_point_to_delaunay_triangulation(fShift, img, face, forceAdd);
+
+      update_Bbox_no_composite({ni});
+      expand_subdiv({ni});
       freshMask.copyTo(polyMaskOutput);
     }
   }
@@ -164,7 +167,7 @@ namespace pathCam {
       int nonzeroMin;
       if (_image->label == Image::_2X) {
         polyMaskOutput = polyMaskOutput.mul(circleMask);
-        nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.20;
+        nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.10;
       } else {
         nonzeroMin = _image->width * _image->height * 0.1;
       }
@@ -265,6 +268,7 @@ namespace pathCam {
         images[i]->readyImage.release();
         continue;
       }
+
       images[i]->vertexId = res;
       images[i]->absoluteCoords = new_info[i]->absoluteCoords;
 
@@ -288,11 +292,10 @@ namespace pathCam {
           auto center = Point2i(image_size.width / 2, image_size.height / 2);
           auto bb = Rect(center.x - parent->scope_radius - 10, center.y - parent->scope_radius - 10,
                          2 * parent->scope_radius + 20, 2 * parent->scope_radius + 20);
-          cv::divide(threeChannelPreallocated(bb), flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
+          cv::divide(threeChannelPreallocated(bb), parent->flat_field2X(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
         }
         else if (images[i]->label == Image::_4X){
-          flat_field = parent->flat_field4X;
-          divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1, CV_8U);
+          divide(threeChannelPreallocated, parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
         }
         channels[0] = threeChannelPreallocated; //3 channel
       }
@@ -399,6 +402,7 @@ namespace pathCam {
     }
   }
 
+
   void CompositeVoronoi::save_pyramid_as_image() {
     auto rootoffsetPoint = Point2f(root_offset.x, root_offset.y);
     auto maxOffsetPoint = Point2f(max_offset.x, max_offset.y);
@@ -433,6 +437,8 @@ namespace pathCam {
     //imwrite(path, pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
     imwrite(path,pyramidImage);
   }
+
+
 
   void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo*> new_info) {
 
@@ -1381,8 +1387,8 @@ namespace pathCam {
     //solve problem for x and y
     std::map<long, long> temp;
 
-    coopers_conjugate_gradient(A, xpr, xac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, ypr);
-    coopers_conjugate_gradient(A, ypr, yac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, xpr);
+    coopers_conjugate_gradient(A, xpr, xac, 10000, 0.0000001, false, systemIndexToFrameIndex, 0.005, ypr);
+    coopers_conjugate_gradient(A, ypr, yac, 10000, 0.0000001, false, systemIndexToFrameIndex, 0.005, xpr);
 
     auto testValAfter = norm(A * xac - xpr);
     int k = 0;
@@ -1427,9 +1433,9 @@ namespace pathCam {
     }
     parent->reg_results_mutex->unlock();
 
-    update(newinfo);
-    //rebuild_DT_elementwise(newinfo, false);
-//    create_and_submit_rebuild_jobs();
+    //update(newinfo);
+    rebuild_DT_elementwise(newinfo, true,false);
+    create_and_submit_rebuild_jobs();
 
 
     auto stop = std::chrono::high_resolution_clock::now();

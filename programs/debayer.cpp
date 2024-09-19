@@ -51,8 +51,8 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 }
 
 int main(int argc, char *argv[]) {
-  auto renameFiles = false;
-  auto convertImages = false;
+  auto renameFiles = true;
+  auto convertImages = true;
   bool makeInput = true;
 
   Mat flat_field;
@@ -78,8 +78,8 @@ int main(int argc, char *argv[]) {
     std::vector<double> *blur = new std::vector<double>;
     std::vector<std::string> *names = new std::vector<std::string>;
 
-    blur->resize(3000, 0);
-    names->resize(3000);
+    blur->resize(5000, 0);
+    names->resize(5000);
 
     std::cout << "Processing Directories\n";
     auto jq = pathCam::JobQueue(10, 10);
@@ -102,10 +102,12 @@ int main(int argc, char *argv[]) {
       }
       ++it;
     }
-    std::sort(images.begin(), images.end(), customComparator);
 
+    if(renameFiles || makeInput) {
+      std::sort(images.begin(), images.end(), customComparator2);
+    }
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/raw_aug7/input.txt";
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/S16_4747_4AT/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -115,6 +117,7 @@ int main(int argc, char *argv[]) {
           std::string newName = std::to_string(i) + ".Raw";
           Poco::Path newfilepath = Poco::Path(argv[1]);
           newfilepath.setFileName(newName);
+          images[i]->set_disk_file(newfilepath);
           currentFile.renameTo(newfilepath.toString());
           if (makeInput) {
             outputFile << newfilepath.toString() << std::endl;
@@ -133,9 +136,14 @@ int main(int argc, char *argv[]) {
       }
     }
     outputFile.close();
+
+    auto start = std::chrono::high_resolution_clock::now();
     while (!jq.is_empty()) {
       jq.run_jobs(false);
     }
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    std::cout << duration.count() << std::endl;
     int k = 0;
 
 

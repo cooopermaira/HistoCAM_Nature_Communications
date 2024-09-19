@@ -31,7 +31,7 @@ namespace pathCam {
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)){
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(10, 10);
+    JobQ = new JobQueue(5, 5);
 //    reg_results.resize(1);
 //    reg_results[0] = new RegInfo(this, true, Vec2(0, 0), true, 0);
 //    reg_results[0]->index = 0;

@@ -67,34 +67,29 @@ namespace pathCam {
       std::cout << "Issue loading image.\n";
       return;
     }
-//    auto val = image->check_blur();
-//    blur->at(sort_order) = val;
-//    names->at(sort_order) = image->get_ImageFile().getFileName();
+    auto val = image->check_blur();
+    blur->at(sort_order) = val;
+    names->at(sort_order) = image->get_ImageFile().getFileName();
 
     if(convertAndSave) {
     //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
     cv::Size image_size(image->width, image->height);
     Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+    Mat mat2 = image_Mat.clone();
 
 
-      cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+      cvtColor(mat2, mat2, COLOR_BayerBG2BGR);
       //cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
-
-//    Ptr<xphoto::WhiteBalancer> wb = xphoto::createSimpleWB();
-//    float p = 0.40;
-//    dynamic_cast<xphoto::SimpleWB*>(wb.get())->setInputMin(val);
-//    dynamic_cast<xphoto::SimpleWB*>(wb.get())->setInputMin(1.f - p);
-//    wb->balanceWhite(image_Mat,image_Mat);
-
-      image->free_memory_RAW();
 
       Poco::Path o = outfile;
       o.append(image->image_file.getFileName());
       o.setExtension("png");
 
 
-      imwrite(o.toString(), image_Mat);
+      imwrite(o.toString(), mat2);
+
     }
+    image->free_memory_RAW();
     int k = 0;
   }
 }

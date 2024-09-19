@@ -165,7 +165,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         std::string temp = pConf->getString("io.flat_field_images.twoX");
         flat_field_file_2x = Path(temp);
         
-        if(flat_field_file_2x.getExtension() != "png" && flat_field_file_2x.getExtension() != "tif"){
+        if(flat_field_file_2x.getExtension() != "png" && flat_field_file_2x.getExtension() != "tif" && flat_field_file_2x.getExtension() != "tiff"){
           logger->warning("Only PNG or TIF outputs supported. No image output.");
           flat_field_file_2x = Path();
         }

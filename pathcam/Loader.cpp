@@ -23,12 +23,14 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
-    if(image->check_blur() < 100){
-      successful = true;
-      parent->loaderCount--;
-      jobComplete.set();
-      return;
-    }
+
+//    if(image->check_blur() < 100){
+//      successful = true;
+//      parent->loaderCount--;
+//      image->free_memory_RAW();
+//      jobComplete.set();
+//      return;
+//    }
 
     image->find_label();
 
@@ -55,7 +57,7 @@ namespace pathCam {
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
-      //image->build_whitebalance_Mat(parent);
+      image->build_whitebalance_Mat(parent);
 
 
 
@@ -95,6 +97,8 @@ namespace pathCam {
         image->label = Image::_LOWFEAT;
         parent->loaderCount--;
         jobComplete.set();
+        image->release_reg_image();
+        image->free_memory_RAW();
         return;
       }
 

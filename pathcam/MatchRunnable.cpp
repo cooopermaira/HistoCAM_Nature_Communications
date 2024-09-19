@@ -170,7 +170,7 @@ namespace pathCam {
       }
       if (result == 1) {
 
-        if (std::abs(m->t_x) < image->width / 1.5 && std::abs(m->t_y) < image->height / 1.5) {
+        if (std::abs(m->t_x) < image->width / 1 && std::abs(m->t_y) < image->height / 1) {
 
           parent->set_match(image_idx, prev_idx, m);
 

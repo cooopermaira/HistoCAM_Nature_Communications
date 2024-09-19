@@ -97,8 +97,7 @@ namespace pathCam {
 
 
 
-
-//    perform_global_alignment();
+    perform_global_alignment();
     rebuildJobsComplete.wait();
     save_components_to_disk();
     parent->compositing = false;
@@ -112,7 +111,7 @@ namespace pathCam {
 
   void CompositeManager::save_components_to_disk() {
     for (auto i: parent->composites) {
-      i->save_pyramid_as_image();
+      i->imagePyramid->level[0]->saveBaseTilesToDisk();
     }
   }
 
@@ -126,8 +125,8 @@ namespace pathCam {
 
   void CompositeManager::decrement_rebuild_jobs_outstanding() {
     rebuildJobsOutstanding--;
+    parent->update_observers();
     if(rebuildJobsOutstanding == 0){
-      parent->update_observers();
       rebuildJobsComplete.set();
     }
   }
@@ -145,32 +144,59 @@ namespace pathCam {
   void RebuildRunnable::run() {
     auto image = composite->parent->get_image_ref(imageIndex);
     image->load_raw_from_disk();
-    Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+    image->build_whitebalance_Mat(composite->parent);
+
+    std::vector<Mat> channels(2);
     Mat3b threeChannelPreallocated;
     Mat4b fourChannelPreallocated;
 
+    if(image->readyImage.data){
+      channels[0] = image->readyImage;
+    }else{
+
+    Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+
+
     cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+
+
+
+
+    channels[0] = threeChannelPreallocated; //3 channel
+    }
 
     image->free_memory_RAW();
 
-    std::vector<Mat> channels(2);
-    channels[0] = threeChannelPreallocated; //3 channel
-    Mat tile_mask = Mat::zeros(image->height,image->width,CV_8U);
-
     if (image->label == Image::_2X) {//flat field correction if needed
-      auto center = Point2i(composite->image_size.width / 2, composite->image_size.height / 2);
-      auto bb = Rect(center.x - composite->parent->scope_radius - 10, center.y - composite->parent->scope_radius - 10,
-                     2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
-      cv::divide(threeChannelPreallocated(bb), composite->flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
-
+      if(!image->readyImage.data){
+        auto center = Point2i(composite->image_size.width / 2, composite->image_size.height / 2);
+        auto bb = Rect(center.x - composite->parent->scope_radius - 10, center.y - composite->parent->scope_radius - 10,
+    2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
+        cv::divide(threeChannelPreallocated(bb), composite->flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
+      }
       channels[1] = composite->circleMask * 255;           //alpha channel
-    }else{
+
+    }else if(image->label == Image::_4X){
+      if(!image->readyImage.data){
+        divide(threeChannelPreallocated, composite->parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
+      }
       channels[1] = Mat(image->height,image->width,CV_8U,Scalar(255));
+
+    }else{
+      //divide(threeChannelPreallocated, composite->parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
+      channels[1] = Mat(image->height,image->width,CV_8U,Scalar(255));
+
     }
+
     merge(channels, fourChannelPreallocated);
+
     auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
-    //composite->imagePyramid->level[0]->inserTileAtBase(fourChannelPreallocated, tile_mask, imageBox, center_in_poly_mask);
     composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated,imageBox,rebuildTiles);
+
+    if(image->readyImage.data){
+      image->readyImage.release();
+    }
+
     cm->decrement_rebuild_jobs_outstanding();
   }
 

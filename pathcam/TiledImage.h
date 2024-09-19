@@ -40,9 +40,11 @@ public:
     return data[getIndex(x, y)];
   }
 
-private:
-  std::vector<T> data;
   int minX, minY, width, height;
+
+  private:
+  std::vector<T> data;
+
 
   inline int64_t getIndex(int x, int y) const {
     assert(x >= minX && x < minX + width);
@@ -95,6 +97,8 @@ public:
   void inserTileAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
 
   void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
+
+  void saveBaseTilesToDisk();
 
   Mat getTile(int x, int y);
 
