@@ -79,7 +79,7 @@ namespace pathCam {
 
 
       cvtColor(mat2, mat2, COLOR_BayerBG2BGR);
-      //cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
+      cv::divide(mat2, flatfield, mat2, 1.0, CV_8U);
 
       Poco::Path o = outfile;
       o.append(image->image_file.getFileName());

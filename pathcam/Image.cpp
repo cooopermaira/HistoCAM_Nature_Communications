@@ -95,12 +95,13 @@ namespace pathCam {
     if (label == _2X){
       flat_field = parent->flat_field2X;
       divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
-      adj = Mat3f(height, width, Vec3f(0.92, 1.08, 0.92));
-      Mat locations = gry > 240;
+      adj = Mat3f(height, width, Vec3f(0.92, 1.0, 0.92));
+      Mat locations = gry > 230;
       image_Mat.copyTo(sbt, locations);
       image_Mat -= sbt;
       cv::multiply(sbt, adj, sbt, 1, CV_8U);
       image_Mat += sbt;
+      imwrite("test3.png",image_Mat);
     }else if(label == _4X){
       flat_field = parent->flat_field4X;
       divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
@@ -169,6 +170,7 @@ namespace pathCam {
   }
 
   bool Image::is_2x() {
+    return true;
     if (!in_memory()) {
       throw std::invalid_argument("Image not in memory during 2x check");
     }
