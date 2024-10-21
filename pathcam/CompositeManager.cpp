@@ -111,7 +111,8 @@ namespace pathCam {
 
   void CompositeManager::save_components_to_disk() {
     for (auto i: parent->composites) {
-      i->imagePyramid->level[0]->saveBaseTilesToDisk();
+      //i->imagePyramid->level[0]->saveBaseTilesToDisk();
+        i->save_pyramid_as_image();
     }
   }
 
@@ -144,7 +145,7 @@ namespace pathCam {
   void RebuildRunnable::run() {
     auto image = composite->parent->get_image_ref(imageIndex);
     image->load_raw_from_disk();
-    image->build_whitebalance_Mat(composite->parent);
+    //image->build_whitebalance_Mat(composite->parent);
 
     std::vector<Mat> channels(2);
     Mat3b threeChannelPreallocated;

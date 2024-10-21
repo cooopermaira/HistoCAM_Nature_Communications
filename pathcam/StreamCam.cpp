@@ -31,7 +31,7 @@ namespace pathCam {
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)){
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(5, 5);
+    JobQ = new JobQueue(1, 1);
 //    reg_results.resize(1);
 //    reg_results[0] = new RegInfo(this, true, Vec2(0, 0), true, 0);
 //    reg_results[0]->index = 0;
@@ -39,11 +39,35 @@ namespace pathCam {
 
     lastFrame = Rect(0,0,image_width,image_height);
 
-    flat_field2X = cv::imread(flat_field_file_2x.toString());
+    
+    if (flat_field_file_2x.getExtension() == "Raw") {
+        char* buffer = new char[6464 * 4852];
+        std::ifstream stream;
+        stream.open(flat_field_file_2x.toString(), std::ios::binary);
+        stream.read(buffer, 6464 * 4852);
+        flat_field2X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
+        cvtColor(flat_field2X, flat_field2X, COLOR_BayerBG2BGR);
+        delete buffer;
+    }
+    else {
+        flat_field2X = cv::imread(flat_field_file_2x.toString());
+    }
+
     flat_field2X.convertTo(flat_field2X, CV_32F);
     flat_field2X *= 1 / 170.0;
 
-    flat_field4X = cv::imread(flat_field_file_4x.toString());
+    if (flat_field_file_4x.getExtension() == "Raw") {
+        char* buffer = new char[6464 * 4852];
+        std::ifstream stream;
+        stream.open(flat_field_file_4x.toString(), std::ios::binary);
+        stream.read(buffer, 6464 * 4852);
+        flat_field4X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
+        cvtColor(flat_field4X, flat_field4X, COLOR_BayerBG2BGR);
+        delete buffer;
+    }
+    else {
+        flat_field4X = cv::imread(flat_field_file_4x.toString());
+    }
     flat_field4X.convertTo(flat_field4X,CV_32F);
     flat_field4X *= 1 / 170.0;
 

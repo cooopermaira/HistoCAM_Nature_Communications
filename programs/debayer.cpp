@@ -44,6 +44,7 @@ bool customComparator2(const pathCam::Image *lhs, const pathCam::Image *rhs) {
   return lhsVal < rhsVal;
 }
 
+
 bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
   unsigned long lhsVal = extractSortableValue(lhs->image_file.getFileName());
   unsigned long rhsVal = extractSortableValue(rhs->image_file.getFileName());
@@ -56,7 +57,15 @@ int main(int argc, char *argv[]) {
   bool makeInput = true;
 
   Mat flat_field;
-  flat_field = cv::imread("/Users/coopermaira/Desktop/pathcam_data/2x_wb.tif");
+  //flat_field = cv::imread("D:/saturation_test/ff_debayer/2x_raw-10072024111413-0.Raw");
+  std::ifstream stream;
+  stream.open("D:/saturation_test/ff_debayer/2x_raw-10072024111413-0.Raw", std::ios::binary);
+  //stream.open("D:/4x_scan/10x_calibration.Raw", std::ios::binary);
+  char* raw_buffer = new char[6464 * 4852];
+  stream.read(raw_buffer, 6464*4852);
+  stream.close();
+  flat_field = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
+  cvtColor(flat_field, flat_field, COLOR_BayerBG2BGR);
   flat_field.convertTo(flat_field, CV_32F);
   flat_field *= 1 / 170.0;
   //Should probably add fancier command line parsing
@@ -107,7 +116,7 @@ int main(int argc, char *argv[]) {
       std::sort(images.begin(), images.end(), customComparator2);
     }
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/S16_4747_4AT/input.txt";
+    std::string outputfilepath = "D:/figure_10_21/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -139,7 +148,7 @@ int main(int argc, char *argv[]) {
 
     auto start = std::chrono::high_resolution_clock::now();
     while (!jq.is_empty()) {
-      jq.run_jobs(false);
+      jq.run_jobs(true);
     }
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);

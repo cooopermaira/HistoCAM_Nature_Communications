@@ -76,10 +76,11 @@ namespace pathCam {
     cv::Size image_size(image->width, image->height);
     Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
     Mat mat2 = image_Mat.clone();
-
+ 
 
       cvtColor(mat2, mat2, COLOR_BayerBG2BGR);
-      //cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
+      //imwrite("test.png", mat2);
+      cv::divide(mat2, flatfield, mat2, 1.0, CV_8U);
 
       Poco::Path o = outfile;
       o.append(image->image_file.getFileName());
