@@ -24,7 +24,8 @@ namespace pathCam {
       return;
     }
 
-    if(image->check_blur() < 200){
+
+    if(image->check_blur() < 100){
       successful = true;
       parent->loaderCount--;
       image->free_memory_RAW();

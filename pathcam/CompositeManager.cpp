@@ -112,7 +112,9 @@ namespace pathCam {
   void CompositeManager::save_components_to_disk() {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
+
       i->save_pyramid_as_image();
+
     }
   }
 

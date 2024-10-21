@@ -165,8 +165,8 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
         std::string temp = pConf->getString("io.flat_field_images.twoX");
         flat_field_file_2x = Path(temp);
         
-        if(flat_field_file_2x.getExtension() != "png" && flat_field_file_2x.getExtension() != "tif" && flat_field_file_2x.getExtension() != "tiff"){
-          logger->warning("Only PNG or TIF outputs supported. No image output.");
+        if(flat_field_file_2x.getExtension() != "png" && flat_field_file_2x.getExtension() != "tif" && flat_field_file_2x.getExtension() != "tiff" && flat_field_file_2x.getExtension() != "Raw") {
+          logger->warning("Only PNG, TIF or Raw formats supported. No image output.");
           flat_field_file_2x = Path();
         }
       }
@@ -174,8 +174,8 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       {
         std::string temp = pConf->getString("io.flat_field_images.fourX");
         flat_field_file_4x = Path(temp);
-        if(flat_field_file_4x.getExtension() != "png" && flat_field_file_4x.getExtension() != "tiff"){
-          logger->warning("Only PNG or TIF outputs supported. No image output.");
+        if(flat_field_file_4x.getExtension() != "png" && flat_field_file_4x.getExtension() != "tiff" && flat_field_file_4x.getExtension() != "Raw") {
+          logger->warning("Only PNG, Raw, or TIF outputs supported. No image output.");
           flat_field_file_4x = Path();
         }
       }

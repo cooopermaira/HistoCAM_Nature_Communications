@@ -224,11 +224,14 @@ namespace pathCam {
     buffer_mutex.unlock();
   }
   */
+
 /*
     if (is_mostly_black()) {
       label = _UNDEREXP;
       return;
     }*/
+      label = _2X;
+      return;
     if (is_2x()) {
       label = _2X;
       return;

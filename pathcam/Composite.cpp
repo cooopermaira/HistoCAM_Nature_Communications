@@ -21,7 +21,7 @@ namespace pathCam {
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
 
     circleMask = cv::Mat::zeros(image_size, CV_8U);
-    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2 ), parent->scope_radius, cv::Scalar(255),
+    cv::circle(circleMask, cv::Point(image_size.width / 2 + 85, image_size.height / 2 - 55), parent->scope_radius-100, cv::Scalar(255),
                -1);
 
     channels.resize(2);
