@@ -102,6 +102,9 @@ namespace pathCam {
 
     Mat flat_field2X;
     Mat flat_field4X;
+    Mat flat_field10X;
+    Mat flat_field20X;
+    Mat circleMask;
 
     std::shared_ptr<MRTiledImageSet> MRimage;
 
@@ -114,6 +117,10 @@ namespace pathCam {
     bool run();
 
     bool spin_run();
+
+    bool has_flatfield(int label);
+
+    Mat get_flatfield(int label);
 
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle);
 
@@ -146,7 +153,7 @@ namespace pathCam {
       }
     }
 
-  protected:
+  public:
     unsigned int increment_and_get_components() { return components++; }
 
     void add_image(Image *image, unsigned long index);

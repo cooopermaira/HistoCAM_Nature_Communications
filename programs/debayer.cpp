@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
   Mat flat_field;
   std::ifstream stream;
-  stream.open("/Users/coopermaira/Desktop/pathcam_data/2x.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/20x/cal/20x_cal.Raw", std::ios::binary);
 
   char* raw_buffer = new char[6464 * 4852];
   stream.read(raw_buffer, 6464*4852);
@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
       std::sort(images.begin(), images.end(), customComparator2);
     }
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/S_6080_15_3P1/input.txt";
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/2_20_comp_png/input20x.txt";
 
     std::ofstream outputFile(outputfilepath);
 
