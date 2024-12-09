@@ -154,7 +154,9 @@ namespace pathCam {
     std::vector<unsigned long> adjacentVerts;
     if(delaunayMembers.size() > 2){
 
-      int firstEdge = subdiv.vtx[vertxId].firstEdge;
+      //int firstEdge = subdiv.vtx[vertxId].firstEdge;
+      int firstEdge = -1;
+      subdiv.getVertex(vertxId, &firstEdge);
       int nextEdge = firstEdge;
       do {
         nextEdge = subdiv.nextEdge(nextEdge);

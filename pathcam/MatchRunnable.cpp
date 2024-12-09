@@ -174,9 +174,9 @@ namespace pathCam {
           tempReg->matchedTo = prev_idx;
           tempReg->relativeCoords.x = -1 * m->t_x;
           tempReg->relativeCoords.y = -1 * m->t_y;
-          auto newAbC = Vec2(tempReg->relativeCoords.x + previous->absoluteCoords.x,tempReg->relativeCoords.y + previous->absoluteCoords.y);
-          if(abs(tempReg->absoluteCoords.x - newAbC.x) > 100 || abs(tempReg->absoluteCoords.y - newAbC.y) > 100){
-            parent->composites[image->component_membership]->save_pyramid_as_image("20x.png");
+          auto newAbC = Vec2(tempReg->relativeCoords.x + previous->regInfo->absoluteCoords.x,tempReg->relativeCoords.y + previous->regInfo->absoluteCoords.y);
+          if(abs(tempReg->absoluteCoords.x - newAbC.x) > 300 || abs(tempReg->absoluteCoords.y - newAbC.y) > 300){
+            //parent->composites[image->component_membership]->save_pyramid_as_image("20x.png");
             int k = 0;
           }
           tempReg->accessMutex->unlock();

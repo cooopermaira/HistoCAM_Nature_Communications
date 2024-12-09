@@ -280,7 +280,7 @@ namespace pathCam {
       label = _UNDEREXP;
       return;
     }*/
-    label = _20X;
+    label = _2X;
     return;
     if (is_2x()) {
       label = _2X;
