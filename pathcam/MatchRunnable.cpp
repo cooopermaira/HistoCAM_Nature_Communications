@@ -13,6 +13,12 @@ namespace pathCam {
                                                                              parent(parent),
                                                                              image_idx(image_idx){};
 
+  ReverseMatchRunnable::ReverseMatchRunnable(pathCam::StreamCam *parent, unsigned long image_idx,
+                                             unsigned long start_from_idx) : RunnableIntermediate(image_idx, 2),
+                                                                             parent(parent),
+                                                                             image_idx(image_idx),
+                                                                             start_from_idx(start_from_idx){};
+
   void XCompRunnable::extract_multilevel_keypoints(pathCam::Image *image) {
 
     auto *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
@@ -120,6 +126,85 @@ namespace pathCam {
     }
   }
 
+  void ReverseMatchRunnable::run() {
+    pathCam::Image *image = parent->get_image_ref(image_idx);
+
+    if (!image->is_good()) {
+      return;
+    }
+
+    //pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
+    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
+        cv::DescriptorMatcher::MatcherType::BRUTEFORCE);
+    pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
+    int mostMatches = 0;
+    long bestMatch = -1;
+    bool tryWaiting = true;
+    std::vector<unsigned int> skipComponents;
+
+
+    for (unsigned long prev_idx = start_from_idx; prev_idx < image_idx; prev_idx++) {
+      pathCam::Image *previous = parent->get_image_ref(prev_idx);
+
+      if (previous == nullptr) {
+        continue;
+      }
+
+      if (!previous->is_good()) { continue; }
+
+      Match *m = new Match(previous, image);
+      matcher->match(m);
+
+      int result = motion_est->findHomography(m, parent->estimator_type, 20, 0);
+
+      if (m->good_matches.size() > mostMatches) {
+        mostMatches = m->good_matches.size();
+        bestMatch = prev_idx;
+      }
+      if (result == 1) {
+
+        if (std::abs(m->t_x) < image->width / 1 && std::abs(m->t_y) < image->height / 1) {
+
+          parent->set_match(image_idx, prev_idx, m);
+
+          auto tempReg = parent->get_registration(image_idx);
+          tempReg->accessMutex->lock();
+          tempReg->index = image_idx;
+          tempReg->root = false;
+          tempReg->matchedTo = prev_idx;
+          tempReg->relativeCoords.x = -1 * m->t_x;
+          tempReg->relativeCoords.y = -1 * m->t_y;
+          auto newAbC = Vec2(tempReg->relativeCoords.x + previous->absoluteCoords.x,tempReg->relativeCoords.y + previous->absoluteCoords.y);
+          if(abs(tempReg->absoluteCoords.x - newAbC.x) > 100 || abs(tempReg->absoluteCoords.y - newAbC.y) > 100){
+            parent->composites[image->component_membership]->save_pyramid_as_image("20x.png");
+            int k = 0;
+          }
+          tempReg->accessMutex->unlock();
+
+          successful = true;
+          break;
+        } else {
+          parent->resize_mmatch_mutex->readLock();
+          parent->matchM.match[prev_idx][image_idx] = nullptr;
+          parent->resize_mmatch_mutex->unlock();
+        }
+      } else {
+        // if(result == -1 || result == -2){
+        parent->resize_mmatch_mutex->readLock();
+        parent->matchM.match[prev_idx][image_idx] = nullptr;
+        parent->resize_mmatch_mutex->unlock();
+
+      }
+      delete m;
+    }
+
+
+    delete matcher;
+    delete motion_est;
+    parent->composites[image->component_membership]->notify_job_complete();
+    jobComplete.set();
+  } //end run
+
   void MatchRunnable::run() {
     pathCam::Image *image = parent->get_image_ref(image_idx);
 
@@ -163,7 +248,7 @@ namespace pathCam {
       Match *m = new Match(previous, image);
       matcher->match(m);
 
-      int result = motion_est->findHomography(m, parent->estimator_type, 10, 0);
+      int result = motion_est->findHomography(m, parent->estimator_type, 20, 0);
 
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
@@ -230,8 +315,8 @@ namespace pathCam {
     int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
 
     if (result == 1) {
-      if (std::abs(m->t_x) < image1->width / 2 && std::abs(
-          m->t_y) < image1->height / 2) {
+      if (std::abs(m->t_x) < float(parent->scope_radius / 1.2) && std::abs(
+          m->t_y) < float(parent->scope_radius / 1.2)) {
         parent->resize_mmatch_mutex->writeLock();
         parent->matchM.match[image_idx1][image_idx2] = new Match(m);
         parent->resize_mmatch_mutex->unlock();

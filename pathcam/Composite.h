@@ -74,6 +74,8 @@ namespace pathCam {
     friend class CompositeManager;
     friend class RebuildRunnable;
   private:
+    unsigned long lastAcceptedImageIndex;
+    Vec2 lastAcceptedImageAbC;
     Mat circleMask;
     Mat polyMaskOutput;
     Mat freshMask;
@@ -109,8 +111,6 @@ namespace pathCam {
 
     void reset_image_as_polygon();
 
-    void save_pyramid_as_image();
-
     void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
 
     void expand_subdiv(std::vector<RegInfo*> new_info);
@@ -120,6 +120,9 @@ namespace pathCam {
     void exclude_for_blur();
 
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
+                                            std::vector<Point2i> &_face, bool _forceAdd);
+
+    int add_point_to_delaunay_triangulation_with_adjustment(cv::Point2f _point, pathCam::Image *_image,
                                             std::vector<Point2i> &_face, bool _forceAdd);
     
     void coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon, bool shouldCleanData, std::map<long, long>& systemIndexToFrameIndex, double epsilonClean = 0, cv::Mat bOther = cv::Mat());
@@ -155,13 +158,14 @@ namespace pathCam {
 
     std::map<std::string,int> tileToSumNonZero;
     bool rebuildTile(Point2i tile,int sum);
+    void notify_job_complete();
+    void save_pyramid_as_image(std::string _fileName);
 
   protected:
     std::priority_queue<unsigned int> freeMasks;
     std::vector<Mat> masks;
     std::vector<Mat> threeChanPreals;
     std::vector<Mat> fourChanPreals;
-    void notify_job_complete();
     int removeCount = 0;
   };
 }

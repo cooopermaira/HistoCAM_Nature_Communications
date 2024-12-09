@@ -81,6 +81,55 @@ namespace pathCam {
     return blurVariance;
   }
 
+  void Image::correct_registration(std::vector<unsigned long> adjacentVerts) {
+    if(adjacentVerts.size() > 0){
+      //pulling parent reference from odd place, could be passed as parameter
+      auto parent = regInfo->parent;
+      for (int i = 0; i < adjacentVerts.size(); i++){
+        parent->composites[component_membership]->matchableCount++;
+        parent->composites[component_membership]->matchedEdges.resize(adjacentVerts.size(),{-1,-1});
+        auto sm = new SingleMatchRunnable(parent,index,adjacentVerts[i],component_membership,i,0);
+        parent->JobQ->add_runnable(sm);
+      }
+      //wait until these jobs have completed
+      while (parent->composites[component_membership]->matchableCount > 0) {
+        Poco::Thread::sleep(40);
+      }
+      auto adjustedAbC = Vec2(0,0);
+      std::vector<Vec2> calcedAbC,calcedOffset,calcedReg;
+      std::vector<unsigned long> adjacentVertsKeep;
+      int count = 0;
+      for (auto i : parent->composites[component_membership]->matchedEdges){
+        if(i.first > -1){
+          auto pwr = parent->matchM.match[i.first][i.second];
+          auto theirReg = parent->get_registration(i.second);
+          adjustedAbC.x += pwr->t_x + theirReg->absoluteCoords.x;
+          adjustedAbC.y += pwr->t_y + theirReg->absoluteCoords.y;
+
+          //debug vectors
+          adjacentVertsKeep.push_back(i.second);
+          calcedReg.push_back(Vec2(theirReg->absoluteCoords.x,theirReg->absoluteCoords.y));
+          calcedOffset.push_back(Vec2(pwr->t_x,pwr->t_y));
+          calcedAbC.push_back(Vec2(pwr->t_x + theirReg->absoluteCoords.x,pwr->t_y + theirReg->absoluteCoords.y));
+          count++;
+        }
+      }
+      if (count == 0){return;}
+      adjustedAbC.x /= double(count);
+      adjustedAbC.y /= double(count);
+      if(adjacentVerts.size()>24){
+        int k = 0;
+      }
+      if(abs(adjustedAbC.x - regInfo->absoluteCoords.x) > 50 || abs(adjustedAbC.y - regInfo->absoluteCoords.y) > 100){
+        int k = 0;
+      }
+      parent->composites[component_membership]->matchedEdges.clear();
+      regInfo->set_abc(adjustedAbC,component_membership,false);
+    }else {
+      regInfo->attempt_absolute_reg(false);
+    }
+  }
+
   void Image::build_whitebalance_Mat(StreamCam* parent) {
     Mat flat_field;
 
@@ -136,6 +185,7 @@ namespace pathCam {
   }
 
   bool Image::is_4x() {
+
     if (!in_memory()) {
       throw std::invalid_argument("Image not in memory during 4x check");
     }
@@ -170,7 +220,7 @@ namespace pathCam {
   }
 
   bool Image::is_2x() {
-    return true;
+    //return true;
     if (!in_memory()) {
       throw std::invalid_argument("Image not in memory during 2x check");
     }
@@ -230,8 +280,8 @@ namespace pathCam {
       label = _UNDEREXP;
       return;
     }*/
-      label = _2X;
-      return;
+    label = _20X;
+    return;
     if (is_2x()) {
       label = _2X;
       return;

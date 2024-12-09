@@ -10,7 +10,7 @@
 namespace pathCam {
   void LoaderLogicRunnable::run() {
 
-
+    image->parent = parent;
     if (!image->in_memory()) {
       image->load_raw_from_disk();
     }
@@ -55,6 +55,7 @@ namespace pathCam {
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
+
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
@@ -145,6 +146,11 @@ namespace pathCam {
       detector->detect(image->get_reg_image(), *points);
       extractor->compute( image->get_reg_image(), *points, descriptors  );
     }else{
+      if(image->label == Image::_2X){
+        detector->detectAndCompute(image->get_reg_image(),
+                                   image->parent->circleMask, *points,
+                                   descriptors );
+      }
       detector->detectAndCompute(image->get_reg_image(),
                                  noArray(), *points,
                                  descriptors );

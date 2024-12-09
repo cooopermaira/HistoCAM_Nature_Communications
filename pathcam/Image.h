@@ -10,6 +10,7 @@ namespace pathCam {
   class StreamCam;
   class Image {
   public:
+    StreamCam* parent;
     RegInfo* regInfo;
     double blurVariance;
     unsigned int width, height;
@@ -20,7 +21,7 @@ namespace pathCam {
     double reg_scale_initial,reg_scale_full;
     double reg_crop_initial,reg_crop_full;
     enum {
-      _NOLABEL = 0, _2X, _4X, _10x, _20x, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _LENS_CHANGE
+      _NOLABEL = 0, _2X, _4X, _10X, _20X, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _LENS_CHANGE
     };
     unsigned int label;
     int vertexId;
@@ -47,6 +48,8 @@ namespace pathCam {
     void set_disk_file(Poco::Path _image_file) {
       image_file = _image_file;
     }
+
+    void correct_registration(std::vector<unsigned long> adjacentVerts);
 
     void build_whitebalance_Mat(StreamCam* parent);
 
@@ -95,8 +98,11 @@ namespace pathCam {
         case _4X:
           return "4x";
           break;
-        case _10x:
+        case _10X:
           return "10x";
+          break;
+        case _20X:
+          return "20x";
           break;
         case _40X:
           return "40x";

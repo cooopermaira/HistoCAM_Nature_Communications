@@ -31,14 +31,16 @@ namespace pathCam {
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)){
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(1, 1);
+    JobQ = new JobQueue(10, 10);
 //    reg_results.resize(1);
 //    reg_results[0] = new RegInfo(this, true, Vec2(0, 0), true, 0);
 //    reg_results[0]->index = 0;
 //    reg_results[0]->resolved = false;
 
-    lastFrame = Rect(0,0,image_width,image_height);
-
+    //lastFrame = Rect(0,0,image_width,image_height);
+    circleMask = cv::Mat::zeros(image_height,image_width, CV_8U);
+    cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
+               -1);
     
     if (flat_field_file_2x.getExtension() == "Raw") {
         char* buffer = new char[6464 * 4852];
@@ -57,19 +59,50 @@ namespace pathCam {
     flat_field2X *= 1 / 170.0;
 
     if (flat_field_file_4x.getExtension() == "Raw") {
+      char* buffer = new char[6464 * 4852];
+      std::ifstream stream;
+      stream.open(flat_field_file_4x.toString(), std::ios::binary);
+      stream.read(buffer, 6464 * 4852);
+      flat_field4X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
+      cvtColor(flat_field4X, flat_field4X, COLOR_BayerBG2BGR);
+      delete buffer;
+    }
+    else {
+      flat_field4X = cv::imread(flat_field_file_4x.toString());
+    }
+
+    flat_field4X.convertTo(flat_field4X, CV_32F);
+    flat_field4X *= 1 / 170.0;
+
+    if (flat_field_file_10x.getExtension() == "Raw") {
         char* buffer = new char[6464 * 4852];
         std::ifstream stream;
-        stream.open(flat_field_file_4x.toString(), std::ios::binary);
+        stream.open(flat_field_file_10x.toString(), std::ios::binary);
         stream.read(buffer, 6464 * 4852);
-        flat_field4X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
-        cvtColor(flat_field4X, flat_field4X, COLOR_BayerBG2BGR);
+        flat_field10X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
+        cvtColor(flat_field10X, flat_field10X, COLOR_BayerBG2BGR);
         delete buffer;
     }
     else {
-        flat_field4X = cv::imread(flat_field_file_4x.toString());
+        flat_field10X = cv::imread(flat_field_file_10x.toString());
     }
-    flat_field4X.convertTo(flat_field4X,CV_32F);
-    flat_field4X *= 1 / 170.0;
+    flat_field10X.convertTo(flat_field10X,CV_32F);
+    flat_field10X *= 1 / 170.0;
+
+    if (flat_field_file_20x.getExtension() == "Raw") {
+      char* buffer = new char[6464 * 4852];
+      std::ifstream stream;
+      stream.open(flat_field_file_20x.toString(), std::ios::binary);
+      stream.read(buffer, 6464 * 4852);
+      flat_field20X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
+      cvtColor(flat_field20X, flat_field20X, COLOR_BayerBG2BGR);
+      delete buffer;
+    }
+    else {
+      flat_field20X = cv::imread(flat_field_file_20x.toString());
+    }
+    flat_field20X.convertTo(flat_field20X,CV_32F);
+    flat_field20X *= 1 / 170.0;
 
   }
 
@@ -95,6 +128,25 @@ namespace pathCam {
     resize_mmatch_mutex->unlock();
   }
 
+  bool StreamCam::has_flatfield(int label) {
+    if (label == Image::_2X || label == Image::_4X || label == Image::_10X || Image::_20X){
+      return true;
+    }
+    return false;
+  }
+
+  Mat StreamCam::get_flatfield(int label) {
+    switch (label){
+      case Image::_2X:
+        return flat_field2X;
+      case Image::_4X:
+        return flat_field4X;
+      case Image::_10X:
+        return flat_field10X;
+      case Image::_20X:
+        return flat_field20X;
+    }
+  }
 
   bool StreamCam::spin_run() {
 
@@ -228,7 +280,7 @@ namespace pathCam {
     component_mutex->lock();
     composites.push_back(temp);
     if (composites.size() == 1) {
-      ri->set_abc(Vec2(0,0), component_index);
+      ri->set_abc(Vec2(0,0), component_index,true);
       set_scale_and_offset(0,1,Point2f(0, 0));
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));

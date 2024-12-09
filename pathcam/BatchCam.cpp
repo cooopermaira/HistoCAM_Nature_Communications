@@ -179,6 +179,24 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
           flat_field_file_4x = Path();
         }
       }
+      if(pConf->has("io.flat_field_images.tenX"))
+      {
+        std::string temp = pConf->getString("io.flat_field_images.tenX");
+        flat_field_file_10x = Path(temp);
+        if(flat_field_file_10x.getExtension() != "png" && flat_field_file_10x.getExtension() != "tiff" && flat_field_file_10x.getExtension() != "Raw") {
+          logger->warning("Only PNG, Raw, or TIF outputs supported. No image output.");
+          flat_field_file_10x = Path();
+        }
+      }
+      if(pConf->has("io.flat_field_images.twentyX"))
+      {
+        std::string temp = pConf->getString("io.flat_field_images.twentyX");
+        flat_field_file_20x = Path(temp);
+        if(flat_field_file_20x.getExtension() != "png" && flat_field_file_20x.getExtension() != "tiff" && flat_field_file_20x.getExtension() != "Raw") {
+          logger->warning("Only PNG, Raw, or TIF outputs supported. No image output.");
+          flat_field_file_20x = Path();
+        }
+      }
     }
     
   }else{
@@ -371,7 +389,7 @@ bool BatchCam::parseConfig(LayeredConfiguration::Ptr pConf){
       if (pConf->has("registration.image.scope_radius")) {
           unsigned int temp = scope_radius;
           try {
-              scope_radius = pConf->getUInt("registration.image.scope_radius");
+              scope_radius = pConf->getUInt("registration.image.scope_radius") - 100;
           }
           catch (std::string bad_input) {
               logger->warning("Bad input for scope radius: " + bad_input + ".");

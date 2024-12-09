@@ -44,9 +44,11 @@ public:
   successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),accessMutex(new Poco::FastMutex), parent(parent) {
   };
 
+  void attempt_absolute_reg(bool queue_for_compositing);
+
   bool get_abc(RegInfo* caller, Vec2& _absoluteCoords, unsigned int& _componentMembership);
 
-  void set_abc(Vec2 _absoluteCoords, unsigned int _componentMembership);
+  void set_abc(Vec2 _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing);
 
   void set_waiting_component(unsigned int componentIndex, Match* m);
   

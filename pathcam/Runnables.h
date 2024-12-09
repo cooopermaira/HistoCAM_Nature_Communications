@@ -214,6 +214,17 @@ namespace pathCam {
     void extract_multilevel_keypoints(Image *image);
   };
 
+  class ReverseMatchRunnable : public RunnableIntermediate {
+  private:
+    StreamCam *parent;
+    unsigned long image_idx;
+    unsigned long start_from_idx;
+
+  public:
+    ReverseMatchRunnable(StreamCam* parent, unsigned long image_idx, unsigned long start_from_idx);
+
+    virtual void run();
+  };
 
   class MatchRunnable : public RunnableIntermediate {
   private:

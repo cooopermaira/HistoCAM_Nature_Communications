@@ -97,8 +97,8 @@ namespace pathCam {
 
 
 
-    perform_global_alignment();
-    rebuildJobsComplete.wait();
+    //perform_global_alignment();
+    //rebuildJobsComplete.wait();
     save_components_to_disk();
     parent->compositing = false;
   }
@@ -113,7 +113,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image();
+      i->save_pyramid_as_image("");
 
     }
   }

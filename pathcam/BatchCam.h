@@ -20,7 +20,7 @@ class BatchCam{
   
   friend class PairRegRunnable;
   
-protected:
+public:
   std::vector <MemoryPool *> mempool;
   Poco::Logger *logger;
   Poco::Logger::Ptr results_logger;
@@ -31,6 +31,8 @@ protected:
   Poco::Path out_image;
   Poco::Path flat_field_file_2x;
   Poco::Path flat_field_file_4x;
+  Poco::Path flat_field_file_10x;
+  Poco::Path flat_field_file_20x;
 
 
   
