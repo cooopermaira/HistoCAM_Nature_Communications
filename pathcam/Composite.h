@@ -81,6 +81,7 @@ namespace pathCam {
     Mat freshMask;
     Mat3b threeChannelPreallocated;
     Mat4b fourChannelPreallocated;
+    Mat convertHolding;
     Subdiv2D subdiv;
     cv::Size image_size;
     std::vector<Mat> channels;
@@ -90,6 +91,7 @@ namespace pathCam {
     std::atomic<unsigned int> jobCount = 0;
     Bbox subdiv_Bbox;
     Poco::Event wakeEvent;
+    RegInfo* storedNewInfo;
 
     void check_set_render_info();
 
@@ -110,6 +112,8 @@ namespace pathCam {
     static void remove_duplicates_without_sort(std::vector<Point2i> &vec);
 
     void reset_image_as_polygon();
+
+    void debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon);
 
     void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
 
@@ -146,7 +150,11 @@ namespace pathCam {
     std::vector<std::pair<Image*, bool>> memberImages;
     std::map<int, unsigned long> delaunayMembers;
 
-    void update(std::vector<RegInfo*> new_info);
+    void store_new_info(RegInfo* _new_info);
+
+    void update_from_stored_info();
+
+    void update(std::vector<RegInfo*> _new_info);
 
     void update_Bbox_no_composite(std::vector<RegInfo*> new_info);
 
@@ -159,7 +167,7 @@ namespace pathCam {
     std::map<std::string,int> tileToSumNonZero;
     bool rebuildTile(Point2i tile,int sum);
     void notify_job_complete();
-    void save_pyramid_as_image(std::string _fileName);
+    void save_pyramid_as_image(std::string _fileName = "");
 
   protected:
     std::priority_queue<unsigned int> freeMasks;

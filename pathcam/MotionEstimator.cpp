@@ -50,7 +50,7 @@ namespace pathCam {
     auto image = parent->get_image_ref(index);
     image->regInfo = this;
 
-    if (!root && queue_for_compositing) {
+    if (queue_for_compositing) {
       parent->push_compositeQ(this);
     }
 

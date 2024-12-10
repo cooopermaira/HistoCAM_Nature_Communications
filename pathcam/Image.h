@@ -55,6 +55,8 @@ namespace pathCam {
 
     void load_raw_from_disk();
 
+    void manually_set_label();
+
     cv::Mat full_image_asMat();
 
     void increment_smart_pointer() { reference_count++; }

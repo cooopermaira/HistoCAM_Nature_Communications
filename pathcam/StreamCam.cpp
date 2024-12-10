@@ -284,12 +284,14 @@ namespace pathCam {
       set_scale_and_offset(0,1,Point2f(0, 0));
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
+      temp->update(std::vector<RegInfo*>{reg_results[image_index]});
     } else {
+      temp->store_new_info(ri);
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0, 0));
     }
     component_mutex->unlock();
-    temp->update(std::vector<RegInfo*>{reg_results[image_index]});
+
   }
 
   std::vector<Image *> StreamCam::get_component_image_refs(unsigned long component) {

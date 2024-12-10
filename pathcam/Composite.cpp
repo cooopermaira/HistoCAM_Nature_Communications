@@ -38,6 +38,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::update(std::vector<RegInfo*> new_info) {
+
     update_mutex->lock();
 
     if (new_info.size() > 1) {
@@ -51,6 +52,15 @@ namespace pathCam {
     add_images_no_composite(new_info);
 
     update_mutex->unlock();
+
+  }
+
+  void CompositeVoronoi::store_new_info(pathCam::RegInfo *_new_info) {
+    storedNewInfo = _new_info;
+  }
+
+  void CompositeVoronoi::update_from_stored_info() {
+    update({storedNewInfo});
   }
 
   void CompositeVoronoi::check_set_render_info() {
@@ -63,8 +73,8 @@ namespace pathCam {
         imagePyramid->set_scale(scale);
         imagePyramid->set_offset(offset);
 
-        auto firstReg = parent->get_registration(memberImages[0].first->index);
-        firstReg->set_abc(Vec2(0,0),componentIndex,true);
+        storedNewInfo->set_abc(Vec2(0,0),componentIndex,true);
+        //update_from_stored_info();
       }
     }
   }
@@ -215,6 +225,7 @@ namespace pathCam {
 
   int CompositeVoronoi::add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
                                                             std::vector<Point2i> &_face, bool _forceAdd) {
+    freshMask.copyTo(polyMaskOutput);
     //make copy of subdiv incase we decide not to use new point
     Subdiv2D tempSubdiv(subdiv);
 
@@ -266,6 +277,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo*> new_info) {
+
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
     for (int i = 0; i < new_info.size(); i++) {
@@ -275,22 +287,26 @@ namespace pathCam {
     bool update = false;
     for (int i = 0; i < images.size(); i++) {
 
-      if (pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x,2) + pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y,2) < pow(500,2)){
+      if (pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x,2) + pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y,2) < pow(1000,2)){
         memberImages.push_back({images[i],false});
         images[i]->readyImage.release();
         continue;
       }
 
-      if(!images[i]->regInfo->root) {
+      if(!memberImages.empty()) {
         //put in reverse match runnable
         auto rmr = new ReverseMatchRunnable(parent, images[i]->index, lastAcceptedImageIndex);
         jobCount++;
         parent->JobQ->add_runnable(rmr);
         wakeEvent.wait();
+        int k = 0;
+      }else{
+        //debug
+        int k = 0;
       }
 
       lastAcceptedImageIndex = images[i]->index;
-      lastAcceptedImageAbC = images[i]->regInfo->absoluteCoords;
+      lastAcceptedImageAbC = new_info[i]->absoluteCoords;
 
       //add point to delaunay triangulation
       std::vector<Point2i> face;
@@ -322,13 +338,22 @@ namespace pathCam {
         images[i]->free_memory_RAW();
         if (parent->has_flatfield(images[i]->label)){
           auto ff = parent->get_flatfield(images[i]->label);
-          divide(threeChannelPreallocated, ff, threeChannelPreallocated, 1, CV_8U);
+          divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
+          cv::pow(convertHolding,1.07, convertHolding);
+          convertHolding.convertTo(threeChannelPreallocated,CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
       }
 
       channels[1] = polyMaskOutput;           //alpha channel
       merge(channels, fourChannelPreallocated);
+
+      //debug
+      //debug_draw_voronoi_face(fourChannelPreallocated,face);
+      //imwrite(std::to_string(images[i]->index)+".png",fourChannelPreallocated);
+      //save_pyramid_as_image();
+
+
       images[i]->readyImage.release();
       //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
       int k = 0;
@@ -357,8 +382,9 @@ namespace pathCam {
 
       freshMask.copyTo(polyMaskOutput);
 
+
     }
-    /*
+
     if(imagePyramid->scale > 0 && update){
       float x = (imagePyramid->offset.x + images.back()->absoluteCoords.x) * imagePyramid->scale;
       float y = (imagePyramid->offset.y + images.back()->absoluteCoords.y) * imagePyramid->scale;
@@ -370,8 +396,21 @@ namespace pathCam {
       }
       parent->update_last_frame(Rect_<float>(x,y,w,h),showAsCircle);
     }
-     */
+
     parent->update_observers();
+  }
+
+  void CompositeVoronoi::debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon) {
+    for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
+
+      int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
+
+      if (maskAsPolygon[ii].x == maskAsPolygon[ii2].x && maskAsPolygon[ii].y == maskAsPolygon[ii2].y) {
+        continue;
+      }
+
+      cv::line(img, maskAsPolygon[ii], maskAsPolygon[ii2], Scalar(0, 0, 0, 255), 75);
+    }
   }
 
   void CompositeVoronoi::add_images_multithread(std::vector<RegInfo*> new_info) {

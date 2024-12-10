@@ -82,25 +82,25 @@ namespace pathCam {
   }
 
   void Image::correct_registration(std::vector<unsigned long> adjacentVerts) {
-    if(adjacentVerts.size() > 0){
+    if (adjacentVerts.size() > 0) {
       //pulling parent reference from odd place, could be passed as parameter
       auto parent = regInfo->parent;
-      for (int i = 0; i < adjacentVerts.size(); i++){
+      for (int i = 0; i < adjacentVerts.size(); i++) {
         parent->composites[component_membership]->matchableCount++;
-        parent->composites[component_membership]->matchedEdges.resize(adjacentVerts.size(),{-1,-1});
-        auto sm = new SingleMatchRunnable(parent,index,adjacentVerts[i],component_membership,i,0);
+        parent->composites[component_membership]->matchedEdges.resize(adjacentVerts.size(), {-1, -1});
+        auto sm = new SingleMatchRunnable(parent, index, adjacentVerts[i], component_membership, i, 0);
         parent->JobQ->add_runnable(sm);
       }
       //wait until these jobs have completed
       while (parent->composites[component_membership]->matchableCount > 0) {
         Poco::Thread::sleep(40);
       }
-      auto adjustedAbC = Vec2(0,0);
-      std::vector<Vec2> calcedAbC,calcedOffset,calcedReg;
+      auto adjustedAbC = Vec2(0, 0);
+      std::vector<Vec2> calcedAbC, calcedOffset, calcedReg;
       std::vector<unsigned long> adjacentVertsKeep;
       int count = 0;
-      for (auto i : parent->composites[component_membership]->matchedEdges){
-        if(i.first > -1){
+      for (auto i: parent->composites[component_membership]->matchedEdges) {
+        if (i.first > -1) {
           auto pwr = parent->matchM.match[i.first][i.second];
           auto theirReg = parent->get_registration(i.second);
           adjustedAbC.x += pwr->t_x + theirReg->absoluteCoords.x;
@@ -108,29 +108,29 @@ namespace pathCam {
 
           //debug vectors
           adjacentVertsKeep.push_back(i.second);
-          calcedReg.push_back(Vec2(theirReg->absoluteCoords.x,theirReg->absoluteCoords.y));
-          calcedOffset.push_back(Vec2(pwr->t_x,pwr->t_y));
-          calcedAbC.push_back(Vec2(pwr->t_x + theirReg->absoluteCoords.x,pwr->t_y + theirReg->absoluteCoords.y));
+          calcedReg.push_back(Vec2(theirReg->absoluteCoords.x, theirReg->absoluteCoords.y));
+          calcedOffset.push_back(Vec2(pwr->t_x, pwr->t_y));
+          calcedAbC.push_back(Vec2(pwr->t_x + theirReg->absoluteCoords.x, pwr->t_y + theirReg->absoluteCoords.y));
           count++;
         }
       }
-      if (count == 0){return;}
+      if (count == 0) { return; }
       adjustedAbC.x /= double(count);
       adjustedAbC.y /= double(count);
-      if(adjacentVerts.size()>24){
+      if (adjacentVerts.size() > 24) {
         int k = 0;
       }
-      if(abs(adjustedAbC.x - regInfo->absoluteCoords.x) > 50 || abs(adjustedAbC.y - regInfo->absoluteCoords.y) > 100){
+      if (abs(adjustedAbC.x - regInfo->absoluteCoords.x) > 50 || abs(adjustedAbC.y - regInfo->absoluteCoords.y) > 100) {
         int k = 0;
       }
       parent->composites[component_membership]->matchedEdges.clear();
-      regInfo->set_abc(adjustedAbC,component_membership,false);
-    }else {
+      regInfo->set_abc(adjustedAbC, component_membership, false);
+    } else {
       regInfo->attempt_absolute_reg(false);
     }
   }
 
-  void Image::build_whitebalance_Mat(StreamCam* parent) {
+  void Image::build_whitebalance_Mat(StreamCam *parent) {
     Mat flat_field;
 
     Mat image_Mat = cv::Mat(height, width, CV_8U, get_Raw(), Mat::AUTO_STEP);
@@ -141,7 +141,7 @@ namespace pathCam {
     cvtColor(image_Mat, gry, COLOR_BayerBG2GRAY);
     cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
 
-    if (label == _2X){
+    if (label == _2X) {
       flat_field = parent->flat_field2X;
       divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
       adj = Mat3f(height, width, Vec3f(0.92, 1.0, 0.92));
@@ -150,11 +150,11 @@ namespace pathCam {
       image_Mat -= sbt;
       cv::multiply(sbt, adj, sbt, 1, CV_8U);
       image_Mat += sbt;
-      imwrite("test3.png",image_Mat);
-    }else if(label == _4X){
+      imwrite("test3.png", image_Mat);
+    } else if (label == _4X) {
       flat_field = parent->flat_field4X;
       divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
-    }else{return;}
+    } else { return; }
 
     readyImage = image_Mat;
   }
@@ -250,37 +250,14 @@ namespace pathCam {
   }
 
   void Image::find_label() {
-    /*
-  Mat ROI;
-  if(!reg_image.empty()){
-    if(reg_image.cols < 64 || reg_image.rows < 64){
-      reg_image.copyTo(ROI);
-    }else{
-      Size ROI_size = Size(64,64);
-      cv::Rect ROIrect (reg_image.cols/2 - 32, reg_image.rows/2 - 32, 64, 64);
-      ROI = reg_image(ROIrect);
-    }
-  }else{
-    buffer_mutex.lock();
-    Size image_size = Size(width,height);
-    cv::Mat temp = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
-    unsigned int center_x = width/2;
-    center_x += center_x%2; //force it to be even
-    unsigned int center_y = height/2;
-    center_y += center_y%2; //force it to be even
-    cv::Rect ROIrect (center_x - 32, center_y - 32, 64, 64);
-    cv::Mat ROI = temp(ROIrect).clone();
-    cvtColor(ROI,ROI,COLOR_BayerBG2GRAY);
-    buffer_mutex.unlock();
-  }
-  */
+
 
 /*
     if (is_mostly_black()) {
       label = _UNDEREXP;
       return;
     }*/
-    label = _2X;
+    manually_set_label();
     return;
     if (is_2x()) {
       label = _2X;
@@ -308,11 +285,23 @@ namespace pathCam {
 
     find_label();
 
-    if (label == _2X || label == _4X){
+    if (label == _2X || label == _4X) {
       return blurVariance > 500.0;
     }
 
     return true;
+  }
+
+  void Image::manually_set_label() {
+    if (index < 413) {
+      label = Image::_2X;
+    } else if (index >= 413 && index < 777) {
+      label = Image::_4X;
+    } else if (index >= 777 && index < 1358){
+      label = Image::_10X;
+    }else{
+      label = Image::_20X;
+    }
   }
 
   cv::Mat Image::full_image_asMat() {

@@ -59,6 +59,9 @@ namespace pathCam {
   }
 
   void DebayerRunnable::run() {
+    Poco::Path o = outfile;
+    o.append(image->image_file.getFileName());
+    o.setExtension("png");
     image->load_raw_from_disk();
 
     bool convertAndSave = true;
@@ -80,9 +83,15 @@ namespace pathCam {
 
       cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
 
-      Poco::Path o = outfile;
-      o.append(image->image_file.getFileName());
-      o.setExtension("png");
+      imwrite(o.toString(),image_Mat);
+      image_Mat.convertTo(image_Mat,CV_32FC3);
+
+      cv::pow(image_Mat,1.1,image_Mat);
+
+      image_Mat.convertTo(image_Mat,CV_8UC3);
+
+
+
 
       imwrite(o.toString(),image_Mat);
     }

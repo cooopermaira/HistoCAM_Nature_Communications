@@ -175,6 +175,7 @@ namespace pathCam {
           tempReg->relativeCoords.x = -1 * m->t_x;
           tempReg->relativeCoords.y = -1 * m->t_y;
           auto newAbC = Vec2(tempReg->relativeCoords.x + previous->regInfo->absoluteCoords.x,tempReg->relativeCoords.y + previous->regInfo->absoluteCoords.y);
+          tempReg->absoluteCoords = newAbC;
           if(abs(tempReg->absoluteCoords.x - newAbC.x) > 300 || abs(tempReg->absoluteCoords.y - newAbC.y) > 300){
             //parent->composites[image->component_membership]->save_pyramid_as_image("20x.png");
             int k = 0;
@@ -201,7 +202,7 @@ namespace pathCam {
 
     delete matcher;
     delete motion_est;
-    parent->composites[image->component_membership]->notify_job_complete();
+    parent->composites[image->regInfo->component_membership]->notify_job_complete();
     jobComplete.set();
   } //end run
 
