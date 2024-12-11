@@ -105,6 +105,7 @@ namespace pathCam {
       }
 
       if(additionalSiftReg){
+        image->create_reg_image(1,1,parent->debayer,parent->interpolation,parent->real);
         pathCam::FeatureDetector *detector2 = new pathCam::FeatureDetector(7, parent->use_FREAK);
         detector2->detect_and_compute(image,1);
       }

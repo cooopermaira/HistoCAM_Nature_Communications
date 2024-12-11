@@ -97,7 +97,7 @@ namespace pathCam {
 
 
 
-    //perform_global_alignment();
+    perform_global_alignment();
     //rebuildJobsComplete.wait();
     save_components_to_disk();
     parent->compositing = false;

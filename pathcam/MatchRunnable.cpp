@@ -307,13 +307,13 @@ namespace pathCam {
     pathCam::Image *image1 = parent->get_image_ref(image_idx1);
     pathCam::Image *image2 = parent->get_image_ref(image_idx2);
 
-    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
+    auto matcher = new pathCam::DescriptorMatcher(cv::DescriptorMatcher::MatcherType::BRUTEFORCE);
 
-    pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
+    auto motion_est = new pathCam::MotionEstimator();
 
-    Match *m= new Match(image2, image1);
-    matcher->match(m);
-    int result = motion_est->findHomography(m, parent->estimator_type, 100, 0);
+    auto m = new Match(image2, image1);
+    matcher->match(m,1);
+    int result = motion_est->findHomography(m, parent->estimator_type, 100, 1);
 
     if (result == 1) {
       if (std::abs(m->t_x) < float(parent->scope_radius / 1.2) && std::abs(

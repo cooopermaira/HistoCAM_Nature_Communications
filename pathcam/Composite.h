@@ -99,7 +99,7 @@ namespace pathCam {
 
     void add_images_with_composite(std::vector<RegInfo*> new_info);
 
-    void add_images_no_composite(std::vector<RegInfo*> new_info);
+    void add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
 
     void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
 
@@ -113,7 +113,7 @@ namespace pathCam {
 
     void reset_image_as_polygon();
 
-    void debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon);
+    void debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon, int line_thickness);
 
     void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
 
@@ -154,7 +154,7 @@ namespace pathCam {
 
     void update_from_stored_info();
 
-    void update(std::vector<RegInfo*> _new_info);
+    void update(std::vector<RegInfo*> _new_info, bool _force_add = false);
 
     void update_Bbox_no_composite(std::vector<RegInfo*> new_info);
 

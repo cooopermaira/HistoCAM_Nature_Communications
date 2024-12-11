@@ -81,6 +81,8 @@ namespace pathCam {
     return blurVariance;
   }
 
+
+
   void Image::correct_registration(std::vector<unsigned long> adjacentVerts) {
     if (adjacentVerts.size() > 0) {
       //pulling parent reference from odd place, could be passed as parameter
@@ -257,7 +259,9 @@ namespace pathCam {
       label = _UNDEREXP;
       return;
     }*/
-    manually_set_label();
+
+    //manually_set_label();
+    label = _2X;
     return;
     if (is_2x()) {
       label = _2X;

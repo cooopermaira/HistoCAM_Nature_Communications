@@ -37,7 +37,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::update(std::vector<RegInfo*> new_info) {
+  void CompositeVoronoi::update(std::vector<RegInfo*> new_info, bool _force_add) {
 
     update_mutex->lock();
 
@@ -49,7 +49,7 @@ namespace pathCam {
 
     update_Bbox_no_composite(new_info);
     expand_subdiv(new_info);
-    add_images_no_composite(new_info);
+    add_images_no_composite(new_info, _force_add);
 
     update_mutex->unlock();
 
@@ -251,7 +251,7 @@ namespace pathCam {
     //build polygon mask for new point
     cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
 
-    if(!_forceAdd) {
+
       //test for exclusion of frame via rollback
       int nonzeroMin;
       if (_image->label == Image::_2X) {
@@ -261,14 +261,14 @@ namespace pathCam {
         nonzeroMin = _image->width * _image->height * 0.1;
       }
 
-      if (countNonZero(polyMaskOutput) <= nonzeroMin) {
+      if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
         //contributing less than x% of its pixels, revert and don't bother loading from disk
         subdiv = tempSubdiv;
         _image->free_memory_RAW();
         memberImages.push_back({_image, false});
         return -1;
       }
-    }
+
     _image->absoluteCoords = Vec2(_point.x,_point.y);
     memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
@@ -276,7 +276,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo*> new_info) {
+  void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add) {
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
@@ -287,13 +287,13 @@ namespace pathCam {
     bool update = false;
     for (int i = 0; i < images.size(); i++) {
 
-      if (pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x,2) + pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y,2) < pow(1000,2)){
+      if (!_force_add && pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x,2) + pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y,2) < pow(1000,2)){
         memberImages.push_back({images[i],false});
         images[i]->readyImage.release();
         continue;
       }
 
-      if(!memberImages.empty()) {
+      if(!memberImages.empty() && !_force_add) {
         //put in reverse match runnable
         auto rmr = new ReverseMatchRunnable(parent, images[i]->index, lastAcceptedImageIndex);
         jobCount++;
@@ -311,7 +311,7 @@ namespace pathCam {
       //add point to delaunay triangulation
       std::vector<Point2i> face;
       auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
-      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face, false);
+      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face, _force_add);
 
       //res is {vertexId,maskId}
       if (res == -1) {
@@ -339,7 +339,7 @@ namespace pathCam {
         if (parent->has_flatfield(images[i]->label)){
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
-          cv::pow(convertHolding,1.07, convertHolding);
+          cv::pow(convertHolding,1.09, convertHolding);
           convertHolding.convertTo(threeChannelPreallocated,CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
@@ -349,7 +349,7 @@ namespace pathCam {
       merge(channels, fourChannelPreallocated);
 
       //debug
-      //debug_draw_voronoi_face(fourChannelPreallocated,face);
+      //debug_draw_voronoi_face(fourChannelPreallocated, face, 2);
       //imwrite(std::to_string(images[i]->index)+".png",fourChannelPreallocated);
       //save_pyramid_as_image();
 
@@ -400,7 +400,7 @@ namespace pathCam {
     parent->update_observers();
   }
 
-  void CompositeVoronoi::debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon) {
+  void CompositeVoronoi::debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon, int line_thickness) {
     for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
 
       int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
@@ -409,7 +409,7 @@ namespace pathCam {
         continue;
       }
 
-      cv::line(img, maskAsPolygon[ii], maskAsPolygon[ii2], Scalar(0, 0, 0, 255), 75);
+      cv::line(img, maskAsPolygon[ii], maskAsPolygon[ii2], Scalar(0, 0, 0, 255), line_thickness);
     }
   }
 
@@ -1231,9 +1231,7 @@ namespace pathCam {
     //exclude_for_blur();
 
     //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
-    if(delaunayMembers.size() < 10){
-      return;
-    }
+
     if (!needsAlignment) {
       return;
     }
@@ -1556,10 +1554,12 @@ namespace pathCam {
 */
     auto start = std::chrono::high_resolution_clock::now();
 
-    self_reset();
+
     parent->update_observers();
     parent->reg_results_mutex->readLock();
     std::vector<RegInfo*> newinfo;
+
+    newinfo.push_back(memberImages[0].first->regInfo);
     for (auto [i, elm]: systemIndexToFrameIndex) {
       parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords.x = xac.at<double>(i);
       parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords.y = yac.at<double>(i);
@@ -1567,7 +1567,8 @@ namespace pathCam {
     }
     parent->reg_results_mutex->unlock();
 
-    update(newinfo);
+    self_reset();
+    update(newinfo,true);
     //rebuild_DT_elementwise(newinfo, true,false);
     //create_and_submit_rebuild_jobs();
 
