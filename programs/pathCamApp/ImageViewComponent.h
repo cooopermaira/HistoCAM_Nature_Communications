@@ -57,9 +57,11 @@ public:
 protected:
   std::shared_ptr< MRTiledImageSet > MRImage;
   
+  bool shade_levels;
+  
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
-  void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) override;
+  void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& fwheel) override;
   
   void scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart) override;
   void updateScrollbar();
