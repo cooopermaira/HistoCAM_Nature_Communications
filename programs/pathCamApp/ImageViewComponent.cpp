@@ -4,7 +4,7 @@
 //==============================================================================
 ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
                                        StringArray &iconNames,
-                                       OwnedArray<Drawable> &iconsFromZipFile) : MRImage(NULL), view(view) {
+                                       OwnedArray<Drawable> &iconsFromZipFile) : MRImage(NULL), view(view), shade_levels(false) {
 
     setOpaque(true); //telling juce that there is nothingi to render underneath
 
@@ -99,6 +99,11 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
         repaint();
         return true;  // Key press handled
     }
+    if (key == juce::KeyPress::createFromDescription("s")) {
+        shade_levels = !shade_levels;
+        repaint();
+        return true;  // Key press handled
+    }
     if (key.getKeyCode() == KeyPress::escapeKey) {
         JUCEApplication::getInstance()->systemRequestedQuit();
     }
@@ -141,6 +146,9 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
       bounds.expand(0.5, 0.5);
       tiles[t].bounds = RectJtoC <float> (bounds);
       if (tile.data) {
+        if(shade_levels){
+            //DO something
+        }
         juce::Image im = juce::Image(juce::Image::ARGB, tile.cols, tile.rows, true);
         juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
         
