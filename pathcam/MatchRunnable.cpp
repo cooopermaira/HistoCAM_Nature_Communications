@@ -215,7 +215,7 @@ namespace pathCam {
 
     //pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
     pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
-        cv::DescriptorMatcher::MatcherType::BRUTEFORCE);
+        parent->matcher_type);
     pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
     int mostMatches = 0;
     long bestMatch = -1;
@@ -249,13 +249,19 @@ namespace pathCam {
       Match *m = new Match(previous, image);
       matcher->match(m);
 
-      int result = motion_est->findHomography(m, parent->estimator_type, 20, 0);
+      int result = motion_est->findHomography(m, parent->estimator_type, 50, 0);
 
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
         bestMatch = prev_idx;
       }
+
       if (result == 1) {
+
+        //debug
+        if(image->index == 413){
+          int k = 0;
+        }
 
         if (std::abs(m->t_x) < image->width / 1 && std::abs(m->t_y) < image->height / 1) {
 

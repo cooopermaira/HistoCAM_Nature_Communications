@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x;
   std::ifstream stream;
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20_new/cal/2x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/2x/cal/2x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
   flat_field2x.convertTo(flat_field2x, CV_32F);
   flat_field2x *= 1 / 170.0;
 
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20_new/cal/4x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/4x/cal/4x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
   flat_field4x *= 1 / 170.0;
 
 
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20_new/cal/10x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/10x/cal/10x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
   flat_field10x.convertTo(flat_field10x, CV_32F);
   flat_field10x *= 1 / 170.0;
 
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20_new/cal/20x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/20x/cal/20x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);

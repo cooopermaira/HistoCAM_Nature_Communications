@@ -28,7 +28,6 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
     addChildComponent(horizontalScrollBar);
     addChildComponent(verticalScrollBar);
 
-
 }
 
 ImageViewComponent::~ImageViewComponent() {
@@ -146,15 +145,23 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
       bounds.expand(0.5, 0.5);
       tiles[t].bounds = RectJtoC <float> (bounds);
       if (tile.data) {
-        if(shade_levels){
-            //DO something
-        }
+
         juce::Image im = juce::Image(juce::Image::ARGB, tile.cols, tile.rows, true);
         juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
         
         jassert(tile.step == bitmap_data.lineStride);
-        memcpy(bitmap_data.data, tile.data, tile.cols*tile.rows*4);
-        
+
+        if(shade_levels){
+          if(!greenShade.data){
+            greenShade = Mat(tile.rows,tile.cols,CV_8UC4,cv::Scalar(0,255,0,255));
+          }
+          double beta = MRImage->images[i]->scale / 1.5;
+          cv::addWeighted(tile,beta,greenShade,1 - beta,0,holding,CV_8UC4);
+          memcpy(bitmap_data.data, holding.data, tile.cols*tile.rows*4);
+        }else {
+          memcpy(bitmap_data.data, tile.data, tile.cols * tile.rows * 4);
+        }
+
         g.drawImage(im, bounds);
       }
     }

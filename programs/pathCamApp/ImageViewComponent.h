@@ -117,7 +117,8 @@ private:
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
                                       juce::Colour colour1, juce::Colour colour2);
   
-  
+  cv::Mat greenShade;
+  cv::Mat holding;
   juce::Image checkerboard;
   
   juce::Point<int> imagePosition;

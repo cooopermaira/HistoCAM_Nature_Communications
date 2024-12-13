@@ -79,7 +79,7 @@ public:
     }
     
     if(points.size() > 2){
-      std::string area = Poco::format("%.0f mm^2", getArea()*1.73*0.001);
+      std::string area = Poco::format("%.0f mm^2", getArea()*pow(1.73*0.001,2));
       int text_width = g.getCurrentFont().getStringWidth(area);
       int text_height = g.getCurrentFont().getHeight();
       g.setColour (juce::Colours::black.withAlpha(0.4f));
