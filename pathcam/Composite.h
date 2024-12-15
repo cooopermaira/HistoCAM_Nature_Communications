@@ -77,6 +77,7 @@ namespace pathCam {
     unsigned long lastAcceptedImageIndex;
     Vec2 lastAcceptedImageAbC;
     Mat circleMask;
+    Mat rectMask;
     Mat polyMaskOutput;
     Mat freshMask;
     Mat3b threeChannelPreallocated;
@@ -105,9 +106,7 @@ namespace pathCam {
 
     void create_and_submit_rebuild_jobs();
 
-    void add_images_multithread(std::vector<RegInfo*> new_info);
-
-    void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord);
+    void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord, std::vector<Point2i> *additionalResult = {});
 
     static void remove_duplicates_without_sort(std::vector<Point2i> &vec);
 
@@ -170,6 +169,8 @@ namespace pathCam {
     void save_pyramid_as_image(std::string _fileName = "");
 
   protected:
+    //std::vector<std::pair<int,int>> falselyClaimedTiles;
+    std::vector<Point_<int>> falselyClaimedTiles;
     std::priority_queue<unsigned int> freeMasks;
     std::vector<Mat> masks;
     std::vector<Mat> threeChanPreals;

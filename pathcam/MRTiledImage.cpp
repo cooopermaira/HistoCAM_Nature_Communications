@@ -47,6 +47,11 @@ void MRTiledImage::build(cv::Mat &image_in){
 }
 */
 
+void MRTiledImage::insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
+                                    std::vector<Point2i> retileIndices) {
+  level[0]->insertTilesAtBase(image_in,mask,box,retileIndices);
+}
+
 void MRTiledImage::insertMat(cv::Mat &image_in, cv::Rect_<float> box){
     
   bounds = bounds | box;

@@ -261,7 +261,7 @@ namespace pathCam {
     }*/
 
     manually_set_label();
-    //label = _2X;
+    //label = _4X;
     return;
     if (is_2x()) {
       label = _2X;

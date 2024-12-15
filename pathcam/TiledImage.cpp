@@ -21,8 +21,8 @@ TiledImage::TiledImage(std::shared_ptr<MRTiledImage> parent, unsigned int tile_s
                                                        4096 * logicRatio),
                                                  parent(parent) {};
 
-void TiledImage::inserTileAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
-                                 std::vector<Point2i> retileIndices) {
+void TiledImage::insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
+                                  std::vector<Point2i> retileIndices) {
 
   unsigned int width = image_in.cols;
   unsigned int height = image_in.rows;
@@ -128,7 +128,12 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
 
       tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                          matROI.rows);
-      matROI.copyTo(temp(tileROI), mask(ROIrect));
+
+      if (mask.data) {
+        matROI.copyTo(temp(tileROI), mask(ROIrect));
+      }else{
+        matROI.copyTo(temp(tileROI));
+      }
 
       assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
     }

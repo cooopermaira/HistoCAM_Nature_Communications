@@ -27,6 +27,8 @@ public:
   ~MRTiledImage(){ level.clear(); };
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
+
+  void insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
   
   void build(cv::Mat &image_in);
 

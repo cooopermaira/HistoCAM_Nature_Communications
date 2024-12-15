@@ -58,6 +58,12 @@ protected:
   std::shared_ptr< MRTiledImageSet > MRImage;
   
   bool shade_levels;
+  cv::Mat greenShade;
+  cv::Mat holding1;
+  cv::Mat holding2;
+  cv::Mat channelHolding;
+  std::vector<cv::Mat> channels;
+
   
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
@@ -116,9 +122,7 @@ protected:
 private:
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
                                       juce::Colour colour1, juce::Colour colour2);
-  
-  cv::Mat greenShade;
-  cv::Mat holding;
+
   juce::Image checkerboard;
   
   juce::Point<int> imagePosition;

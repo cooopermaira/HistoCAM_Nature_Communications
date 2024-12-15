@@ -21,8 +21,11 @@ namespace pathCam {
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
 
     circleMask = cv::Mat::zeros(image_size, CV_8U);
-    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius, cv::Scalar(255),
+    cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
+               cv::Scalar(255),
                -1);
+
+    rectMask = Mat(image_size, CV_8U, cv::Scalar(255));
 
     channels.resize(2);
 
@@ -37,7 +40,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::update(std::vector<RegInfo*> new_info, bool _force_add) {
+  void CompositeVoronoi::update(std::vector<RegInfo *> new_info, bool _force_add) {
 
     update_mutex->lock();
 
@@ -64,16 +67,16 @@ namespace pathCam {
   }
 
   void CompositeVoronoi::check_set_render_info() {
-    if(imagePyramid->scale == 0){
+    if (imagePyramid->scale == 0) {
 
       double scale;
       Point2f offset;
-      if(parent->get_scale_and_offset(componentIndex,scale,offset)){
+      if (parent->get_scale_and_offset(componentIndex, scale, offset)) {
 
         imagePyramid->set_scale(scale);
         imagePyramid->set_offset(offset);
 
-        storedNewInfo->set_abc(Vec2(0,0),componentIndex,true);
+        storedNewInfo->set_abc(Vec2(0, 0), componentIndex, true);
         //update_from_stored_info();
       }
     }
@@ -92,7 +95,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::expand_subdiv(std::vector<RegInfo*> new_info) {
+  void CompositeVoronoi::expand_subdiv(std::vector<RegInfo *> new_info) {
     bool extend = false;
     if (root_offset.x < subdiv_Bbox.min_x) {
       extend = true;
@@ -156,13 +159,13 @@ namespace pathCam {
 
     //correct registration in case matchedTo was corrected at composite time
     _image->correct_registration({});
-    auto point = cv::Point2f(_image->regInfo->absoluteCoords.x,_image->regInfo->absoluteCoords.y);
+    auto point = cv::Point2f(_image->regInfo->absoluteCoords.x, _image->regInfo->absoluteCoords.y);
     //add new point
     int vertxId = subdiv.insert(point);
 
     //gather adjacent images for correcting _image registration
     std::vector<unsigned long> adjacentVerts;
-    if(delaunayMembers.size() > 2){
+    if (delaunayMembers.size() > 2) {
 
       //int firstEdge = subdiv.vtx[vertxId].firstEdge;
       int firstEdge = -1;
@@ -171,13 +174,13 @@ namespace pathCam {
       do {
         nextEdge = subdiv.nextEdge(nextEdge);
         auto val = delaunayMembers.find(subdiv.edgeDst(nextEdge));
-        if (val != delaunayMembers.end()){
+        if (val != delaunayMembers.end()) {
           adjacentVerts.push_back(val->second);
         }
-      } while(nextEdge != firstEdge);
+      } while (nextEdge != firstEdge);
       _image->correct_registration(adjacentVerts);
       subdiv = tempSubdiv;
-      point = cv::Point2f(_image->regInfo->absoluteCoords.x,_image->regInfo->absoluteCoords.y);
+      point = cv::Point2f(_image->regInfo->absoluteCoords.x, _image->regInfo->absoluteCoords.y);
       vertxId = subdiv.insert(point);
     }
 
@@ -199,7 +202,7 @@ namespace pathCam {
     //build polygon mask for new point
     cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
 
-    if(!_forceAdd) {
+    if (!_forceAdd) {
       //test for exclusion of frame via rollback
       int nonzeroMin;
       if (_image->label == Image::_2X) {
@@ -217,7 +220,7 @@ namespace pathCam {
         return -1;
       }
     }
-    _image->absoluteCoords = Vec2(point.x,point.y);
+    _image->absoluteCoords = Vec2(point.x, point.y);
     memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
@@ -252,24 +255,24 @@ namespace pathCam {
     cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
 
 
-      //test for exclusion of frame via rollback
-      int nonzeroMin;
-      if (_image->label == Image::_2X) {
-        polyMaskOutput = polyMaskOutput.mul(circleMask);
-        nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.10;
-      } else {
-        nonzeroMin = _image->width * _image->height * 0.1;
-      }
+    //test for exclusion of frame via rollback
+    int nonzeroMin;
+    if (_image->label == Image::_2X) {
+      polyMaskOutput = polyMaskOutput.mul(circleMask);
+      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.10;
+    } else {
+      nonzeroMin = _image->width * _image->height * 0.1;
+    }
 
-      if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
-        //contributing less than x% of its pixels, revert and don't bother loading from disk
-        subdiv = tempSubdiv;
-        _image->free_memory_RAW();
-        memberImages.push_back({_image, false});
-        return -1;
-      }
+    if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
+      //contributing less than x% of its pixels, revert and don't bother loading from disk
+      subdiv = tempSubdiv;
+      _image->free_memory_RAW();
+      memberImages.push_back({_image, false});
+      return -1;
+    }
 
-    _image->absoluteCoords = Vec2(_point.x,_point.y);
+    _image->absoluteCoords = Vec2(_point.x, _point.y);
     memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
@@ -287,20 +290,21 @@ namespace pathCam {
     bool update = false;
     for (int i = 0; i < images.size(); i++) {
 
-      if (!_force_add && pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x,2) + pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y,2) < pow(1000,2)){
-        memberImages.push_back({images[i],false});
+      if (!_force_add && pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x, 2) +
+                         pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y, 2) < pow(1000, 2)) {
+        memberImages.push_back({images[i], false});
         images[i]->readyImage.release();
         continue;
       }
 
-      if(!memberImages.empty() && !_force_add) {
+      if (!memberImages.empty() && !_force_add) {
         //put in reverse match runnable
         auto rmr = new ReverseMatchRunnable(parent, images[i]->index, lastAcceptedImageIndex);
         jobCount++;
         parent->JobQ->add_runnable(rmr);
         wakeEvent.wait();
         int k = 0;
-      }else{
+      } else {
         //debug
         int k = 0;
       }
@@ -324,28 +328,24 @@ namespace pathCam {
       //indicate that a new image has been added since last global alignment
       needsAlignment = true;
 
-      //calculate effected tiles
-      std::vector<Point2i> effectedTiles;
-      calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords);
-
       //build image with alpha channel
-      if (images[i]->readyImage.data){
+      if (images[i]->readyImage.data) {
         channels[0] = images[i]->readyImage;
-      }else {
+      } else {
         images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
-        if (parent->has_flatfield(images[i]->label)){
+        if (parent->has_flatfield(images[i]->label)) {
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
-          cv::pow(convertHolding,1.09, convertHolding);
-          convertHolding.convertTo(threeChannelPreallocated,CV_8UC3);
+          cv::pow(convertHolding, 1.09, convertHolding);
+          convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
       }
 
-      channels[1] = polyMaskOutput;           //alpha channel
+      channels[1] = rectMask;           //alpha channel
       merge(channels, fourChannelPreallocated);
 
       //debug
@@ -356,49 +356,170 @@ namespace pathCam {
 
       images[i]->readyImage.release();
       //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
-      int k = 0;
-      for (auto tile: effectedTiles) {
-        try {
-          auto mask = polyMaskOutput;
-          auto imageMat = fourChannelPreallocated;
-          auto tileSize = imagePyramid->level[0]->getTileSize();
-          auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
-          auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
-                                           images[i]->height);
 
-          imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
-        }
-        catch (cv::Exception &e) {
-          int k = 0;
-        }
+      //calculate effected tiles
+      std::vector<Point2i> effectedTiles;
+      std::vector<Point2i> effectedTilesNoMask;
+      calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
 
-      }
+      auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
+                                       images[i]->height);
+
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
+      //imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
 
 
-      //update pyramid bounds and observer, reset mask
-
+      //update pyramid bounds, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
-
-
       freshMask.copyTo(polyMaskOutput);
-
 
     }
 
-    if(imagePyramid->scale > 0 && update){
+    //highlight bounds of last frame
+    if (imagePyramid->scale > 0 && update) {
       float x = (imagePyramid->offset.x + images.back()->absoluteCoords.x) * imagePyramid->scale;
       float y = (imagePyramid->offset.y + images.back()->absoluteCoords.y) * imagePyramid->scale;
       float w = parent->image_width * imagePyramid->scale;
       float h = parent->image_height * imagePyramid->scale;
-      auto showAsCircle = images.back()->label == Image::_2X;
-      if (!showAsCircle){
-        int k = 0;
-      }
-      parent->update_last_frame(Rect_<float>(x,y,w,h),showAsCircle);
+      bool showAsCircle = images.back()->label == Image::_2X;
+
+      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle);
     }
 
     parent->update_observers();
   }
+
+
+  void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
+                                                  Vec2 absCoord, std::vector<Point2i> *additionalResult) {
+    std::vector<Point2i> tileIndices;
+    std::map<int, std::vector<float>> tilesByColumn;
+
+    //get the tile column of the left and right edges
+    int columnBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
+    int columnBoundHigh = imagePyramid->level[0]->getIJ(
+        Point2f(absCoord.x + image_size.width, absCoord.y)).x;
+
+    //get the tile row top and bottom edges of the image frame
+    long rowBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
+    long rowBoundHigh = imagePyramid->level[0]->getIJ(
+        Point2f(absCoord.x, absCoord.y + image_size.height)).y;
+
+    //get the tile row top and bottom as if the image was square. This is used to prevent chevrons
+    auto dimensionDifference = parent->image_width - parent->image_height;
+    long rowBoundFalseLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y - dimensionDifference / 2)).y;
+    long rowBoundFalseHigh = imagePyramid->level[0]->getIJ(
+        Point2f(absCoord.x, absCoord.y + image_size.height + dimensionDifference / 2)).y;
+
+    float yPixelBoundLow = float(rowBoundFalseLow) * float(imagePyramid->tile_size);
+    float yPixelBoundHigh = float(rowBoundFalseHigh) * float(imagePyramid->tile_size);
+
+    //for each edge of the voronoi mask
+    for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
+      //if we are at the last point, make the next point the first point (this makes the last edge)
+      int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
+
+      //create an Point2f from the cv::Point2i and shift voronoi mask to tile space
+      auto p1 = Point2f(maskAsPolygon[ii].x + absCoord.x, maskAsPolygon[ii].y + absCoord.y);
+      auto p2 = Point2f(maskAsPolygon[ii2].x + absCoord.x, maskAsPolygon[ii2].y + absCoord.y);
+
+      //test for duplicate points that result from the voronoi calculation
+      if (p1.x == p2.x && p1.y == p2.y) {
+        continue;
+      }
+
+      //retrieve the tiles these points fall within
+      auto tile1 = imagePyramid->level[0]->getIJ(p1);
+      auto tile2 = imagePyramid->level[0]->getIJ(p2);
+
+      //get the column of these tiles
+      int column1 = tile1.x;
+      int column2 = tile2.x;
+
+      //determine which column is on the right and which is on the left
+      int xlow = min(column1, column2);
+      int xhigh = max(column1, column2);
+
+      //take the column range bounds to be the most inward of the frame edges and the voronoi cell vertices
+      //this accomplishes the same thing as taking the polygon intersection of the voronoi face and the image frame
+      if (columnBoundHigh < xlow) {
+        continue; //no intersection with frame tiles
+      }
+      if(columnBoundLow > xhigh){
+        continue;
+      }
+      xlow = max(columnBoundLow, xlow);
+      xhigh = min(columnBoundHigh, xhigh);
+
+      auto plow = p1.x < p2.x ? p1 : p2;
+      auto phigh = p1.x >= p2.x ? p1 : p2;
+
+      for (float j = xlow; j <= xhigh; j++) {
+
+        float columnLeftEdge = j * float(imagePyramid->level[0]->getTileSize());
+        float columnRightEdge = (j + 1) * float(imagePyramid->level[0]->getTileSize());
+        float xloclow = max(columnLeftEdge, plow.x);
+        float xlochigh = min(columnRightEdge, phigh.x);
+
+        long enterColumn = segment_yval_at_point(xloclow, p1, p2);
+        long exitColumn = segment_yval_at_point(xlochigh, p1, p2);
+
+        tilesByColumn[j].push_back((float) enterColumn);
+        tilesByColumn[j].push_back((float) exitColumn);
+
+      }
+    }
+
+    auto maxDist = std::sqrt(std::pow(parent->image_height / 2,2) + std::pow(parent->image_width / 2,2)) ;
+    auto columnBoundFalseLow = imagePyramid->level[0]->getIJ(Point2f(double(parent->image_width / 2) + absCoord.x - maxDist,absCoord.y)).x;
+    auto columnBoundFalseHigh = imagePyramid->level[0]->getIJ(Point2f(double(parent->image_width / 2) + absCoord.x + maxDist,absCoord.y)).x;
+    for (int x = columnBoundLow ; x <= columnBoundHigh; x++) {
+
+
+      bool columnIntersectsMask = tilesByColumn.find(x) != tilesByColumn.end();
+      int lastTile,firstTile;
+
+      if(columnIntersectsMask) {
+        float firstPoint_y = *std::min_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
+        float lastPoint_y = *std::max_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
+
+        firstPoint_y = std::max((double)firstPoint_y,absCoord.y);
+        lastPoint_y = std::min((double)lastPoint_y,absCoord.y + parent->image_height);
+
+        lastTile = imagePyramid->level[0]->getIJ(
+            Point2f(x * imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
+        firstTile = imagePyramid->level[0]->getIJ(
+            Point2f(x * imagePyramid->level[0]->getTileSize(), firstPoint_y)).y;
+      }
+
+      for (int y = rowBoundFalseLow; y <= rowBoundFalseHigh; y++) {
+
+        auto tilePoint = Point2i(x, y);
+        //debug
+        if (tilePoint == Point2i(17,7)){
+          int k = 0;
+        }
+        auto loc = std::find(falselyClaimedTiles.begin(), falselyClaimedTiles.end(), tilePoint);
+
+        if (loc != falselyClaimedTiles.end()) {
+          additionalResult->push_back(tilePoint);
+          if (x > columnBoundLow && x < columnBoundHigh && y > rowBoundLow && y < rowBoundHigh) {
+            falselyClaimedTiles.erase(loc);
+          }
+        }else if(columnIntersectsMask) {
+          if (y > firstTile && y < lastTile) {
+            result.push_back(tilePoint);
+          } else if (y == firstTile || y == lastTile) {
+            result.push_back(tilePoint);
+            falselyClaimedTiles.push_back(tilePoint);
+          } else {
+            falselyClaimedTiles.push_back(tilePoint);
+          }
+        }
+      }
+    }
+  }
+
 
   void CompositeVoronoi::debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon, int line_thickness) {
     for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
@@ -410,64 +531,6 @@ namespace pathCam {
       }
 
       cv::line(img, maskAsPolygon[ii], maskAsPolygon[ii2], Scalar(0, 0, 0, 255), line_thickness);
-    }
-  }
-
-  void CompositeVoronoi::add_images_multithread(std::vector<RegInfo*> new_info) {
-
-    // get a copy of references to all images at once so that only one mutex lock is needed
-    std::vector<unsigned long> indexes;
-    for (int i = 0; i < new_info.size(); i++) {
-      indexes.push_back(new_info[i]->index);
-    }
-    std::vector<Image *> images = parent->get_image_refs(indexes);
-
-    for (int i = 0; i < images.size(); i++) {
-
-      //add point to delaunay triangulation
-      std::vector<Point2i> face;
-      auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
-      auto res = add_point_to_delaunay_triangulation(fShift, images[i], face, false);
-
-      //res is {vertexId,maskId}
-      if (res == -1) { continue; }
-      images[i]->vertexId = res;
-      images[i]->absoluteCoords = new_info[i]->absoluteCoords;
-
-      //calculate effected tiles
-      std::vector<Point2i> effectedTiles;
-      calculate_effected_tiles(face, effectedTiles, new_info[i]->absoluteCoords);
-
-      //build image with alpha channel
-
-      images[i]->load_raw_from_disk();
-      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
-
-      images[i]->free_memory_RAW();
-
-      if (images[i]->label == Image::_2X) {//flat field correction if needed
-        cv::divide(threeChannelPreallocated, flat_field, threeChannelPreallocated, 1.0, CV_8U);
-      }
-
-      channels[0] = threeChannelPreallocated; //3 channel
-      channels[1] = polyMaskOutput;           //alpha channel
-      merge(channels, fourChannelPreallocated);
-
-      //build and run copy runnable
-      for (auto tile: effectedTiles) {
-        jobCount++;
-        auto cr = new ImageToTileCopyRunnable(parent, images[i], componentIndex, tile, 0);
-        parent->JobQ->add_runnable(cr);
-      }
-
-      //wait till jobs have processed
-      wakeEvent.wait();
-
-      //update pyramid bounds and observer, reset mask
-      imagePyramid->bounds = imagePyramid->level[0]->bounds;
-      parent->update_observers();
-      freshMask.copyTo(polyMaskOutput);
     }
   }
 
@@ -501,23 +564,22 @@ namespace pathCam {
       }
     }
     //currently hardcoded, maybe add an output directory in config?
-    String path = "pyramidImage" + std::to_string(componentIndex) + "_"+std::to_string(imagePyramid->scale)+ ".png";
+    String path = "pyramidImage" + std::to_string(componentIndex) + "_" + std::to_string(imagePyramid->scale) + ".png";
     //only write pixels with information
     //imwrite(path, pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
-    if(_fileName != ""){
-      imwrite(_fileName,pyramidImage);
-    }else {
+    if (_fileName != "") {
+      imwrite(_fileName, pyramidImage);
+    } else {
       imwrite(path, pyramidImage);
     }
   }
 
   void CompositeVoronoi::create_and_submit_rebuild_jobs() {
-    std::vector<RebuildRunnable*> runnables;
-    for (auto el : delaunayMembers)
-    {
+    std::vector<RebuildRunnable *> runnables;
+    for (auto el: delaunayMembers) {
       auto dt = subdiv;
       auto image = parent->get_image_ref(el.second);
-      Mat polyMaskOutput = Mat::zeros(image_size,CV_8U);
+      Mat polyMaskOutput = Mat::zeros(image_size, CV_8U);
       std::vector<Point2i> face;
       std::vector<std::vector<Point2f>> facets;
       std::vector<Point2f> centers;
@@ -532,49 +594,48 @@ namespace pathCam {
         face.push_back((Point2i) ii);
       }
       //build polygon mask for new point
-      if (image->label == Image::_2X)
-      {
+      if (image->label == Image::_2X) {
         polyMaskOutput = polyMaskOutput.mul(circleMask);
       }
       fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
       //imwrite("polymask.png", polyMaskOutput);
       Mat polyMaskPadded;
       int tileSize = imagePyramid->level[0]->getTileSize();
-      copyMakeBorder(polyMaskOutput,polyMaskPadded,tileSize,tileSize,tileSize,tileSize,BORDER_CONSTANT,Scalar(0));
+      copyMakeBorder(polyMaskOutput, polyMaskPadded, tileSize, tileSize, tileSize, tileSize, BORDER_CONSTANT,
+                     Scalar(0));
       std::vector<Point2i> effectedTiles;
       calculate_effected_tiles(face, effectedTiles, image->absoluteCoords);
       //Vector containing the tiles where their center
       std::vector<Point2i> rebuildTiles;
-      for (auto tile : effectedTiles){
-        auto tileBox = Rect(tileSize * tile.x - image->absoluteCoords.x + tileSize, tileSize * tile.y - image->absoluteCoords.y + tileSize, tileSize, tileSize);
+      for (auto tile: effectedTiles) {
+        auto tileBox = Rect(tileSize * tile.x - image->absoluteCoords.x + tileSize,
+                            tileSize * tile.y - image->absoluteCoords.y + tileSize, tileSize, tileSize);
         int sum = countNonZero(polyMaskPadded(tileBox));
-        bool rebuild = rebuildTile(tile,sum);
-        if (rebuild)
-        {
+        bool rebuild = rebuildTile(tile, sum);
+        if (rebuild) {
           rebuildTiles.push_back(tile);
         }
       }
 
-      auto rr = new RebuildRunnable(this,el.first,el.second,rebuildTiles,polyMaskOutput);
+      auto rr = new RebuildRunnable(this, el.first, el.second, rebuildTiles, polyMaskOutput);
       runnables.push_back(rr);
       parent->cm->rebuildJobsOutstanding++;
     }
-    for (auto rr : runnables) {
+    for (auto rr: runnables) {
       parent->JobQ->add_runnable(rr);
     }
   }
-  bool CompositeVoronoi::rebuildTile(Point2i tile,int sum)
-  {
+
+  bool CompositeVoronoi::rebuildTile(Point2i tile, int sum) {
     std::string tileStr = std::to_string(tile.x) + "_" + std::to_string(tile.y);
-    if (tileToSumNonZero[tileStr] < sum)
-    {
+    if (tileToSumNonZero[tileStr] < sum) {
       tileToSumNonZero[tileStr] = sum;
       return true;
     }
     return false;
   }
 
-  void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo*> new_info) {
+  void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo *> new_info) {
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
@@ -634,106 +695,6 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
-                                                  Vec2 absCoord) {
-    std::vector<Point2i> tileIndices;
-    std::map<int, std::vector<float>> tilesByColumn;
-
-    //get the tile column of the left and right edges of the image frame
-    int columnBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
-    int columnBoundHigh = imagePyramid->level[0]->getIJ(
-        Point2f(absCoord.x + image_size.width, absCoord.y)).x;
-
-    //get the tile row the top and bottom edges of the image frame
-    long rowBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
-    long rowBoundHigh = imagePyramid->level[0]->getIJ(
-        Point2f(absCoord.x, absCoord.y + image_size.height)).y;
-
-    float yPixelBoundLow = float(rowBoundLow) * float(imagePyramid->tile_size);
-    float yPixelBoundHigh = float(rowBoundHigh) * float(imagePyramid->tile_size);
-
-    //for each edge of the voronoi mask
-    for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
-      //if we are at the last point, make the next point the first point (this makes the last edge)
-      int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
-
-      //create an Point2f from the cv::Point2i
-      auto p1 = Point2f(maskAsPolygon[ii].x + absCoord.x, maskAsPolygon[ii].y + absCoord.y);
-      auto p2 = Point2f(maskAsPolygon[ii2].x + absCoord.x, maskAsPolygon[ii2].y + absCoord.y);
-
-      //test for duplicate points that result from the voronoi calculation
-      if (p1.x == p2.x && p1.y == p2.y) {
-        continue;
-      }
-
-      //retreive the tiles these points fall within
-      auto tile1 = imagePyramid->level[0]->getIJ(p1);
-      auto tile2 = imagePyramid->level[0]->getIJ(p2);
-
-      //get the column of these tiles
-      int column1 = tile1.x;
-      int column2 = tile2.x;
-
-      //determine which column is on the right and which is on the left
-      int xlow = min(column1, column2);
-      int xhigh = max(column1, column2);
-
-      //take the column range bounds to be the most inward of the frame edges and the voronoi cell vertices
-      //this accomplishes the same thing as taking the polygon intersection of the voronoi face and the image frame
-      if (columnBoundHigh < xlow || columnBoundLow > xhigh) {
-        continue; //no intersection with frame tiles
-      }
-      xlow = max(columnBoundLow, xlow);
-      xhigh = min(columnBoundHigh, xhigh);
-
-      auto plow = p1.x < p2.x ? p1 : p2;
-      auto phigh = p1.x >= p2.x ? p1 : p2;
-
-      for (float j = xlow; j <= xhigh; j++) {
-
-        float columnLeftEdge = j * float(imagePyramid->level[0]->getTileSize());
-        float columnRightEdge = (j + 1) * float(imagePyramid->level[0]->getTileSize());
-        float xloclow = max(columnLeftEdge, plow.x);
-        float xlochigh = min(columnRightEdge, phigh.x);
-
-        long enterColumn = segment_yval_at_point(xloclow, p1, p2);
-        long exitColumn = segment_yval_at_point(xlochigh, p1, p2);
-
-        //if((enterColumn >= yPixelBoundLow || exitColumn >= yPixelBoundLow) && (enterColumn <= yPixelBoundHigh || exitColumn <= yPixelBoundHigh)) {
-        //enterColumn = max(enterColumn, yPixelBoundLow);
-        //enterColumn = min(enterColumn, yPixelBoundHigh);
-        tilesByColumn[j].push_back((float) enterColumn);
-
-        //exitColumn = max(exitColumn, yPixelBoundLow);
-        //exitColumn = min(exitColumn, yPixelBoundHigh);
-        tilesByColumn[j].push_back((float) exitColumn);
-        //}
-      }
-
-    }
-    for (auto &[key, value]: tilesByColumn) {
-
-      float firstPoint_y = *std::min_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
-      float lastPoint_y = *std::max_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
-
-      if (lastPoint_y < yPixelBoundLow || firstPoint_y > yPixelBoundHigh) {
-        continue;
-      }
-
-      int lastTile = imagePyramid->level[0]->getIJ(
-          Point2f(key * imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
-      int firstTile = imagePyramid->level[0]->getIJ(
-          Point2f(key * imagePyramid->level[0]->getTileSize(), firstPoint_y)).y;
-
-      for (int ii = firstTile; ii <= lastTile; ii++) {
-        if (ii <= rowBoundHigh && ii >= rowBoundLow) {
-          result.push_back(Point2i(key, ii));
-        }
-      }
-    }
-  }
-
-
   Composite::Composite(StreamCam *parent) : update_mutex(new Poco::FastMutex()), parent(parent), root_offset(0.0, 0.0),
                                             max_offset(0.0, 0.0) {
     flat_field = parent->flat_field2X;
@@ -742,7 +703,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::update_Bbox_no_composite(std::vector<RegInfo*> new_info) {
+  void CompositeVoronoi::update_Bbox_no_composite(std::vector<RegInfo *> new_info) {
     bool update_box = false;
 
     //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
@@ -800,7 +761,7 @@ namespace pathCam {
   }
 
 
-  void Composite::update_Bbox(std::vector<RegInfo*> new_info) {
+  void Composite::update_Bbox(std::vector<RegInfo *> new_info) {
 
     bool update_box = false;
 
@@ -869,7 +830,7 @@ namespace pathCam {
     }
   };
 
-  void Composite::add_images(std::vector<RegInfo*> new_info) {
+  void Composite::add_images(std::vector<RegInfo *> new_info) {
 
     std::vector<unsigned long int> indexes;
 
@@ -929,7 +890,7 @@ namespace pathCam {
     */
   }
 
-  void Composite::update(std::vector<RegInfo*> new_info) {
+  void Composite::update(std::vector<RegInfo *> new_info) {
     update_Bbox(new_info);
     add_images(new_info);
   }
@@ -1054,7 +1015,7 @@ namespace pathCam {
       auto tileBox = cv::Rect_<float>(tileSize * tile.x, tileSize * tile.y, tileSize, tileSize);
       auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
 
-      composite->imagePyramid->level[0]->inserTileAtBase(imageMat, mask, imageBox, {tile});
+      composite->imagePyramid->insertTilesAtBase(imageMat, mask, imageBox, {tile});
     }
     catch (cv::Exception &e) {
       int k = 0;
@@ -1151,7 +1112,7 @@ namespace pathCam {
           auto image_idx2 = delaunayMembers[vertId2];
           auto m = parent->matchM.match[image_idx1][image_idx2];
 
-          if(m == nullptr){
+          if (m == nullptr) {
             m = parent->matchM.match[image_idx2][image_idx1];
             image_idx2 = delaunayMembers[vertId1];
             image_idx1 = delaunayMembers[vertId2];
@@ -1160,16 +1121,16 @@ namespace pathCam {
           auto imageReg1 = parent->get_registration(image_idx1);
           auto imageReg2 = parent->get_registration(image_idx2);
 
-          if(m != nullptr){
+          if (m != nullptr) {
 
             auto val = imageReg1->absoluteCoords.x - imageReg2->absoluteCoords.x - m->t_x;
             auto i1 = imageReg1->absoluteCoords.x;
             auto i2 = imageReg2->absoluteCoords.x;
             auto i3 = m->t_x;
 
-            if(abs(val) < 200){
+            if (abs(val) < 200) {
               count1++;
-              matchedEdges.push_back({image_idx1,image_idx2});
+              matchedEdges.push_back({image_idx1, image_idx2});
 
               if (image_idx1 != 0) {
                 if (frameIndexToSystemIndex.find(image_idx1) == frameIndexToSystemIndex.end()) {
@@ -1185,8 +1146,7 @@ namespace pathCam {
                   systemIndexToFrameIndex[val] = image_idx2;
                 }
               }
-            }
-            else{
+            } else {
               int k = 0;
             }
           }
@@ -1261,7 +1221,7 @@ namespace pathCam {
         auto edge = indexIndexEdgenumJobneeded[i];
         auto idx1 = std::get<0>(edge);
         auto idx2 = std::get<1>(edge);
-        if((idx1 == 367 && idx2 == 412) || (idx1 == 412 && idx2 == 367)){
+        if ((idx1 == 367 && idx2 == 412) || (idx1 == 412 && idx2 == 367)) {
           int k = 0;
         }
         if (std::get<3>(edge)) {
@@ -1282,8 +1242,8 @@ namespace pathCam {
       }
       matchedEdges.clear();
 
-      std::vector<RegInfo*> new_info(memberImages.size());
-      for (int i = 0; i < memberImages.size(); i++){
+      std::vector<RegInfo *> new_info(memberImages.size());
+      for (int i = 0; i < memberImages.size(); i++) {
         new_info[i] = memberImages[i].first->regInfo;
       }
 
@@ -1298,35 +1258,35 @@ namespace pathCam {
 
       self_reset();
       rebuild_DT_elementwise(new_info, true, false);
-      build_system_from_DT(systemIndexToFrameIndex,frameIndexToSystemIndex,A,xpr,ypr,xac,yac);
+      build_system_from_DT(systemIndexToFrameIndex, frameIndexToSystemIndex, A, xpr, ypr, xac, yac);
 
       auto testValBefore = norm(A * xac - xpr);
       //solve problem for x and y
       std::map<long, long> temp;
 
-      coopers_conjugate_gradient2(A, xpr, xac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, ypr,0);
-      coopers_conjugate_gradient2(A, ypr, yac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, xpr,1);
+      coopers_conjugate_gradient2(A, xpr, xac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, ypr, 0);
+      coopers_conjugate_gradient2(A, ypr, yac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, xpr, 1);
 
       auto testValAfter = norm(A * xac - xpr);
 
       self_reset();
       parent->update_observers();
       parent->reg_results_mutex->readLock();
-      std::vector<RegInfo*> newinfo;
+      std::vector<RegInfo *> newinfo;
       newinfo.push_back(parent->get_registration(memberImages[0].first->index));
-      double xDiff,yDiff;
+      double xDiff, yDiff;
       double xDiffMax = 0;
       double yDiffMax = 0;
       for (auto [i, elm]: systemIndexToFrameIndex) {
         auto ri = parent->get_registration(systemIndexToFrameIndex[i]);
 
         xDiff = abs(ri->absoluteCoords.x - xac.at<double>(i));
-        if(xDiff > xDiffMax){
+        if (xDiff > xDiffMax) {
           xDiffMax = xDiff;
         }
 
         yDiff = abs(ri->absoluteCoords.y - yac.at<double>(i));
-        if(yDiff > yDiffMax){
+        if (yDiff > yDiffMax) {
           yDiffMax = yDiff;
         }
 
@@ -1345,8 +1305,7 @@ namespace pathCam {
       return;
 
 
-    }
-    else if (flag == 0) {
+    } else if (flag == 0) {
 
       //collect list of all edges.
       std::vector<Vec4f> edges;
@@ -1557,7 +1516,7 @@ namespace pathCam {
 
     parent->update_observers();
     parent->reg_results_mutex->readLock();
-    std::vector<RegInfo*> newinfo;
+    std::vector<RegInfo *> newinfo;
 
     newinfo.push_back(memberImages[0].first->regInfo);
     for (auto [i, elm]: systemIndexToFrameIndex) {
@@ -1568,7 +1527,7 @@ namespace pathCam {
     parent->reg_results_mutex->unlock();
 
     self_reset();
-    update(newinfo,true);
+    update(newinfo, true);
     //rebuild_DT_elementwise(newinfo, true,false);
     //create_and_submit_rebuild_jobs();
 
@@ -1617,23 +1576,23 @@ namespace pathCam {
 
         clean_data(A, b, bOther, x, systemIndexToFrameIndex);
 
-        std::vector<RegInfo*> new_info(systemIndexToFrameIndex.size() + 1);
+        std::vector<RegInfo *> new_info(systemIndexToFrameIndex.size() + 1);
         new_info[0] = parent->get_registration(memberImages[0].first->index);
         double diffmax = 0;
         int ii = 1;
-        for(auto el : systemIndexToFrameIndex){
+        for (auto el: systemIndexToFrameIndex) {
           auto ni = parent->get_registration(el.second);
           auto val = x.at<double>(el.first);
           new_info[ii] = ni;
           double diff;
-          if(flag == 0){//change x
+          if (flag == 0) {//change x
             diff = abs(new_info[ii]->absoluteCoords.x - val);
             new_info[ii]->absoluteCoords.x = val;
-          }else{//change y
+          } else {//change y
             diff = abs(new_info[ii]->absoluteCoords.y - val);
             new_info[ii]->absoluteCoords.y = val;
           }
-          if(diff > diffmax){
+          if (diff > diffmax) {
             diffmax = diff;
           }
           ii++;
@@ -1652,7 +1611,7 @@ namespace pathCam {
         self_reset();
 
         rebuild_DT_elementwise(new_info, true, false);
-        build_system_from_DT(systemIndexToFrameIndex,f2s,A,b,bOther,x,xOther);
+        build_system_from_DT(systemIndexToFrameIndex, f2s, A, b, bOther, x, xOther);
 
         ATA = A.t() * A;
         r = A.t() * b - (ATA * x);
@@ -1660,23 +1619,23 @@ namespace pathCam {
       }
 
       if (abs(n0 - n1) < epsilon || n1 < epsilon) {
-        std::vector<RegInfo*> new_info(systemIndexToFrameIndex.size() + 1);
+        std::vector<RegInfo *> new_info(systemIndexToFrameIndex.size() + 1);
         new_info[0] = parent->get_registration(memberImages[0].first->index);
         double diffmax = 0;
         int ii = 1;
-        for(auto el : systemIndexToFrameIndex){
+        for (auto el: systemIndexToFrameIndex) {
           auto ni = parent->get_registration(el.second);
           auto val = x.at<double>(el.first);
           new_info[ii] = ni;
           double diff;
-          if(flag == 0){//change x
+          if (flag == 0) {//change x
             diff = abs(new_info[ii]->absoluteCoords.x - val);
             new_info[ii]->absoluteCoords.x = val;
-          }else{//change y
+          } else {//change y
             diff = abs(new_info[ii]->absoluteCoords.y - val);
             new_info[ii]->absoluteCoords.y = val;
           }
-          if(diff > diffmax){
+          if (diff > diffmax) {
             diffmax = diff;
           }
           ii++;
