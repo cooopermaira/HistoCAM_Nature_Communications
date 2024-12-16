@@ -75,6 +75,7 @@ namespace pathCam {
     friend class RebuildRunnable;
   private:
     unsigned long lastAcceptedImageIndex;
+    unsigned int minPixelDistanceBetweenFrames;
     Vec2 lastAcceptedImageAbC;
     Mat circleMask;
     Mat rectMask;
@@ -105,6 +106,8 @@ namespace pathCam {
     void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
 
     void create_and_submit_rebuild_jobs();
+
+    void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord);
 
     void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord, std::vector<Point2i> *additionalResult = {});
 

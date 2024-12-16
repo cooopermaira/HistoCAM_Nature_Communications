@@ -157,12 +157,15 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
             channels.resize(2);
             channels[0] = greenShade;
           }
+          double beta = (log2(1.0 / MRImage->images[i]->scale) / 3.4) * 0.7 + 0.05;
+
           greenShade.setTo(cv::Scalar(0,0,0));
           cv::extractChannel(tile,channels[1],3);
-          greenShade.setTo(cv::Scalar(70,150,60),channels[1]);
+          greenShade.setTo(cv::Scalar(200 * beta,150 * (1 - beta),100 * beta ),channels[1]);
           cv::merge(channels,holding1);
-          double beta = (0.1/MRImage->images[i]->scale) * 0.9 + 0.05;
-          holding2 = beta * tile + (1.0 - beta) * holding1;
+
+          holding2 = beta * holding1 + (1.0 - beta) * tile;
+          //holding2 = 0.5 * holding1 + 0.5 * tile;
           memcpy(bitmap_data.data, holding2.data, tile.cols*tile.rows*4);
         }else {
           memcpy(bitmap_data.data, tile.data, tile.cols * tile.rows * 4);
@@ -171,17 +174,17 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
       }
     }
 
-#ifdef DEBUG
-    for (unsigned int t = 0; t < tiles.size(); t++) {
-        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
-        g.setColour(juce::Colours::greenyellow);
-        g.drawRect(bounds, 3);
-        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-        g.setFont(20);
-        g.drawText(ij, bounds.getCentreX() - 50,
-                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
-    }
-#endif
+//#ifdef DEBUG
+//    for (unsigned int t = 0; t < tiles.size(); t++) {
+//        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
+//        g.setColour(juce::Colours::greenyellow);
+//        g.drawRect(bounds, 3);
+//        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+//        g.setFont(20);
+//        g.drawText(ij, bounds.getCentreX() - 50,
+//                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
+//    }
+//#endif
     
     
   }
