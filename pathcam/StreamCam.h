@@ -105,6 +105,7 @@ namespace pathCam {
     Mat flat_field10X;
     Mat flat_field20X;
     Mat circleMask;
+    Mat regCircleMask;
 
     std::shared_ptr<MRTiledImageSet> MRimage;
 
@@ -126,7 +127,7 @@ namespace pathCam {
 
     void get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &showAsCircle);
 
-    void pass_image(Image *, unsigned long _image_index = 0);
+    void pass_image(Image *, unsigned long _image_index = 0, bool saveImg = false);
 
     void set_match(unsigned long image_idx, unsigned long prev_idx, Match *m);
 

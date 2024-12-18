@@ -249,7 +249,7 @@ namespace pathCam {
       Match *m = new Match(previous, image);
       matcher->match(m);
 
-      int result = motion_est->findHomography(m, parent->estimator_type, 50, 0);
+      int result = motion_est->findHomography(m, parent->estimator_type, 10, 0);
 
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();

@@ -13,7 +13,7 @@ namespace pathCam {
   CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int component_index) : Composite(
       parent), componentIndex(component_index), wakeEvent(true), image_size(image_size) {
 
-    minPixelDistanceBetweenFrames = 100;
+    minPixelDistanceBetweenFrames = 200;
 
     imagePyramid.reset(new MRTiledImage);
     std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid);
@@ -231,6 +231,7 @@ namespace pathCam {
 
   int CompositeVoronoi::add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
                                                             std::vector<Point2i> &_face, bool _forceAdd) {
+
     freshMask.copyTo(polyMaskOutput);
     //make copy of subdiv incase we decide not to use new point
     Subdiv2D tempSubdiv(subdiv);
@@ -283,6 +284,9 @@ namespace pathCam {
 
 
   void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add) {
+    //debug (figures)
+    unsigned long fig_ind = 270;
+    //unsigned long fig_ind = 0;
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
@@ -291,25 +295,30 @@ namespace pathCam {
     }
     std::vector<Image *> images = parent->get_image_refs(indexes);
     bool update = false;
+
+    //debug (figure making)
+//    if(images[0]->index >= fig_ind){
+//      minPixelDistanceBetweenFrames = 1000;
+//    }
+
     for (int i = 0; i < images.size(); i++) {
 
+      //verify minimum number of pixels has been covered since last added image
       if (!_force_add && pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x, 2) +
-                         pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y, 2) < pow(minPixelDistanceBetweenFrames, 2)) {
+                         pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y, 2) <
+                         pow(minPixelDistanceBetweenFrames, 2)) {
         memberImages.push_back({images[i], false});
         images[i]->readyImage.release();
         continue;
       }
 
+      //correct placement of last added image
       if (!memberImages.empty() && !_force_add) {
         //put in reverse match runnable
         auto rmr = new ReverseMatchRunnable(parent, images[i]->index, lastAcceptedImageIndex);
         jobCount++;
         parent->JobQ->add_runnable(rmr);
         wakeEvent.wait();
-        int k = 0;
-      } else {
-        //debug
-        int k = 0;
       }
 
       lastAcceptedImageIndex = images[i]->index;
@@ -355,10 +364,67 @@ namespace pathCam {
       //debug_draw_voronoi_face(fourChannelPreallocated, face, 2);
       //imwrite(std::to_string(images[i]->index)+".png",fourChannelPreallocated);
       //save_pyramid_as_image();
+      //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
+
+      //drawing next frame in some form
+//      if(images[0]->index >= fig_ind){
+//        freshMask.copyTo(polyMaskOutput);
+//        //circleMask.copyTo(polyMaskOutput);
+//        double beta = 0.3619;
+//        Mat greenshade = Mat::zeros(image_size,CV_8UC4);
+//        //greenshade.setTo(cv::Scalar(200 * beta,150 * (1 - beta),100 * beta,255 ),polyMaskOutput);
+//        //fourChannelPreallocated = fourChannelPreallocated * (1 - beta) + greenshade * beta;
+//
+//        face.clear();
+//        auto absC = Point(0,0);
+//        face.push_back(absC);
+//        absC.x += image_size.width;
+//        face.push_back(absC);
+//        absC.y += image_size.height;
+//        face.push_back(absC);
+//        absC.x -= image_size.width;
+//        face.push_back(absC);
+//        //fourChannelPreallocated = greenshade;
+//        //circle(polyMaskOutput,Point2i(image_size.width / 2, image_size.height/2+50),parent->scope_radius,Scalar(255),-1);
+//        circle(polyMaskOutput,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(255),-1);
+//        int shadewidth = 100;
+//        for( int i = 0; i <= shadewidth; i++){
+//          int incrval = (i * 255)/200;
+//          auto shade = Scalar( incrval, incrval, incrval,0);
+//          circle(greenshade,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius - shadewidth+i,shade,1);
+//        }
+//        fourChannelPreallocated -= greenshade;
+//
+//        //circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2+50),parent->scope_radius,Scalar(120,120,120,255),-1);
+//        //circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(220 - incrval,220 - incrval,220 - incrval,255),-1);
+//
+//      }
+
+      //voronoi
+//      fourChannelPreallocated *= 0.1;
+//      if (images[0]->index >= fig_ind) {
+//        double beta = 0.3619;
+//        Mat greenshade = Mat::zeros(image_size, CV_8UC4);
+//        greenshade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta, 255), polyMaskOutput);
+//        fourChannelPreallocated = fourChannelPreallocated * (1 - beta) + greenshade * beta;
+//      }
+//      circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),15,Scalar(0,0,0,255),30);
+//      debug_draw_voronoi_face(fourChannelPreallocated, face, 20);
+
+      //save last frame w mask
+//      if(images[0]->index >= fig_ind){
+//        Mat frame = Mat::zeros(image_size,CV_8UC4);
+//        fourChannelPreallocated.copyTo(frame,polyMaskOutput);
+//        circle(frame,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,255,255),50);
+//        imwrite("frame.png",frame);
+//
+//
+//        circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,0,255),100);
+//        debug_draw_voronoi_face(fourChannelPreallocated,face,100);
+//      }
 
 
       images[i]->readyImage.release();
-      //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
 
       //calculate effected tiles
       std::vector<Point2i> effectedTiles;
@@ -368,15 +434,17 @@ namespace pathCam {
       auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
                                        images[i]->height);
 
-      if(images[i]->label == Image::_2X){
+      if (images[i]->label == Image::_2X) {
         calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
 
-      }else {
+      } else {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
         imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
       }
+
+      //debug
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-      //imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
 
 
       //update pyramid bounds, reset mask
@@ -394,6 +462,10 @@ namespace pathCam {
       bool showAsCircle = images.back()->label == Image::_2X;
 
       parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle);
+//      if (images[0]->index >= fig_ind ) {
+//        save_pyramid_as_image();
+//        int k = 0;
+//      }
     }
 
     parent->update_observers();
@@ -455,7 +527,7 @@ namespace pathCam {
       if (columnBoundHigh < xlow) {
         continue; //no intersection with frame tiles
       }
-      if(columnBoundLow > xhigh){
+      if (columnBoundLow > xhigh) {
         continue;
       }
       xlow = max(columnBoundLow, xlow);
@@ -480,21 +552,23 @@ namespace pathCam {
       }
     }
 
-    auto maxDist = std::sqrt(std::pow(parent->image_height / 2,2) + std::pow(parent->image_width / 2,2)) ;
-    auto columnBoundFalseLow = imagePyramid->level[0]->getIJ(Point2f(double(parent->image_width / 2) + absCoord.x - maxDist,absCoord.y)).x;
-    auto columnBoundFalseHigh = imagePyramid->level[0]->getIJ(Point2f(double(parent->image_width / 2) + absCoord.x + maxDist,absCoord.y)).x;
-    for (int x = columnBoundLow ; x <= columnBoundHigh; x++) {
+    auto maxDist = std::sqrt(std::pow(parent->image_height / 2, 2) + std::pow(parent->image_width / 2, 2));
+    auto columnBoundFalseLow = imagePyramid->level[0]->getIJ(
+        Point2f(double(parent->image_width / 2) + absCoord.x - maxDist, absCoord.y)).x;
+    auto columnBoundFalseHigh = imagePyramid->level[0]->getIJ(
+        Point2f(double(parent->image_width / 2) + absCoord.x + maxDist, absCoord.y)).x;
+    for (int x = columnBoundLow; x <= columnBoundHigh; x++) {
 
 
       bool columnIntersectsMask = tilesByColumn.find(x) != tilesByColumn.end();
-      int lastTile,firstTile;
+      int lastTile, firstTile;
 
-      if(columnIntersectsMask) {
+      if (columnIntersectsMask) {
         float firstPoint_y = *std::min_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
         float lastPoint_y = *std::max_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
 
-        firstPoint_y = std::max((double)firstPoint_y,absCoord.y);
-        lastPoint_y = std::min((double)lastPoint_y,absCoord.y + parent->image_height);
+        firstPoint_y = std::max((double) firstPoint_y, absCoord.y);
+        lastPoint_y = std::min((double) lastPoint_y, absCoord.y + parent->image_height);
 
         lastTile = imagePyramid->level[0]->getIJ(
             Point2f(x * imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
@@ -506,7 +580,7 @@ namespace pathCam {
 
         auto tilePoint = Point2i(x, y);
         //debug
-        if (tilePoint == Point2i(17,7)){
+        if (tilePoint == Point2i(17, 7)) {
           int k = 0;
         }
         auto loc = std::find(falselyClaimedTiles.begin(), falselyClaimedTiles.end(), tilePoint);
@@ -516,7 +590,7 @@ namespace pathCam {
           if (x > columnBoundLow && x < columnBoundHigh && y > rowBoundLow && y < rowBoundHigh) {
             falselyClaimedTiles.erase(loc);
           }
-        }else if(columnIntersectsMask) {
+        } else if (columnIntersectsMask) {
           if (y > firstTile && y < lastTile) {
             result.push_back(tilePoint);
           } else if (y == firstTile || y == lastTile) {
@@ -530,8 +604,9 @@ namespace pathCam {
     }
   }
 
-  void CompositeVoronoi::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
-                                                  Vec2 absCoord) {
+  void
+  CompositeVoronoi::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
+                                                   Vec2 absCoord) {
     std::vector<Point2i> tileIndices;
     std::map<int, std::vector<float>> tilesByColumn;
 
@@ -628,6 +703,7 @@ namespace pathCam {
       }
     }
   }
+
   void CompositeVoronoi::debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon, int line_thickness) {
     for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
 

@@ -137,7 +137,7 @@ label = _NOLABEL;
     inline Poco::Path get_ImageFile() { return image_file; }
 
     void create_reg_image(double reg_scale, double reg_crop, bool convert = true, int interpolation = cv::INTER_LINEAR,
-                          bool real = false);
+                          bool real = false, bool flatfield_first = false, cv::Mat flatfield = cv::Mat());
 
     inline cv::Mat get_reg_image() { return reg_image; }
 

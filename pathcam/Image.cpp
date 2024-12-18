@@ -82,7 +82,6 @@ namespace pathCam {
   }
 
 
-
   void Image::correct_registration(std::vector<unsigned long> adjacentVerts) {
     if (adjacentVerts.size() > 0) {
       //pulling parent reference from odd place, could be passed as parameter
@@ -262,6 +261,7 @@ namespace pathCam {
 
     manually_set_label();
     //label = _4X;
+    //label = _2X;
     return;
     if (is_2x()) {
       label = _2X;
@@ -297,13 +297,13 @@ namespace pathCam {
   }
 
   void Image::manually_set_label() {
-    if (index < 413) {
+    if (index < 649) {
       label = Image::_2X;
-    } else if (index >= 413 && index < 777) {
+    } else if ((index >= 649 && index < 754) || (index >= 832 && index < 1103)) {
       label = Image::_4X;
-    } else if (index >= 777 && index < 1358){
+    } else if ((index >= 754 && index < 832) || (index >= 1103 && index < 1365)) {
       label = Image::_10X;
-    }else{
+    } else {
       label = Image::_20X;
     }
   }
@@ -317,7 +317,7 @@ namespace pathCam {
     return image_Mat;
   }
 
-  void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real) {
+  void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real, bool flatfield_first, Mat flatfield) {
     bool release = false;
     buffer_mutex.lock();
 
@@ -333,20 +333,25 @@ namespace pathCam {
       release = true;
     }
 
-//    reg_scale_initial = _reg_scale;
-//    reg_crop_initial = _reg_crop;
 
     Size image_size = Size(width, height);
 
-    //this should be redone, this extra copy is unnecessary and is a significant inefficiency
-    cv::Mat temp = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
-    temp.copyTo(reg_image);
+    reg_image = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
+    //temp.copyTo(reg_image);
     buffer_mutex.unlock();
 
     if (release) { free_memory_RAW(); }
 
+
+
     if (convert) {
-      cvtColor(reg_image, reg_image, COLOR_BayerBG2GRAY);
+//      if(flatfield_first){
+//        cvtColor(reg_image,reg_image,COLOR_BayerBG2BGR);
+//        divide(reg_image, flatfield, reg_image, 1, CV_8U);
+//        cvtColor(reg_image,reg_image,COLOR_BGR2GRAY);
+//      }else {
+        cvtColor(reg_image, reg_image, COLOR_BayerBG2GRAY);
+      //}
     }
     if (real) {
       reg_image.convertTo(reg_image, CV_32FC1);

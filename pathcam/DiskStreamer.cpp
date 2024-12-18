@@ -75,25 +75,28 @@ namespace pathCam {
     names->at(sort_order) = image->get_ImageFile().getFileName();
 
     if (convertAndSave) {
+
       //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
       cv::Size image_size(image->width, image->height);
       Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
 
       cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+      try {
+        cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
 
-      cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
+        imwrite(o.toString(), image_Mat);
+        image_Mat.convertTo(image_Mat, CV_32FC3);
 
-      imwrite(o.toString(),image_Mat);
-      image_Mat.convertTo(image_Mat,CV_32FC3);
+        cv::pow(image_Mat, 1.1, image_Mat);
 
-      cv::pow(image_Mat,1.1,image_Mat);
-
-      image_Mat.convertTo(image_Mat,CV_8UC3);
-
-
+        image_Mat.convertTo(image_Mat, CV_8UC3);
 
 
-      imwrite(o.toString(),image_Mat);
+        imwrite(o.toString(), image_Mat);
+      }
+      catch (...) {
+        int k = 0;
+      }
     }
     image->free_memory_RAW();
     int k = 0;

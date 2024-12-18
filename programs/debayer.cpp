@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x;
   std::ifstream stream;
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/2x/cal/2x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/cooper/cal/2x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
   flat_field2x.convertTo(flat_field2x, CV_32F);
   flat_field2x *= 1 / 170.0;
 
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/4x/cal/4x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/cooper/cal/4x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
   flat_field4x *= 1 / 170.0;
 
 
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/10x/cal/10x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/cooper/cal/10x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
   flat_field10x.convertTo(flat_field10x, CV_32F);
   flat_field10x *= 1 / 170.0;
 
-  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20/20x/cal/20x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/cooper/cal/20x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
       std::sort(images.begin(), images.end(), customComparator);
     }
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/2_20_comp_png/input.txt";
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/2_20_Dec17/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -175,13 +175,18 @@ int main(int argc, char *argv[]) {
       }
       if (convertImages) {
         Mat flat_field;
-        if (i < 429) {
+        if (i < 666) {
           flat_field = flat_field2x;
-        } else if (i < 827 && i > 430) {
+        } else if (i < 784 && i >= 666) {
           flat_field = flat_field4x;
-        } else if (i > 828 && i < 1417) {
+        } else if (i >= 784 && i < 900) {
           flat_field = flat_field10x;
-        } else if (i > 1418) {
+        } else if(i>= 900 && i <1209){
+          flat_field = flat_field4x;
+        }
+        else if (i >= 1209 && i < 1496) {
+          flat_field = flat_field10x;
+        }else{
           flat_field = flat_field20x;
         }
         auto *dr = new pathCam::DebayerRunnable(images[i], flat_field, outFile, blur, names, i);

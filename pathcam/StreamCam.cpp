@@ -41,7 +41,10 @@ namespace pathCam {
     circleMask = cv::Mat::zeros(image_height,image_width, CV_8U);
     cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
                -1);
-    
+    regCircleMask = cv::Mat::zeros(image_height * scale_factor,image_width * scale_factor, CV_8U);
+    cv::circle(regCircleMask, cv::Point(float(image_width / 2) * scale_factor, float(image_height / 2) * scale_factor), scope_radius, cv::Scalar(255),
+               -1);
+
     if (flat_field_file_2x.getExtension() == "Raw") {
         char* buffer = new char[6464 * 4852];
         std::ifstream stream;
@@ -321,8 +324,8 @@ namespace pathCam {
     return temp;
   }
 
-  void StreamCam::pass_image(Image *image, unsigned long _image_index) {
-    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true);
+  void StreamCam::pass_image(Image *image, unsigned long _image_index, bool _saveImg) {
+    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true,_saveImg);
     loaderCount++;
     JobQ->add_runnable(llr);
   }

@@ -25,6 +25,16 @@ namespace pathCam {
     }
 
 
+    if(saveImg){
+      std::fstream file;
+      file = std::fstream(image->image_file.toString(), std::ios::out | std::ios::binary);
+      if (file.fail()) {
+        throw new std::exception;
+      }
+      file.write(image->get_Raw(), image->width * image->height);
+    }
+
+
     if(image->check_blur() < 100){
       successful = true;
       parent->loaderCount--;
@@ -44,17 +54,12 @@ namespace pathCam {
 //      }
 //    }
 
-//    if (!image->decide_label_and_blur()){
-//      successful = true;
-//      parent->loaderCount--;
-//      jobComplete.set();
-//      return;
-//    }
+
 
     if (image->is_good()) {
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
-                              parent->real);
+                              parent->real,true,parent->get_flatfield(image->label));
 
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
@@ -149,8 +154,9 @@ namespace pathCam {
       extractor->compute( image->get_reg_image(), *points, descriptors  );
     }else{
       if(image->label == Image::_2X){
+
         detector->detectAndCompute(image->get_reg_image(),
-                                   image->parent->circleMask, *points,
+                                   image->parent->regCircleMask, *points,
                                    descriptors );
       }
       detector->detectAndCompute(image->get_reg_image(),

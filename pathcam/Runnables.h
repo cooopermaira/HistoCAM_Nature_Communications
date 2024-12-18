@@ -111,13 +111,14 @@ namespace pathCam {
   class LoaderLogicRunnable : public RunnableIntermediate {
   private:
     bool additionalSiftReg;
+    bool saveImg;
     StreamCam *parent;
     Image *image;
 
   public:
 
-    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx, bool additionalFullReg) : image(
-        image), parent(parent), additionalSiftReg(additionalFullReg), RunnableIntermediate(image_idx, 1) {};
+    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx, bool additionalFullReg, bool saveImg = false) : image(
+        image), parent(parent), additionalSiftReg(additionalFullReg), saveImg(saveImg), RunnableIntermediate(image_idx, 1) {};
 
     virtual void run();
   };
