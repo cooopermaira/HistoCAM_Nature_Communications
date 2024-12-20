@@ -207,6 +207,36 @@ void ImageViewComponent::paint(juce::Graphics &g) {
         drawSlide(g, 1.0);
     }
 
+  if(shade_levels){
+
+    // Define the buffer space from the edges
+    int padding = 100;
+
+    int squareSize = 30; // Size of the square
+    int textPadding = 10; // Space between the square and the text
+    int linePadding = 10;  // Space between lines
+    
+    std::vector < std::string > objectives = { "2x", "4x", "20x"};
+    std::vector < juce::Colour > colors = { Colours::purple, Colours::rebeccapurple, Colours::plum};
+
+    for(unsigned int i=0; i < 3; i++){
+      int xPosition = getWidth() - padding - squareSize - textPadding;
+      int yPosition = getHeight() - padding - (i*squareSize) - (i*linePadding);
+
+      // Set the color for the square (purple)
+      g.setColour(colors[i]);
+      // Draw the purple square
+      g.fillRect(xPosition, yPosition, squareSize, squareSize);
+
+      // Set the color for the text (you can choose any color)
+      g.setColour(Colours::black);
+      g.setFont(Font(24.0));
+      g.drawText(objectives[i], xPosition + squareSize + textPadding, yPosition, 40, squareSize, Justification::centredLeft, true);
+      
+    }
+    
+  }
+
 }
 
 
