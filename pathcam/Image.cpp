@@ -297,13 +297,22 @@ namespace pathCam {
   }
 
   void Image::manually_set_label() {
-    if (index < 649) {
+//    if (index < 649) {
+//      label = Image::_2X;
+//    } else if ((index >= 649 && index < 754) || (index >= 832 && index < 1103)) {
+//      label = Image::_4X;
+//    } else if ((index >= 754 && index < 832) || (index >= 1103 && index < 1365)) {
+//      label = Image::_10X;
+//    } else {
+//      label = Image::_20X;
+//    }
+    if(index < 413){
       label = Image::_2X;
-    } else if ((index >= 649 && index < 754) || (index >= 832 && index < 1103)) {
-      label = Image::_4X;
-    } else if ((index >= 754 && index < 832) || (index >= 1103 && index < 1365)) {
+    }else if(index >= 413 && index <777) {
+      label = _4X;
+    }else if(index >= 777 && index < 1358){
       label = Image::_10X;
-    } else {
+    }else{
       label = Image::_20X;
     }
   }

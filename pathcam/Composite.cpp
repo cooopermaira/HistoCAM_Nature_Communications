@@ -360,6 +360,7 @@ namespace pathCam {
       channels[1] = rectMask;           //alpha channel
       merge(channels, fourChannelPreallocated);
 
+
       //debug
       //debug_draw_voronoi_face(fourChannelPreallocated, face, 2);
       //imwrite(std::to_string(images[i]->index)+".png",fourChannelPreallocated);
@@ -467,7 +468,6 @@ namespace pathCam {
 //        int k = 0;
 //      }
     }
-
     parent->update_observers();
   }
 
