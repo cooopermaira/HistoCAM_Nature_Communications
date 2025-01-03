@@ -29,13 +29,12 @@ namespace pathCam {
                                                            scaleRepoMutex(new Poco::FastMutex()),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
-                                                           dr(new DiskReader(this)){
+                                                           dr(new DiskReader(this)),
+im(new InferenceManager(this)){
+  
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(10, 10);
-//    reg_results.resize(1);
-//    reg_results[0] = new RegInfo(this, true, Vec2(0, 0), true, 0);
-//    reg_results[0]->index = 0;
-//    reg_results[0]->resolved = false;
+
 
     //lastFrame = Rect(0,0,image_width,image_height);
     circleMask = cv::Mat::zeros(image_height,image_width, CV_8U);
@@ -174,10 +173,12 @@ namespace pathCam {
     disk_thread.start(dr);
     Q_thread.start(qm);
     composite_thread.start(cm);
+    inference_thread.start(im);
 
     disk_thread.join();
     Q_thread.join();
     composite_thread.join();
+    inference_thread.join();
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);

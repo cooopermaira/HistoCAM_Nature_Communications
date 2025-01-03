@@ -31,6 +31,8 @@ namespace pathCam {
 
   class DiskReader;
 
+  class InferenceManager;
+
 
   class StreamCam : public BatchCam {
 
@@ -114,6 +116,7 @@ namespace pathCam {
     CompositeManager *cm;
     QManager *qm;
     DiskReader *dr;
+    InferenceManager *im;
 
     bool run();
 
@@ -208,7 +211,7 @@ namespace pathCam {
 
     std::vector<DataObserver *> observers;
 
-    Poco::Thread disk_thread, Q_thread, composite_thread;
+    Poco::Thread disk_thread, Q_thread, composite_thread, inference_thread;
 
   };
 

@@ -33,7 +33,7 @@ public:
   Poco::Path flat_field_file_4x;
   Poco::Path flat_field_file_10x;
   Poco::Path flat_field_file_20x;
-
+    Poco::Path tile_encoder_path;
 
   
   //Registration Params

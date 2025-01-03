@@ -120,6 +120,11 @@ namespace pathCam {
         logger->fatal("Input images required.");
         return false;
       }
+        
+        if(pConf->has("io.tile_encoder")){
+            inferencing = true;
+            tile_encoder_path = Path(pConf->getString("io.tile_encoder"));
+        }
 
       if (pConf->has("io.output_log")) {
         std::string temp = pConf->getString("io.output_log");

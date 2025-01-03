@@ -135,6 +135,8 @@ namespace pathCam {
 
   public:
     InferenceManager(StreamCam *parent);
+    
+    virtual void run();
 
     std::map<unsigned int,std::shared_ptr< MRTiledImage >> pyramidRef;
   };

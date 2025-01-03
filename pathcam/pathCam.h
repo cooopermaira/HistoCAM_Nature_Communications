@@ -45,6 +45,7 @@
 #include "Poco/DateTimeFormatter.h"
 
 #include <torch/torch.h>
+#include <torch/script.h>
 
 #include "util.h"
 #include "DataObserver.h"

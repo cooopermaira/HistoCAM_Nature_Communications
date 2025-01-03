@@ -184,7 +184,7 @@ namespace pathCam {
       _image->correct_registration(adjacentVerts);
       subdiv = tempSubdiv;
       point = cv::Point2f(_image->regInfo->absoluteCoords.x, _image->regInfo->absoluteCoords.y);
-      vertxId = subdiv.insert(point);
+        vertxId = subdiv.insert(point);
     }
 
     //get voronoi facets for only this face
@@ -196,7 +196,7 @@ namespace pathCam {
     //shift and recast
     for (auto &ii: facets[0]) {//we have pulled only one face so facets has only 1 element
       ii.x -= centers[0].x;
-      ii.x += image_size.width / 2;
+        ii.x += image_size.width / 2;
       ii.y -= centers[0].y;
       ii.y += image_size.height / 2;
       _face.push_back((Point2i) ii);
