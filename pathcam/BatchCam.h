@@ -41,6 +41,7 @@ public:
   double scale_factor;
   bool debayer;
   bool real;
+  bool inferencing;
   int interpolation;
   int feature_type;
   unsigned int image_width;

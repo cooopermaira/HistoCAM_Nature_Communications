@@ -25,7 +25,7 @@ namespace pathCam {
 //      if(duration.count() < 100){
 //        Poco::Thread::sleep(100 - duration.count());
 //      }
-      start = timeCheck;
+      //start = timeCheck;
 
       //pull new components that might need to be processed
       std::tuple<unsigned long, cv::Size, unsigned int> newComp;
@@ -92,8 +92,8 @@ namespace pathCam {
       check_render_info();
     }
 
-
-
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     //perform_global_alignment();
     //rebuildJobsComplete.wait();
     //save_components_to_disk();

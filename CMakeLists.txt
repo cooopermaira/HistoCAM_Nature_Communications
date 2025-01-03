@@ -72,6 +72,7 @@ add_subdirectory(JUCE)
 
 
 IF (APPLE)
+    SET(Torch_DIR "/Users/coopermaira/libtorch")
     SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
     IF (NOT OpenCV_DIR)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
@@ -86,6 +87,10 @@ INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
+
+list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
+find_package(Torch REQUIRED)
+include_directories()
 
 IF (NOT OVERRRIDE_SPINNAKER)
 
@@ -129,7 +134,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 include_directories(pathcam)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES})
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

@@ -263,18 +263,19 @@ namespace pathCam {
     int nonzeroMin;
     if (_image->label == Image::_2X) {
       polyMaskOutput = polyMaskOutput.mul(circleMask);
-      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.10;
-    } else {
-      nonzeroMin = _image->width * _image->height * 0.1;
     }
+//      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.00;
+//    } else {
+//      nonzeroMin = _image->width * _image->height * 0.1;
+//    }
 
-    if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
-      //contributing less than x% of its pixels, revert and don't bother loading from disk
-      subdiv = tempSubdiv;
-      _image->free_memory_RAW();
-      memberImages.push_back({_image, false});
-      return -1;
-    }
+//    if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
+//      //contributing less than x% of its pixels, revert and don't bother loading from disk
+//      subdiv = tempSubdiv;
+//      _image->free_memory_RAW();
+//      memberImages.push_back({_image, false});
+//      return -1;
+//    }
 
     _image->absoluteCoords = Vec2(_point.x, _point.y);
     memberImages.push_back({_image, true});
@@ -285,8 +286,8 @@ namespace pathCam {
 
   void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add) {
     //debug (figures)
-    unsigned long fig_ind = 270;
-    //unsigned long fig_ind = 0;
+    //unsigned long fig_ind = 270;
+    //unsigned long fig_ind = 9;
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
@@ -360,7 +361,6 @@ namespace pathCam {
       channels[1] = rectMask;           //alpha channel
       merge(channels, fourChannelPreallocated);
 
-
       //debug
       //debug_draw_voronoi_face(fourChannelPreallocated, face, 2);
       //imwrite(std::to_string(images[i]->index)+".png",fourChannelPreallocated);
@@ -368,7 +368,8 @@ namespace pathCam {
       //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
 
       //drawing next frame in some form
-//      if(images[0]->index >= fig_ind){
+      //if(images[0]->index >= fig_ind){
+//      if(images[0]->index < fig_ind){
 //        freshMask.copyTo(polyMaskOutput);
 //        //circleMask.copyTo(polyMaskOutput);
 //        double beta = 0.3619;
@@ -400,6 +401,9 @@ namespace pathCam {
 //        //circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(220 - incrval,220 - incrval,220 - incrval,255),-1);
 //
 //      }
+//      if(images[0]->index >= fig_ind){
+//        circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,255,255),50);
+//      }
 
       //voronoi
 //      fourChannelPreallocated *= 0.1;
@@ -415,13 +419,15 @@ namespace pathCam {
       //save last frame w mask
 //      if(images[0]->index >= fig_ind){
 //        Mat frame = Mat::zeros(image_size,CV_8UC4);
-//        fourChannelPreallocated.copyTo(frame,polyMaskOutput);
+//
+//        circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,0,255),50);
+//
 //        circle(frame,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,255,255),50);
+//
+//        debug_draw_voronoi_face(fourChannelPreallocated,face,50);
+//        fourChannelPreallocated.copyTo(frame,polyMaskOutput);
 //        imwrite("frame.png",frame);
-//
-//
-//        circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,0,255),100);
-//        debug_draw_voronoi_face(fourChannelPreallocated,face,100);
+//        int k = 0;
 //      }
 
 
@@ -442,8 +448,9 @@ namespace pathCam {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
         imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
       }
+      auto pushForInferencing = push_for_inferencing(effectedTiles,effectedTilesNoMask);
+      inferenceCount += pushForInferencing.size();
 
-      //debug
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
 
@@ -471,6 +478,17 @@ namespace pathCam {
     parent->update_observers();
   }
 
+  std::vector<Point2i> CompositeVoronoi::push_for_inferencing(std::vector<Point2i> &effectedTiles,
+                                                              std::vector<Point2i> &effectedTilesNoMask) {
+    queuedTiles.end();
+    std::vector<Point2i> List3;
+    std::remove_copy_if(queuedTiles.begin(), queuedTiles.end(), std::back_inserter(List3),
+                        [&effectedTiles](const Point2i& arg)
+                        { return (std::find(effectedTiles.begin(), effectedTiles.end(), arg) != effectedTiles.end());});
+
+    queuedTiles = effectedTiles;
+    return List3;
+  }
 
   void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                   Vec2 absCoord, std::vector<Point2i> *additionalResult) {
@@ -918,7 +936,9 @@ namespace pathCam {
       unsigned int tile_size = imagePyramid->level[0]->getTileSize();
       unsigned int topLogicSize = imagePyramid->level.back()->getLogicSize();
       bool addedLevel = false;
-      while (topLogicSize < max_offset.x - root_offset.x || topLogicSize < max_offset.y - root_offset.y) {
+      bool canResize = std::log2(tile_size) - imagePyramid->level.size() >= 1;
+
+      while (canResize && (topLogicSize < max_offset.x - root_offset.x || topLogicSize < max_offset.y - root_offset.y)) {
         addedLevel = true;
         unsigned int logic_size = 2 * topLogicSize;
         int levelWithinPyramid = imagePyramid->level.size();
@@ -926,6 +946,7 @@ namespace pathCam {
         imagePyramid->level.push_back(
             std::make_shared<TiledImage>(imagePyramid, tile_size, logic_size, levelWithinPyramid));
         topLogicSize = logic_size;
+        canResize = std::log2(tile_size) - imagePyramid->level.size() >= 1;
       }
       if (addedLevel) {
         auto tl = topLevelBeforeAdding->getIJ(Point2f(root_offset.x, root_offset.y));

@@ -199,9 +199,10 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
 //==============================================================================
 void ImageViewComponent::paint(juce::Graphics &g) {
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-
-    g.drawImageAt(checkerboard, 0, 0);
+//    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+//
+//    g.drawImageAt(checkerboard, 0, 0);
+  g.fillAll(juce::Colours::white);
 
     if (MRImage) {
         drawSlide(g, 1.0);
@@ -216,10 +217,10 @@ void ImageViewComponent::paint(juce::Graphics &g) {
     int textPadding = 10; // Space between the square and the text
     int linePadding = 10;  // Space between lines
     
-    std::vector < std::string > objectives = { "2x", "4x", "20x"};
-    std::vector < juce::Colour > colors = { Colours::purple, Colours::rebeccapurple, Colours::plum};
+    std::vector < std::string > objectives = { "20x","10x", "4x", "2x"};
+    std::vector < juce::Colour > colors = { Colour(66,91,176), Colour(120,154,175), Colour(190,217,201), Colour(243,249,243)};
 
-    for(unsigned int i=0; i < 3; i++){
+    for(unsigned int i=0; i < 4; i++){
       int xPosition = getWidth() - padding - squareSize - textPadding;
       int yPosition = getHeight() - padding - (i*squareSize) - (i*linePadding);
 

@@ -204,7 +204,7 @@ namespace pathCam {
 
     std::atomic<int> debugMatchSuspendThread = 0;
 
-    pathCam::ConsecQ RegistrationConsecQ;
+//pathCam::ConsecQ RegistrationConsecQ;
 
     std::vector<DataObserver *> observers;
 

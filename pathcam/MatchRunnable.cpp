@@ -262,6 +262,7 @@ namespace pathCam {
 
           parent->set_match(image_idx, prev_idx, m);
 
+          //this should all be in the damn constructor
           auto tempReg = parent->get_registration(image_idx);
           tempReg->accessMutex->lock();
           tempReg->index = image_idx;

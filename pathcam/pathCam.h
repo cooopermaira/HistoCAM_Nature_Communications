@@ -44,6 +44,8 @@
 #include "Poco/ThreadPool.h"
 #include "Poco/DateTimeFormatter.h"
 
+#include <torch/torch.h>
+
 #include "util.h"
 #include "DataObserver.h"
 #include "Image.h"
@@ -54,8 +56,9 @@
 #include "MotionEstimator.h"
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
-#include "ConsecQ.h"
 #include "StreamCam.h"
+
+
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"

@@ -95,6 +95,8 @@ namespace pathCam {
     Poco::Event wakeEvent;
     RegInfo* storedNewInfo;
 
+    std::vector<Point2i> push_for_inferencing(std::vector<Point2i>& effectedTiles,std::vector<Point2i>& effectedTilesNoMask);
+
     void check_set_render_info();
 
     long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
@@ -151,6 +153,9 @@ namespace pathCam {
     std::vector<std::pair<long, long>> matchedEdges;
     std::vector<std::pair<Image*, bool>> memberImages;
     std::map<int, unsigned long> delaunayMembers;
+    std::vector<Point2i> queuedTiles;
+    int inferenceCount = 0;
+    //std::vector<Point2i> tilesPushForInferencing;
 
     void store_new_info(RegInfo* _new_info);
 

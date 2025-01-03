@@ -32,28 +32,32 @@ namespace pathCam {
     void waitOnThisGuy();
   };
 
-  class RebuildRunnable : public RunnableIntermediate{
+  class RebuildRunnable : public RunnableIntermediate {
   public:
     int dtVertex;
     unsigned long imageIndex;
-    CompositeVoronoi* composite;
-    CompositeManager* cm;
+    CompositeVoronoi *composite;
+    CompositeManager *cm;
     Mat polyMaskOutput;
     std::vector<Point2i> rebuildTiles;
 
-    RebuildRunnable(CompositeVoronoi* _composite, int _dtVertex, unsigned long _imageIndex, std::vector<Point2i> _rebuildTiles,Mat _polyMaskOutput);
+    RebuildRunnable(CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex,
+                    std::vector<Point2i> _rebuildTiles, Mat _polyMaskOutput);
+
     virtual void run();
   };
 
   class DebayerRunnable : public pathCam::RunnableIntermediate {
   public:
     explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<double> *_blur,
-                             std::vector<std::string> *_names, unsigned long _sort_order) : image(image),flatfield(flat_field),
+                             std::vector<std::string> *_names, unsigned long _sort_order) : image(image),
+                                                                                            flatfield(flat_field),
                                                                                             outfile(outfile),
                                                                                             RunnableIntermediate(
                                                                                                 _sort_order, 0),
                                                                                             blur(_blur),
                                                                                             names(_names) {}
+
     Mat flatfield;
     std::vector<double> *blur;
     std::vector<std::string> *names;
@@ -92,15 +96,14 @@ namespace pathCam {
   class RegistrationRunnable : public RunnableIntermediate {
   private:
     StreamCam *parent;
-    RegInfo* regInfo;
+    RegInfo *regInfo;
   public:
-    RegistrationRunnable(StreamCam *parent, RegInfo* regInfo) :
+    RegistrationRunnable(StreamCam *parent, RegInfo *regInfo) :
         parent(parent),
         regInfo(regInfo),
         RunnableIntermediate(regInfo->index, 3) {};
 
     virtual void run();
-
 
 
     std::pair<bool, Vec2> trace_to_root(unsigned long index);
@@ -117,10 +120,23 @@ namespace pathCam {
 
   public:
 
-    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx, bool additionalFullReg, bool saveImg = false) : image(
-        image), parent(parent), additionalSiftReg(additionalFullReg), saveImg(saveImg), RunnableIntermediate(image_idx, 1) {};
+    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx, bool additionalFullReg,
+                        bool saveImg = false) : image(
+        image), parent(parent), additionalSiftReg(additionalFullReg), saveImg(saveImg),
+                                                RunnableIntermediate(image_idx, 1) {};
 
     virtual void run();
+  };
+
+
+  class InferenceManager : public Poco::Runnable {
+  private:
+    StreamCam *parent;
+
+  public:
+    InferenceManager(StreamCam *parent);
+
+    std::map<unsigned int,std::shared_ptr< MRTiledImage >> pyramidRef;
   };
 
 
@@ -222,7 +238,7 @@ namespace pathCam {
     unsigned long start_from_idx;
 
   public:
-    ReverseMatchRunnable(StreamCam* parent, unsigned long image_idx, unsigned long start_from_idx);
+    ReverseMatchRunnable(StreamCam *parent, unsigned long image_idx, unsigned long start_from_idx);
 
     virtual void run();
   };
