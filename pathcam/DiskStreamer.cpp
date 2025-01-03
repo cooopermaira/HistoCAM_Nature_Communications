@@ -84,7 +84,6 @@ namespace pathCam {
       try {
         cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
 
-        imwrite(o.toString(), image_Mat);
         image_Mat.convertTo(image_Mat, CV_32FC3);
 
         cv::pow(image_Mat, 1.1, image_Mat);

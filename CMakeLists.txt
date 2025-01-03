@@ -78,6 +78,8 @@ IF (APPLE)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
     ENDIF ()
 ELSEIF (WIN32)
+    SET(Torch_DIR "D:/libtorch-win-shared-with-deps-2.5.1+cu124/libtorch")
+    SET(CUDA_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4/lib/x64")
     SET(OpenCV_DIR "C:/Users/Max Cooper/documents/opencv/install")
 ELSEIF (LINUX)
     SET(OpenCV_DIR "home/opencv/cmake/templates")
@@ -90,7 +92,7 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
 find_package(Torch REQUIRED)
-include_directories()
+include_directories("${Torch_INCLUDE_DIRS}")
 
 IF (NOT OVERRRIDE_SPINNAKER)
 

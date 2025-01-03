@@ -92,17 +92,19 @@ void CameraStream::run(){
             
           }else{
             
-            const size_t width = pResultImage->GetWidth();
-            const size_t height = pResultImage->GetHeight();
-            parent->camlogger.information(Poco::format("Got image: %u %u", (unsigned int)width, (unsigned int)height));
+            //const size_t width = pResultImage->GetWidth();
+            //const size_t height = pResultImage->GetHeight();
+            //parent->camlogger.information(Poco::format("Got image: %u %u", (unsigned int)width, (unsigned int)height));
             
-            pathCam::Image *image = new pathCam::Image(width, height, parent->sCam->get_scope_radius());
+            pathCam::Image *image = new pathCam::Image(parent->sCam->image_width, parent->sCam->image_height, parent->sCam->get_scope_radius());
             image->copy_in(pResultImage->GetData());
-            image->increment_smart_pointer();
-            parent->sCam->pass_image(image,i);
+            //image->increment_smart_pointer();
+
+            std::string str = std::to_string(i) + ".Raw";
             i++;
-            Poco::DateTime time = Poco::DateTime();
-            std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i");
+            //Poco::DateTime time = Poco::DateTime();
+            //std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i") + ".Raw";
+            
 
             //i++;
             //std::stringstream ss;
@@ -112,20 +114,18 @@ void CameraStream::run(){
            // ss << time.day() << time.hour();
            // ss << time.minute() << time.millisecond();
             
-            parent->camlogger.information(Poco::format("%s", str));
+            //parent->camlogger.information(Poco::format("%s", str));
 
-            cache_element image_in_cache;
-            image_in_cache.image = image;
-            image_in_cache.name = str;
-            
-            parent->cache_mutex.lock();
-            parent->camlogger.information("Put on Queue");
+            Poco::Path image_path = parent->getRootPath();
 
-            parent->cache->push(image_in_cache);
             
-            parent->cache_mutex.unlock();
+            image_path.append(Poco::Path(parent->captureSetName));
+           
+            image_path.append(Poco::Path(str));
+            image->set_disk_file(image_path);
+            parent->sCam->pass_image(image, i, true);
+            //image->free_memory_RAW();
             
-                      
           }
           
           pResultImage->Release();
