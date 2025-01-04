@@ -78,8 +78,10 @@ IF (APPLE)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
     ENDIF ()
 ELSEIF (WIN32)
-    SET(Torch_DIR "D:/libtorch-win-shared-with-deps-2.5.1+cu124/libtorch")
-    SET(CUDA_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4/lib/x64")
+    SET(Torch_DIR "D:/libtorch-win-shared-with-deps-debug-2.0.1+cu118/libtorch")
+    SET(CUDA_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
+    SET(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
+    SET(CUDA_SDK_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
     SET(OpenCV_DIR "C:/Users/Max Cooper/documents/opencv/install")
 ELSEIF (LINUX)
     SET(OpenCV_DIR "home/opencv/cmake/templates")
@@ -90,9 +92,16 @@ INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
+
+#list(APPEND CMAKE_PREFIX_PATH "${CUDA_DIR}")
+#message(status "${CMAKE_PREFIX_PATH}")
+#find_package(CUDA REQUIRED "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4" NO_DEFAULT_PATH)
+
+
+
 list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
 find_package(Torch REQUIRED)
-include_directories("${Torch_INCLUDE_DIRS}")
+#include_directories("${Torch_INCLUDE_DIRS}")
 
 IF (NOT OVERRRIDE_SPINNAKER)
 
@@ -230,7 +239,18 @@ IF (BUILD_PATHCAM_GUI)
         add_custom_command(TARGET pathCamApp
                 POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
-                "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/Debug/")
+                $<TARGET_FILE_DIR:pathCamApp>)
+  file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
+  add_custom_command(TARGET pathCamApp
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     ${TORCH_DLLS}
+                     $<TARGET_FILE_DIR:pathCamApp>)
+  add_custom_command(TARGET debayer
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                     ${TORCH_DLLS}
+                     $<TARGET_FILE_DIR:debayer>)
     endif ()
 
 

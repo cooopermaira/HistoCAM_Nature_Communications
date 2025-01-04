@@ -29,9 +29,13 @@ namespace pathCam {
                                                            scaleRepoMutex(new Poco::FastMutex()),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
-                                                           dr(new DiskReader(this)),
-im(new InferenceManager(this)){
-  
+                                                           dr(new DiskReader(this))
+{
+      inferencing = false;
+    if (inferencing) {
+      im = new InferenceManager(this);
+    }
+
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(10, 10);
 
@@ -173,12 +177,16 @@ im(new InferenceManager(this)){
     disk_thread.start(dr);
     Q_thread.start(qm);
     composite_thread.start(cm);
-    inference_thread.start(im);
+    if (inferencing) {
+        inference_thread.start(im);
+    }
 
     disk_thread.join();
     Q_thread.join();
     composite_thread.join();
-    inference_thread.join();
+    if (inferencing) {
+        inference_thread.join();
+    }
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);

@@ -125,6 +125,9 @@ namespace pathCam {
             inferencing = true;
             tile_encoder_path = Path(pConf->getString("io.tile_encoder"));
         }
+        else {
+            inferencing = false;
+        }
 
       if (pConf->has("io.output_log")) {
         std::string temp = pConf->getString("io.output_log");
