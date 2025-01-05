@@ -29,10 +29,11 @@ namespace pathCam {
                                                            scaleRepoMutex(new Poco::FastMutex()),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
-                                                           dr(new DiskReader(this))
-{
-      inferencing = false;
+                                                           dr(new DiskReader(this)),
+                                                           inferenceWait(false){
+
     if (inferencing) {
+      inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
     }
 
@@ -41,39 +42,38 @@ namespace pathCam {
 
 
     //lastFrame = Rect(0,0,image_width,image_height);
-    circleMask = cv::Mat::zeros(image_height,image_width, CV_8U);
+    circleMask = cv::Mat::zeros(image_height, image_width, CV_8U);
     cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
                -1);
-    regCircleMask = cv::Mat::zeros(image_height * scale_factor,image_width * scale_factor, CV_8U);
-    cv::circle(regCircleMask, cv::Point(float(image_width / 2) * scale_factor, float(image_height / 2) * scale_factor), scope_radius, cv::Scalar(255),
+    regCircleMask = cv::Mat::zeros(image_height * scale_factor, image_width * scale_factor, CV_8U);
+    cv::circle(regCircleMask, cv::Point(float(image_width / 2) * scale_factor, float(image_height / 2) * scale_factor),
+               scope_radius, cv::Scalar(255),
                -1);
 
     if (flat_field_file_2x.getExtension() == "Raw") {
-        char* buffer = new char[6464 * 4852];
-        std::ifstream stream;
-        stream.open(flat_field_file_2x.toString(), std::ios::binary);
-        stream.read(buffer, 6464 * 4852);
-        flat_field2X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
-        cvtColor(flat_field2X, flat_field2X, COLOR_BayerBG2BGR);
-        delete buffer;
-    }
-    else {
-        flat_field2X = cv::imread(flat_field_file_2x.toString());
+      char *buffer = new char[6464 * 4852];
+      std::ifstream stream;
+      stream.open(flat_field_file_2x.toString(), std::ios::binary);
+      stream.read(buffer, 6464 * 4852);
+      flat_field2X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
+      cvtColor(flat_field2X, flat_field2X, COLOR_BayerBG2BGR);
+      delete buffer;
+    } else {
+      flat_field2X = cv::imread(flat_field_file_2x.toString());
     }
 
     flat_field2X.convertTo(flat_field2X, CV_32F);
     flat_field2X *= 1 / 170.0;
 
     if (flat_field_file_4x.getExtension() == "Raw") {
-      char* buffer = new char[6464 * 4852];
+      char *buffer = new char[6464 * 4852];
       std::ifstream stream;
       stream.open(flat_field_file_4x.toString(), std::ios::binary);
       stream.read(buffer, 6464 * 4852);
       flat_field4X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
       cvtColor(flat_field4X, flat_field4X, COLOR_BayerBG2BGR);
       delete buffer;
-    }
-    else {
+    } else {
       flat_field4X = cv::imread(flat_field_file_4x.toString());
     }
 
@@ -81,33 +81,31 @@ namespace pathCam {
     flat_field4X *= 1 / 170.0;
 
     if (flat_field_file_10x.getExtension() == "Raw") {
-        char* buffer = new char[6464 * 4852];
-        std::ifstream stream;
-        stream.open(flat_field_file_10x.toString(), std::ios::binary);
-        stream.read(buffer, 6464 * 4852);
-        flat_field10X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
-        cvtColor(flat_field10X, flat_field10X, COLOR_BayerBG2BGR);
-        delete buffer;
+      char *buffer = new char[6464 * 4852];
+      std::ifstream stream;
+      stream.open(flat_field_file_10x.toString(), std::ios::binary);
+      stream.read(buffer, 6464 * 4852);
+      flat_field10X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
+      cvtColor(flat_field10X, flat_field10X, COLOR_BayerBG2BGR);
+      delete buffer;
+    } else {
+      flat_field10X = cv::imread(flat_field_file_10x.toString());
     }
-    else {
-        flat_field10X = cv::imread(flat_field_file_10x.toString());
-    }
-    flat_field10X.convertTo(flat_field10X,CV_32F);
+    flat_field10X.convertTo(flat_field10X, CV_32F);
     flat_field10X *= 1 / 170.0;
 
     if (flat_field_file_20x.getExtension() == "Raw") {
-      char* buffer = new char[6464 * 4852];
+      char *buffer = new char[6464 * 4852];
       std::ifstream stream;
       stream.open(flat_field_file_20x.toString(), std::ios::binary);
       stream.read(buffer, 6464 * 4852);
       flat_field20X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
       cvtColor(flat_field20X, flat_field20X, COLOR_BayerBG2BGR);
       delete buffer;
-    }
-    else {
+    } else {
       flat_field20X = cv::imread(flat_field_file_20x.toString());
     }
-    flat_field20X.convertTo(flat_field20X,CV_32F);
+    flat_field20X.convertTo(flat_field20X, CV_32F);
     flat_field20X *= 1 / 170.0;
 
   }
@@ -127,7 +125,6 @@ namespace pathCam {
   }
 
 
-
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx, Match *m) {
     resize_mmatch_mutex->writeLock();
     matchM.match[image_idx][prev_idx] = new Match(m);
@@ -135,14 +132,14 @@ namespace pathCam {
   }
 
   bool StreamCam::has_flatfield(int label) {
-    if (label == Image::_2X || label == Image::_4X || label == Image::_10X || Image::_20X){
+    if (label == Image::_2X || label == Image::_4X || label == Image::_10X || Image::_20X) {
       return true;
     }
     return false;
   }
 
   Mat StreamCam::get_flatfield(int label) {
-    switch (label){
+    switch (label) {
       case Image::_2X:
         return flat_field2X;
       case Image::_4X:
@@ -178,14 +175,14 @@ namespace pathCam {
     Q_thread.start(qm);
     composite_thread.start(cm);
     if (inferencing) {
-        inference_thread.start(im);
+      inference_thread.start(im);
     }
 
     disk_thread.join();
     Q_thread.join();
     composite_thread.join();
     if (inferencing) {
-        inference_thread.join();
+      inference_thread.join();
     }
 
     auto stop = std::chrono::high_resolution_clock::now();
@@ -216,7 +213,7 @@ namespace pathCam {
     image_mutex->unlock();
   }
 
-  void StreamCam::add_registration(pathCam::RegInfo* regInfo) {
+  void StreamCam::add_registration(pathCam::RegInfo *regInfo) {
     reg_results_mutex->writeLock();
     auto index = regInfo->index;
     reg_results[index] = regInfo;
@@ -225,10 +222,10 @@ namespace pathCam {
     image->regInfo = regInfo;
   }
 
-  bool StreamCam::get_registration(unsigned long image_idx, RegInfo* res) {
+  bool StreamCam::get_registration(unsigned long image_idx, RegInfo *res) {
     reg_results_mutex->readLock();
 
-    if (reg_results.size() <= image_idx || reg_results[image_idx] == nullptr){
+    if (reg_results.size() <= image_idx || reg_results[image_idx] == nullptr) {
       reg_results_mutex->unlock();
       return false;
     }
@@ -253,7 +250,7 @@ namespace pathCam {
   }
 
   RegInfo *StreamCam::get_registration(unsigned long image_idx) {
-    RegInfo* temp;
+    RegInfo *temp;
     reg_results_mutex->readLock();
     temp = reg_results[image_idx];
     reg_results_mutex->unlock();
@@ -268,10 +265,10 @@ namespace pathCam {
     return temp;
   }
 
-  void StreamCam::add_new_component_Q(unsigned long image_index, cv::Size image_size)  {
+  void StreamCam::add_new_component_Q(unsigned long image_index, cv::Size image_size) {
 
     auto component_index = increment_and_get_components();
-    if(component_index != 0){
+    if (component_index != 0) {
       //start job to find scale and offset
       auto xcm = new XCompRunnable(this, image_index, component_index);
       JobQ->add_runnable(xcm);
@@ -292,11 +289,11 @@ namespace pathCam {
     component_mutex->lock();
     composites.push_back(temp);
     if (composites.size() == 1) {
-      ri->set_abc(Vec2(0,0), component_index,true);
-      set_scale_and_offset(0,1,Point2f(0, 0));
+      ri->set_abc(Vec2(0, 0), component_index, true);
+      set_scale_and_offset(0, 1, Point2f(0, 0));
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
-      temp->update(std::vector<RegInfo*>{reg_results[image_index]});
+      temp->update(std::vector<RegInfo *>{reg_results[image_index]});
     } else {
       temp->store_new_info(ri);
       temp->imagePyramid->set_scale(0);
@@ -317,12 +314,31 @@ namespace pathCam {
     return get_image_refs(res);
   }
 
-  std::vector<RegInfo*> StreamCam::get_Q_front() {
+  std::vector<RegInfo *> StreamCam::get_Q_front() {
     compositeQ_mutex->lock();
-    std::vector<RegInfo*> temp = compositeBatch.top();
+    std::vector<RegInfo *> temp = compositeBatch.top();
     compositeBatch.pop();
     compositeQ_mutex->unlock();
     return temp;
+  }
+
+  std::pair<std::vector<Point2i>, unsigned int> StreamCam::get_tile_embed_Q_front() {
+    inferenceQMutex->lock();
+    if(tileEmbedQ.empty()){
+      inferenceQMutex->unlock();
+      return {};
+    }else {
+      auto temp = tileEmbedQ.front();
+      tileEmbedQ.pop();
+      inferenceQMutex->unlock();
+      return temp;
+    }
+  }
+
+  void StreamCam::push_tile_embed_Q(std::pair<std::vector<Point2i>, unsigned int> _tileSet) {
+    inferenceQMutex->lock();
+    tileEmbedQ.push(_tileSet);
+    inferenceQMutex->unlock();
   }
 
   Image *StreamCam::get_Q_front_Spin() {
@@ -334,12 +350,12 @@ namespace pathCam {
   }
 
   void StreamCam::pass_image(Image *image, unsigned long _image_index, bool _saveImg) {
-    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true,_saveImg);
+    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true, _saveImg);
     loaderCount++;
     JobQ->add_runnable(llr);
   }
 
-  void StreamCam::push_compositeQ(RegInfo* index) {
+  void StreamCam::push_compositeQ(RegInfo *index) {
     compositeQ_mutex->lock();
     compositeBatch.push({index});
     compositeQ_mutex->unlock();

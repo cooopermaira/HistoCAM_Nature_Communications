@@ -14,19 +14,36 @@ InferenceManager::InferenceManager(StreamCam* parent):parent(parent){
   torch::Device device(torch::kCPU);
   
   if (torch::cuda::is_available()) {
-    std::cout << "Using GPU (CUDA)." << std::endl;
+    std::cout << "Using GPU (CUDA)" << std::endl;
     device = torch::Device(torch::kCUDA);
-  } else {
+  } else if(torch::mps::is_available()){
+    std::cout << "Using GPU (MPS)" << std::endl;
+    device = torch::Device(torch::kMPS);
+  }
+  else {
     std::cout << "CUDA not available. Using CPU." << std::endl;
   }
   
   // Load the TorchScript model and move it to the selected device
   auto val = parent->tile_encoder_path.toString();
   torch::jit::script::Module model =  torch::jit::load(val);
+  model.eval();
   model.to(device);
-  
 }
 
-void InferenceManager::run(){}
+void InferenceManager::run(){
+
+  while(parent->compositing){
+
+    auto tileList = parent->get_tile_embed_Q_front();
+
+    if(tileList.first.empty()){
+      parent->inferenceWait.wait();
+    }else{
+      //parse and push tiles
+    }
+  }
+
+}
 
 }

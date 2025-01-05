@@ -20,25 +20,6 @@ OPTION(BUILD_PATHCAM_GUI "" ON)
 OPTION(OVERRRIDE_SPINNAKER "" OFF)
 OPTION(BUILD_SPINNAKER "" OFF)
 
-find_package(Git QUIET)
-if (GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-    # Update submodules as needed
-    option(GIT_SUBMODULE "Check submodules during build" ON)
-    if (GIT_SUBMODULE)
-        message(STATUS "Submodule update")
-        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                RESULT_VARIABLE GIT_SUBMOD_RESULT)
-        if (NOT GIT_SUBMOD_RESULT EQUAL "0")
-            message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
-        endif ()
-    endif ()
-endif ()
-
-if (NOT EXISTS "${PROJECT_SOURCE_DIR}/poco/CMakeLists.txt")
-    message(STATUS "Poco and NanoGUI were not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
-endif ()
-
 
 set(CMAKE_SKIP_INSTALL_RULES NO)
 
@@ -68,10 +49,11 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 add_subdirectory(poco)
 
 
-add_subdirectory(JUCE)
 
 
 IF (APPLE)
+    SET(JUCE_INSTALL_DESTINATION "lib/cmake/JUCE-7.0.10")
+    SET(JUCE_TOOL_INSTALL_DIR "bin/JUCE-7.0.10")
     SET(Torch_DIR "/Users/coopermaira/libtorch")
     SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
     IF (NOT OpenCV_DIR)
@@ -101,7 +83,8 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
 find_package(Torch REQUIRED)
-#include_directories("${Torch_INCLUDE_DIRS}")
+
+add_subdirectory(JUCE)
 
 IF (NOT OVERRRIDE_SPINNAKER)
 
