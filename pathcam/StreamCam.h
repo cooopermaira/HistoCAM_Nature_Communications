@@ -96,6 +96,7 @@ namespace pathCam {
     Poco::FastMutex *component_mutex;
     Poco::FastMutex *lastFrameMutex;
     Poco::FastMutex *scaleRepoMutex;
+    Poco::FastMutex *inferenceQMutex;
 
     cv::Rect_<float> lastFrame;
     bool showAsCircle;
@@ -178,13 +179,16 @@ namespace pathCam {
 
     std::vector<RegInfo*> get_Q_front();
 
+    std::pair<std::vector<Point2i>,unsigned int> get_tile_embed_Q_front();
+
+    void push_tile_embed_Q(std::pair<std::vector<Point2i>,unsigned int> tileSet);
+
     Image *get_Q_front_Spin();
 
     bool compositeQ_empty();
 
     void push_compositeQ(RegInfo* index);
 
-    //void reg_spanning_tree(unsigned int root_idx, Vec2 offset);
     void add_new_component(unsigned long image_index, cv::Size image_size, unsigned int component_index);
 
     void add_new_component_Q(unsigned long image_index, cv::Size image_size);
@@ -194,6 +198,7 @@ namespace pathCam {
     std::vector<bool> visited;
 
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
+    std::queue<std::pair<std::vector<Point2i>,unsigned int>> tileEmbedQ;
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;
@@ -205,13 +210,11 @@ namespace pathCam {
     std::atomic<unsigned int> matchableCount = 0;
     std::atomic<unsigned int> regCount = 0;
 
-    std::atomic<int> debugMatchSuspendThread = 0;
-
-//pathCam::ConsecQ RegistrationConsecQ;
-
     std::vector<DataObserver *> observers;
 
     Poco::Thread disk_thread, Q_thread, composite_thread, inference_thread;
+
+    Poco::Event inferenceWait;
 
   };
 
