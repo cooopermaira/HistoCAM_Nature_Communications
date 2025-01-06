@@ -15,10 +15,12 @@ namespace pathCam {
     if (torch::cuda::is_available()) {
       std::cout << "Using GPU (CUDA)" << std::endl;
       device = torch::Device(torch::kCUDA);
-    } else if (torch::mps::is_available()) {
+    } 
+    /*else if (torch::mps::is_available()) {
       std::cout << "Using GPU (MPS)" << std::endl;
       device = torch::Device(torch::kMPS);
-    } else {
+    }*/
+    else {
       std::cout << "GPU not available. Using CPU." << std::endl;
     }
 

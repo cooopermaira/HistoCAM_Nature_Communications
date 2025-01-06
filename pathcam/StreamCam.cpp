@@ -31,7 +31,7 @@ namespace pathCam {
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
                                                            inferenceWait(false) {
-
+      inferencing = false;
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);

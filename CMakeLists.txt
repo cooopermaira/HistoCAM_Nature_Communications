@@ -60,7 +60,7 @@ IF (APPLE)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
     ENDIF ()
 ELSEIF (WIN32)
-    SET(Torch_DIR "D:/libtorch-win-shared-with-deps-debug-2.0.1+cu118/libtorch")
+    SET(Torch_DIR "D:/libtorch-win-shared-with-deps-2.0.1+cu118/libtorch")
     SET(CUDA_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
     SET(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
     SET(CUDA_SDK_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
@@ -217,7 +217,7 @@ IF (BUILD_PATHCAM_GUI)
     target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 
     if (MSVC)
-        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Debug/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Debug/*.pdb")
+        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.pdb")
 
         add_custom_command(TARGET pathCamApp
                 POST_BUILD
