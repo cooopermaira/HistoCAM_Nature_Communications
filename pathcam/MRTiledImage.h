@@ -23,7 +23,7 @@ public:
   Poco::Event scaleSet;
  
   
-  MRTiledImage(unsigned int tile_size=512):tile_size(tile_size), scaleSet(false){};
+  MRTiledImage(unsigned int tile_size=256):tile_size(tile_size), scaleSet(false){};
   ~MRTiledImage(){ level.clear(); };
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);

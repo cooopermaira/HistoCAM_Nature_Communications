@@ -448,12 +448,19 @@ namespace pathCam {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
         imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
       }
-      auto pushForInferencing = push_for_inferencing(effectedTiles,effectedTilesNoMask);
-      inferenceCount += pushForInferencing.size();
 
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
 
+      std::vector<Point2i> tiles;
+      tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
+      tiles.insert(tiles.end(),effectedTiles.begin(),effectedTiles.end());
+      tiles.insert(tiles.end(),effectedTilesNoMask.begin(),effectedTilesNoMask.end());
+
+      auto pushForInferencing = push_for_inferencing(tiles);
+      if(pushForInferencing.size() > 0) {
+        parent->push_tile_embed_Q({pushForInferencing, componentIndex});
+      }
 
       //update pyramid bounds, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
@@ -478,16 +485,14 @@ namespace pathCam {
     parent->update_observers();
   }
 
-  std::vector<Point2i> CompositeVoronoi::push_for_inferencing(std::vector<Point2i> &effectedTiles,
-                                                              std::vector<Point2i> &effectedTilesNoMask) {
-    queuedTiles.end();
-    std::vector<Point2i> List3;
-    std::remove_copy_if(queuedTiles.begin(), queuedTiles.end(), std::back_inserter(List3),
-                        [&effectedTiles](const Point2i& arg)
-                        { return (std::find(effectedTiles.begin(), effectedTiles.end(), arg) != effectedTiles.end());});
+  std::vector<Point2i> CompositeVoronoi::push_for_inferencing(std::vector<Point2i> &_tiles) {
+    std::vector<Point2i> temp;
+    std::remove_copy_if(queuedTiles.begin(), queuedTiles.end(), std::back_inserter(temp),
+                        [&_tiles](const Point2i& arg)
+                        { return (std::find(_tiles.begin(), _tiles.end(), arg) != _tiles.end());});
 
-    queuedTiles = effectedTiles;
-    return List3;
+    queuedTiles = _tiles;
+    return temp;
   }
 
   void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
@@ -933,7 +938,7 @@ namespace pathCam {
     }
     if (update_box) {
       auto topLevelBeforeAdding = imagePyramid->level.back();
-      unsigned int tile_size = imagePyramid->level[0]->getTileSize();
+      unsigned int tile_size = imagePyramid->tile_size;
       unsigned int topLogicSize = imagePyramid->level.back()->getLogicSize();
       bool addedLevel = false;
       bool canResize = std::log2(tile_size) - imagePyramid->level.size() >= 1;

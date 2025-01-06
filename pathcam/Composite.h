@@ -95,7 +95,7 @@ namespace pathCam {
     Poco::Event wakeEvent;
     RegInfo* storedNewInfo;
 
-    std::vector<Point2i> push_for_inferencing(std::vector<Point2i>& effectedTiles,std::vector<Point2i>& effectedTilesNoMask);
+    std::vector<Point2i> push_for_inferencing(std::vector<Point2i> &_tiles);
 
     void check_set_render_info();
 

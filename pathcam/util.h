@@ -10,6 +10,15 @@
 
 namespace pathCam {
 
+  struct PointComparator {
+    bool operator()(const cv::Point2i& lhs, const cv::Point2i& rhs) const {
+      if (lhs.x != rhs.x) {
+        return lhs.x < rhs.x; // Compare x-coordinates
+      }
+      return lhs.y < rhs.y;     // Compare y-coordinates if x-coordinates are equal
+    }
+  };
+
   class Vec2 {
   public:
     double x, y;

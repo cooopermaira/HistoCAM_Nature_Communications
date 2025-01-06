@@ -132,13 +132,22 @@ namespace pathCam {
   class InferenceManager : public Poco::Runnable {
   private:
     StreamCam *parent;
+    Mat threeChannelPreallocated;
+    torch::Device device;
+    torch::jit::script::Module model;
 
   public:
     InferenceManager(StreamCam *parent);
     
     virtual void run();
 
-    std::map<unsigned int,std::shared_ptr< MRTiledImage >> pyramidRef;
+    int cropedDim;
+    int embedSize;
+    torch::Tensor mean;
+    torch::Tensor stddv;
+    torch::Tensor tileEmbeds;
+    std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
+
   };
 
 

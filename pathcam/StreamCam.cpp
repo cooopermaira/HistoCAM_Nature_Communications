@@ -30,7 +30,7 @@ namespace pathCam {
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
-                                                           inferenceWait(false){
+                                                           inferenceWait(false) {
 
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
@@ -323,22 +323,33 @@ namespace pathCam {
   }
 
   std::pair<std::vector<Point2i>, unsigned int> StreamCam::get_tile_embed_Q_front() {
+    std::pair<std::vector<Point2i>, unsigned int> temp;
+
     inferenceQMutex->lock();
-    if(tileEmbedQ.empty()){
+    if (!tileEmbedQ.empty()) {
+      unsigned int component_index = tileEmbedQ.front().second;
+
+
+      while (!tileEmbedQ.empty() && tileEmbedQ.front().second == component_index && temp.first.size() < 512) {
+        temp.first.insert(temp.first.end(), tileEmbedQ.front().first.begin(), tileEmbedQ.front().first.end());
+        tileEmbedQ.pop();
+      }
+      inferenceQMutex->unlock();
+      temp.second = component_index;
+      return temp;
+
+    } else {
       inferenceQMutex->unlock();
       return {};
-    }else {
-      auto temp = tileEmbedQ.front();
-      tileEmbedQ.pop();
-      inferenceQMutex->unlock();
-      return temp;
     }
+
   }
 
   void StreamCam::push_tile_embed_Q(std::pair<std::vector<Point2i>, unsigned int> _tileSet) {
     inferenceQMutex->lock();
     tileEmbedQ.push(_tileSet);
     inferenceQMutex->unlock();
+    inferenceWait.set();
   }
 
   Image *StreamCam::get_Q_front_Spin() {
