@@ -8,6 +8,15 @@
 #ifndef util_h
 #define util_h
 
+namespace std {
+  template <>
+  struct hash<cv::Point2i> {
+    std::size_t operator()(const cv::Point2i& p) const noexcept {
+      return std::hash<int>()(p.x) ^ (std::hash<int>()(p.y) << 1);
+    }
+  };
+}
+
 namespace pathCam {
 
   struct PointComparator {
@@ -74,6 +83,62 @@ namespace pathCam {
     }
 
   };
+
+
+  template <typename T, typename Hash = std::hash<T>>
+  class UniqueQueue {
+  private:
+    std::queue<T> q;                  // To store elements in FIFO order
+    std::unordered_set<T, Hash> seen;        // To track unique elements
+
+  public:
+
+    // Push an element into the queue if it is not already present
+    void push(const T& value) {
+      if (seen.find(value) == seen.end()) { // Check for uniqueness
+        q.push(value);                   // Add to the queue
+        seen.insert(value);              // Mark as seen
+      }
+    }
+
+    // Pop an element from the front of the queue
+    void pop() {
+      if (!q.empty()) {
+        T value = q.front();
+        q.pop();                         // Remove from the queue
+        seen.erase(value);               // Remove from the set
+      }
+    }
+
+    // Get the front element of the queue
+    T front() const {
+      if (!q.empty()) {
+        return q.front();
+      }
+      throw std::runtime_error("Queue is empty!");
+    }
+
+    // Check if the queue is empty
+    bool empty() const {
+      return q.empty();
+    }
+
+    // Get the size of the queue
+    size_t size() const {
+      return q.size();
+    }
+  };
+
+  struct PairHash {
+    template <typename T1, typename T2>
+    std::size_t operator()(const std::pair<T1, T2>& p) const {
+      std::size_t h1 = std::hash<T1>()(p.first);  // Hash the first element
+      std::size_t h2 = std::hash<T2>()(p.second); // Hash the second element
+      return h1 ^ (h2 << 1);                      // Combine the two hashes
+    }
+  };
+
+
 
 
   class ThreadQueue {

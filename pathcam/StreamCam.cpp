@@ -30,7 +30,8 @@ namespace pathCam {
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
-                                                           inferenceWait(false) {
+                                                           inferenceWait(false),
+                                                           microscopeInput(true){
 
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
@@ -322,20 +323,19 @@ namespace pathCam {
     return temp;
   }
 
-  std::pair<std::vector<Point2i>, unsigned int> StreamCam::get_tile_embed_Q_front() {
-    std::pair<std::vector<Point2i>, unsigned int> temp;
+  std::vector<std::pair<Point2i, unsigned int>> StreamCam::get_tile_embed_Q_front() {
+    std::vector<std::pair<Point2i,unsigned int>> temp;
 
     inferenceQMutex->lock();
     if (!tileEmbedQ.empty()) {
       unsigned int component_index = tileEmbedQ.front().second;
 
 
-      while (!tileEmbedQ.empty() && tileEmbedQ.front().second == component_index && temp.first.size() < 512) {
-        temp.first.insert(temp.first.end(), tileEmbedQ.front().first.begin(), tileEmbedQ.front().first.end());
+      while (!tileEmbedQ.empty() && tileEmbedQ.front().second == component_index && temp.size() < 512) {
+        temp.push_back(tileEmbedQ.front());
         tileEmbedQ.pop();
       }
       inferenceQMutex->unlock();
-      temp.second = component_index;
       return temp;
 
     } else {
@@ -345,7 +345,7 @@ namespace pathCam {
 
   }
 
-  void StreamCam::push_tile_embed_Q(std::pair<std::vector<Point2i>, unsigned int> _tileSet) {
+  void StreamCam::push_tile_embed_Q(std::pair<Point2i, unsigned int> _tileSet) {
     inferenceQMutex->lock();
     tileEmbedQ.push(_tileSet);
     inferenceQMutex->unlock();

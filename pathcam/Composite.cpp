@@ -458,8 +458,9 @@ namespace pathCam {
       tiles.insert(tiles.end(),effectedTilesNoMask.begin(),effectedTilesNoMask.end());
 
       auto pushForInferencing = push_for_inferencing(tiles);
-      if(pushForInferencing.size() > 0) {
-        parent->push_tile_embed_Q({pushForInferencing, componentIndex});
+
+      for (auto tilePoint : pushForInferencing){
+        parent->push_tile_embed_Q({tilePoint,componentIndex});
       }
 
       //update pyramid bounds, reset mask

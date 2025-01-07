@@ -179,9 +179,9 @@ namespace pathCam {
 
     std::vector<RegInfo*> get_Q_front();
 
-    std::pair<std::vector<Point2i>,unsigned int> get_tile_embed_Q_front();
+    std::vector<std::pair<Point2i,unsigned int>> get_tile_embed_Q_front();
 
-    void push_tile_embed_Q(std::pair<std::vector<Point2i>,unsigned int> tileSet);
+    void push_tile_embed_Q(std::pair<Point2i,unsigned int> tileSet);
 
     Image *get_Q_front_Spin();
 
@@ -198,7 +198,7 @@ namespace pathCam {
     std::vector<bool> visited;
 
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
-    std::queue<std::pair<std::vector<Point2i>,unsigned int>> tileEmbedQ;
+    UniqueQueue<std::pair<Point2i,unsigned int>,PairHash> tileEmbedQ;
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;
@@ -216,6 +216,8 @@ namespace pathCam {
 
     Poco::Event inferenceWait;
 
+    //debug inference
+    int duplicateInferenceCount = 0;
   };
 
 }

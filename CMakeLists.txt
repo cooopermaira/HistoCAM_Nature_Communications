@@ -49,12 +49,9 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 add_subdirectory(poco)
 
 
-
-
 IF (APPLE)
-    SET(JUCE_INSTALL_DESTINATION "lib/cmake/JUCE-7.0.10")
-    SET(JUCE_TOOL_INSTALL_DIR "bin/JUCE-7.0.10")
     SET(Torch_DIR "/Users/coopermaira/libtorch")
+    add_compile_definitions(WITH_MPS)
     SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
     IF (NOT OpenCV_DIR)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
@@ -73,12 +70,6 @@ INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
-
-
-#list(APPEND CMAKE_PREFIX_PATH "${CUDA_DIR}")
-#message(status "${CMAKE_PREFIX_PATH}")
-#find_package(CUDA REQUIRED "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.4" NO_DEFAULT_PATH)
-
 
 
 list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
@@ -120,8 +111,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 FILE(GLOB PATHCAM_FILES pathcam/*.h pathcam/*.cpp)
 
 IF (NOT BUILD_SPINNAKER)
-  list(FILTER PATHCAM_FILES EXCLUDE REGEX SpinPath)
-ENDIF()
+    list(FILTER PATHCAM_FILES EXCLUDE REGEX SpinPath)
+ENDIF ()
 
 add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
@@ -223,21 +214,21 @@ IF (BUILD_PATHCAM_GUI)
                 POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
                 $<TARGET_FILE_DIR:pathCamApp>)
-  file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
-  add_custom_command(TARGET pathCamApp
-                     POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     ${TORCH_DLLS}
-                     $<TARGET_FILE_DIR:pathCamApp>)
-  add_custom_command(TARGET debayer
-                     POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                     ${TORCH_DLLS}
-                     $<TARGET_FILE_DIR:debayer>)
+        file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
+        add_custom_command(TARGET pathCamApp
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TORCH_DLLS}
+                $<TARGET_FILE_DIR:pathCamApp>)
+        add_custom_command(TARGET debayer
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TORCH_DLLS}
+                $<TARGET_FILE_DIR:debayer>)
     endif ()
 
 
-ENDIF ()
+    ENDIF ()
 
 
 

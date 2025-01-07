@@ -15,10 +15,14 @@ namespace pathCam {
     if (torch::cuda::is_available()) {
       std::cout << "Using GPU (CUDA)" << std::endl;
       device = torch::Device(torch::kCUDA);
-    } else if (torch::mps::is_available()) {
+    }
+#ifdef WITH_MPS
+    else if (torch::mps::is_available()) {
       std::cout << "Using GPU (MPS)" << std::endl;
       device = torch::Device(torch::kMPS);
-    } else {
+    }
+#endif
+    else {
       std::cout << "GPU not available. Using CPU." << std::endl;
     }
 
@@ -45,16 +49,17 @@ namespace pathCam {
   }
 
   void InferenceManager::run() {
+    int count = 0;
     torch::NoGradGuard noGrad;
     while (parent->compositing) {
 
       auto tileList = parent->get_tile_embed_Q_front();
 
-      if (tileList.first.empty()) {
+      if (tileList.empty()) {
         parent->inferenceWait.wait();
       } else {
-        unsigned int component = tileList.second;
-        size_t numImages = tileList.first.size();
+        unsigned int component = tileList[0].second;
+        size_t numImages = tileList.size();
         auto pyramidLevel = parent->composites[component]->imagePyramid->level[0];
         int tileSize = parent->composites[component]->imagePyramid->tile_size;
         auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), tileSize, tileSize, 3},torch::kFloat32);
@@ -63,15 +68,18 @@ namespace pathCam {
         for (int i = 0; i < numImages; i++) {
 
           //add to coord dict
-          if(tileCoordToTensorIndex.find(tileList.first[i]) == tileCoordToTensorIndex.end()){
-            tileCoordToTensorIndex.insert({tileList.first[i],tileCoordToTensorIndex.size()});
+          if(tileCoordToTensorIndex.find(tileList[i].first) == tileCoordToTensorIndex.end()){
+            tileCoordToTensorIndex.insert({tileList[i].first,tileCoordToTensorIndex.size()});
+          }else{
+            parent->duplicateInferenceCount++;
           }
 
-          cvtColor(pyramidLevel->getTile(tileList.first[i].x, tileList.first[i].y), threeChannelPreallocated,
+          cvtColor(pyramidLevel->getTile(tileList[i].first.x, tileList[i].first.y), threeChannelPreallocated,
                    COLOR_BGRA2RGB);
           //clone would be necessary if not immediately moved to gpu
           batch_tensor[i] = torch::from_blob(threeChannelPreallocated.data, {tileSize, tileSize, 3});
 
+          count++;
         }
         //send data before cropping. not sure if this is the way to go since you send data you end up cropping out.
         batch_tensor = batch_tensor.to(device);
@@ -96,7 +104,7 @@ namespace pathCam {
 
         //add new tile embedding to the list, if a tile has been run previously, overwrite it
         for (int i = 0; i < numImages; i++){
-          auto locationInList = tileCoordToTensorIndex[tileList.first[i]];
+          auto locationInList = tileCoordToTensorIndex[tileList[i].first];
           tileEmbeds[locationInList] = output[i];
         }
 
