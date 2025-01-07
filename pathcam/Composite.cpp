@@ -457,8 +457,9 @@ namespace pathCam {
       tiles.insert(tiles.end(),effectedTiles.begin(),effectedTiles.end());
       tiles.insert(tiles.end(),effectedTilesNoMask.begin(),effectedTilesNoMask.end());
 
-      auto pushForInferencing = push_for_inferencing(tiles);
 
+      auto pushForInferencing = push_for_inferencing(tiles);
+      
       for (auto tilePoint : pushForInferencing){
         parent->push_tile_embed_Q({tilePoint,componentIndex});
       }
