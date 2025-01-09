@@ -110,7 +110,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("");
+      i->save_pyramid_as_image();
 
     }
   }

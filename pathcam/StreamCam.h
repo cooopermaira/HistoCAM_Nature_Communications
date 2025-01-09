@@ -204,6 +204,7 @@ namespace pathCam {
     std::queue<Image *> spin_image_buffer;
 
     std::atomic<bool> compositing = true;
+    std::atomic<bool> tileEmbeddingComplete = false;
     std::atomic<unsigned int> components = 0;
     std::atomic<unsigned int> diskCount = 0;
     std::atomic<unsigned int> loaderCount = 0;

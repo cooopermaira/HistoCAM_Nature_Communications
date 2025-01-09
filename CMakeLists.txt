@@ -50,21 +50,37 @@ add_subdirectory(poco)
 
 
 IF (APPLE)
-    SET(Torch_DIR "/Users/coopermaira/libtorch")
+    SET(Torch_DIR "/Users/coopermaira/libtorch_2.4.0")
     add_compile_definitions(WITH_MPS)
+
     SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
     IF (NOT OpenCV_DIR)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
     ENDIF ()
+
+    set(Python3_INCLUDE_DIR "/opt/homebrew/Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/include/python3.12")
+    set(Python3_LIBRARY_DIR "/opt/homebrew/Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/lib")
+    set(Python3_LIB "/opt/homebrew//Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/lib/python3.12/config-3.12-darwin/libpython3.12.dylib")
 ELSEIF (WIN32)
     SET(Torch_DIR "D:/libtorch-win-shared-with-deps-2.0.1+cu118/libtorch")
     SET(CUDA_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
     SET(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
     SET(CUDA_SDK_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
+
     SET(OpenCV_DIR "C:/Users/Max Cooper/documents/opencv/install")
+
+    set(Python3_INCLUDE_DIR "C:/Program Files/Python311/Include")
+    set(Python3_LIBRARY_DIR "C:/Program Files/Python311/libs")
+    set(Python3_LIB "python311")
+
 ELSEIF (LINUX)
     SET(OpenCV_DIR "home/opencv/cmake/templates")
 ENDIF ()
+
+link_directories(${Python3_INCLUDE_DIR})
+include_directories(${Python3_INCLUDE_DIR})
+
+#find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
@@ -120,6 +136,7 @@ include_directories(pathcam)
 
 
 target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES})
+target_link_directories(pathCamLib PRIVATE ${Python3_LIBRARY_DIR})
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})
@@ -203,7 +220,10 @@ IF (BUILD_PATHCAM_GUI)
             juce::juce_events
             juce::juce_graphics
             juce::juce_opengl
+            ${Python3_LIB}
     )
+
+
 
     target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 

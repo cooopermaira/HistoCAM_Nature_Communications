@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <queue>
+#include <Python.h>
 
 #include "opencv2/core.hpp"
 
@@ -28,6 +29,7 @@
 #include "Poco/RWLock.h"
 #include "Poco/Runnable.h"
 #include "Poco/Thread.h"
+#include "Poco/RunnableAdapter.h"
 #include "Poco/MemoryPool.h"
 #include "Poco/File.h"
 #include "Poco/Path.h"

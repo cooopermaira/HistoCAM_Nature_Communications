@@ -13,6 +13,53 @@
 using Poco::DirectoryIterator;
 
 namespace pathCam {
+
+    Mat ConvertBGR2Bayer(Mat BGRImage) {
+
+        /*
+        Assuming a Bayer filter that looks like this:
+
+        # // 0  1  2  3  4  5
+        /////////////////////
+        0 // B  G  B  G  B  G
+        1 // G  R  G  R  G  R
+        2 // B  G  B  G  B  G
+        3 // G  R  G  R  G  R
+        4 // B  G  B  G  B  G
+        5 // G  R  G  R  G  R
+
+        */
+
+
+        Mat BayerImage(BGRImage.rows, BGRImage.cols, CV_8UC1);
+
+        int channel;
+
+        for (int row = 0; row < BayerImage.rows; row++)
+        {
+            for (int col = 0; col < BayerImage.cols; col++)
+            {
+                if (row % 2 == 0)
+                {
+                    //even columns and even rows = blue = channel:0
+                    //even columns and uneven rows = green = channel:1 
+                    channel = (col % 2 == 0) ? 0 : 1;
+                }
+                else
+                {
+                    //uneven columns and even rows = green = channel:1
+                    //uneven columns and uneven rows = red = channel:2 
+                    channel = (col % 2 == 0) ? 1 : 2;
+                }
+
+                BayerImage.at<uchar>(row, col) = BGRImage.at<Vec3b>(row, col).val[channel];
+            }
+        }
+
+        return BayerImage;
+    }
+
+
   DiskReader::DiskReader(StreamCam *parent) : parent(parent) {
     parent->microscopeInput = true;
   }
@@ -61,7 +108,7 @@ namespace pathCam {
   void DebayerRunnable::run() {
     Poco::Path o = outfile;
     o.append(image->image_file.getFileName());
-    o.setExtension("png");
+    o.setExtension("Raw");
     image->load_raw_from_disk();
 
     bool convertAndSave = true;
@@ -86,12 +133,19 @@ namespace pathCam {
 
         image_Mat.convertTo(image_Mat, CV_32FC3);
 
-        cv::pow(image_Mat, 1.1, image_Mat);
+        cv::pow(image_Mat, 1.09, image_Mat);
 
         image_Mat.convertTo(image_Mat, CV_8UC3);
+        image_Mat = ConvertBGR2Bayer(image_Mat);
 
-
-        imwrite(o.toString(), image_Mat);
+        
+        std::fstream file;
+        file = std::fstream(o.toString(), std::ios::out | std::ios::binary);
+        if (file.fail()) {
+            throw new std::exception;
+        }
+        file.write(reinterpret_cast<const char*>(image_Mat.data), image->width * image->height);
+        //imwrite(o.toString(), image_Mat);
       }
       catch (...) {
         int k = 0;

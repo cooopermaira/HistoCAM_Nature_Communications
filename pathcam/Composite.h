@@ -174,7 +174,7 @@ namespace pathCam {
     std::map<std::string,int> tileToSumNonZero;
     bool rebuildTile(Point2i tile,int sum);
     void notify_job_complete();
-    void save_pyramid_as_image(std::string _fileName = "");
+    void save_pyramid_as_image(std::string _fileName = "", bool _withGridAndIndexes = false);
 
   protected:
     //std::vector<std::pair<int,int>> falselyClaimedTiles;

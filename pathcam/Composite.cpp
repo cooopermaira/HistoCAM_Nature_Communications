@@ -349,7 +349,8 @@ namespace pathCam {
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
-        if (parent->has_flatfield(images[i]->label)) {
+        //if (parent->has_flatfield(images[i]->label)) {
+        if(false){
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
           cv::pow(convertHolding, 1.09, convertHolding);
@@ -448,22 +449,23 @@ namespace pathCam {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
         imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
       }
-
+      
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
-
-      std::vector<Point2i> tiles;
-      tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
-      tiles.insert(tiles.end(),effectedTiles.begin(),effectedTiles.end());
-      tiles.insert(tiles.end(),effectedTilesNoMask.begin(),effectedTilesNoMask.end());
-
-
-      auto pushForInferencing = push_for_inferencing(tiles);
       
-      for (auto tilePoint : pushForInferencing){
-        parent->push_tile_embed_Q({tilePoint,componentIndex});
-      }
+      if (parent->inferencing) {
+          std::vector<Point2i> tiles;
+          tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
+          tiles.insert(tiles.end(), effectedTiles.begin(), effectedTiles.end());
+          tiles.insert(tiles.end(), effectedTilesNoMask.begin(), effectedTilesNoMask.end());
 
+
+          auto pushForInferencing = push_for_inferencing(tiles);
+
+          for (auto tilePoint : pushForInferencing) {
+              parent->push_tile_embed_Q({ tilePoint,componentIndex });
+          }
+      }
       //update pyramid bounds, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
       freshMask.copyTo(polyMaskOutput);
@@ -743,7 +745,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::save_pyramid_as_image(std::string _fileName) {
+  void CompositeVoronoi::save_pyramid_as_image(std::string _fileName,bool _withGridAndIndexes) {
     auto rootoffsetPoint = Point2f(root_offset.x, root_offset.y);
     auto maxOffsetPoint = Point2f(max_offset.x, max_offset.y);
     auto level = imagePyramid->level[0];
@@ -759,17 +761,26 @@ namespace pathCam {
     //we need to shift the x and y tiles so we aren't writing to negtive coordinates
     int x_offset = -ul.x;
     int y_offset = -ul.y;
-    //for removing excess empty pixels around edge tiles
-    int left_offset = std::abs(ul.x * tile_size - rootoffsetPoint.x);
-    int top_offset = std::abs(ul.y * tile_size - rootoffsetPoint.y);
-    int right_offset = std::abs(lr.x * tile_size - maxOffsetPoint.x);
-    int bottom_offset = std::abs(lr.y * tile_size - maxOffsetPoint.y);
+
     for (int i = ul.x; i <= lr.x; i++) {
       for (int j = ul.y; j <= lr.y; j++) {
-        Mat tile = level->getTile(i, j);
-        //imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
-        tile.copyTo(pyramidImage(Rect((i + x_offset) * tile.cols, (j + y_offset) * tile.rows, tile.cols, tile.rows)));
-      }
+          try {
+              Mat tile = level->getTile(i, j);
+              if (_withGridAndIndexes) {
+                  cv::line(tile, cv::Point(0, 0), cv::Point(0, tile_size - 1), Scalar(0, 0, 0, 255));
+                  cv::line(tile, cv::Point(0, tile_size - 1), cv::Point(tile_size - 1, tile_size - 1), Scalar(0, 0, 0, 255));
+                  cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(tile_size - 1, tile_size - 1), Scalar(0, 0, 0, 255));
+                  cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(0, 0), Scalar(0, 0, 0, 255));
+                  putText(tile, "(" + std::to_string(i) + "," + std::to_string(j) + ")", Point(10, 50), FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0, 255));
+              }
+              //imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
+              tile.copyTo(pyramidImage(Rect((i + x_offset) * tile.cols, (j + y_offset) * tile.rows, tile.cols, tile.rows)));
+          }
+          catch (const cv::Exception& e) {
+              auto k = e.what();
+              int kk = 0;
+          }
+          }
     }
     //currently hardcoded, maybe add an output directory in config?
     String path = "pyramidImage" + std::to_string(componentIndex) + "_" + std::to_string(imagePyramid->scale) + ".png";

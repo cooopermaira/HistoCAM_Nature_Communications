@@ -34,6 +34,9 @@ public:
   Poco::Path flat_field_file_10x;
   Poco::Path flat_field_file_20x;
     Poco::Path tile_encoder_path;
+    Poco::Path slide_encoder_path;
+    Poco::Path python_venv_path;
+
 
   
   //Registration Params
@@ -42,6 +45,8 @@ public:
   bool debayer;
   bool real;
   bool inferencing;
+  bool slideEncoding;
+  bool pyVenv;
   int interpolation;
   int feature_type;
   unsigned int image_width;

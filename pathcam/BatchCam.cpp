@@ -129,6 +129,22 @@ namespace pathCam {
             inferencing = false;
         }
 
+        if (pConf->has("io.slide_encoder")) {
+            slideEncoding = true;
+            slide_encoder_path = Path(pConf->getString("io.slide_encoder"));
+        }
+        else {
+            slideEncoding = false;
+        }
+
+        if (pConf->has("io.python_venv")) {
+            pyVenv = true;
+            python_venv_path = Path(pConf->getString("io.python_venv"));
+        }
+        else {
+            pyVenv = false;
+        }
+
       if (pConf->has("io.output_log")) {
         std::string temp = pConf->getString("io.output_log");
         Path temp_log = Path(temp);

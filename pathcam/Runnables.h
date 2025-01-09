@@ -134,12 +134,21 @@ namespace pathCam {
     StreamCam *parent;
     Mat threeChannelPreallocated;
     torch::Device device;
-    torch::jit::script::Module model;
+    torch::jit::script::Module tileEncoderModel;
+    PyObject* slideEncoder;
+    Poco::Thread thread;
+    Poco::RunnableAdapter<InferenceManager> adapter;
 
   public:
+
+
+
     InferenceManager(StreamCam *parent);
     
     virtual void run();
+    void run_slide_analysis();
+    void initializeModel();
+    void slide_encoder_inference();
 
     int cropedDim;
     int embedSize;
@@ -147,7 +156,6 @@ namespace pathCam {
     torch::Tensor stddv;
     torch::Tensor tileEmbeds;
     std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
-
   };
 
 
