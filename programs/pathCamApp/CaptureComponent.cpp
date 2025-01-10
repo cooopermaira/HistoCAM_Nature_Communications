@@ -40,6 +40,26 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 
   captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
   addAndMakeVisible(captureOverlay.get());
+  aiOverlay.reset(new AIOverlay(this, iconNames, iconsFromZipFile));
+  addAndMakeVisible(aiOverlay.get());
+
+                                                          
+}
+
+void CaptureComponent::resized() {
+
+    ImageViewComponent::resized();
+
+    {
+        const ScopedLock lock(mutex);
+        juce::Rectangle<int> b = getLocalBounds();
+        int width = 300;
+        captureOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - width - 20, 20, width, 60));
+        aiOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - 100 - 20,
+                                                  b.getHeight() - 100 - 20, 100, 100));
+
+    }
+
 }
 
 void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {

@@ -20,7 +20,8 @@ class StreamCam;
 class CaptureComponent : public ImageViewComponent {
   
   friend class CaptureOverlay;
-  
+  friend class AIOverlay;
+
 public:
     CaptureComponent(std::shared_ptr<fRectangle> view,
         StringArray& iconNames,
@@ -38,21 +39,9 @@ public:
 
     MainComponent *parent;
 
-    void resized() {
+    void resized() override;
 
-        ImageViewComponent::resized();
-
-        {
-            const ScopedLock lock(mutex);
-            juce::Rectangle<int> b = getLocalBounds();
-            int width = 300;
-            captureOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - width - 20, 20, width, 60));
-
-        }
-
-    }
-
-    bool keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) {
+    bool keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) override {
         ImageViewComponent::keyPressed(key, originatingComponent);
 
         if (!isVisible()) { return false; }
@@ -93,6 +82,8 @@ public:
 
 private:
     std::unique_ptr<CaptureOverlay> captureOverlay;
+    std::unique_ptr<AIOverlay> aiOverlay;
+
     Poco::Thread compositeThread;
     bool recording;
     bool simulating;
