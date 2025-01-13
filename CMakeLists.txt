@@ -73,9 +73,20 @@ ELSEIF (WIN32)
     set(Python3_LIBRARY_DIR "C:/Program Files/Python311/libs")
     set(Python3_LIB "python311")
 
-ELSEIF (LINUX)
-    SET(OpenCV_DIR "home/opencv/cmake/templates")
-ENDIF ()
+    ENDIF()
+    SET(Torch_DIR "/home/max/libtorch-cxx11-abi-shared-with-deps-2.0.1+cu118/libtorch")
+
+    SET(Python3_INCLUDE_DIR "/usr/include/python3.10")
+    SET(Python3_LIBRARY_DIR "/usr/lib/python3.10/config-3.10-x86_64-linux-gnu")
+    SET(Python3_LIB "/usr/lib/python3.10/config-3.10-x86_64-linux-gnu/libpython3.10.so")
+
+    set(CMAKE_CUDA_COMPILER "/usr/local/cuda-11.8/bin/nvcc")
+    SET(CUDAToolkit_ROOT_DIR "/usr/local/cuda-11.8" CACHE PATH "CUDA toolkit root")
+    set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-11.8/bin/nvcc")
+    set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
+    set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
+    set(CMAKE_CUDA_ARCHITECTURES "native")
+
 
 link_directories(${Python3_INCLUDE_DIR})
 include_directories(${Python3_INCLUDE_DIR})
@@ -135,8 +146,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 include_directories(pathcam)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES})
-target_link_directories(pathCamLib PRIVATE ${Python3_LIBRARY_DIR})
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB})
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})
