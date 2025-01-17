@@ -35,13 +35,13 @@ namespace pathCam {
     }
 
 
-    if(image->check_blur() < 100){
-      successful = true;
-      parent->loaderCount--;
-      image->free_memory_RAW();
-      jobComplete.set();
-      return;
-    }
+    // if(image->check_blur() < 100){
+    //   successful = true;
+    //   parent->loaderCount--;
+    //   image->free_memory_RAW();
+    //   jobComplete.set();
+    //   return;
+    // }
     image->index = image_index;
     image->find_label();
 
@@ -60,6 +60,7 @@ namespace pathCam {
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real,true,parent->get_flatfield(image->label));
+
 
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;

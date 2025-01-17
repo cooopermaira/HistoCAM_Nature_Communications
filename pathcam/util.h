@@ -18,63 +18,6 @@ namespace std {
 }
 
 namespace pathCam {
-
-//    std::string getPythonErrorMessage() {
-//        PyObject* ptype, * pvalue, * ptraceback;
-//        PyErr_Fetch(&ptype, &pvalue, &ptraceback); // Fetch the error details
-//        PyErr_NormalizeException(&ptype, &pvalue, &ptraceback);
-//
-//        std::string error_message = "Unknown error";
-//
-//        if (pvalue != nullptr) {
-//            PyObject* pStr = PyObject_Str(pvalue); // Convert error value to string
-//            if (pStr != nullptr) {
-//                error_message = PyUnicode_AsUTF8(pStr); // Extract UTF-8 string
-//                Py_XDECREF(pStr);
-//            }
-//        }
-//
-//        // Cleanup
-//        Py_XDECREF(ptype);
-//        Py_XDECREF(pvalue);
-//        Py_XDECREF(ptraceback);
-//
-//        return error_message;
-//    }
-
-
-//    void initializePython(std::string venv_python_path) {
-//      // Python configuration for interpreter initialization
-//      PyConfig config;
-//      PyConfig_InitPythonConfig(&config); // Initialize the configuration
-//
-//      // Convert the venv path to wchar_t*
-//      wchar_t* program_name = Py_DecodeLocale(venv_python_path.c_str(), nullptr);
-//      if (program_name == nullptr) {
-//        throw std::runtime_error("Failed to decode venv path to wchar_t.");
-//      }
-//
-//      // Set the program name in the configuration
-//      PyStatus status = PyConfig_SetString(&config, &config.program_name, program_name);
-//      PyMem_RawFree(program_name); // Free the allocated memory
-//      if (PyStatus_Exception(status)) {
-//        PyErr_Print();
-//        PyConfig_Clear(&config);
-//        throw std::runtime_error("Failed to set program name.");
-//      }
-//
-//      // Initialize the Python interpreter with the configuration
-//      status = Py_InitializeFromConfig(&config);
-//      if (PyStatus_Exception(status)) {
-//        PyErr_Print();
-//        PyConfig_Clear(&config);
-//        throw std::runtime_error("Failed to initialize Python interpreter.");
-//      }
-//
-//      PyConfig_Clear(&config); // Clear configuration after initialization
-//    }
-
-
   struct PointComparator {
     bool operator()(const cv::Point2i& lhs, const cv::Point2i& rhs) const {
       if (lhs.x != rhs.x) {

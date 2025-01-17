@@ -135,7 +135,8 @@ namespace pathCam {
     Mat threeChannelPreallocated;
     torch::Device device;
     torch::jit::script::Module tileEncoderModel;
-    PyObject* slideEncoder;
+    PyObject* slideAggregator;
+    PyObject *pModule;
     Poco::Thread thread;
     Poco::RunnableAdapter<InferenceManager> adapter;
 
@@ -147,15 +148,25 @@ namespace pathCam {
     
     virtual void run();
     void run_slide_analysis();
-    void initializeModel();
-    void slide_encoder_inference();
+    void initialize_aggregator();
+    PyObject* tensorToList2(const torch::Tensor& tensor);
+    void run_slide_aggregation();
 
+    int minx;
+    int miny;
     int cropedDim;
     int embedSize;
+
+    bool aggregatorReady = false;
+
     torch::Tensor mean;
     torch::Tensor stddv;
     torch::Tensor tileEmbeds;
+
     std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
+
+    Poco::Event aggregatorWait;
+    Poco::FastMutex *aggregatorMutex;
   };
 
 

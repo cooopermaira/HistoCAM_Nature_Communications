@@ -72,9 +72,10 @@ ELSEIF (WIN32)
     set(Python3_INCLUDE_DIR "C:/Program Files/Python311/Include")
     set(Python3_LIBRARY_DIR "C:/Program Files/Python311/libs")
     set(Python3_LIB "python311")
+elseif (LINUX)
 
-    ENDIF()
-    SET(Torch_DIR "/home/max/libtorch-cxx11-abi-shared-with-deps-2.0.1+cu118/libtorch")
+    SET(Torch_DIR "/home/max/libtorch-cxx11-abi-shared-with-deps-2.0.1+cu118/libtorch/share/cmake/Torch")
+    #SET(Torch_DIR "/media/max/Data/2_20/Torch/pytorch/torch")
 
     SET(Python3_INCLUDE_DIR "/usr/include/python3.10")
     SET(Python3_LIBRARY_DIR "/usr/lib/python3.10/config-3.10-x86_64-linux-gnu")
@@ -86,7 +87,7 @@ ELSEIF (WIN32)
     set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
     set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
     set(CMAKE_CUDA_ARCHITECTURES "native")
-
+ENDIF()
 
 link_directories(${Python3_INCLUDE_DIR})
 include_directories(${Python3_INCLUDE_DIR})
@@ -101,6 +102,9 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 
 list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
 find_package(Torch REQUIRED)
+#add_library(torch_python_shared SHARED IMPORTED)
+#set_target_properties(torch_python_shared PROPERTIES IMPORTED_LOCATION "/home/max/venv-2/lib/python3.10/site-packages/torch/lib/libtorch_python.so")
+#set(CMAKE_BUILD_RPATH "/home/max/venv-2/lib/python3.10/site-packages/torch/lib")
 
 add_subdirectory(JUCE)
 
@@ -146,7 +150,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 include_directories(pathcam)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB})
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} )
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

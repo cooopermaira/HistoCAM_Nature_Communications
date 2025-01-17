@@ -48,6 +48,7 @@
 
 #include <torch/torch.h>
 #include <torch/script.h>
+#include <torch/csrc/autograd/python_variable.h>
 
 #include "util.h"
 #include "DataObserver.h"
