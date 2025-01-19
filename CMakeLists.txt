@@ -234,7 +234,7 @@ IF (BUILD_PATHCAM_GUI)
             juce::juce_events
             juce::juce_graphics
             juce::juce_opengl
-            ${Python3_LIB}
+            ${TORCH_LIBRARIES} ${Python3_LIB}
     )
 
 

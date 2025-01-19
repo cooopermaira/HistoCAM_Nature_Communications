@@ -129,6 +129,7 @@ namespace pathCam {
   };
 
 
+
   class InferenceManager : public Poco::Runnable {
   private:
     StreamCam *parent;
@@ -140,9 +141,13 @@ namespace pathCam {
     Poco::Thread thread;
     Poco::RunnableAdapter<InferenceManager> adapter;
 
+    Poco::Event aggregatorWait;
+    Poco::FastMutex *aggregatorMutex;
+
+    std::vector<std::vector<float>>tileEmbedVec;
+    std::vector<std::vector<float>>coordsVec;
+
   public:
-
-
 
     InferenceManager(StreamCam *parent);
     
@@ -150,6 +155,9 @@ namespace pathCam {
     void run_slide_analysis();
     void initialize_aggregator();
     PyObject* tensorToList2(const torch::Tensor& tensor);
+    torch::Tensor vectorToTensor(const std::vector<std::vector<float>>& tensor);
+    //torch::Tensor pyListToTensor(PyObject* pyList);
+    std::vector<std::vector<float>> tensorToVector(const torch::Tensor& tensor);
     void run_slide_aggregation();
 
     int minx;
@@ -159,14 +167,17 @@ namespace pathCam {
 
     bool aggregatorReady = false;
 
-    torch::Tensor mean;
-    torch::Tensor stddv;
-    torch::Tensor tileEmbeds;
+    std::map<Point2i,unsigned long,PointComparator> *tileCoordToTensorIndex;
 
-    std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
+  };
 
-    Poco::Event aggregatorWait;
-    Poco::FastMutex *aggregatorMutex;
+  class InferenceInitRunner:public Poco::Runnable {
+  public:
+    InferenceManager *parent;
+    InferenceInitRunner(InferenceManager *parent) :parent(parent) {};
+    void run() override {
+      parent->initialize_aggregator();
+    };
   };
 
 
