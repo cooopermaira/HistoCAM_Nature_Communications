@@ -83,8 +83,7 @@ namespace pathCam {
             auto tileList = parent->get_tile_embed_Q_front();
 
             if (tileList.empty()) {
-                //parent->inferenceWait.wait();
-                continue;
+                parent->inferenceWait.wait();
             } else {
                 unsigned int component = tileList[0].second;
                 size_t numImages = tileList.size();
@@ -140,20 +139,20 @@ namespace pathCam {
                     auto locationInList = (*tileCoordToTensorIndex)[tileList[i].first];
                     tileEmbeds[locationInList] = output[i];
                 }
+                std::cout<<"Processed "+std::to_string(tileList.size())<<std::endl;
             }
-            std::cout<<"Processed "+std::to_string(tileList.size())<<std::endl;
+
         }
         tileEmbeds = tileEmbeds.to(torch::kCPU);
 
-
+        //turn coords and embeds into a vectors
         auto coordsTensor = torch::empty({tileCoordToTensorIndex->size(), 2}, torch::TensorOptions().dtype(torch::kFloat32));
         for (const auto &[key,value]: *tileCoordToTensorIndex) {
-            std::cout << key << " " << value << "\n";
             coordsTensor[value][0] = key.x - minx;
             coordsTensor[value][1] = key.y - miny;
         }
-        tileEmbedVec = tensorToVector(tileEmbeds);
-        coordsVec = tensorToVector(coordsTensor);
+        tileEmbedVec = tensor_to_vector(tileEmbeds);
+        coordsVec = tensor_to_vector(coordsTensor);
 
         std::cout<<"Tile Embedding Complete"<<std::endl;
 
@@ -192,21 +191,22 @@ namespace pathCam {
         //auto pyCoords = py::reinterpret_steal<py::object>(THPVariable_Wrap(coordsTensor));
         //auto pyTileEmbeds = py::reinterpret_steal<py::object>(THPVariable_Wrap(tileEmbeds));
 
-        auto pyCoords = tensorToList2(vectorToTensor(coordsVec));
-        auto pyTileEmbeds = tensorToList2(vectorToTensor(tileEmbedVec));
+        auto pyCoords = tensor_to_list(vector_to_tensor(coordsVec));
+        auto pyTileEmbeds = tensor_to_list(vector_to_tensor(tileEmbedVec));
         auto pyArgs = PyTuple_Pack(3,slideAggregator,pyTileEmbeds,pyCoords);
 
 
         std::cout<<"Calling Aggregator"<<std::endl;
         PyObject *pyResult = PyObject_Call(pFuncForwardStep, pyArgs, NULL);
-        auto attendedTileEmbeds = THPVariable_Unpack(pyResult);
+        //auto attendedTileEmbeds = py::reinterpret_steal<py::object>(THPVariable_Unpack(pyResult));
+        auto attendedTileEmbedsVec = pyList_to_vector(pyResult);
         int k = 0;
         PyGILState_Release(gstate);
 
-        // Py_XDECREF(pArgs);
-        // Py_XDECREF(pTileEmbeds);
-        // Py_XDECREF(pCoords);
-        // Py_XDECREF(pFuncForwardStep);
+        Py_XDECREF(pyArgs);
+        Py_XDECREF(pyTileEmbeds);
+        Py_XDECREF(pyCoords);
+        Py_XDECREF(pFuncForwardStep);
 
         // if (pOutput) {
         //     // Process the output (example)
@@ -291,7 +291,7 @@ namespace pathCam {
     }
 
 
-    PyObject* InferenceManager::tensorToList2(const torch::Tensor& tensor) {
+    PyObject* InferenceManager::tensor_to_list(const torch::Tensor& tensor) {
             if (!tensor.device().is_cpu()) {
         throw std::runtime_error("Tensor must be on CPU before conversion to a Python list.");
     }
@@ -316,7 +316,7 @@ namespace pathCam {
         // For multidimensional tensors, recursively handle sub-tensors
         for (int64_t i = 0; i < contiguous_tensor.size(0); ++i) {
             // Create a separate sub-list for each dimension
-            PyObject* sub_list = tensorToList2(contiguous_tensor[i]);
+            PyObject* sub_list = tensor_to_list(contiguous_tensor[i]);
             PyList_Append(py_list, sub_list);
             Py_DECREF(sub_list);
         }
@@ -325,7 +325,7 @@ namespace pathCam {
     return py_list;
     }
 
-    std::vector<std::vector<float>> InferenceManager::tensorToVector(const torch::Tensor& tensor) {
+    std::vector<std::vector<float>> InferenceManager::tensor_to_vector(const torch::Tensor& tensor) {
     // Ensure the tensor is contiguous
     torch::Tensor contigTensor = tensor.contiguous();
     auto sizes = tensor.sizes();
@@ -352,7 +352,7 @@ namespace pathCam {
 }
 
 // Convert std::vector<std::vector<float>> to torch::Tensor
-torch::Tensor InferenceManager::vectorToTensor(const std::vector<std::vector<float>>& vec) {
+torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<float>>& vec) {
     size_t rows = vec.size();
     size_t cols = vec[0].size();
 
@@ -366,6 +366,49 @@ torch::Tensor InferenceManager::vectorToTensor(const std::vector<std::vector<flo
     // Create a torch::Tensor from the flat vector and reshape
     return torch::from_blob(flatVec.data(), {static_cast<int64_t>(rows), static_cast<int64_t>(cols)}).clone();
 }
+
+    std::vector<std::vector<float> > InferenceManager::pyList_to_vector(PyObject *pyList) {
+            // Check if the PyObject is a Python list
+    if (!PyList_Check(pyList)) {
+        throw std::runtime_error("Provided PyObject is not a Python list.");
+    }
+
+    // Get the number of rows
+    Py_ssize_t rows = PyList_Size(pyList);
+    if (rows == 0) {
+        throw std::runtime_error("The list is empty.");
+    }
+
+    // Extract elements row by row
+    std::vector<std::vector<float>> data;
+    for (Py_ssize_t i = 0; i < rows; ++i) {
+        PyObject* row = PyList_GetItem(pyList, i); // Borrowed reference
+        if (!PyList_Check(row)) {
+            throw std::runtime_error("Inner elements are not Python lists.");
+        }
+
+        // Get the number of columns
+        Py_ssize_t cols = PyList_Size(row);
+        if (i > 0 && cols != data[0].size()) {
+            throw std::runtime_error("Inconsistent number of columns in rows.");
+        }
+
+        std::vector<float> rowData;
+        rowData.reserve(cols);
+        for (Py_ssize_t j = 0; j < cols; ++j) {
+            PyObject* item = PyList_GetItem(row, j); // Borrowed reference
+            if (!PyFloat_Check(item) && !PyLong_Check(item)) {
+                throw std::runtime_error("List contains non-numeric elements.");
+            }
+
+            // Convert Python number to C++ float
+            float value = static_cast<float>(PyFloat_AsDouble(item));
+            rowData.push_back(value);
+        }
+        data.push_back(rowData);
+    }
+  return data;
+  }
 
     void InferenceManager::run_slide_analysis() {
     }

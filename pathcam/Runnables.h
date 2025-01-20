@@ -154,10 +154,10 @@ namespace pathCam {
     virtual void run();
     void run_slide_analysis();
     void initialize_aggregator();
-    PyObject* tensorToList2(const torch::Tensor& tensor);
-    torch::Tensor vectorToTensor(const std::vector<std::vector<float>>& tensor);
-    //torch::Tensor pyListToTensor(PyObject* pyList);
-    std::vector<std::vector<float>> tensorToVector(const torch::Tensor& tensor);
+    PyObject* tensor_to_list(const torch::Tensor& tensor);
+    torch::Tensor vector_to_tensor(const std::vector<std::vector<float>>& tensor);
+    std::vector<std::vector<float>> pyList_to_vector(PyObject* pyList);
+    std::vector<std::vector<float>> tensor_to_vector(const torch::Tensor& tensor);
     void run_slide_aggregation();
 
     int minx;

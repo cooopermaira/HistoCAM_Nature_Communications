@@ -98,6 +98,7 @@ namespace pathCam {
     //rebuildJobsComplete.wait();
     //save_components_to_disk();
     parent->compositing = false;
+    parent->inferenceWait.set();
   }
 
   void CompositeManager::perform_global_alignment() {
