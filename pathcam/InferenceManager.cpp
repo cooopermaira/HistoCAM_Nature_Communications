@@ -14,45 +14,27 @@
  *usually still step into embedded python, but cannot send things to the GPU once there if you haven't acquired the GIL in your calling c++.
  */
 
+#include <bits/fs_fwd.h>
+
 #include "pathCam.h"
 
 namespace pathCam {
-    InferenceManager::InferenceManager(StreamCam *parent) : parent(parent), device(torch::kCPU),
-                                                            aggregatorMutex(new Poco::FastMutex()),
-                                                            aggregatorWait(false),
-                                                            adapter(*this, &InferenceManager::initialize_aggregator) {
-        if (torch::cuda::is_available()) {
-            std::cout << "Using GPU (CUDA)" << std::endl;
-            device = torch::Device(torch::kCUDA);
-        }
-#ifdef WITH_MPS
-    else if (torch::mps::is_available()) {
-      std::cout << "Using GPU (MPS)" << std::endl;
-      device = torch::Device(torch::kMPS);
-    }
-#endif
-        else {
-            std::cout << "GPU not available. Using CPU." << std::endl;
-        }
+    InferenceManager::InferenceManager(StreamCam *parent) : parent(parent){
+
 
         //load slide aggregator
-        if (parent->slideEncoding) {
-#ifdef WITH_MPS
-            //on its own thread doesnt work on apple
-            //https://github.com/python/cpython/issues/123022
-            initializeModel();
-#else
-            auto initRunnable = new InferenceInitRunner(this);
-            thread.start(initRunnable);
-
-#endif
-            //initialize_aggregator();
-        }
-        // Load the tile encoder TorchScript model and move it to the selected device
-        auto val = parent->tile_encoder_path.toString();
-        tileEncoderModel = torch::jit::load(val);
-        tileEncoderModel.eval();
-        tileEncoderModel.to(device);
+//         if (parent->aggregating) {
+// #ifdef WITH_MPS
+//             //on its own thread doesnt work on apple
+//             //https://github.com/python/cpython/issues/123022
+//             initializeModel();
+// #else
+//             auto initRunnable = new InferenceInitRunner(this);
+//             thread.start(initRunnable);
+//
+// #endif
+//             //initialize_aggregator();
+//         }
 
         //coord shifting values
         minx = 0;
@@ -64,231 +46,190 @@ namespace pathCam {
         //set size of embed vector, again this should be configurable
         embedSize = 1536;
 
-        tileCoordToTensorIndex = new std::map<Point2i,unsigned long,PointComparator>();
+        tileCoordToTensorIndex = std::map<Point2i,unsigned long,PointComparator>();
     }
+
 
     void InferenceManager::run() {
         torch::NoGradGuard noGrad;
+        auto device = torch::Device(torch::kCPU);
+
+        if (torch::cuda::is_available()) {
+            std::cout << "Using GPU (CUDA)" << std::endl;
+            device = torch::Device(torch::kCUDA);
+        }
+#ifdef WITH_MPS
+        else if (torch::mps::is_available()) {
+            std::cout << "Using GPU (MPS)" << std::endl;
+            device = torch::Device(torch::kMPS);
+        }
+#endif
+        else {
+            std::cout << "GPU not available. Using CPU." << std::endl;
+        }
 
         
         //empty tileEmbeds, just needs to be initialized
-        auto tileEmbeds = torch::empty({0, embedSize}, torch::TensorOptions().dtype(torch::kFloat32).device(device));
+        torch::Tensor tileEmbeds = torch::empty({0, embedSize}, torch::TensorOptions().dtype(torch::kFloat32).device(device));
 
-        //set standard deviation and mean tensors to match imageNet normalization
-        auto mean = torch::tensor({0.485, 0.456, 0.406}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
-        auto stddv = torch::tensor({0.229, 0.224, 0.225}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
+        {
+            // Load the tile encoder TorchScript model and move it to the selected device
+            auto val = parent->tile_encoder_path.toString();
+            auto tileEncoderModel = torch::jit::load(val);
+            tileEncoderModel.to(device);
 
-        
-        while (parent->compositing) {
-            auto tileList = parent->get_tile_embed_Q_front();
+            //set standard deviation and mean tensors to match imageNet normalization
+            auto mean = torch::tensor({0.485, 0.456, 0.406}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
+            auto stddv = torch::tensor({0.229, 0.224, 0.225}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
 
-            if (tileList.empty()) {
-                parent->inferenceWait.wait();
-            } else {
-                unsigned int component = tileList[0].second;
-                size_t numImages = tileList.size();
-                auto pyramidLevel = parent->composites[component]->imagePyramid->level[0];
-                int tileSize = parent->composites[component]->imagePyramid->tile_size;
-                auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), tileSize, tileSize, 3},
-                                                 torch::kFloat32).to(device);
-                int cropLoc = (tileSize - cropedDim) / 2;
 
-                for (int i = 0; i < numImages; i++) {
-                    //add to coord dict
-                    if (tileCoordToTensorIndex->find(tileList[i].first) == tileCoordToTensorIndex->end()) {
-                        tileCoordToTensorIndex->insert({tileList[i].first, tileCoordToTensorIndex->size()});
+            while (parent->compositing || !parent->tileEmbedQ.empty()) {
+                auto tileList = parent->get_tile_embed_Q_front();
+
+                if (tileList.empty()) {
+                    parent->inferenceWait.wait();
+                } else {
+                    unsigned int component = tileList[0].second;
+                    size_t numImages = tileList.size();
+                    auto pyramidLevel = parent->composites[component]->imagePyramid->level[0];
+                    int tileSize = parent->composites[component]->imagePyramid->tile_size;
+                    auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), tileSize, tileSize, 3},
+                                                     torch::kFloat32).to(device);
+                    int cropLoc = (tileSize - cropedDim) / 2;
+
+                    for (int i = 0; i < numImages; i++) {
+                        //add to coord dict
+                        if (tileCoordToTensorIndex.find(tileList[i].first) == tileCoordToTensorIndex.end()) {
+                            tileCoordToTensorIndex.insert({tileList[i].first, tileCoordToTensorIndex.size()});
+                        }
+
+
+
+                        //adjust mins (later used for adjustment)
+                        if (tileList[i].first.x < minx) { minx = tileList[i].first.x; }
+                        if (tileList[i].first.y < miny) { miny = tileList[i].first.y; }
+
+                        cvtColor(pyramidLevel->getTile(tileList[i].first.x, tileList[i].first.y), threeChannelPreallocated,
+                                 COLOR_BGRA2RGB);
+
+                        //clone would be necessary if not immediately moved to gpu. Tensor from_blob keeps ref to orig obj
+                        batch_tensor[i] = torch::from_blob(threeChannelPreallocated.data, {tileSize, tileSize, 3},
+                                                           torch::kUInt8).to(device);
                     }
 
+                    //center crop, make memory block index contiguous, normalize to [0,1], normalize to imageNet mean/stddv
+                    batch_tensor = batch_tensor.permute({0, 3, 1, 2})
+                            .slice(2, cropLoc, cropLoc + cropedDim)
+                            .slice(3, cropLoc, cropLoc + cropedDim)
+                            .to(torch::kFloat32)
+                            .div(255)
+                            .sub(mean)
+                            .div(stddv);
 
 
-                    //adjust mins (later used for adjustment)
-                    if (tileList[i].first.x < minx) { minx = tileList[i].first.x; }
-                    if (tileList[i].first.y < miny) { miny = tileList[i].first.y; }
+                    //extend tensor to match coord dict
+                    int extendBy = tileCoordToTensorIndex.size() - tileEmbeds.sizes()[0];
+                    tileEmbeds = torch::cat({
+                        tileEmbeds, torch::empty({extendBy, embedSize},
+                                                 torch::TensorOptions().dtype(torch::kFloat32).device(
+                                                     device))
+                    });
 
-                    cvtColor(pyramidLevel->getTile(tileList[i].first.x, tileList[i].first.y), threeChannelPreallocated,
-                             COLOR_BGRA2RGB);
+                    //run inference on batch of images
+                    auto output = tileEncoderModel.forward({batch_tensor}).toTensor();
 
-                    //clone would be necessary if not immediately moved to gpu. Tensor from_blob keeps ref to orig obj
-                    batch_tensor[i] = torch::from_blob(threeChannelPreallocated.data, {tileSize, tileSize, 3},
-                                                       torch::kUInt8).to(device);
+                    //add new tile embedding to the list, if a tile has been run previously, overwrite it
+                    for (int i = 0; i < numImages; i++) {
+                        auto locationInList = (tileCoordToTensorIndex)[tileList[i].first];
+                        tileEmbeds[locationInList] = output[i];
+                    }
+                    std::cout<<"Processed "+std::to_string(tileList.size())<<std::endl;
                 }
 
-                //center crop, make memory block index contiguous, normalize to [0,1], normalize to imageNet mean/stddv
-                batch_tensor = batch_tensor.permute({0, 3, 1, 2})
-                        .slice(2, cropLoc, cropLoc + cropedDim)
-                        .slice(3, cropLoc, cropLoc + cropedDim)
-                        .to(torch::kFloat32)
-                        .div(255)
-                        .sub(mean)
-                        .div(stddv);
-
-
-                //extend tensor to match coord dict
-                int extendBy = tileCoordToTensorIndex->size() - tileEmbeds.sizes()[0];
-                tileEmbeds = torch::cat({
-                    tileEmbeds, torch::empty({extendBy, embedSize},
-                                             torch::TensorOptions().dtype(torch::kFloat32).device(
-                                                 device))
-                });
-
-                //run inference on batch of images
-                auto output = tileEncoderModel.forward({batch_tensor}).toTensor();
-
-                //add new tile embedding to the list, if a tile has been run previously, overwrite it
-                for (int i = 0; i < numImages; i++) {
-                    auto locationInList = (*tileCoordToTensorIndex)[tileList[i].first];
-                    tileEmbeds[locationInList] = output[i];
-                }
-                std::cout<<"Processed "+std::to_string(tileList.size())<<std::endl;
             }
 
-        }
+        }//scope to expire 4+ gb tile encoder model
         tileEmbeds = tileEmbeds.to(torch::kCPU);
 
-        //turn coords and embeds into a vectors
-        auto coordsTensor = torch::empty({tileCoordToTensorIndex->size(), 2}, torch::TensorOptions().dtype(torch::kFloat32));
-        for (const auto &[key,value]: *tileCoordToTensorIndex) {
-            coordsTensor[value][0] = key.x - minx;
-            coordsTensor[value][1] = key.y - miny;
-        }
-        tileEmbedVec = tensor_to_vector(tileEmbeds);
-        coordsVec = tensor_to_vector(coordsTensor);
-
         std::cout<<"Tile Embedding Complete"<<std::endl;
-
-        aggregatorMutex->lock();
-        aggregatorReady = true;
-        aggregatorWait.set();
-        aggregatorMutex->unlock();
-
-        tileEncoderModel = torch::jit::Module();
         parent->tileEmbeddingComplete = true;
-        ///run_slide_aggregation();
+
+        if (parent->aggregating) {
+            //file exchange
+            std::string embedFileOut("/media/max/Data/2_20/Torch/handoff/tileEmbeds.pt");
+            std::string coordsFileOut("/media/max/Data/2_20/Torch/handoff/coords.pt");
+            std::string signalFileOut("/media/max/Data/2_20/Torch/handoff/pSignal.txt");
+
+            std::string embedFileIn("/media/max/Data/2_20/Torch/handoff/response.pt");
+            std::string signalFileIn("/media/max/Data/2_20/Torch/handoff/cSignal.txt");
+
+
+            //create coords tensor for handoff
+            torch::Tensor coordsTensor = torch::empty({long(tileCoordToTensorIndex.size()), 2}, torch::TensorOptions().dtype(torch::kFloat32));
+            for (const auto &[key,value]: tileCoordToTensorIndex) {
+                coordsTensor[value][0] = key.x - minx;
+                coordsTensor[value][1] = key.y - miny;
+            }
+
+            //pack as disk savable tensors
+            auto pickledEmbed = torch::pickle_save(tileEmbeds);
+            std::ofstream feout = std::ofstream(embedFileOut);
+            feout.write(pickledEmbed.data(), pickledEmbed.size());
+            feout.close();
+
+            auto pickledCoords = torch::pickle_save(coordsTensor);
+            std::ofstream fcout = std::ofstream(coordsFileOut);
+            fcout.write(pickledCoords.data(), pickledCoords.size());
+            fcout.close();
+
+            //create signal file
+            std::ofstream fsout = std::ofstream(signalFileOut);
+            fsout.close();
+
+            //wait for response
+            while (!std::ifstream(signalFileIn).good()) {
+                continue;
+            }
+
+            //load response, embeds are at index specified by tileCoordToTensorIndex
+            std::ifstream fin(embedFileIn,std::ios::binary);
+            std::vector<char> buffer((std::istreambuf_iterator<char>(fin)),std::istreambuf_iterator<char>());
+            torch::Tensor aggregatedEmbeds = torch::pickle_load(buffer).toTensor();
+
+            //reset signal
+            remove(signalFileIn.c_str());
+
+            //update tileEmbeds after attention
+            tileEmbeds = aggregatedEmbeds;
+        }
+
+        if (parent->classifying) {
+
+            //setup classifier model
+            auto val = parent->classifier_path.toString();
+            auto classifier = torch::jit::load(val);
+            classifier.eval();
+            classifier.to(device);
+            tileEmbeds = tileEmbeds.to(device);
+
+            //run and argmax
+            auto classes = classifier.forward({tileEmbeds}).toTensor();
+            classes = std::get<1>(classes.max(1));
+            classes = classes.to(torch::kCPU);
+
+            //build tile to class dict
+            for (auto [key,value] : tileCoordToTensorIndex) {
+                tileCoordToClass[key] = classes[value].item<int>();
+
+                //debug
+                if (classes[value].item<int>() != 0) {
+                    std::cout<<key.x + minx<<","<<key.y+miny<<std::endl;
+                }
+            }
+            int k = 0;
+        }
     }
 
-    void InferenceManager::run_slide_aggregation() {
-        //make sure aggregator initialization is complete
-        aggregatorMutex->lock();
-        if (!aggregatorReady) {
-            aggregatorMutex->unlock();
-            aggregatorWait.wait();
-        }else {
-            aggregatorMutex->unlock();
-        }
-
-        //make tensor of coords where coords are kept at proper index
-
-        PyGILState_STATE gstate = PyGILState_Ensure();
-        // Import the Python function
-        //PyObject *pFuncForwardStep = PyObject_GetAttrString(pModule, "forward_step");
-        PyObject *pFuncForwardStep = PyObject_GetAttrString(pModule, "forward_step_from_lists");
-        if (!pFuncForwardStep || !PyCallable_Check(pFuncForwardStep)) {
-            PyErr_Print();
-            throw std::runtime_error("Failed to locate 'forward_step' function.");
-        }
-
-        //package it up for the python call
-        //auto pyCoords = py::reinterpret_steal<py::object>(THPVariable_Wrap(coordsTensor));
-        //auto pyTileEmbeds = py::reinterpret_steal<py::object>(THPVariable_Wrap(tileEmbeds));
-
-        auto pyCoords = tensor_to_list(vector_to_tensor(coordsVec));
-        auto pyTileEmbeds = tensor_to_list(vector_to_tensor(tileEmbedVec));
-        auto pyArgs = PyTuple_Pack(3,slideAggregator,pyTileEmbeds,pyCoords);
-
-
-        std::cout<<"Calling Aggregator"<<std::endl;
-        PyObject *pyResult = PyObject_Call(pFuncForwardStep, pyArgs, NULL);
-        //auto attendedTileEmbeds = py::reinterpret_steal<py::object>(THPVariable_Unpack(pyResult));
-        auto attendedTileEmbedsVec = pyList_to_vector(pyResult);
-        int k = 0;
-        PyGILState_Release(gstate);
-
-        Py_XDECREF(pyArgs);
-        Py_XDECREF(pyTileEmbeds);
-        Py_XDECREF(pyCoords);
-        Py_XDECREF(pFuncForwardStep);
-
-        // if (pOutput) {
-        //     // Process the output (example)
-        //     PyObject *pClsToken = PyTuple_GetItem(pOutput, 0);
-        //     PyObject *pAttentionEmbeds = PyTuple_GetItem(pOutput, 1);
-        //
-        //     // Print results (or convert to C++ objects as needed)
-        //     std::cout << "Output received successfully." << std::endl;
-        //
-        //     Py_XDECREF(pClsToken);
-        //     Py_XDECREF(pAttentionEmbeds);
-        //     Py_XDECREF(pOutput);
-        // } else {
-        //     PyErr_Print();
-        // }
-    }
-
-    void InferenceManager::initialize_aggregator() {
-
-        std::string venv_python_path = parent->python_venv_path.toString(); // Update with your venv Python path
-
-        // Path to the directory containing model_inference.py
-        std::string model_script_dir = parent->slide_encoder_path.parent().toString(); // Update with your path
-        std::string python_file_name = parent->slide_encoder_path.getBaseName();
-        // Python module name (no .py extension)
-
-        std::string venvPath = "/media/max/pathCAM/gigapath-venv-linux";
-        //std::string venvPath = "/home/max/venv-3";
-        std::string oldPath = std::getenv("PATH") ? std::getenv("PATH") : "";
-
-        // 1) Ensure the venv bin is first in PATH:
-        std::string newPath = venvPath + "/bin:" + oldPath;
-        setenv("PATH", newPath.c_str(), 1);
-
-        // 2) Virtual env pointer
-        setenv("VIRTUAL_ENV", venvPath.c_str(), 1);
-
-        // 4) Let dynamic loader find PyTorch libs:
-        std::string oldLD = std::getenv("LD_LIBRARY_PATH") ? std::getenv("LD_LIBRARY_PATH") : "";
-        std::string newLD = venvPath + "/lib/python3.10/site-packages/torch/lib:" + oldLD;
-        setenv("LD_LIBRARY_PATH", newLD.c_str(), 1);
-
-        // Now initialize Python
-        Py_Initialize();
-        //PyEval_InitThreads();
-        PyGILState_STATE gstate = PyGILState_Ensure();
-
-
-        // Add the Python script directory to sys.path
-        std::string add_path_command = "import sys; sys.path.append('" + model_script_dir + "')";
-        PyRun_SimpleString(add_path_command.c_str());
-
-        // Import the Python module
-        pModule = PyImport_ImportModule(python_file_name.c_str());
-
-
-        if (!pModule) {
-            PyErr_Print();
-            throw std::runtime_error("Failed to import Python module.");
-        }
-
-        // Call load_model to retrieve the model
-        PyObject *pFuncLoadModel = PyObject_GetAttrString(pModule, "load_model");
-        if (!pFuncLoadModel || !PyCallable_Check(pFuncLoadModel)) {
-            PyErr_Print();
-            throw std::runtime_error("Failed to locate 'load_model' function.");
-        }
-
-        PyObject *pModel = PyObject_CallObject(pFuncLoadModel, nullptr);
-        Py_XDECREF(pFuncLoadModel);
-        Py_XDECREF(pModule);
-
-        if (!pModel) {
-            PyErr_Print();
-            throw std::runtime_error("Failed to load the model.");
-        }
-
-        slideAggregator = pModel;
-        PyGILState_Release(gstate);
-
-        run_slide_aggregation();
-    }
 
 
     PyObject* InferenceManager::tensor_to_list(const torch::Tensor& tensor) {
@@ -344,7 +285,7 @@ namespace pathCam {
     std::vector<std::vector<float>> vec(rows, std::vector<float>(cols));
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            vec[i][j] = data[i * cols + j];
+            vec[i][j] = float(data[i * cols + j]);
         }
     }
 
@@ -352,12 +293,12 @@ namespace pathCam {
 }
 
 // Convert std::vector<std::vector<float>> to torch::Tensor
-torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<float>>& vec) {
+torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<double>>& vec) {
     size_t rows = vec.size();
     size_t cols = vec[0].size();
 
     // Flatten std::vector<std::vector<float>> to 1D std::vector<float>
-    std::vector<float> flatVec;
+    std::vector<double> flatVec;
     flatVec.reserve(rows * cols);
     for (const auto& row : vec) {
         flatVec.insert(flatVec.end(), row.begin(), row.end());
@@ -366,6 +307,21 @@ torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<f
     // Create a torch::Tensor from the flat vector and reshape
     return torch::from_blob(flatVec.data(), {static_cast<int64_t>(rows), static_cast<int64_t>(cols)}).clone();
 }
+
+    torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<float>>& vec) {
+        size_t rows = vec.size();
+        size_t cols = vec[0].size();
+
+        // Flatten std::vector<std::vector<float>> to 1D std::vector<float>
+        std::vector<float> flatVec;
+        flatVec.reserve(rows * cols);
+        for (const auto& row : vec) {
+            flatVec.insert(flatVec.end(), row.begin(), row.end());
+        }
+
+        // Create a torch::Tensor from the flat vector and reshape
+        return torch::from_blob(flatVec.data(), {static_cast<int64_t>(rows), static_cast<int64_t>(cols)}).clone();
+    }
 
     std::vector<std::vector<float> > InferenceManager::pyList_to_vector(PyObject *pyList) {
             // Check if the PyObject is a Python list
@@ -410,6 +366,4 @@ torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<f
   return data;
   }
 
-    void InferenceManager::run_slide_analysis() {
-    }
 }

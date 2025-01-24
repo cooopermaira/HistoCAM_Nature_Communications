@@ -79,31 +79,7 @@ namespace pathCam {
   }
 
 
-  DiskStreamer::DiskStreamer(StreamCam *parent, std::string imageFile,
-                             unsigned long sort_order) : parent(parent),
-                                                         imageFile(std::move(imageFile)),
-                                                         RunnableIntermediate(sort_order, 0) {
-  };
 
-  void DiskStreamer::run() {
-    if (imageFile.empty()) { return; }
-    std::ifstream stream;
-    stream.open(imageFile, std::ios::binary);
-    unsigned int height = parent->image_height;
-    unsigned int width = parent->image_width;
-    char *raw_image_data = new char[width * height];
-    stream.read(raw_image_data, width * height);
-
-    Image *image = new Image(width, height, parent->scope_radius);
-    image->copy_in(raw_image_data);
-    image->set_disk_file(imageFile);
-    delete[] raw_image_data;
-
-    parent->pass_image(image, sort_order + 1);
-
-    parent->diskCount--;
-    successful = true;
-  }
 
   void DebayerRunnable::run() {
     Poco::Path o = outfile;

@@ -134,31 +134,26 @@ namespace pathCam {
   private:
     StreamCam *parent;
     Mat threeChannelPreallocated;
-    torch::Device device;
-    torch::jit::script::Module tileEncoderModel;
-    PyObject* slideAggregator;
-    PyObject *pModule;
-    Poco::Thread thread;
-    Poco::RunnableAdapter<InferenceManager> adapter;
-
-    Poco::Event aggregatorWait;
-    Poco::FastMutex *aggregatorMutex;
 
     std::vector<std::vector<float>>tileEmbedVec;
     std::vector<std::vector<float>>coordsVec;
+    std::vector<std::vector<float>> resultsVec;
 
   public:
 
-    InferenceManager(StreamCam *parent);
+    explicit InferenceManager(StreamCam *parent);
     
     virtual void run();
-    void run_slide_analysis();
-    void initialize_aggregator();
+
     PyObject* tensor_to_list(const torch::Tensor& tensor);
-    torch::Tensor vector_to_tensor(const std::vector<std::vector<float>>& tensor);
+    static torch::Tensor vector_to_tensor(const std::vector<std::vector<double>>& tensor);
+    static torch::Tensor vector_to_tensor(const std::vector<std::vector<float>>& tensor);
     std::vector<std::vector<float>> pyList_to_vector(PyObject* pyList);
-    std::vector<std::vector<float>> tensor_to_vector(const torch::Tensor& tensor);
-    void run_slide_aggregation();
+
+    std::vector<std::vector<float>> tensor_to_vector(const torch::Tensor &tensor);
+
+
+    Poco::Thread thread;
 
     int minx;
     int miny;
@@ -167,7 +162,8 @@ namespace pathCam {
 
     bool aggregatorReady = false;
 
-    std::map<Point2i,unsigned long,PointComparator> *tileCoordToTensorIndex;
+    std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
+    std::map<Point2i,int,PointComparator> tileCoordToClass;
 
   };
 
@@ -176,7 +172,7 @@ namespace pathCam {
     InferenceManager *parent;
     InferenceInitRunner(InferenceManager *parent) :parent(parent) {};
     void run() override {
-      parent->initialize_aggregator();
+      //parent->initialize_aggregator2();
     };
   };
 
@@ -199,19 +195,6 @@ namespace pathCam {
 
     DiskReader(StreamCam *parent);
 
-    virtual void run();
-  };
-
-  class DiskStreamer : public RunnableIntermediate {
-  private:
-    StreamCam *parent;
-    std::string imageFile;
-
-  public:
-
-    DiskStreamer(StreamCam *parent, std::string file, unsigned long sort_order);
-
-    //DiskStreamer(StreamCam *parent);
     virtual void run();
   };
 

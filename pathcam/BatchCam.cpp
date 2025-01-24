@@ -130,11 +130,11 @@ namespace pathCam {
         }
 
         if (pConf->has("io.slide_encoder")) {
-            slideEncoding = true;
+            aggregating = true;
             slide_encoder_path = Path(pConf->getString("io.slide_encoder"));
         }
         else {
-            slideEncoding = false;
+            aggregating = false;
         }
 
         if (pConf->has("io.python_venv")) {
@@ -144,6 +144,10 @@ namespace pathCam {
         else {
             pyVenv = false;
         }
+      if (pConf->has("io.classifier")) {
+        classifying = true;
+        classifier_path = Path(pConf->getString("io.classifier"));
+      }
 
       if (pConf->has("io.output_log")) {
         std::string temp = pConf->getString("io.output_log");

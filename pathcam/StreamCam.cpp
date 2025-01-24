@@ -111,6 +111,31 @@ namespace pathCam {
 
   }
 
+  bool StreamCam::run() {
+    auto start = std::chrono::high_resolution_clock::now();
+
+
+    disk_thread.start(dr);
+    Q_thread.start(qm);
+    composite_thread.start(cm);
+    if (inferencing) {
+      inference_thread.start(im);
+    }
+
+    disk_thread.join();
+    Q_thread.join();
+    composite_thread.join();
+    if (inferencing) {
+      //im->thread.join();
+      inference_thread.join();
+    }
+
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    std::cout << duration.count() << std::endl;
+    return true;
+  }
+
   void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle) {
     lastFrameMutex->lock();
     lastFrame = _rectInScale1Space;
@@ -168,29 +193,7 @@ namespace pathCam {
     return true;
   }
 
-  bool StreamCam::run() {
-    auto start = std::chrono::high_resolution_clock::now();
 
-
-    disk_thread.start(dr);
-    Q_thread.start(qm);
-    composite_thread.start(cm);
-    if (inferencing) {
-      inference_thread.start(im);
-    }
-
-    disk_thread.join();
-    Q_thread.join();
-    composite_thread.join();
-    if (inferencing) {
-      inference_thread.join();
-    }
-
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << duration.count() << std::endl;
-    return true;
-  }
 
   void StreamCam::add_image(Image *image, unsigned long index) {
     image_mutex->writeLock();

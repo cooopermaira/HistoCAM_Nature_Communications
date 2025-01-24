@@ -3,6 +3,7 @@ project(pathCam)
 
 set(CMAKE_BUILD_TYPE Debug)
 
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "")
 
@@ -74,12 +75,11 @@ ELSEIF (WIN32)
     set(Python3_LIB "python311")
 elseif (LINUX)
 
-    SET(Torch_DIR "/home/max/libtorch-cxx11-abi-shared-with-deps-2.0.1+cu118/libtorch/share/cmake/Torch")
-    #SET(Torch_DIR "/media/max/Data/2_20/Torch/pytorch/torch")
+    SET(Torch_DIR "/home/max/libtorch-cxx11-abi-shared-with-deps-2.5.1+cu118/libtorch")
 
-    SET(Python3_INCLUDE_DIR "/usr/include/python3.10")
-    SET(Python3_LIBRARY_DIR "/usr/lib/python3.10/config-3.10-x86_64-linux-gnu")
-    SET(Python3_LIB "/usr/lib/python3.10/config-3.10-x86_64-linux-gnu/libpython3.10.so")
+    SET(Python3_INCLUDE_DIR "/home/max/Python-3.11.0/shared_library_dynamic/include/python3.11")
+    SET(Python3_LIBRARY_DIR "/home/max/Python-3.11.0/shared_library_dynamic/lib")
+    SET(Python3_LIB "/home/max/Python-3.11.0/shared_library_dynamic/lib/libpython3.11.so")
 
     set(CMAKE_CUDA_COMPILER "/usr/local/cuda-11.8/bin/nvcc")
     SET(CUDAToolkit_ROOT_DIR "/usr/local/cuda-11.8" CACHE PATH "CUDA toolkit root")
@@ -107,6 +107,7 @@ find_package(Torch REQUIRED)
 #set(CMAKE_BUILD_RPATH "/home/max/venv-2/lib/python3.10/site-packages/torch/lib")
 
 add_subdirectory(JUCE)
+
 
 IF (NOT OVERRRIDE_SPINNAKER)
 

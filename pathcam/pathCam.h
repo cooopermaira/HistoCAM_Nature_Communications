@@ -12,7 +12,7 @@
 #include <sstream>
 #include <string>
 #include <queue>
-#include <Python.h>
+//#include <Python.h>
 
 #include "opencv2/core.hpp"
 
@@ -48,6 +48,9 @@
 
 #include <torch/torch.h>
 #include <torch/script.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
 #include <torch/csrc/autograd/python_variable.h>
 
 #include "util.h"
