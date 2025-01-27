@@ -9,6 +9,7 @@
 #define MRTiledImage_h
 
 #include "pathCam.h"
+#include "StreamCam.h"
 #include "TiledImage.h"
 
 class MRTiledImage{
@@ -21,14 +22,17 @@ public:
   double scale;
   Point2f offset;
   Poco::Event scaleSet;
+  pathCam::StreamCam* parent;
  
   
-  MRTiledImage(unsigned int tile_size=256):tile_size(tile_size), scaleSet(false){};
+  MRTiledImage(pathCam::StreamCam* parent = nullptr,unsigned int tile_size=256):tile_size(tile_size), scaleSet(false),parent(parent){};
   ~MRTiledImage(){ level.clear(); };
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
 
   void insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+
+  int get_class_for_tile(Point2i tile);
   
   void build(cv::Mat &image_in);
 
@@ -36,7 +40,7 @@ public:
 
   void set_offset(Point2f _offset){offset = _offset;}
   
-  std::vector < TileQuery > getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen);
+  std::vector < TileQuery > getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen, bool pullFromBase = false);
 
   std::vector < std::shared_ptr< TiledImage > > level;
 
@@ -71,6 +75,7 @@ class MRTiledImageSet{
   
 public:
   cv::Rect_<float> bounds;
+
 
   MRTiledImageSet(){};
 

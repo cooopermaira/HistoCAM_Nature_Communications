@@ -102,6 +102,7 @@ namespace pathCam {
     bool showAsCircle;
 
     std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
+    std::map<Point2i,int,PointComparator> tileCoordToClass;
 
     Mat flat_field2X;
     Mat flat_field4X;

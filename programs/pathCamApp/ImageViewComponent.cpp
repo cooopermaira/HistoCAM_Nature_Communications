@@ -132,6 +132,7 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRa
 }
 
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
+  bool shadeClasses = true;
 
   for (unsigned int i = 0; i < MRImage->images.size(); i++) {
     if (MRImage->images[i]->scale == 0) { continue; }
@@ -173,19 +174,60 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         }
         g.drawImage(im, bounds);
       }
+
     }
 
-//#ifdef DEBUG
-//    for (unsigned int t = 0; t < tiles.size(); t++) {
-//        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
-//        g.setColour(juce::Colours::greenyellow);
-//        g.drawRect(bounds, 3);
-//        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-//        g.setFont(20);
-//        g.drawText(ij, bounds.getCentreX() - 50,
-//                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
-//    }
-//#endif
+    if (MRImage->images[0]->parent->classifyingComplete && shadeClasses) {
+      auto baseTiles = MRImage->images[i]->getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()),true);
+      for (auto tile : baseTiles) {
+        if (tile.i == MRImage->images[0]->parent->im->minx && tile.j == MRImage->images[0]->parent->im->miny) {
+          int k = 0;
+        }
+
+        //get draw bounds of base level tile
+        auto bounds = RectCtoJ<float>(tile.bounds);
+        bounds *= view2screenScale(imageview) * scale;
+        bounds.expand(0.5, 0.5);
+        tile.bounds = RectJtoC<float>(bounds);
+
+        //get class for color
+        auto tileCoords = Point2i(tile.i,tile.j);
+        int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
+
+        //draw it
+        auto tileColor = Colour(uint8(0),0,0,uint8(0));
+        switch (classScore) {
+          case 1:
+            tileColor = Colour(0, uint8(255), 0,uint8(50));
+            break;
+          case 2:
+            tileColor = Colour(uint8(0), 0, 255,  uint8(50));
+            break;
+          case 3:
+            tileColor = Colour(255,uint8(0), 0,  uint8(50));
+            break;
+          case 0:
+            tileColor = Colour(uint8(50), 50, 50, uint8(50));
+            break;
+        }
+        g.setColour(tileColor);
+        g.fillRect(bounds);
+
+      }
+    }
+
+
+#ifdef DEBUG
+    for (unsigned int t = 0; t < tiles.size(); t++) {
+        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
+        g.setColour(juce::Colours::greenyellow);
+        g.drawRect(bounds, 3);
+        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+        g.setFont(20);
+        g.drawText(ij, bounds.getCentreX() - 50,
+                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
+    }
+#endif
 
 
   }

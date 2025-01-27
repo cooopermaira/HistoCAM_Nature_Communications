@@ -49,6 +49,7 @@ namespace pathCam {
         bool aggregating;
         bool pyVenv;
         bool classifying;
+        bool classifyingComplete = false;
 
         int interpolation;
         int feature_type;

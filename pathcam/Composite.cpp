@@ -15,7 +15,7 @@ namespace pathCam {
                                                                        wakeEvent(true), image_size(image_size) {
         minPixelDistanceBetweenFrames = 200;
 
-        imagePyramid.reset(new MRTiledImage);
+        imagePyramid.reset(new MRTiledImage(parent));
         std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid);
         imagePyramid->level.push_back(current);
         parent->MRimage->add(imagePyramid);
@@ -432,6 +432,7 @@ namespace pathCam {
 
             //calculate effected tiles
             std::vector<Point2i> effectedTiles;
+            std::vector<Point2i> effectedTiles2;
             std::vector<Point2i> effectedTilesNoMask;
 
 
@@ -440,6 +441,7 @@ namespace pathCam {
 
             if (images[i]->label == Image::_2X) {
                 calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
+                //calculate_effected_tiles_count_nonzero(polyMaskOutput, effectedTiles, images[i]->absoluteCoords);
             } else {
                 calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
                 imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
@@ -625,6 +627,8 @@ namespace pathCam {
     void
     CompositeVoronoi::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                      Vec2 absCoord) {
+        auto start = std::chrono::high_resolution_clock::now();
+
         std::vector<Point2i> tileIndices;
         std::map<int, std::vector<float> > tilesByColumn;
 
@@ -681,23 +685,19 @@ namespace pathCam {
             for (float j = xlow; j <= xhigh; j++) {
                 float columnLeftEdge = j * float(imagePyramid->level[0]->getTileSize());
                 float columnRightEdge = (j + 1) * float(imagePyramid->level[0]->getTileSize());
+
                 float xloclow = max(columnLeftEdge, plow.x);
                 float xlochigh = min(columnRightEdge, phigh.x);
 
                 long enterColumn = segment_yval_at_point(xloclow, p1, p2);
                 long exitColumn = segment_yval_at_point(xlochigh, p1, p2);
 
-                //if((enterColumn >= yPixelBoundLow || exitColumn >= yPixelBoundLow) && (enterColumn <= yPixelBoundHigh || exitColumn <= yPixelBoundHigh)) {
-                //enterColumn = max(enterColumn, yPixelBoundLow);
-                //enterColumn = min(enterColumn, yPixelBoundHigh);
                 tilesByColumn[j].push_back((float) enterColumn);
-
-                //exitColumn = max(exitColumn, yPixelBoundLow);
-                //exitColumn = min(exitColumn, yPixelBoundHigh);
                 tilesByColumn[j].push_back((float) exitColumn);
-                //}
             }
         }
+
+        int scopeRadSqr = pow(parent->scope_radius, 2);
         for (auto &[key, value]: tilesByColumn) {
             float firstPoint_y = *std::min_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
             float lastPoint_y = *std::max_element(tilesByColumn[key].begin(), tilesByColumn[key].end());
@@ -713,10 +713,47 @@ namespace pathCam {
 
             for (int ii = firstTile; ii <= lastTile; ii++) {
                 if (ii <= rowBoundHigh && ii >= rowBoundLow) {
-                    result.push_back(Point2i(key, ii));
+                    //make sure at least one corner is closer than scope radius from center
+                    for (int i = 0; i < 4; i++) {
+                        int x = key * imagePyramid->tile_size + (i%2==0?imagePyramid->tile_size:0);
+                        int y = ii * imagePyramid->tile_size + (i%3==0?imagePyramid->tile_size:0);
+                        auto dist = pow(absCoord.x + image_size.width / 2 - x,2) + pow(absCoord.y + image_size.height / 2 - y,2);
+                        if (dist<scopeRadSqr) {
+                            result.push_back(Point2i(key, ii));
+                            break;
+                        }
+                    }
+
                 }
             }
         }
+        auto stop = std::chrono::high_resolution_clock::now();
+        timeR += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+    }
+
+
+    void CompositeVoronoi::debug_write_contribution_on_grid(std::string name, pathCam::Vec2 absCoord, cv::Mat &img,
+                                                            cv::Mat &mask) {
+        int k = int(absCoord.x);
+        k = 512 - k % 512;
+        k = abs(k);
+        Mat debugmat = Mat::zeros(4852, 6464, CV_8UC4);
+        img.copyTo(debugmat, mask);
+        for (int m = k; m < debugmat.cols; m += 512) {
+            cv::line(debugmat, cv::Point(m, 0), cv::Point(m, 4852), Scalar(0, 0, 255, 255));
+            cv::line(debugmat, cv::Point(m + 1, 0), cv::Point(m + 1, 4852), Scalar(0, 0, 255, 255));
+            cv::line(debugmat, cv::Point(m + 2, 0), cv::Point(m + 2, 4852), Scalar(0, 0, 255, 255));
+        }
+        k = int(absCoord.y);
+        k = 512 - k % 512;
+
+        k = abs(k);
+        for (int m = k; m < debugmat.rows; m += 512) {
+            cv::line(debugmat, cv::Point(0, m), cv::Point(6464, m), Scalar(0, 0, 255, 255));
+            cv::line(debugmat, cv::Point(0, m + 1), cv::Point(6464, m + 1), Scalar(0, 0, 255, 255));
+            cv::line(debugmat, cv::Point(0, m + 2), cv::Point(6464, m + 2), Scalar(0, 0, 255, 255));
+        }
+        imwrite(name, debugmat);
     }
 
     void CompositeVoronoi::debug_draw_voronoi_face(cv::Mat img, std::vector<Point2i> maskAsPolygon,
@@ -763,7 +800,8 @@ namespace pathCam {
                         cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(tile_size - 1, tile_size - 1),
                                  Scalar(0, 0, 0, 255));
                         cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(0, 0), Scalar(0, 0, 0, 255));
-                        putText(tile, "(" + std::to_string(i+x_offset) + "," + std::to_string(j+y_offset) + ")", Point(10, 50),
+                        putText(tile, "(" + std::to_string(i + x_offset) + "," + std::to_string(j + y_offset) + ")",
+                                Point(10, 50),
                                 FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0, 255));
                     }
                     //imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
@@ -1184,30 +1222,6 @@ namespace pathCam {
         imwrite("mask.png", temp);
         //imwrite("img.png", img);
         return temp;
-    }
-
-    void CompositeVoronoi::debug_write_contribution_on_grid(std::string name, pathCam::Vec2 absCoord, cv::Mat &img,
-                                                            cv::Mat &mask) {
-        int k = int(absCoord.x);
-        k = 512 - k % 512;
-        if (k < 0) { k = abs(k); }
-        Mat debugmat = Mat::zeros(4852, 6464, CV_8UC4);
-        img.copyTo(debugmat, mask);
-        for (int m = k; m < debugmat.cols; m += 512) {
-            cv::line(debugmat, cv::Point(m, 0), cv::Point(m, 4852), Scalar(0, 0, 255, 255));
-            cv::line(debugmat, cv::Point(m + 1, 0), cv::Point(m + 1, 4852), Scalar(0, 0, 255, 255));
-            cv::line(debugmat, cv::Point(m + 2, 0), cv::Point(m + 2, 4852), Scalar(0, 0, 255, 255));
-        }
-        k = int(absCoord.y);
-        k = 512 - k % 512;
-
-        if (k < 0) { k = abs(k); }
-        for (int m = k; m < debugmat.rows; m += 512) {
-            cv::line(debugmat, cv::Point(0, m), cv::Point(6464, m), Scalar(0, 0, 255, 255));
-            cv::line(debugmat, cv::Point(0, m + 1), cv::Point(6464, m + 1), Scalar(0, 0, 255, 255));
-            cv::line(debugmat, cv::Point(0, m + 2), cv::Point(6464, m + 2), Scalar(0, 0, 255, 255));
-        }
-        imwrite(name, debugmat);
     }
 
 

@@ -92,6 +92,8 @@ namespace pathCam {
       check_render_info();
     }
 
+
+    push_remaining_tiles_for_inference();
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     //perform_global_alignment();
@@ -100,6 +102,15 @@ namespace pathCam {
     parent->compositing = false;
     parent->inferenceWait.set();
   }
+
+  void CompositeManager::push_remaining_tiles_for_inference() {
+    for (auto i:parent->composites) {
+      for (auto tilePoint: i->queuedTiles) {
+        parent->push_tile_embed_Q({tilePoint, i->componentIndex});
+      }
+    }
+  }
+
 
   void CompositeManager::perform_global_alignment() {
     for (auto i: parent->composites) {

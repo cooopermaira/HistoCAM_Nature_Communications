@@ -7,8 +7,11 @@
 
 #include "pathCam.h"
 
-std::vector < TileQuery > MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect_<int> screen){
-  
+std::vector < TileQuery > MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect_<int> screen, bool pullFromBase){
+  if (pullFromBase) {
+    return level[0]->getTiles(view);
+  }
+
   if(level.size() == 0){ return std::vector<TileQuery>(); }
   float scale = max(view.width/float(screen.width),
                     view.height/float(screen.height));
@@ -19,33 +22,19 @@ std::vector < TileQuery > MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect
   return level[i_scale]->getTiles(view);
 }
 
-/*
-void MRTiledImage::build(cv::Mat &image_in){
-  //Determine the number of levels
-  unsigned int height = image_in.rows;
-  unsigned int width = image_in.cols;
-  
-  bounds = fRectangle(0,0,width,height);
-  
-  std::cout << (unsigned int)(max(log2(width),log2(height)) - log2(tile_size) + 2) << "\n";
-
-  unsigned int num_levels = 1;
-  std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(this,tile_size, tile_size,0);
-  current->insertMat(image_in, fRectangle(0,0, width, height));
-  level.push_back(current);
-  
-  while(image_in.cols > tile_size || image_in.rows > tile_size){
-    std::shared_ptr< TiledImage > current = std::make_shared< TiledImage >(tile_size, tile_size*pow(2,num_levels));
-    cv::resize(image_in, image_in, cv::Size(image_in.cols/2, image_in.rows/2));
-    current->insertMat(image_in, fRectangle(0,0, width, height));
-    level.push_back(current);
-    num_levels += 1;
+int MRTiledImage::get_class_for_tile(Point2i tile) {
+  // if (tileCoordToTensorIndex.find(tileList[i].first) == tileCoordToTensorIndex.end()) {
+  //   tileCoordToTensorIndex.insert({tileList[i].first, tileCoordToTensorIndex.size()});
+  // }
+  if (parent) {
+    if (parent->tileCoordToClass.find(tile) != parent->tileCoordToClass.end()) {
+      return parent->tileCoordToClass[tile];
+    }
   }
-  
-  std::cout << "Image has " << num_levels << " levels.";
-  
+  return -1;
+
 }
-*/
+
 
 void MRTiledImage::insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
                                     std::vector<Point2i> retileIndices) {

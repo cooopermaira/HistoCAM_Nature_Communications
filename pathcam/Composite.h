@@ -111,6 +111,8 @@ namespace pathCam {
 
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord);
 
+    void calculate_effected_tiles_count_nonzero(Mat polyMaskOutput,std::vector<Point2i> &result, Vec2 absCoord);
+
     void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord, std::vector<Point2i> *additionalResult = {});
 
     static void remove_duplicates_without_sort(std::vector<Point2i> &vec);
@@ -155,7 +157,8 @@ namespace pathCam {
     std::map<int, unsigned long> delaunayMembers;
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
-    //std::vector<Point2i> tilesPushForInferencing;
+    long timeR = 0;
+    long timeC = 0;
 
     void store_new_info(RegInfo* _new_info);
 

@@ -90,6 +90,8 @@ namespace pathCam {
 
     void save_components_to_disk();
 
+    void push_remaining_tiles_for_inference();
+
     void decrement_rebuild_jobs_outstanding();
   };
 
@@ -163,7 +165,7 @@ namespace pathCam {
     bool aggregatorReady = false;
 
     std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
-    std::map<Point2i,int,PointComparator> tileCoordToClass;
+
 
   };
 
