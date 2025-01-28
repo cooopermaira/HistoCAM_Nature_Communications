@@ -200,12 +200,12 @@ namespace pathCam {
             remove(signalFileIn.c_str());
 
             //update tileEmbeds after attention
-            //tileEmbeds = torch::cat({aggregatedEmbeds,coordsTensor.to(torch::kF16)},1);
-            tileEmbeds = aggregatedEmbeds;
+            tileEmbeds = torch::cat({aggregatedEmbeds,coordsTensor},1).to(torch::kF32);
+            //tileEmbeds = aggregatedEmbeds;
         }
 
         if (parent->classifying) {
-/*
+
             //setup classifier model
             auto val = parent->classifier_path.toString();
             auto classifier = torch::jit::load(val);
@@ -213,15 +213,16 @@ namespace pathCam {
             classifier.to(device);
             tileEmbeds = tileEmbeds.to(device);
 
+
             //run and argmax
             auto classes = classifier.forward({tileEmbeds}).toTensor();
             classes = std::get<1>(classes.max(1));
             classes = classes.to(torch::kCPU);
-*/
+
             //build tile to class dict
             for (auto [key,value] : tileCoordToTensorIndex) {
-                //parent->tileCoordToClass[key] = classes[value].item<int>();
-                parent->tileCoordToClass[key];
+                parent->tileCoordToClass[key] = classes[value].item<int>();
+                //parent->tileCoordToClass[key];
                 //debug
                  // if (classes[value].item<int>() != 0) {
                  //     std::cout<<key.x + minx<<","<<key.y+miny<<std::endl;
