@@ -25,7 +25,7 @@ public:
   pathCam::StreamCam* parent;
  
   
-  MRTiledImage(pathCam::StreamCam* parent = nullptr,unsigned int tile_size=256):tile_size(tile_size), scaleSet(false),parent(parent){};
+  MRTiledImage(pathCam::StreamCam* parent = nullptr,unsigned int tile_size=224):tile_size(tile_size), scaleSet(false),parent(parent){};
   ~MRTiledImage(){ level.clear(); };
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);

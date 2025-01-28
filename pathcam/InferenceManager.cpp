@@ -14,7 +14,7 @@
  *usually still step into embedded python, but cannot send things to the GPU once there if you haven't acquired the GIL in your calling c++.
  */
 
-#include <bits/fs_fwd.h>
+//#include <bits/fs_fwd.h>
 
 #include "pathCam.h"
 
@@ -119,8 +119,8 @@ namespace pathCam {
 
                     //center crop, make memory block index contiguous, normalize to [0,1], normalize to imageNet mean/stddv
                     batch_tensor = batch_tensor.permute({0, 3, 1, 2})
-                            .slice(2, cropLoc, cropLoc + cropedDim)
-                            .slice(3, cropLoc, cropLoc + cropedDim)
+                            //.slice(2, cropLoc, cropLoc + cropedDim)
+                            //.slice(3, cropLoc, cropLoc + cropedDim)
                             .to(torch::kFloat32)
                             .div(255)
                             .sub(mean)
@@ -240,141 +240,5 @@ namespace pathCam {
             parent->update_observers();
         }
     }
-
-
-
-    PyObject* InferenceManager::tensor_to_list(const torch::Tensor& tensor) {
-            if (!tensor.device().is_cpu()) {
-        throw std::runtime_error("Tensor must be on CPU before conversion to a Python list.");
-    }
-
-    // Ensure the tensor is contiguous for efficient access
-    torch::Tensor contiguous_tensor = tensor.contiguous();
-
-    // Create a Python list
-    PyObject* py_list = PyList_New(0);
-
-    // Handle 1D and multidimensional tensors
-    if (contiguous_tensor.dim() == 1) {
-        // Create a separate copy of the tensor data
-        auto data_ptr = contiguous_tensor.data_ptr<float>();
-        for (int64_t i = 0; i < contiguous_tensor.size(0); ++i) {
-            // Copy the value into the Python list
-            PyObject* py_value = PyFloat_FromDouble(static_cast<double>(data_ptr[i]));
-            PyList_Append(py_list, py_value);
-            Py_DECREF(py_value);  // PyList_Append increments the reference count
-        }
-    } else {
-        // For multidimensional tensors, recursively handle sub-tensors
-        for (int64_t i = 0; i < contiguous_tensor.size(0); ++i) {
-            // Create a separate sub-list for each dimension
-            PyObject* sub_list = tensor_to_list(contiguous_tensor[i]);
-            PyList_Append(py_list, sub_list);
-            Py_DECREF(sub_list);
-        }
-    }
-
-    return py_list;
-    }
-
-    std::vector<std::vector<float>> InferenceManager::tensor_to_vector(const torch::Tensor& tensor) {
-    // Ensure the tensor is contiguous
-    torch::Tensor contigTensor = tensor.contiguous();
-    auto sizes = tensor.sizes();
-
-    // Validate dimensions
-    if (sizes.size() != 2) {
-        throw std::runtime_error("Tensor must be 2D to convert to vector of vectors.");
-    }
-
-    // Access tensor data
-    const float* data = contigTensor.data_ptr<float>();
-    size_t rows = sizes[0];
-    size_t cols = sizes[1];
-
-    // Create std::vector<std::vector<float>>
-    std::vector<std::vector<float>> vec(rows, std::vector<float>(cols));
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            vec[i][j] = float(data[i * cols + j]);
-        }
-    }
-
-    return vec;
-}
-
-// Convert std::vector<std::vector<float>> to torch::Tensor
-torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<double>>& vec) {
-    size_t rows = vec.size();
-    size_t cols = vec[0].size();
-
-    // Flatten std::vector<std::vector<float>> to 1D std::vector<float>
-    std::vector<double> flatVec;
-    flatVec.reserve(rows * cols);
-    for (const auto& row : vec) {
-        flatVec.insert(flatVec.end(), row.begin(), row.end());
-    }
-
-    // Create a torch::Tensor from the flat vector and reshape
-    return torch::from_blob(flatVec.data(), {static_cast<int64_t>(rows), static_cast<int64_t>(cols)}).clone();
-}
-
-    torch::Tensor InferenceManager::vector_to_tensor(const std::vector<std::vector<float>>& vec) {
-        size_t rows = vec.size();
-        size_t cols = vec[0].size();
-
-        // Flatten std::vector<std::vector<float>> to 1D std::vector<float>
-        std::vector<float> flatVec;
-        flatVec.reserve(rows * cols);
-        for (const auto& row : vec) {
-            flatVec.insert(flatVec.end(), row.begin(), row.end());
-        }
-
-        // Create a torch::Tensor from the flat vector and reshape
-        return torch::from_blob(flatVec.data(), {static_cast<int64_t>(rows), static_cast<int64_t>(cols)}).clone();
-    }
-
-    std::vector<std::vector<float> > InferenceManager::pyList_to_vector(PyObject *pyList) {
-            // Check if the PyObject is a Python list
-    if (!PyList_Check(pyList)) {
-        throw std::runtime_error("Provided PyObject is not a Python list.");
-    }
-
-    // Get the number of rows
-    Py_ssize_t rows = PyList_Size(pyList);
-    if (rows == 0) {
-        throw std::runtime_error("The list is empty.");
-    }
-
-    // Extract elements row by row
-    std::vector<std::vector<float>> data;
-    for (Py_ssize_t i = 0; i < rows; ++i) {
-        PyObject* row = PyList_GetItem(pyList, i); // Borrowed reference
-        if (!PyList_Check(row)) {
-            throw std::runtime_error("Inner elements are not Python lists.");
-        }
-
-        // Get the number of columns
-        Py_ssize_t cols = PyList_Size(row);
-        if (i > 0 && cols != data[0].size()) {
-            throw std::runtime_error("Inconsistent number of columns in rows.");
-        }
-
-        std::vector<float> rowData;
-        rowData.reserve(cols);
-        for (Py_ssize_t j = 0; j < cols; ++j) {
-            PyObject* item = PyList_GetItem(row, j); // Borrowed reference
-            if (!PyFloat_Check(item) && !PyLong_Check(item)) {
-                throw std::runtime_error("List contains non-numeric elements.");
-            }
-
-            // Convert Python number to C++ float
-            float value = static_cast<float>(PyFloat_AsDouble(item));
-            rowData.push_back(value);
-        }
-        data.push_back(rowData);
-    }
-  return data;
-  }
 
 }

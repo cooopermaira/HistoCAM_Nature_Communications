@@ -172,6 +172,11 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
     auto theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
 
     //resize self cv image into their cv image ROI
+    Mat temp1 = theirCV(theirROI);
+    int test1 = temp1.rows;
+    int test2 = temp1.cols;
+    int test3 = myCV.rows / 2;
+    int test4 = myCV.cols / 2;
     assert(theirCV(theirROI).rows == myCV.rows / 2 && theirCV(theirROI).cols == myCV.cols / 2);
     auto testSize = Size(theirCV(theirROI).cols, theirCV(theirROI).rows);
     resize(myCV, theirCV(theirROI), testSize);
