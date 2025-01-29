@@ -157,8 +157,10 @@ namespace pathCam {
     std::map<int, unsigned long> delaunayMembers;
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
-    long timeR = 0;
-    long timeC = 0;
+    int minTilex = 0;
+    int maxTilex = 0;
+    int minTiley = 0;
+    int maxTiley = 0;
 
     void store_new_info(RegInfo* _new_info);
 

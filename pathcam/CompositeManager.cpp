@@ -98,7 +98,7 @@ namespace pathCam {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     //perform_global_alignment();
     //rebuildJobsComplete.wait();
-    //save_components_to_disk();
+    save_components_to_disk();
     parent->compositing = false;
     parent->inferenceWait.set();
   }

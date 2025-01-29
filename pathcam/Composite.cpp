@@ -718,8 +718,12 @@ namespace pathCam {
                         int x = key * imagePyramid->tile_size + (i%2==0?imagePyramid->tile_size:0);
                         int y = ii * imagePyramid->tile_size + (i%3==0?imagePyramid->tile_size:0);
                         auto dist = pow(absCoord.x + image_size.width / 2 - x,2) + pow(absCoord.y + image_size.height / 2 - y,2);
-                        if (dist<scopeRadSqr) {
+                        if (dist < scopeRadSqr) {
                             result.push_back(Point2i(key, ii));
+                            if (key < minTilex){minTilex = key;}
+                            if (key > maxTilex){maxTilex = key;}
+                            if (ii < minTiley){minTiley = ii;}
+                            if (ii > maxTiley){maxTiley = ii;}
                             break;
                         }
                     }
@@ -727,8 +731,7 @@ namespace pathCam {
                 }
             }
         }
-        auto stop = std::chrono::high_resolution_clock::now();
-        timeR += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+
     }
 
 
@@ -776,8 +779,8 @@ namespace pathCam {
         auto rootoffsetPoint = Point2f(root_offset.x, root_offset.y);
         auto maxOffsetPoint = Point2f(max_offset.x, max_offset.y);
         auto level = imagePyramid->level[0];
-        auto ul = imagePyramid->level[0]->getIJ(rootoffsetPoint);
-        auto lr = imagePyramid->level[0]->getIJ(maxOffsetPoint);
+        auto ul = Point2i(minTilex,minTiley);
+        auto lr = Point2i(maxTilex,maxTiley);
         int tile_size = level->getTileSize();
         int width = (lr.x + 1 - ul.x) * tile_size;
         width = std::abs(width);
@@ -802,7 +805,7 @@ namespace pathCam {
                         cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(0, 0), Scalar(0, 0, 0, 255));
                         putText(tile, "(" + std::to_string(i + x_offset) + "," + std::to_string(j + y_offset) + ")",
                                 Point(10, 50),
-                                FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0, 255));
+                                FONT_HERSHEY_PLAIN, 5, Scalar(0, 0, 0, 255));
                     }
                     //imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
                     tile.copyTo(pyramidImage(Rect((i + x_offset) * tile.cols, (j + y_offset) * tile.rows, tile.cols,
