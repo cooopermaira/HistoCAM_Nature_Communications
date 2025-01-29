@@ -98,7 +98,7 @@ namespace pathCam {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     //perform_global_alignment();
     //rebuildJobsComplete.wait();
-    save_components_to_disk();
+    //save_components_to_disk();
     parent->compositing = false;
     parent->inferenceWait.set();
   }
@@ -122,7 +122,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image();
+      i->save_pyramid_as_image("/Users/coopermaira/desktop/tiledImage.png");
 
     }
   }

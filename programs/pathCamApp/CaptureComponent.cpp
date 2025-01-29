@@ -95,9 +95,7 @@ void CaptureComponent::startRecording() {
   parent->capture->setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
-
-  auto r = new bcamPocoRunnable(this);
-  compositeThread.start(r);
+  compositeThread.start(new bcamPocoRunnable(this));
 
   repaint();
 }
@@ -114,9 +112,7 @@ void CaptureComponent::startSimulating() {
   parent->capture->setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
-
-  auto r = new sCamPocoRunnable(this);
-  compositeThread.start(r);
+  compositeThread.start(new sCamPocoRunnable(this));
   repaint();
 }
 

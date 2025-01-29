@@ -345,8 +345,8 @@ namespace pathCam {
                 Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
                 cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
                 images[i]->free_memory_RAW();
-                //if (parent->has_flatfield(images[i]->label)) {
-                if (false) {
+                if (parent->has_flatfield(images[i]->label)) {
+                //if (false) {
                     auto ff = parent->get_flatfield(images[i]->label);
                     divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
                     cv::pow(convertHolding, 1.09, convertHolding);
@@ -805,7 +805,7 @@ namespace pathCam {
                         cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(0, 0), Scalar(0, 0, 0, 255));
                         putText(tile, "(" + std::to_string(i + x_offset) + "," + std::to_string(j + y_offset) + ")",
                                 Point(10, 50),
-                                FONT_HERSHEY_PLAIN, 5, Scalar(0, 0, 0, 255));
+                                FONT_HERSHEY_PLAIN, 3, Scalar(0, 0, 0, 255),5);
                     }
                     //imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
                     tile.copyTo(pyramidImage(Rect((i + x_offset) * tile.cols, (j + y_offset) * tile.rows, tile.cols,
