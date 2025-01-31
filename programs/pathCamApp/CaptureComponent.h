@@ -50,6 +50,8 @@ public:
             captureOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - width - 20, 20, width, 60));
             aiOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - 100 - 20,
                                                     b.getHeight() - 100 - 20, 100, 100));
+            reportOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - 200 - 40,
+                                                      b.getHeight() - 100 - 20, 100, 100));
 
 
         }
@@ -98,6 +100,8 @@ public:
 private:
     std::unique_ptr<CaptureOverlay> captureOverlay;
     std::unique_ptr<AIOverlay> aiOverlay;
+    std::unique_ptr<ReportOverlay> reportOverlay;
+
     Poco::Thread compositeThread;
     bool recording;
     bool simulating;
