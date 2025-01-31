@@ -48,6 +48,9 @@ cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
 
 #include "ToolBarComponent.h"
 
+#include "EditorWindow.h"
+#include "AIOverlay.h"
+#include "ReportOverlay.h"
 #include "ImageViewOverlay.h"
 #include "ImageViewComponent.h"
 
@@ -75,6 +78,7 @@ cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
  #error "This project was last saved using an outdated version of the Projucer! Re-save this project with the latest version to fix this error."
 #endif
 
+#define JUCE_APP_CONFIG_HEADER "JuceHeader.h"
 
 #if ! JUCE_DONT_DECLARE_PROJECTINFO
 namespace ProjectInfo

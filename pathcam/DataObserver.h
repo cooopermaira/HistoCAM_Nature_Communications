@@ -8,7 +8,7 @@
 #ifndef DataObserver_h
 #define DataObserver_h
 
-#include <stdio.h>
+#include "pathCam.h"
 
 class DataObserver {
 public:

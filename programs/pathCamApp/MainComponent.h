@@ -15,7 +15,7 @@ public:
   //MainComponent(std::shared_ptr< pathCam::StreamCam > bcam);
     MainComponent(Poco::Util::LayeredConfiguration::Ptr config);
   ~MainComponent() override;
-  
+  unsigned int ImageWidth, ImageHeight;
   
   //==============================================================================
   void paint (juce::Graphics& g) override;
@@ -24,7 +24,8 @@ public:
   void GuiEventHandler(std::string event);
 
     ImageViewComponent * imageview;
-    std::shared_ptr< MRTiledImage >  MRimage;
+    std::shared_ptr< MRTiledImageSet > MRimage;
+    std::shared_ptr< MRTiledImage >  imagePyramid;
     CaptureComponent * capture;
     AnnotateComponent * annotate;
   

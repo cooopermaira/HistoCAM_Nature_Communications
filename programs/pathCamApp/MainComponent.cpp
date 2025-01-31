@@ -9,7 +9,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
     ss << PROJECT_SOURCE_DIR << "/resources/hud_icons.zip";
 
     ZipFile icons(File(ss.str().c_str()));
-
+    
     for (int i = 0; i < icons.getNumEntries(); ++i) {
         std::unique_ptr<InputStream> svgFileStream(icons.createStreamForEntry(i));
 
@@ -19,7 +19,8 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
         }
     }
 
-    MRimage.reset(new MRTiledImage);
+    imagePyramid.reset(new MRTiledImage);
+    MRimage.reset(new MRTiledImageSet);
     toolbar = new ToolbarComponent(this);
     view.reset(new fRectangle());
     imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile);
@@ -68,17 +69,17 @@ public:
 
         cv::Mat image_in = imread(path);
         std::cout << "Read OpenCV image: " << image_in.cols << "X" << image_in.rows << "\n";
-        parent->MRimage.reset(new MRTiledImage());
+        parent->imagePyramid.reset(new MRTiledImage());
 
         setStatusMessage("Building Hierarchy");
 
         unsigned int height = image_in.rows;
         unsigned int width = image_in.cols;
 
-        parent->MRimage->bounds = cv::Rect_<float> (-5000, -5000, width, height);
+        parent->imagePyramid->bounds = cv::Rect_<float> (-5000, -5000, width, height);
 
 
-        unsigned int tile_size = parent->MRimage->tile_size;
+        unsigned int tile_size = parent->imagePyramid->tile_size;
 
         double total_levels = ceil(max(log2(width), log2(height)) - log2(tile_size) + 1);
         double total_pixels = 0.0;
@@ -87,16 +88,16 @@ public:
         }
 
         unsigned int num_levels = 1;
-        std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->MRimage,tile_size, tile_size,0);
+        std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid, tile_size, tile_size, 0);
         setStatusMessage("Computing level 1");
         current->insertMat(image_in, cv::Rect_ <float>(-5000, -5000, width, height));
         double pixels_processed = image_in.cols * image_in.rows;
         setProgress(pixels_processed / total_pixels);
-        parent->MRimage->level.push_back(current);
+        parent->imagePyramid->level.push_back(current);
 
         while (image_in.cols > tile_size || image_in.rows > tile_size) {
-            std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->MRimage,tile_size,
-                                                                               tile_size * pow(2, num_levels),num_levels);
+            std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(parent->imagePyramid, tile_size,
+                                                                               tile_size * pow(2, num_levels), num_levels);
             setStatusMessage("Computing level " + juce::String(num_levels));
             //cv::resize causes a reallocation and is possibly better done with cv::pyrDown()
             cv::resize(image_in, image_in, cv::Size(image_in.cols / 2, image_in.rows / 2));
@@ -104,7 +105,7 @@ public:
             num_levels += 1;
             current->insertMat(image_in, cv::Rect_<float>(-5000, -5000, width, height));
             setProgress(pixels_processed / total_pixels);
-            parent->MRimage->level.push_back(current);
+            parent->imagePyramid->level.push_back(current);
 
 
             if (threadShouldExit())
@@ -115,7 +116,7 @@ public:
     }
 
     void threadComplete(bool userPressedCancel) override {
-        if (userPressedCancel) { parent->MRimage.reset(new MRTiledImage()); }
+      if (userPressedCancel) { parent->MRimage.reset(new MRTiledImageSet()); }
         else {
             parent->imageview->setImage(parent->MRimage);
             parent->capture->setImage(parent->MRimage);
@@ -135,8 +136,8 @@ void MainComponent::loadImage(std::string path) {
 
 //  cv::Mat cvimage = imread(path);
 //  std::cout << "Read OpenCV image: " << cvimage.cols << "X" << cvimage.rows << "\n";
-//  imagePyramid.reset(new MRTiledImage());
-//  imagePyramid->build(cvimage);
+//  MRimage.reset(new MRTiledImage());
+//  MRimage->build(cvimage);
 }
 
 

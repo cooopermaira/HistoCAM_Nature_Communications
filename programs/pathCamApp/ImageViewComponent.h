@@ -13,6 +13,7 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
   
   friend class ImageViewOverlay;
   
+  
 public:
   //==============================================================================
   ImageViewComponent(std::shared_ptr < fRectangle > view,
@@ -22,12 +23,12 @@ public:
   
   //==============================================================================
   void paint (juce::Graphics& g) override;
-  void drawSlide(juce::Graphics& g, float scale);
+  virtual void drawSlide(juce::Graphics& g, float scale);
   void resized() override;
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
   
-  void setImage(std::shared_ptr< MRTiledImage > image);
+  void setImage(std::shared_ptr< MRTiledImageSet > image);
   
   void fixAspectRatio(){
     if(!MRImage || !isVisible()){ return; }
@@ -54,11 +55,19 @@ public:
   void refreshImage();
   
 protected:
-  std::shared_ptr< MRTiledImage> MRImage;
+  std::shared_ptr< MRTiledImageSet > MRImage;
+  
+  bool shade_levels;
+  cv::Mat greenShade;
+  cv::Mat holding1;
+  cv::Mat holding2;
+  cv::Mat channelHolding;
+  std::vector<cv::Mat> channels;
+
   
   void mouseDown(const juce::MouseEvent& event) override;
   void mouseDrag(const juce::MouseEvent& event) override;
-  void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& wheel) override;
+  void mouseWheelMove(const MouseEvent& event, const MouseWheelDetails& fwheel) override;
   
   void scrollBarMoved(juce::ScrollBar* scrollBar, double newRangeStart) override;
   void updateScrollbar();
@@ -67,21 +76,7 @@ protected:
   void mouseMagnify (const MouseEvent&, float magnifyAmmount) override;
   
   
-  void zoomAndCenter(){
-    if(!MRImage || !isVisible()){ return; }
-    juce::Rectangle<int> b = getLocalBounds();
-    *view = fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight());
-    //view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
-    view->setCentre(RectCtoJ(MRImage->bounds).getCentre());
-    
-    float scale = max((float)MRImage->bounds.width/
-                      (float)view->getHorizontalRange().getLength(),
-                      (float)MRImage->bounds.height/
-                      (float)view->getVerticalRange().getLength());
-    
-    scaleCenter(fPoint(scale,scale));
-    
-  }
+  void zoomAndCenter();
   
   inline void translate(fPoint amount){
     if(!MRImage){ return; }
@@ -101,34 +96,33 @@ protected:
   }
   
 protected:
-  inline fPoint screen2viewScale(){
+  inline fPoint screen2viewScale(fRectangle myview){
     if(!MRImage){ return fPoint(); }
-    return fPoint(view->getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
-                  view->getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
+    return fPoint(myview.getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
+                  myview.getVerticalRange().getLength()/getLocalBounds().getVerticalRange().getLength());
   }
   
-  inline fPoint view2screenScale(){
+  inline fPoint view2screenScale(fRectangle myview){
     if(!MRImage){ return fPoint(); }
-    return fPoint(getLocalBounds().getHorizontalRange().getLength()/view->getHorizontalRange().getLength(),
-                  getLocalBounds().getVerticalRange().getLength()/view->getVerticalRange().getLength());
+    return fPoint(getLocalBounds().getHorizontalRange().getLength()/myview.getHorizontalRange().getLength(),
+                  getLocalBounds().getVerticalRange().getLength()/myview.getVerticalRange().getLength());
   }
   
-  inline fPoint screen2view(fPoint p){
+  inline fPoint screen2view(fPoint p, fRectangle myview){
     if(!MRImage){ return p; }
-    return p*screen2viewScale()+view->getPosition();
+    return p*screen2viewScale(myview) + myview.getPosition();
   }
   
-  inline fPoint view2screen(fPoint p){
+  inline fPoint view2screen(fPoint p, fRectangle myview){
     if(!MRImage){ return p; }
-    return (p-view->getPosition())*view2screenScale();
+    return (p-myview.getPosition())*view2screenScale(myview);
   }
   
   
 private:
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
                                       juce::Colour colour1, juce::Colour colour2);
-  
-  
+
   juce::Image checkerboard;
   
   juce::Point<int> imagePosition;

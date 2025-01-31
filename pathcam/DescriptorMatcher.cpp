@@ -15,10 +15,18 @@ DescriptorMatcher::DescriptorMatcher(cv::DescriptorMatcher::MatcherType matcher_
 }
 
 
-void DescriptorMatcher::match(Match *match){
+void DescriptorMatcher::match(Match *match, int flag){
   //From OpenCV tutorial
   std::vector< std::vector<DMatch> > knn_matches;
-  matcher->knnMatch( match->image_1->descriptors, match->image_2->descriptors, knn_matches, 2 );
+  if(flag == 0) {
+    matcher->knnMatch(match->image_1->descriptors, match->image_2->descriptors, knn_matches, 2);
+  }
+  else if(flag == 1){
+    matcher->knnMatch(match->image_1->descriptorsMultilevel, match->image_2->descriptorsMultilevel, knn_matches, 2);
+  }
+  else if(flag == 2){
+    matcher->knnMatch(match->image_1->descriptorsFull, match->image_2->descriptorsFull, knn_matches, 2);
+  }
   //-- Filter matches using the Lowe's ratio test
   for (size_t i = 0; i < knn_matches.size(); i++)
   {

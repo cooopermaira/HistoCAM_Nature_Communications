@@ -18,6 +18,10 @@ class StreamCam;
 
 
 class CaptureComponent : public ImageViewComponent {
+  
+  friend class CaptureOverlay;
+  friend class AIOverlay;
+  
 public:
     CaptureComponent(std::shared_ptr<fRectangle> view,
         StringArray& iconNames,
@@ -29,13 +33,13 @@ public:
     
 #ifdef WITH_SPINNAKER
     std::shared_ptr<pathCam::SpinPath> bcam;
-#else
-    std::shared_ptr<pathCam::StreamCam> bcam;
 #endif
+
+    std::shared_ptr<pathCam::StreamCam> sCam;
 
     MainComponent *parent;
 
-    void resized() {
+    void resized()  override {
 
         ImageViewComponent::resized();
 
@@ -44,35 +48,41 @@ public:
             juce::Rectangle<int> b = getLocalBounds();
             int width = 300;
             captureOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - width - 20, 20, width, 60));
+            aiOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - 100 - 20,
+                                                    b.getHeight() - 100 - 20, 100, 100));
+            reportOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - 200 - 40,
+                                                      b.getHeight() - 100 - 20, 100, 100));
+
 
         }
 
     }
 
-    bool keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) {
+    bool keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) override {
         ImageViewComponent::keyPressed(key, originatingComponent);
 
         if (!isVisible()) { return false; }
 
         if (key.getKeyCode() == KeyPress::spaceKey) {
-            if (recording) { stopRecording(); } else { startRecording(); }
+          if (recording || simulating) { stop(); }
         }
         return false;  // Key press not handled
     }
 
     void startRecording();
+  
+    void startSimulating();
 
-    void stopRecording() {
-        
-#ifdef WITH_SPINNAKER
-        bcam->stopCamera();
-#endif
+    void stop();
+  
+    void stopRecording();
+  
+    void stopSimulating();
 
-        recording = false;
-        repaint();
-    }
+    void drawSlide(juce::Graphics& g, float scale) override;
 
-    void paint(juce::Graphics &g) {
+
+    void paint(juce::Graphics &g) override {
         ImageViewComponent::paint(g);
 
         if (recording) {
@@ -89,10 +99,16 @@ public:
 
 private:
     std::unique_ptr<CaptureOverlay> captureOverlay;
-    Poco::Thread bcamThread;
+    std::unique_ptr<AIOverlay> aiOverlay;
+    std::unique_ptr<ReportOverlay> reportOverlay;
+
+    Poco::Thread compositeThread;
     bool recording;
+    bool simulating;
+    float scopeRadius;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CaptureComponent)
 };
 
 #endif /* CaptureComponent_h */
+

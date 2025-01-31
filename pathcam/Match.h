@@ -18,12 +18,16 @@ class Match{
 public:
   Image * image_1;
   Image * image_2;
+
+  int mostMatches = 0;
+  
   
   std::vector<DMatch> good_matches;
   
   //image_2 from image_1
   cv::Mat H;
   double t_x, t_y;
+  double scale;
   
   Match(Image * image_1, Image * image_2): image_1(image_1),
                                            image_2(image_2),

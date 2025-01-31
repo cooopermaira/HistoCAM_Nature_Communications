@@ -13,30 +13,32 @@
 
 namespace pathCam{
 
-class JobQueue{
-  friend class QManager;
-public:
-  static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
+  class JobQueue{
+    friend class QManager;
+    friend class MatchRunnable;
+  public:
+    static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
+    std::vector<RunnableIntermediate*> jobRefs;
+    Poco::Event *pathCamEvent;
 
-protected:
+  protected:
     struct CompareRunnable {
-        bool operator()(const RunnableIntermediate *a, const RunnableIntermediate *b); 
+      bool operator()(const RunnableIntermediate *a, const RunnableIntermediate *b);
     };
-  Poco::FastMutex *queue_mutex;
-  Poco::ThreadPool *pool;
-  //std::deque < RunnableIntermediate *> jobQueue;
-std::priority_queue<RunnableIntermediate*,std::deque<RunnableIntermediate*>,CompareRunnable> jobQueue;
-  
-  
-public:
-  JobQueue(int min_threads, int max_threads);
-  
-  void add_runnable(RunnableIntermediate *job);
-  bool run_jobs(bool join_all);
-  bool run_jobs(std::vector < Poco::Runnable * > jobs);
-  bool is_empty(){return jobQueue.empty();}
+    Poco::FastMutex *queue_mutex;
+    Poco::ThreadPool *pool;
+    //std::deque < RunnableIntermediate *> jobQueue;
+    std::priority_queue<RunnableIntermediate*,std::deque<RunnableIntermediate*>,CompareRunnable> jobQueue;
 
-};
+
+  public:
+    JobQueue(int min_threads, int max_threads);
+    void add_runnable(RunnableIntermediate *job, long sortOrder = -1);
+    bool run_jobs(bool join_all);
+    bool run_jobs(std::vector < Poco::Runnable * > jobs);
+    bool is_empty(){return jobQueue.empty();}
+    std::pair<int,unsigned long> getSortOrderAndJobRefs(int jobTypeFlag, unsigned long image_idx);
+  };
 
 }
 #endif /* JobQueue_hpp */

@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <queue>
+//#include <Python.h>
 
 #include "opencv2/core.hpp"
 
@@ -21,11 +22,14 @@
 #include "opencv2/imgproc.hpp"
 #include "opencv2/features2d.hpp"
 #include "opencv2/xfeatures2d.hpp"
+#include "opencv2/xphoto/white_balance.hpp"
 #endif
 
 #include "Poco/Mutex.h"
+#include "Poco/RWLock.h"
 #include "Poco/Runnable.h"
 #include "Poco/Thread.h"
+#include "Poco/RunnableAdapter.h"
 #include "Poco/MemoryPool.h"
 #include "Poco/File.h"
 #include "Poco/Path.h"
@@ -42,6 +46,13 @@
 #include "Poco/ThreadPool.h"
 #include "Poco/DateTimeFormatter.h"
 
+#include <torch/torch.h>
+#include <torch/script.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/embed.h>
+#include <torch/csrc/autograd/python_variable.h>
+
 #include "util.h"
 #include "DataObserver.h"
 #include "Image.h"
@@ -52,8 +63,9 @@
 #include "MotionEstimator.h"
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
-#include "ConsecQ.h"
 #include "StreamCam.h"
+
+
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"

@@ -25,7 +25,7 @@ namespace pathCam{
       images.clear();
     }
     
-    bool loadFileList(std::string filelist);
+    bool loadFileList(std::string filelist, unsigned int image_width, unsigned int image_height, unsigned int scope_radius);
   };
   
 }

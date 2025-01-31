@@ -17,27 +17,56 @@ namespace pathCam {
 
   class RunnableIntermediate : public Poco::Runnable {
   public:
-    RunnableIntermediate(unsigned long sort_order) : sort_order(sort_order) {
-    }
+    RunnableIntermediate(unsigned long image_index, int jobTypeFlag) : image_index(image_index),
+                                                                       jobTypeFlag(jobTypeFlag), jobComplete(false),
+                                                                       someoneWaitingOnJobCompleteEvent(false) {}
 
-/*
-        bool operator > (const RunnableIntermediate& other) const {
-            return sort_order > other.sort_order;
-        }
-*/
+    Poco::Event jobComplete;
+    bool someoneWaitingOnJobCompleteEvent;
     unsigned long sort_order = 0;
+    int jobTypeFlag = 0;
+    unsigned long image_index;
+    int jobRefNumber = 0;
+    std::atomic<bool> successful = false;
+
+    void waitOnThisGuy();
+  };
+
+  class RebuildRunnable : public RunnableIntermediate {
+  public:
+    int dtVertex;
+    unsigned long imageIndex;
+    CompositeVoronoi *composite;
+    CompositeManager *cm;
+    Mat polyMaskOutput;
+    std::vector<Point2i> rebuildTiles;
+
+    RebuildRunnable(CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex,
+                    std::vector<Point2i> _rebuildTiles, Mat _polyMaskOutput);
+
+    virtual void run();
   };
 
   class DebayerRunnable : public pathCam::RunnableIntermediate {
   public:
-    explicit DebayerRunnable(pathCam::Image *image, Poco::Path outfile) : image(image), outfile(outfile),
-                                                                          RunnableIntermediate(0) {}
+    explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<double> *_blur,
+                             std::vector<std::string> *_names, unsigned long _sort_order) : image(image),
+                                                                                            flatfield(flat_field),
+                                                                                            outfile(outfile),
+                                                                                            RunnableIntermediate(
+                                                                                                _sort_order, 0),
+                                                                                            blur(_blur),
+                                                                                            names(_names) {}
 
+    Mat flatfield;
+    std::vector<double> *blur;
+    std::vector<std::string> *names;
     Poco::Path outfile;
     pathCam::Image *image;
 
     virtual void run();
   };
+
 
   class CompositeManager : public Poco::Runnable {
   private:
@@ -46,44 +75,107 @@ namespace pathCam {
   public:
     bool successful;
 
+    std::atomic<int> rebuildJobsOutstanding = 0;
+    Poco::Event rebuildJobsComplete;
+
     CompositeManager(StreamCam *parent);
 
     virtual void run();
+
+    void align_new_comp();
+
     void perform_global_alignment();
+
+    void check_render_info();
+
+    void save_components_to_disk();
+
+    void push_remaining_tiles_for_inference();
+
+    void decrement_rebuild_jobs_outstanding();
   };
 
   class RegistrationRunnable : public RunnableIntermediate {
   private:
     StreamCam *parent;
-    unsigned long index;
+    RegInfo *regInfo;
   public:
-    RegistrationRunnable(StreamCam *parent, unsigned long index, unsigned long sort_order) : parent(parent),
-                                                                                             index(index),
-                                                                                             RunnableIntermediate(
-                                                                                                 sort_order) {
-    };
+    RegistrationRunnable(StreamCam *parent, RegInfo *regInfo) :
+        parent(parent),
+        regInfo(regInfo),
+        RunnableIntermediate(regInfo->index, 3) {};
 
     virtual void run();
+
 
     std::pair<bool, Vec2> trace_to_root(unsigned long index);
   };
 
+
   //loader class takes data from disk streamer/microscope and prepares matchable jobs
   class LoaderLogicRunnable : public RunnableIntermediate {
   private:
+    bool additionalSiftReg;
+    bool saveImg;
     StreamCam *parent;
     Image *image;
 
   public:
-    bool successful;
 
-    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long sort_order) : image(image), parent(parent),
-                                                                                     successful(true),
-                                                                                     RunnableIntermediate(
-                                                                                         sort_order) {
-    };
+    LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx, bool additionalFullReg,
+                        bool saveImg = false) : image(
+        image), parent(parent), additionalSiftReg(additionalFullReg), saveImg(saveImg),
+                                                RunnableIntermediate(image_idx, 1) {};
 
     virtual void run();
+  };
+
+
+
+  class InferenceManager : public Poco::Runnable {
+  private:
+    StreamCam *parent;
+    Mat threeChannelPreallocated;
+
+    std::vector<std::vector<float>>tileEmbedVec;
+    std::vector<std::vector<float>>coordsVec;
+    std::vector<std::vector<float>> resultsVec;
+
+  public:
+
+    explicit InferenceManager(StreamCam *parent);
+    
+    virtual void run();
+
+    PyObject* tensor_to_list(const torch::Tensor& tensor);
+    static torch::Tensor vector_to_tensor(const std::vector<std::vector<double>>& tensor);
+    static torch::Tensor vector_to_tensor(const std::vector<std::vector<float>>& tensor);
+    std::vector<std::vector<float>> pyList_to_vector(PyObject* pyList);
+
+    std::vector<std::vector<float>> tensor_to_vector(const torch::Tensor &tensor);
+
+
+    Poco::Thread thread;
+
+    int minx;
+    int miny;
+    int cropedDim;
+    int embedSize;
+
+    bool aggregatorReady = false;
+
+    std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
+
+
+  };
+
+  class InferenceInitRunner:public Poco::Runnable {
+  public:
+    InferenceManager *parent;
+    InferenceInitRunner(InferenceManager *parent) :parent(parent) {};
+    void run() override {
+      //parent->initialize_aggregator2();
+    };
   };
 
 
@@ -102,24 +194,29 @@ namespace pathCam {
     StreamCam *parent;
 
   public:
-    bool successful;
 
     DiskReader(StreamCam *parent);
 
     virtual void run();
   };
 
-  class DiskStreamer : public RunnableIntermediate {
+
+  class ImageToTileCopyRunnable : public RunnableIntermediate {
   private:
     StreamCam *parent;
-    std::string imageFile;
+    Image *image;
+    unsigned int component_membership;
+    Point2i tile;
+
 
   public:
-    bool successful;
+    ImageToTileCopyRunnable(StreamCam *parent, Image *image, unsigned int component_membership,
+                            Point2i tile, unsigned long sort_order) : RunnableIntermediate(sort_order, 0),
+                                                                      parent(parent),
+                                                                      image(image),
+                                                                      tile(tile),
+                                                                      component_membership(component_membership) {};
 
-    DiskStreamer(StreamCam *parent, std::string file, unsigned long sort_order);
-
-    //DiskStreamer(StreamCam *parent);
     virtual void run();
   };
 
@@ -131,7 +228,6 @@ namespace pathCam {
     unsigned int component_membership;
     int edgeNumber;
   public:
-    bool successful;
 
     SingleMatchRunnable(StreamCam *parent, unsigned long image_idx1, unsigned long image_idx2,
                         unsigned int component_membership, int edgeNumber, unsigned long sort_order);
@@ -142,23 +238,36 @@ namespace pathCam {
 
   class XCompRunnable : public RunnableIntermediate {
   public:
-    XCompRunnable(unsigned long image_idx, unsigned int componentMembershipSelf,
-                  unsigned int componentMembershipMatchTo, StreamCam *parent) : image_idx(image_idx),
-                                                                                componentMembershipSelf(
-                                                                                    componentMembershipSelf),
-                                                                                componentMembershipMatchTo(
-                                                                                    componentMembershipMatchTo),
-                                                                                parent(parent),
-                                                                                RunnableIntermediate(0) {};
+    XCompRunnable(StreamCam *parent, unsigned long image_idx, unsigned int componentMembershipSelf) : image_idx(
+        image_idx),
+                                                                                                      componentMembership(
+                                                                                                          componentMembershipSelf),
+                                                                                                      parent(parent),
+                                                                                                      RunnableIntermediate(
+                                                                                                          image_idx,
+                                                                                                          0) {};
     StreamCam *parent;
     unsigned long image_idx;
-    unsigned int componentMembershipSelf;
-    //grab this value from back() of compositeQ when job is launched
-    unsigned int componentMembershipMatchTo;
+    unsigned int componentMembership;
+
+    virtual void run();
+
+    bool match_to_images(Image *selfImage, std::vector<Image *> images);
+
+    void extract_multilevel_keypoints(Image *image);
+  };
+
+  class ReverseMatchRunnable : public RunnableIntermediate {
+  private:
+    StreamCam *parent;
+    unsigned long image_idx;
+    unsigned long start_from_idx;
+
+  public:
+    ReverseMatchRunnable(StreamCam *parent, unsigned long image_idx, unsigned long start_from_idx);
 
     virtual void run();
   };
-
 
   class MatchRunnable : public RunnableIntermediate {
   private:
@@ -166,9 +275,8 @@ namespace pathCam {
     unsigned long image_idx;
 
   public:
-    bool successful;
 
-    MatchRunnable(StreamCam *parent, unsigned long image_idx, unsigned long sort_order);
+    MatchRunnable(StreamCam *parent, unsigned long image_idx);
 
     virtual void run();
   };

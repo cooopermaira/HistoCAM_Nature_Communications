@@ -29,7 +29,7 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent& event)
     
     if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_POLY){
       PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
-      cast->add(screen2view(fPoint(event.x, event.y)));
+      cast->add(screen2view(fPoint(event.x, event.y), *view));
       return true;
     }
   }
@@ -38,7 +38,7 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent& event)
   if(event.mods.isLeftButtonDown()){
     if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_POLY){
       PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
-      if(cast->test(screen2view(fPoint(event.x, event.y)), screen2viewScale())){
+      if(cast->test(screen2view(fPoint(event.x, event.y), *view), screen2viewScale(*view))){
         return true;
       }
     }
@@ -52,7 +52,7 @@ bool AnnoViewComponent::polyMouseDrag(const juce::MouseEvent& event)
   if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_POLY){
     PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
     if(cast->isPointSelected()){
-      cast->move(screen2view(fPoint(event.x, event.y)));
+      cast->move(screen2view(fPoint(event.x, event.y), *view));
       return true;
     }
   }
@@ -83,9 +83,9 @@ bool AnnoViewComponent::measureMouseDown(const juce::MouseEvent& event){
     if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_MEAS){
       MeasureAnnotation *cast = dynamic_cast < MeasureAnnotation * >(parent->getSelected().get());
       if(cast->isMeasuring()){
-        cast->stopMeasuring(screen2view(fPoint(event.x, event.y)));
+        cast->stopMeasuring(screen2view(fPoint(event.x, event.y), *view));
       }else{
-        cast->startMeasuring(screen2view(fPoint(event.x, event.y)));
+        cast->startMeasuring(screen2view(fPoint(event.x, event.y), *view));
       }
       return true;
     }
@@ -97,7 +97,7 @@ bool AnnoViewComponent::measureMouseMove(const juce::MouseEvent& event){
   if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_MEAS){
     MeasureAnnotation *cast = dynamic_cast < MeasureAnnotation * >(parent->getSelected().get());
     if(cast->isMeasuring()){
-      cast->continueMeasuring(screen2view(fPoint(event.x, event.y)));
+      cast->continueMeasuring(screen2view(fPoint(event.x, event.y), *view));
       return true;
     }
   }
@@ -180,7 +180,7 @@ void AnnoViewComponent::paint (juce::Graphics& g)
   {
     const ScopedLock lock (mutex);
     for(unsigned int i=0; i < annotations->size(); i++){
-      (*annotations)[i]->paint(g, view->getPosition(), (*annotations)[i].get() == parent->getSelected().get(), view2screenScale());
+      (*annotations)[i]->paint(g, view->getPosition(), (*annotations)[i].get() == parent->getSelected().get(), view2screenScale(*view));
     }
   }
 }

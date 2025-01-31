@@ -8,12 +8,12 @@ import sys
 import os
 import xml.etree.cElementTree as ET
 
-directory = "D:\\sim\\ColoredFrames Panel1-Case1155" ## sys.argv[1]
+directory = "D:\\front_end_test\\20248271918528" ## sys.argv[1]
 print(directory)
 #build input
 k = []
 for file in os.listdir(directory):
-    if file.endswith('.tif'):
+    if file.endswith('.Raw'):
         k.append(file)
 
 k.sort(key = lambda x:(int(x.split('.')[0][8:10]) , int(x.split('.')[0][10:])))
@@ -34,8 +34,9 @@ with open(os.path.join(directory,'input.txt'),'w') as f:
     ET.SubElement(element_io,"output_image").text = os.path.join(directory,"result.png")
     flatfield = ET.SubElement(element_io,"flat_field_images")
     ET.SubElement(flatfield,"twoX").text = "C:\\Users\\Max Cooper\\Documents\\pathcam\\calibration\\2x_wb.tif"
+    ET.SubElement(flatfield,"fourX").text = "C:\\Users\\Max Cooper\\Documents\\pathcam\\calibration\\4x.tiff"
     
-    root.append(ET.fromstring("<registration><detector><features><type>ORB</type></features><FREAK>False</FREAK></detector><image><crop>0.5</crop><scale>0.25</scale><interpolation>CUBIC</interpolation><real>false</real><debayer>true</debayer></image><matcher>BRUTEFORCE_HAMMING</matcher><estimator>RANSAC</estimator></registration>"))
+    root.append(ET.fromstring("<registration><detector><features><type>ORB</type></features><FREAK>False</FREAK></detector><image><height>4852</height><width>6464</width><scope_radius>2190</scope_radius><crop>1</crop><scale>0.25</scale><interpolation>CUBIC</interpolation><real>false</real><debayer>true</debayer></image><matcher>BRUTEFORCE_HAMMING</matcher><estimator>RANSAC</estimator></registration>"))
     feature = root.find("registration/detector/features")
     ET.SubElement(feature,"params",{"nfeatures":"500", "scaleFactor":"1.0", "nlevels":"1", "edgeThreshold":"31","firstLevel":"0", "WTA_K":"2", "scoreType":"HARRIS_SCORE", "patchSize":"31", "fastThreshold":"20"})
     print(ET.tostring(root))

@@ -13,73 +13,121 @@
 using Poco::DirectoryIterator;
 
 namespace pathCam {
-    DiskReader::DiskReader(StreamCam *parent): parent(parent), successful(false) {
-        parent->microscopeInput = true;
-    }
 
-    void DiskReader::run() {
-        std::ifstream infile(parent->input_images.toString().c_str());
-        std::string imageFile;
-        unsigned long sort_order = 0;
-        while (infile >> imageFile) {
-            /*
-            auto ds = new DiskStreamer(parent, imageFile, sort_order);
-            parent->diskCount++;
-            parent->JobQ->add_runnable(ds);
-            sort_order += 10;
-             */
-            Image* image = new Image();
-            image->set_disk_file(imageFile);
-            parent->pass_image(image, sort_order);
-            sort_order++;
-        }
-        parent->microscopeInput = false;
-        std::cout << "disk images set " << std::endl;
-    }
+    Mat ConvertBGR2Bayer(Mat BGRImage) {
+
+        /*
+        Assuming a Bayer filter that looks like this:
+
+        # // 0  1  2  3  4  5
+        /////////////////////
+        0 // B  G  B  G  B  G
+        1 // G  R  G  R  G  R
+        2 // B  G  B  G  B  G
+        3 // G  R  G  R  G  R
+        4 // B  G  B  G  B  G
+        5 // G  R  G  R  G  R
+
+        */
 
 
-    DiskStreamer::DiskStreamer(StreamCam *parent, std::string imageFile,
-                               unsigned long sort_order): parent(parent),
-                                                          imageFile(std::move(imageFile)),
-                                                          successful(false), RunnableIntermediate(sort_order){
-    };
+        Mat BayerImage(BGRImage.rows, BGRImage.cols, CV_8UC1);
 
-    void DiskStreamer::run() {
-        if (imageFile.empty()) { return; }
-        std::ifstream stream;
-        stream.open(imageFile, std::ios::binary);
+        int channel;
 
-        char *raw_image_data = new char[6464 * 4852];
-        stream.read(raw_image_data, 6464 * 4852);
+        for (int row = 0; row < BayerImage.rows; row++)
+        {
+            for (int col = 0; col < BayerImage.cols; col++)
+            {
+                if (row % 2 == 0)
+                {
+                    //even columns and even rows = blue = channel:0
+                    //even columns and uneven rows = green = channel:1 
+                    channel = (col % 2 == 0) ? 0 : 1;
+                }
+                else
+                {
+                    //uneven columns and even rows = green = channel:1
+                    //uneven columns and uneven rows = red = channel:2 
+                    channel = (col % 2 == 0) ? 1 : 2;
+                }
 
-        Image *image = new Image();
-        image->copy_in(raw_image_data);
-        image->set_disk_file(imageFile);
-        delete [] raw_image_data;
-
-        parent->pass_image(image, sort_order + 1);
-
-        parent->diskCount--;
-        successful = true;
-    }
-
-    void DebayerRunnable::run() {
-        image->load_raw_from_disk();
-
-        if(!image->in_memory() ){
-            std::cout << "Issue loading image.\n";
-            return;
+                BayerImage.at<uchar>(row, col) = BGRImage.at<Vec3b>(row, col).val[channel];
+            }
         }
 
-        //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
-        cv::Size image_size(image->width, image->height);
-        Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-        cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-
-        Poco::Path o = outfile;
-        o.append(image->image_file.getFileName());
-        o.setExtension("png");
-
-        imwrite(o.toString(), image_Mat);
+        return BayerImage;
     }
+
+
+  DiskReader::DiskReader(StreamCam *parent) : parent(parent) {
+    parent->microscopeInput = true;
+  }
+
+  void DiskReader::run() {
+    std::ifstream infile(parent->input_images.toString().c_str());
+    std::string imageFile;
+    unsigned long image_index = 0;
+    while (infile >> imageFile) {
+      Image *image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
+      image->set_disk_file(imageFile);
+      parent->pass_image(image, image_index);
+      image_index++;
+    }
+    parent->microscopeInput = false;
+    std::cout << "disk images set " << std::endl;
+  }
+
+
+
+
+  void DebayerRunnable::run() {
+    Poco::Path o = outfile;
+    o.append(image->image_file.getFileName());
+    o.setExtension("Raw");
+    image->load_raw_from_disk();
+
+    bool convertAndSave = true;
+
+    if (!image->in_memory()) {
+      std::cout << "Issue loading image.\n";
+      return;
+    }
+    auto val = image->check_blur();
+    blur->at(sort_order) = val;
+    names->at(sort_order) = image->get_ImageFile().getFileName();
+
+    if (convertAndSave) {
+
+      //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
+      cv::Size image_size(image->width, image->height);
+      Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+
+      cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
+      try {
+        cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
+
+        image_Mat.convertTo(image_Mat, CV_32FC3);
+
+        cv::pow(image_Mat, 1.09, image_Mat);
+
+        image_Mat.convertTo(image_Mat, CV_8UC3);
+        image_Mat = ConvertBGR2Bayer(image_Mat);
+
+        
+        std::fstream file;
+        file = std::fstream(o.toString(), std::ios::out | std::ios::binary);
+        if (file.fail()) {
+            throw new std::exception;
+        }
+        file.write(reinterpret_cast<const char*>(image_Mat.data), image->width * image->height);
+        //imwrite(o.toString(), image_Mat);
+      }
+      catch (...) {
+        int k = 0;
+      }
+    }
+    image->free_memory_RAW();
+    int k = 0;
+  }
 }

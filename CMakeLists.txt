@@ -3,6 +3,7 @@ project(pathCam)
 
 set(CMAKE_BUILD_TYPE Debug)
 
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "")
 
@@ -19,25 +20,6 @@ OPTION(BUILD_THREAD_TEST "" OFF)
 OPTION(BUILD_PATHCAM_GUI "" ON)
 OPTION(OVERRRIDE_SPINNAKER "" OFF)
 OPTION(BUILD_SPINNAKER "" OFF)
-
-find_package(Git QUIET)
-if (GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
-    # Update submodules as needed
-    option(GIT_SUBMODULE "Check submodules during build" ON)
-    if (GIT_SUBMODULE)
-        message(STATUS "Submodule update")
-        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                RESULT_VARIABLE GIT_SUBMOD_RESULT)
-        if (NOT GIT_SUBMOD_RESULT EQUAL "0")
-            message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
-        endif ()
-    endif ()
-endif ()
-
-if (NOT EXISTS "${PROJECT_SOURCE_DIR}/poco/CMakeLists.txt")
-    message(STATUS "Poco and NanoGUI were not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
-endif ()
 
 
 set(CMAKE_SKIP_INSTALL_RULES NO)
@@ -68,24 +50,64 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 add_subdirectory(poco)
 
 
-add_subdirectory(JUCE)
-
-
 IF (APPLE)
+    SET(Torch_DIR "/Users/coopermaira/libtorch_2.4.0")
+    add_compile_definitions(WITH_MPS)
+
     SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
     IF (NOT OpenCV_DIR)
         SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
     ENDIF ()
+
+    set(Python3_INCLUDE_DIR "/opt/homebrew/Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/include/python3.12")
+    set(Python3_LIBRARY_DIR "/opt/homebrew/Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/lib")
+    set(Python3_LIB "/opt/homebrew//Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/lib/python3.12/config-3.12-darwin/libpython3.12.dylib")
 ELSEIF (WIN32)
-    SET(OpenCV_DIR "C:/Users/Max Cooper/Documents/opencv/install")
-ELSEIF (LINUX)
-    SET(OpenCV_DIR "home/opencv/cmake/templates")
-ENDIF ()
+    SET(Torch_DIR "D:/libtorch-win-shared-with-deps-2.0.1+cu118/libtorch")
+    SET(CUDA_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
+    SET(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
+    SET(CUDA_SDK_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
+
+    SET(OpenCV_DIR "C:/Users/Max Cooper/documents/opencv/install")
+
+    set(Python3_INCLUDE_DIR "C:/Program Files/Python311/Include")
+    set(Python3_LIBRARY_DIR "C:/Program Files/Python311/libs")
+    set(Python3_LIB "python311")
+elseif (LINUX)
+
+    SET(Torch_DIR "/home/max/libtorch-cxx11-abi-shared-with-deps-2.5.1+cu118/libtorch")
+
+    SET(Python3_INCLUDE_DIR "/home/max/Python-3.11.0/shared_library_dynamic/include/python3.11")
+    SET(Python3_LIBRARY_DIR "/home/max/Python-3.11.0/shared_library_dynamic/lib")
+    SET(Python3_LIB "/home/max/Python-3.11.0/shared_library_dynamic/lib/libpython3.11.so")
+
+    set(CMAKE_CUDA_COMPILER "/usr/local/cuda-11.8/bin/nvcc")
+    SET(CUDAToolkit_ROOT_DIR "/usr/local/cuda-11.8" CACHE PATH "CUDA toolkit root")
+    set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-11.8/bin/nvcc")
+    set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
+    set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
+    set(CMAKE_CUDA_ARCHITECTURES "native")
+ENDIF()
+
+link_directories(${Python3_INCLUDE_DIR})
+include_directories(${Python3_INCLUDE_DIR})
+
+#find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
+
+
+list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
+find_package(Torch REQUIRED)
+#add_library(torch_python_shared SHARED IMPORTED)
+#set_target_properties(torch_python_shared PROPERTIES IMPORTED_LOCATION "/home/max/venv-2/lib/python3.10/site-packages/torch/lib/libtorch_python.so")
+#set(CMAKE_BUILD_RPATH "/home/max/venv-2/lib/python3.10/site-packages/torch/lib")
+
+add_subdirectory(JUCE)
+
 
 IF (NOT OVERRRIDE_SPINNAKER)
 
@@ -121,15 +143,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 FILE(GLOB PATHCAM_FILES pathcam/*.h pathcam/*.cpp)
 
 IF (NOT BUILD_SPINNAKER)
-  list(FILTER PATHCAM_FILES EXCLUDE REGEX SpinPath)
-ENDIF()
+    list(FILTER PATHCAM_FILES EXCLUDE REGEX SpinPath)
+ENDIF ()
 
 add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} )
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})
@@ -213,21 +235,35 @@ IF (BUILD_PATHCAM_GUI)
             juce::juce_events
             juce::juce_graphics
             juce::juce_opengl
+            ${TORCH_LIBRARIES} ${Python3_LIB}
     )
+
+
 
     target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 
     if (MSVC)
-        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Release/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/Release/*.pdb")
+        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.pdb")
 
         add_custom_command(TARGET pathCamApp
                 POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
-                "${CMAKE_BINARY_DIR}/pathCamApp_artefacts/Release/")
+                $<TARGET_FILE_DIR:pathCamApp>)
+        file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
+        add_custom_command(TARGET pathCamApp
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TORCH_DLLS}
+                $<TARGET_FILE_DIR:pathCamApp>)
+        add_custom_command(TARGET debayer
+                POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${TORCH_DLLS}
+                $<TARGET_FILE_DIR:debayer>)
     endif ()
 
 
-ENDIF ()
+    ENDIF ()
 
 
 

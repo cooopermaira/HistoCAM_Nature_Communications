@@ -9,6 +9,8 @@
 #define MRTiledImage_h
 
 #include "pathCam.h"
+#include "StreamCam.h"
+#include "TiledImage.h"
 
 class MRTiledImage{
   
@@ -17,16 +19,28 @@ class MRTiledImage{
 public:
   cv::Rect_<float> bounds;
   unsigned int tile_size;
+  double scale;
+  Point2f offset;
+  Poco::Event scaleSet;
+  pathCam::StreamCam* parent;
  
   
-  MRTiledImage(unsigned int tile_size=512):tile_size(tile_size){};
+  MRTiledImage(pathCam::StreamCam* parent = nullptr,unsigned int tile_size=224):tile_size(tile_size), scaleSet(false),parent(parent){};
   ~MRTiledImage(){ level.clear(); };
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
+
+  void insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+
+  int get_class_for_tile(Point2i tile);
   
   void build(cv::Mat &image_in);
+
+  void set_scale(double _scale){scale = _scale;}
+
+  void set_offset(Point2f _offset){offset = _offset;}
   
-  std::vector < TileQuery > getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen);
+  std::vector < TileQuery > getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen, bool pullFromBase = false);
 
   std::vector < std::shared_ptr< TiledImage > > level;
 
@@ -55,19 +69,26 @@ private:
 
 
 class MRTiledImageSet{
+  
+  friend class ImageViewComponent;
+  friend class CaptureComponent;
+  
 public:
+  cv::Rect_<float> bounds;
+
+
   MRTiledImageSet(){};
 
-  void add(MRTiledImage &image, double scale, Point2f offset){
+  void add(std::shared_ptr<MRTiledImage> image){
     images.push_back(image);
-    scales.push_back(scale);
-    offsets.push_back(offset);
   }
+  
+  bool empty(){ return images.empty(); }
+  
+  void update_bounds();
 
 private:
-  std::vector < MRTiledImage > images;
-  std::vector < double > scales;
-  std::vector < Point2f > offsets;
+  std::vector < std::shared_ptr < MRTiledImage> > images;
 };
 
 

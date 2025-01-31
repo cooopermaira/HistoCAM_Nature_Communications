@@ -77,7 +77,7 @@ void CameraStream::run(){
       
       interrupt = false;
       
-      unsigned long i = 1;
+      unsigned long i = 0;
       
       //Will run until killed
       while (!interrupt){
@@ -92,17 +92,19 @@ void CameraStream::run(){
             
           }else{
             
-            const size_t width = pResultImage->GetWidth();
-            const size_t height = pResultImage->GetHeight();
-            parent->camlogger.information(Poco::format("Got image: %u %u", (unsigned int)width, (unsigned int)height));
+            //const size_t width = pResultImage->GetWidth();
+            //const size_t height = pResultImage->GetHeight();
+            //parent->camlogger.information(Poco::format("Got image: %u %u", (unsigned int)width, (unsigned int)height));
             
-            pathCam::Image *image = new pathCam::Image();
+            pathCam::Image *image = new pathCam::Image(parent->sCam->image_width, parent->sCam->image_height, parent->sCam->get_scope_radius());
             image->copy_in(pResultImage->GetData());
-            image->increment_smart_pointer();
-            parent->sCam->pass_image(image,i);
-            i+=10;
-            Poco::DateTime time = Poco::DateTime();
-            std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i");
+            //image->increment_smart_pointer();
+
+            std::string str = std::to_string(i) + ".Raw";
+            i++;
+            //Poco::DateTime time = Poco::DateTime();
+            //std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i") + ".Raw";
+            
 
             //i++;
             //std::stringstream ss;
@@ -112,20 +114,18 @@ void CameraStream::run(){
            // ss << time.day() << time.hour();
            // ss << time.minute() << time.millisecond();
             
-            parent->camlogger.information(Poco::format("%s", str));
+            //parent->camlogger.information(Poco::format("%s", str));
 
-            cache_element image_in_cache;
-            image_in_cache.image = image;
-            image_in_cache.name = str;
-            
-            parent->cache_mutex.lock();
-            parent->camlogger.information("Put on Queue");
+            Poco::Path image_path = parent->getRootPath();
 
-            parent->cache->push(image_in_cache);
             
-            parent->cache_mutex.unlock();
+            image_path.append(Poco::Path(parent->captureSetName));
+           
+            image_path.append(Poco::Path(str));
+            image->set_disk_file(image_path);
+            parent->sCam->pass_image(image, i, true);
+            //image->free_memory_RAW();
             
-                      
           }
           
           pResultImage->Release();
@@ -150,7 +150,7 @@ void FileStream::run(){
   
   parent->IOlogger.information("*** FILE IO ***");
   
-  Poco::Thread::sleep(50);
+  Poco::Thread::sleep(200);
 
   interrupt = false;
   
@@ -174,6 +174,8 @@ void FileStream::run(){
     parent->caputure_set_mutex.unlock();
     image_path.append(Poco::Path(name));
     image->set_disk_file(image_path);
+
+    std::string test = image_path.toString();
     
     //std::cout << image_path.toString() << "\n";
     /*
@@ -185,7 +187,7 @@ void FileStream::run(){
     std::fstream myfile;
     myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
     if (myfile.fail()) {
-        std::cout << strerror(errno);
+        throw new exception;
     }
     myfile.write(image->get_Raw(), image_bytes);
     image->free_memory_RAW();
@@ -194,7 +196,7 @@ void FileStream::run(){
     
 
   }
-
+  
 
 }
 
@@ -377,7 +379,17 @@ int SpinPath::spinUpCamera(){
       camlogger.error("Unable to get or set acquisition mode to continuous (entry retrieval). Aborting...");
       return -1;
     }
-    
+
+    // Set expsoure time to 1500 us
+    CEnumerationPtr exposureAuto = nodeMap.GetNode("ExposureAuto");
+    exposureAuto->SetIntValue(exposureAuto->GetEntryByName("Off")->GetValue());
+
+    CEnumerationPtr exposureMode = nodeMap.GetNode("ExposureMode");
+    exposureMode->SetIntValue(exposureMode->GetEntryByName("Timed")->GetValue());
+
+    CFloatPtr exposureTime = nodeMap.GetNode("ExposureTime");
+    exposureTime->SetValue(1500);
+
     // Retrieve integer value from entry node
     const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
     
@@ -493,6 +505,10 @@ int SpinPath::run(){
   int result = spinUpCamera();
   
   if(result != -1){
+      Poco::Path root_path = Poco::Path("D:/front_end_test");
+
+      setRootPath(root_path);
+      newCaptureSet();
     cameraStream = new CameraStream(this);
     fileStream =  new FileStream(this);
     processStream = new ProcessStream(this);
@@ -503,7 +519,7 @@ int SpinPath::run(){
     thread_file.start(*fileStream);
     sCam->microscopeInput = true;
     thread_sCam.start(*processStream);
-    if (0 == 0) { int j = 0;  }
+    
   }
 
  
@@ -518,11 +534,11 @@ void SpinPath::stopCamera(){
   std::cout << "Collection complete, processing " << std::endl;
   thread_cam.join();
   thread_file.join();
-  thread_sCam.join();
+  //thread_sCam.join();
   
   delete cameraStream;
   delete fileStream;
-  delete processStream;
+  //delete processStream;
 
   spinDownCamera();
 }
