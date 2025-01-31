@@ -40,6 +40,9 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 
   captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
   addAndMakeVisible(captureOverlay.get());
+  aiOverlay.reset(new AIOverlay(this, iconNames, iconsFromZipFile));
+  addAndMakeVisible(aiOverlay.get());
+
 }
 
 void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {

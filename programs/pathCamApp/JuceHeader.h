@@ -48,6 +48,7 @@ cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
 
 #include "ToolBarComponent.h"
 
+#include "AIOverlay.h"
 #include "ImageViewOverlay.h"
 #include "ImageViewComponent.h"
 
