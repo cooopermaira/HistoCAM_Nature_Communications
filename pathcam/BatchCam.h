@@ -46,7 +46,7 @@ namespace pathCam {
         bool real;
 
         bool inferencing;
-        bool aggregating;
+        bool aggregatingHandoff;
         bool pyVenv;
         bool classifying;
         bool classifyingComplete = false;
