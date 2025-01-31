@@ -40,9 +40,6 @@ namespace pathCam {
         minx = 0;
         miny = 0;
 
-        //set crop dimension, this should probably be configurable;
-        cropedDim = 224;
-
         //set size of embed vector, again this should be configurable
         embedSize = 1536;
 
@@ -70,7 +67,7 @@ namespace pathCam {
 
         
         //empty tileEmbeds, just needs to be initialized
-        torch::Tensor tileEmbeds = torch::empty({0, embedSize}, torch::TensorOptions().dtype(torch::kFloat32).device(device));
+        torch::Tensor tileEmbeds;
 
         {
             // Load the tile encoder TorchScript model and move it to the selected device
@@ -126,22 +123,25 @@ namespace pathCam {
                             .sub(mean)
                             .div(stddv);
 
-
-                    //extend tensor to match coord dict
-                    int extendBy = tileCoordToTensorIndex.size() - tileEmbeds.sizes()[0];
-                    tileEmbeds = torch::cat({
-                        tileEmbeds, torch::empty({extendBy, embedSize},
-                                                 torch::TensorOptions().dtype(torch::kFloat32).device(
-                                                     device))
-                    });
-
                     //run inference on batch of images
                     auto output = tileEncoderModel.forward({batch_tensor}).toTensor();
 
-                    //add new tile embedding to the list, if a tile has been run previously, overwrite it
-                    for (int i = 0; i < numImages; i++) {
-                        auto locationInList = (tileCoordToTensorIndex)[tileList[i].first];
-                        tileEmbeds[locationInList] = output[i];
+                    if (tileEmbeds.sizes().size() == 1) {
+                        tileEmbeds = output;
+                    }else {
+                        //extend tensor to match coord dict
+                        int extendBy = tileCoordToTensorIndex.size() - tileEmbeds.sizes()[0];
+                        tileEmbeds = torch::cat({
+                            tileEmbeds, torch::empty({extendBy, output.sizes()[1]},
+                                                     torch::TensorOptions().dtype(torch::kFloat32).device(
+                                                         device))
+                        });
+
+                        //add new tile embedding to the list, if a tile has been run previously, overwrite it
+                        for (int i = 0; i < numImages; i++) {
+                            auto locationInList = (tileCoordToTensorIndex)[tileList[i].first];
+                            tileEmbeds[locationInList] = output[i];
+                        }
                     }
                     std::cout<<"Processed "+std::to_string(tileList.size())<<std::endl;
                 }
@@ -154,14 +154,14 @@ namespace pathCam {
         std::cout<<"Tile Embedding Complete"<<std::endl;
         parent->tileEmbeddingComplete = true;
 
-        if (parent->aggregating) {
+        if (parent->aggregatingHandoff) {
             //file exchange
-            std::string embedFileOut("/media/max/Data/2_20/Torch/handoff/tileEmbeds.pt");
-            std::string coordsFileOut("/media/max/Data/2_20/Torch/handoff/coords.pt");
-            std::string signalFileOut("/media/max/Data/2_20/Torch/handoff/pSignal.txt");
+            std::string embedFileOut(parent->slide_encoder_path.toString()+"/tileEmbeds.pt");
+            std::string coordsFileOut(parent->slide_encoder_path.toString()+"/coords.pt");
+            std::string signalFileOut(parent->slide_encoder_path.toString()+"/pSignal.txt");
 
-            std::string embedFileIn("/media/max/Data/2_20/Torch/handoff/response.pt");
-            std::string signalFileIn("/media/max/Data/2_20/Torch/handoff/cSignal.txt");
+            std::string embedFileIn(parent->slide_encoder_path.toString()+"/response.pt");
+            std::string signalFileIn(parent->slide_encoder_path.toString()+"/cSignal.txt");
 
 
             //create coords tensor for handoff
@@ -196,8 +196,9 @@ namespace pathCam {
             std::vector<char> buffer((std::istreambuf_iterator<char>(fin)),std::istreambuf_iterator<char>());
             torch::Tensor aggregatedEmbeds = torch::pickle_load(buffer).toTensor();
 
-            //reset signal
+            //reset dir
             remove(signalFileIn.c_str());
+            remove(embedFileIn.c_str());
 
             //update tileEmbeds after attention
             tileEmbeds = torch::cat({aggregatedEmbeds,coordsTensor},1).to(torch::kF32);
