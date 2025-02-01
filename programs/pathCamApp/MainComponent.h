@@ -35,8 +35,9 @@ public:
     clientHasData = true;
   }
   
+
+
   inline void refreshImage(){
-    repaint();
     imageview->refreshImage();
     capture->refreshImage();
     annotate->refreshImage();
@@ -65,7 +66,7 @@ private:
   OwnedArray<Drawable> iconsFromZipFile;
 
   std::atomic<bool> clientHasData;
-  
+
 public:
   std::shared_ptr < fRectangle > view;
 

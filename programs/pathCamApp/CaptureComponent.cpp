@@ -56,6 +56,10 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 
   captureOverlay.reset(new CaptureOverlay(this, iconNames, iconsFromZipFile));
   addAndMakeVisible(captureOverlay.get());
+  aiOverlay.reset(new AIOverlay(this, iconNames, iconsFromZipFile));
+  addAndMakeVisible(aiOverlay.get());
+  reportOverlay.reset(new ReportOverlay(this, iconNames, iconsFromZipFile));
+  addAndMakeVisible(reportOverlay.get());
 }
 
 void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {
@@ -131,6 +135,9 @@ void CaptureComponent::startSimulating() {
   compositeThread.start(new sCamPocoRunnable(this));
   updateDrawThread.start(new drawThreadRunnable(parent,compositeThread));
 
+  aiOverlay->resized();
+  reportOverlay->resized();
+  repaint();
 }
 
 

@@ -121,32 +121,25 @@ namespace pathCam {
         return false;
       }
         
-        if(pConf->has("io.tile_encoder")){
+        if(pConf->has("io.inferencing.tile_encoder")){
             inferencing = true;
-            tile_encoder_path = Path(pConf->getString("io.tile_encoder"));
+            tile_encoder_path = Path(pConf->getString("io.inferencing.tile_encoder"));
         }
         else {
             inferencing = false;
         }
 
-        if (pConf->has("io.slide_encoder")) {
-            aggregating = true;
-            slide_encoder_path = Path(pConf->getString("io.slide_encoder"));
+        if (pConf->has("io.inferencing.slide_encoder")) {
+            aggregatingHandoff = true;
+            slide_encoder_path = Path(pConf->getString("io.inferencing.slide_encoder"));
         }
         else {
-            aggregating = false;
+            aggregatingHandoff = false;
         }
 
-        if (pConf->has("io.python_venv")) {
-            pyVenv = true;
-            python_venv_path = Path(pConf->getString("io.python_venv"));
-        }
-        else {
-            pyVenv = false;
-        }
-      if (pConf->has("io.classifier")) {
+      if (pConf->has("io.inferencing.classifier")) {
         classifying = true;
-        classifier_path = Path(pConf->getString("io.classifier"));
+        classifier_path = Path(pConf->getString("io.inferencing.classifier"));
       }
 
       if (pConf->has("io.output_log")) {
