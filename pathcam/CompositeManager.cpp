@@ -143,7 +143,7 @@ namespace pathCam {
 
   void CompositeManager::decrement_rebuild_jobs_outstanding() {
     rebuildJobsOutstanding--;
-    parent->update_observers();
+    parent->notify_observers();
     if(rebuildJobsOutstanding == 0){
       rebuildJobsComplete.set();
     }

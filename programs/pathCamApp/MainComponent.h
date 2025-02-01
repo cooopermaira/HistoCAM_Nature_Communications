@@ -29,9 +29,10 @@ public:
     CaptureComponent * capture;
     AnnotateComponent * annotate;
   
-  inline void update() override {
-    const MessageManagerLock mmLock;
-    refreshImage();
+  inline void update() override;
+
+  inline void notify_new_data(){
+    clientHasData = true;
   }
   
   inline void refreshImage(){
@@ -62,6 +63,8 @@ private:
   
   StringArray iconNames;
   OwnedArray<Drawable> iconsFromZipFile;
+
+  std::atomic<bool> clientHasData;
   
 public:
   std::shared_ptr < fRectangle > view;

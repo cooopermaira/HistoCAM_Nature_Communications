@@ -152,12 +152,9 @@ namespace pathCam {
       observers.push_back(new_observer);
     }
 
-    void update_observers() {
-      for (unsigned int i = 0; i < observers.size(); i++) {
-        MRimage->update_bounds();
-        observers[i]->update();
-      }
-    }
+    void update_observers();
+
+    void notify_observers();
 
   public:
     unsigned int increment_and_get_components() { return components++; }

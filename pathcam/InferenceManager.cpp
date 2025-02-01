@@ -243,7 +243,7 @@ namespace pathCam {
         // parent->tileCoordToClass[key] = (keyhash % 4);
       }
       parent->classifyingComplete = true;
-      parent->update_observers();
+      parent->notify_observers();
     }
   }
 

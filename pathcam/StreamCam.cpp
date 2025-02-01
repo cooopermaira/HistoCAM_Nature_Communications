@@ -307,6 +307,21 @@ namespace pathCam {
 
   }
 
+  void StreamCam::update_observers()  {
+    for (unsigned int i = 0; i < observers.size(); i++) {
+      MRimage->update_bounds();
+      observers[i]->notify_new_data();
+      observers[i]->update();
+    }
+  }
+
+  void StreamCam::notify_observers() {
+    for (unsigned int i = 0; i < observers.size(); i++) {
+      MRimage->update_bounds();
+      observers[i]->notify_new_data();
+    }
+  }
+
   std::vector<Image *> StreamCam::get_component_image_refs(unsigned long component) {
     auto dm = composites[component]->delaunayMembers;
     std::vector<unsigned long> res(dm.size());

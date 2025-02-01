@@ -13,6 +13,7 @@
 class DataObserver {
 public:
     virtual void update() = 0;
+    virtual void notify_new_data() = 0;
 };
 
 #endif /* DataObserver_h */

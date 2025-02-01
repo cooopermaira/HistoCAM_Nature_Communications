@@ -7,6 +7,22 @@
 
 #include "JuceHeader.h"
 
+class drawThreadRunnable : public Poco::Runnable {
+public:
+  drawThreadRunnable(MainComponent* parent, Poco::Thread& sCamThread):parent(parent),sCamThread(sCamThread){};
+
+  virtual void run(){
+    while(sCamThread.isRunning()){
+      parent->update();
+      sleep(1);
+    }
+    int k = 0;
+  }
+
+private:
+  MainComponent* parent;
+  Poco::Thread& sCamThread;
+};
 
 class sCamPocoRunnable : public Poco::Runnable {
 public:
@@ -113,7 +129,8 @@ void CaptureComponent::startSimulating() {
   parent->annotate->setImage(parent->MRimage);
 
   compositeThread.start(new sCamPocoRunnable(this));
-  repaint();
+  updateDrawThread.start(new drawThreadRunnable(parent,compositeThread));
+
 }
 
 

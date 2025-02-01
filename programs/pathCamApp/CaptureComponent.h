@@ -94,6 +94,7 @@ public:
 private:
     std::unique_ptr<CaptureOverlay> captureOverlay;
     Poco::Thread compositeThread;
+    Poco::Thread updateDrawThread;
     bool recording;
     bool simulating;
     float scopeRadius;

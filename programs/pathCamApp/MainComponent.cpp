@@ -3,7 +3,7 @@
 
 //==============================================================================
 //MainComponent::MainComponent(std::shared_ptr<pathCam::StreamCam> bcam) : bcam(bcam) {
-MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):config(config){ 
+MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):config(config),clientHasData(false){
     //Won't work for deployment, but ok for now
     std::stringstream ss;
     ss << PROJECT_SOURCE_DIR << "/resources/hud_icons.zip";
@@ -45,6 +45,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
     setSize(1024, 768);
 
 }
+
 
 MainComponent::~MainComponent() {
     delete progressBar;
@@ -129,6 +130,13 @@ public:
     std::string path;
 };
 
+void MainComponent::update()  {
+  if(clientHasData) {
+    const MessageManagerLock mmLock;
+    refreshImage();
+    clientHasData = false;
+  }
+}
 
 void MainComponent::loadImage(std::string path) {
 
