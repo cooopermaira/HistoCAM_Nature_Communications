@@ -40,8 +40,6 @@ namespace pathCam {
         minx = 0;
         miny = 0;
 
-        //set size of embed vector, again this should be configurable
-        embedSize = 1536;
 
         tileCoordToTensorIndex = std::map<Point2i,unsigned long,PointComparator>();
     }

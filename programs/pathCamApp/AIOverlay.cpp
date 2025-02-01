@@ -14,24 +14,26 @@ void AIOverlay::resized()
   
   AIthinkingButton->setVisible(false);
   AIreadyButton->setVisible(false);
-    
-  if(parent->sCam){
-    bool compositing = parent->sCam->compositing;
-    bool done = parent->sCam->tileEmbeddingComplete;
-    
-    if(compositing && !done){
-      AIthinkingButton->setVisible(true);
-      AIthinkingButton->setBounds(area);
-    }
-    
-    if(compositing && done){
-      AIreadyButton->setVisible(true);
-      AIreadyButton->setBounds(area);
-    }
-  }
+  AIthinkingButton->setBounds(area);
+  AIreadyButton->setBounds(area);
+
+
 }
 
 void AIOverlay::paint(juce::Graphics &g) {
+  if(parent->sCam){
+    bool compositing = parent->sCam->compositing;
+    bool done = parent->sCam->tileEmbeddingComplete;
+
+    if(compositing && !done){
+      AIthinkingButton->setVisible(true);
+    }
+
+    if(compositing && done){
+      AIreadyButton->setVisible(true);
+    }
+  }
+
   if(AIthinkingButton->isVisible()){
     setAlpha(currentOpacity);
   }
@@ -53,7 +55,7 @@ void AIOverlay::buttonClicked(juce::Button* button)
 void AIOverlay::timerCallback()
 {
   // Update the opacity value to create the fade animation
-  const float speed = 0.02f; // Change rate per frame
+  const float speed = 0.2f; // Change rate per frame
 
   if (increasingOpacity)
   {

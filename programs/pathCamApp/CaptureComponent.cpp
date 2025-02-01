@@ -82,6 +82,7 @@ void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {
         g.drawRect(bounds, 3);
     }
 
+
 }
 
 void CaptureComponent::startRecording() {
@@ -117,6 +118,9 @@ void CaptureComponent::startSimulating() {
   parent->annotate->setImage(parent->MRimage);
 
   compositeThread.start(new sCamPocoRunnable(this));
+
+  aiOverlay->resized();
+  reportOverlay->resized();
   repaint();
 }
 

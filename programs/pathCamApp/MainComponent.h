@@ -32,10 +32,10 @@ public:
   inline void update() override {
     const MessageManagerLock mmLock;
     refreshImage();
+    repaint();
   }
   
   inline void refreshImage(){
-    repaint();
     imageview->refreshImage();
     capture->refreshImage();
     annotate->refreshImage();
