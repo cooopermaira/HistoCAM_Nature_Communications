@@ -29,6 +29,8 @@ public:
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;
   
   void setImage(std::shared_ptr< MRTiledImageSet > image);
+
+  void notify_new_data(){newData = true;}
   
   void fixAspectRatio(){
     if(!MRImage || !isVisible()){ return; }
@@ -56,7 +58,8 @@ public:
   
 protected:
   std::shared_ptr< MRTiledImageSet > MRImage;
-  
+
+  std::atomic<bool> newData;
   bool shade_levels;
   cv::Mat greenShade;
   cv::Mat holding1;

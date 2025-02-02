@@ -14,7 +14,7 @@ public:
   virtual void run(){
     while(sCamThread.isRunning()){
       parent->update();
-      sleep(1);
+      Poco::Thread::sleep(100);
     }
     int k = 0;
   }
@@ -58,8 +58,8 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   addAndMakeVisible(captureOverlay.get());
   aiOverlay.reset(new AIOverlay(this, iconNames, iconsFromZipFile));
   addAndMakeVisible(aiOverlay.get());
-  reportOverlay.reset(new ReportOverlay(this, iconNames, iconsFromZipFile));
-  addAndMakeVisible(reportOverlay.get());
+  // reportOverlay.reset(new ReportOverlay(this, iconNames, iconsFromZipFile));
+  // addAndMakeVisible(reportOverlay.get());
 }
 
 void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {
@@ -136,7 +136,7 @@ void CaptureComponent::startSimulating() {
   updateDrawThread.start(new drawThreadRunnable(parent,compositeThread));
 
   aiOverlay->resized();
-  reportOverlay->resized();
+  //reportOverlay->resized();
   repaint();
 }
 

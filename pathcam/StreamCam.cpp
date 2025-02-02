@@ -379,7 +379,7 @@ namespace pathCam {
   }
 
   void StreamCam::pass_image(Image *image, unsigned long _image_index, bool _saveImg) {
-    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, false, _saveImg);
+    LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true, _saveImg);
     loaderCount++;
     JobQ->add_runnable(llr);
   }

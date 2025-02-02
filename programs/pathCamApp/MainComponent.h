@@ -38,6 +38,7 @@ public:
 
 
   inline void refreshImage(){
+    imageview->notify_new_data();
     imageview->refreshImage();
     capture->refreshImage();
     annotate->refreshImage();

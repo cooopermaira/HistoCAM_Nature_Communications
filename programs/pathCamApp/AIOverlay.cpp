@@ -21,7 +21,10 @@ void AIOverlay::resized()
 }
 
 void AIOverlay::paint(juce::Graphics &g) {
-  if(parent->sCam){
+  if(parent->sCam && parent->sCam->classifying) {
+    AIreadyButton->setVisible(true);
+  }
+    /*
     bool compositing = parent->sCam->compositing;
     bool done = parent->sCam->tileEmbeddingComplete;
 
@@ -37,6 +40,7 @@ void AIOverlay::paint(juce::Graphics &g) {
   if(AIthinkingButton->isVisible()){
     setAlpha(currentOpacity);
   }
+  */
   Component::paint(g);
 }
 

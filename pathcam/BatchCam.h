@@ -16,9 +16,17 @@ using Poco::Logger;
 
 namespace pathCam {
     class BatchCam {
+
+        struct ClassInfo {
+            int id;
+            std::string name;
+            int r, g, b;
+        };
+
         friend class PairRegRunnable;
 
     public:
+        std::vector<ClassInfo> classesInfo;
         std::vector<MemoryPool *> mempool;
         Poco::Logger *logger;
         Poco::Logger::Ptr results_logger;

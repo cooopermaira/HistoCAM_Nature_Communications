@@ -133,106 +133,105 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRa
 
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
   bool shadeClasses = true;
-
-  for (unsigned int i = 0; i < MRImage->images.size(); i++) {
-    if (MRImage->images[i]->scale == 0) { continue; }
-    auto imageview = *view;
-    imageview *= 1.0 / MRImage->images[i]->scale;
-    imageview -= fPoint(MRImage->images[i]->offset.x, MRImage->images[i]->offset.y);
-    std::vector<TileQuery> tiles = MRImage->images[i]->getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
-    for (unsigned int t = 0; t < tiles.size(); t++) {
-      cv::Mat tile = tiles[t].image;
-      auto bounds = RectCtoJ<float>(tiles[t].bounds);
-      bounds *= view2screenScale(imageview) * scale;
-      bounds.expand(0.5, 0.5);
-      tiles[t].bounds = RectJtoC<float>(bounds);
-      if (tile.data) {
-
-        juce::Image im = juce::Image(juce::Image::ARGB, tile.cols, tile.rows, true);
-        juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-
-        jassert(tile.step == bitmap_data.lineStride);
-
-        if (shade_levels) {
-          if (!greenShade.data) {
-            greenShade = Mat(tile.rows, tile.cols, CV_8UC3, cv::Scalar(0, 255, 0));
-            channels.resize(2);
-            channels[0] = greenShade;
-          }
-          double beta = (log2(1.0 / MRImage->images[i]->scale) / 3.4) * 0.7 + 0.05;
-
-          greenShade.setTo(cv::Scalar(0, 0, 0));
-          cv::extractChannel(tile, channels[1], 3);
-          greenShade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta), channels[1]);
-          cv::merge(channels, holding1);
-
-          holding2 = beta * holding1 + (1.0 - beta) * tile;
-          //holding2 = 0.5 * holding1 + 0.5 * tile;
-          memcpy(bitmap_data.data, holding2.data, tile.cols * tile.rows * 4);
-        } else {
-          memcpy(bitmap_data.data, tile.data, tile.cols * tile.rows * 4);
-        }
-        g.drawImage(im, bounds);
-      }
-
-    }
-
-    if (MRImage->images[0]->parent->classifyingComplete && shadeClasses) {
-      auto baseTiles = MRImage->images[i]->getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()),true);
-      for (auto tile : baseTiles) {
-        if (tile.i == MRImage->images[0]->parent->im->minx && tile.j == MRImage->images[0]->parent->im->miny) {
-          int k = 0;
-        }
-
-        //get draw bounds of base level tile
-        auto bounds = RectCtoJ<float>(tile.bounds);
+  if (newData) {
+    for (unsigned int i = 0; i < MRImage->images.size(); i++) {
+      if (MRImage->images[i]->scale == 0) { continue; }
+      auto imageview = *view;
+      imageview *= 1.0 / MRImage->images[i]->scale;
+      imageview -= fPoint(MRImage->images[i]->offset.x, MRImage->images[i]->offset.y);
+      std::vector<TileQuery> tiles = MRImage->images[i]->getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
+      for (unsigned int t = 0; t < tiles.size(); t++) {
+        cv::Mat tile = tiles[t].image;
+        auto bounds = RectCtoJ<float>(tiles[t].bounds);
         bounds *= view2screenScale(imageview) * scale;
         bounds.expand(0.5, 0.5);
-        tile.bounds = RectJtoC<float>(bounds);
+        tiles[t].bounds = RectJtoC<float>(bounds);
+        if (tile.data) {
 
-        //get class for color
-        auto tileCoords = Point2i(tile.i,tile.j);
-        int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
+          juce::Image im = juce::Image(juce::Image::ARGB, tile.cols, tile.rows, true);
+          juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
 
-        //draw it
-        auto tileColor = Colour(uint8(0),0,0,uint8(0));
-        switch (classScore) {
-          case 1:
-            tileColor = Colour(0, uint8(255), 0,uint8(50));
-            break;
-          case 2:
-            tileColor = Colour(uint8(0), 0, 255,  uint8(50));
-            break;
-          case 3:
-            tileColor = Colour(255,uint8(0), 0,  uint8(50));
-            break;
-          case 0:
-            tileColor = Colour(uint8(50), 50, 50, uint8(20));
-            break;
+          jassert(tile.step == bitmap_data.lineStride);
+
+          if (shade_levels) {
+            if (!greenShade.data) {
+              greenShade = Mat(tile.rows, tile.cols, CV_8UC3, cv::Scalar(0, 255, 0));
+              channels.resize(2);
+              channels[0] = greenShade;
+            }
+            double beta = (log2(1.0 / MRImage->images[i]->scale) / 3.4) * 0.7 + 0.05;
+
+            greenShade.setTo(cv::Scalar(0, 0, 0));
+            cv::extractChannel(tile, channels[1], 3);
+            greenShade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta), channels[1]);
+            cv::merge(channels, holding1);
+
+            holding2 = beta * holding1 + (1.0 - beta) * tile;
+            //holding2 = 0.5 * holding1 + 0.5 * tile;
+            memcpy(bitmap_data.data, holding2.data, tile.cols * tile.rows * 4);
+          } else {
+            memcpy(bitmap_data.data, tile.data, tile.cols * tile.rows * 4);
+          }
+          g.drawImage(im, bounds);
         }
-        g.setColour(tileColor);
-        g.fillRect(bounds);
 
       }
+
+      if (MRImage->images[0]->parent->classifyingComplete && shadeClasses) {
+        auto baseTiles = MRImage->images[i]->getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()),true);
+        for (auto tile : baseTiles) {
+          if (tile.i == MRImage->images[0]->parent->im->minx && tile.j == MRImage->images[0]->parent->im->miny) {
+            int k = 0;
+          }
+
+          //get draw bounds of base level tile
+          auto bounds = RectCtoJ<float>(tile.bounds);
+          bounds *= view2screenScale(imageview) * scale;
+          bounds.expand(0.5, 0.5);
+          tile.bounds = RectJtoC<float>(bounds);
+
+          //get class for color
+          auto tileCoords = Point2i(tile.i,tile.j);
+          int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
+
+          //draw it
+          auto tileColor = Colour(uint8(0),0,0,uint8(0));
+          switch (classScore) {
+            case 1:
+              tileColor = Colour(0, uint8(255), 0,uint8(50));
+            break;
+            case 2:
+              tileColor = Colour(uint8(0), 0, 255,  uint8(50));
+            break;
+            case 3:
+              tileColor = Colour(255,uint8(0), 0,  uint8(50));
+            break;
+            case 0:
+              tileColor = Colour(uint8(50), 50, 50, uint8(20));
+            break;
+          }
+          g.setColour(tileColor);
+          g.fillRect(bounds);
+
+        }
+      }
+
+
+      //#ifdef DEBUG
+      //    for (unsigned int t = 0; t < tiles.size(); t++) {
+      //        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
+      //        g.setColour(juce::Colours::greenyellow);
+      //        g.drawRect(bounds, 3);
+      //        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+      //        g.setFont(20);
+      //        g.drawText(ij, bounds.getCentreX() - 50,
+      //                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
+      //    }
+      //#endif
+
+
     }
-
-
-//#ifdef DEBUG
-//    for (unsigned int t = 0; t < tiles.size(); t++) {
-//        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
-//        g.setColour(juce::Colours::greenyellow);
-//        g.drawRect(bounds, 3);
-//        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-//        g.setFont(20);
-//        g.drawText(ij, bounds.getCentreX() - 50,
-//                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
-//    }
-//#endif
-
-
   }
-
-
 }
 
 

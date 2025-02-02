@@ -285,6 +285,7 @@ namespace pathCam {
     //debug (figures)
     //unsigned long fig_ind = 270;
     //unsigned long fig_ind = 9;
+    auto start = std::chrono::high_resolution_clock::now();
 
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<unsigned long> indexes;
@@ -345,8 +346,8 @@ namespace pathCam {
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
-        if (parent->has_flatfield(images[i]->label)) {
-          //if (false) {
+        //if (parent->has_flatfield(images[i]->label)) {
+        if (false) {
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
           cv::pow(convertHolding, 1.09, convertHolding);
@@ -484,6 +485,11 @@ namespace pathCam {
       //        save_pyramid_as_image();
       //        int k = 0;
       //      }
+      auto stop = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+      if (duration < 250) {
+        Poco::Thread::sleep(250 - duration);
+      }
     }
 
   }

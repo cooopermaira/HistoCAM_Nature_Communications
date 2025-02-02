@@ -13,15 +13,13 @@ namespace pathCam {
   CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),rebuildJobsOutstanding(true) {};
 
   void CompositeManager::run() {
-    auto start = std::chrono::high_resolution_clock::now();
+    unsigned long duration = 0;
+
+
     rebuildJobsOutstanding = 0;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
 
-
-
-      auto timeCheck = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(timeCheck - start);
 //      if(duration.count() < 100){
 //        Poco::Thread::sleep(100 - duration.count());
 //      }
@@ -80,25 +78,29 @@ namespace pathCam {
           if (current_component == indexes[i]->component_membership) {
             new_info.push_back(indexes[i]);
           } else {
+            auto start = std::chrono::high_resolution_clock::now();
             parent->composites[current_component]->update(new_info);
+            auto stop = std::chrono::high_resolution_clock::now();
+            duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
             current_component = indexes[i]->component_membership;
             new_info.clear();
           }
         }
-
+        auto start = std::chrono::high_resolution_clock::now();
         parent->composites[current_component]->update(new_info);
-
+        auto stop = std::chrono::high_resolution_clock::now();
+        duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
       }
       check_render_info();
     }
 
 
     push_remaining_tiles_for_inference();
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+
     //perform_global_alignment();
     //rebuildJobsComplete.wait();
     //save_components_to_disk();
+    std::cout<<"CM duration: "+std::to_string(duration)<<std::endl;
     parent->compositing = false;
     parent->inferenceWait.set();
   }

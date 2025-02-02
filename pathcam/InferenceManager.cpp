@@ -46,6 +46,7 @@ namespace pathCam {
 
 
     void InferenceManager::run() {
+
         torch::NoGradGuard noGrad;
         auto device = torch::Device(torch::kCPU);
 
@@ -104,15 +105,18 @@ namespace pathCam {
                         if (tileList[i].first.x < minx) { minx = tileList[i].first.x; }
                         if (tileList[i].first.y < miny) { miny = tileList[i].first.y; }
 
+                        //for some reason, removing this convert and doing from_blob right from tile makes it slower
                         cvtColor(pyramidLevel->getTile(tileList[i].first.x, tileList[i].first.y), threeChannelPreallocated,
                                  COLOR_BGRA2RGB);
+
 
                         //clone would be necessary if not immediately moved to gpu. Tensor from_blob keeps ref to orig obj
                         batch_tensor[i] = torch::from_blob(threeChannelPreallocated.data, {tileSize, tileSize, 3},
                                                            torch::kUInt8).to(device);
                     }
 
-                    //center crop, make memory block index contiguous, normalize to [0,1], normalize to imageNet mean/stddv
+                    //permute to N,C,W,H, center crop, make memory block index-contiguous via type conversion,
+                    //normalize to [0,1], normalize to imageNet mean/stddv
                     batch_tensor = batch_tensor.permute({0, 3, 1, 2})
                             //.slice(2, cropLoc, cropLoc + cropedDim)
                             //.slice(3, cropLoc, cropLoc + cropedDim)
@@ -200,7 +204,6 @@ namespace pathCam {
 
             //update tileEmbeds after attention
             tileEmbeds = torch::cat({aggregatedEmbeds,coordsTensor},1).to(torch::kF32);
-            //tileEmbeds = aggregatedEmbeds;
         }
 
         if (parent->classifying) {
@@ -221,19 +224,6 @@ namespace pathCam {
             //build tile to class dict
             for (auto [key,value] : tileCoordToTensorIndex) {
                 parent->tileCoordToClass[key] = classes[value].item<int>();
-                //parent->tileCoordToClass[key];
-                //debug
-                 // if (classes[value].item<int>() != 0) {
-                 //     std::cout<<key.x + minx<<","<<key.y+miny<<std::endl;
-                 // }
-
-                //debug build fake dict for testing
-                // int keyhash = key.x - minx + key.y - miny;
-                // if (keyhash == 0) {
-                //     int k = 0;
-                // }
-                //
-                // parent->tileCoordToClass[key] = (keyhash % 4);
             }
             parent->classifyingComplete = true;
             parent->update_observers();
