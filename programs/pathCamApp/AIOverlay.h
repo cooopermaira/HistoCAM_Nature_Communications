@@ -20,6 +20,7 @@ public:
              StringArray &iconNames,
              OwnedArray<Drawable> &iconsFromZipFile) : parent(parent)
   {
+    AIready = true;
     
     
     for (int i = 0; i < iconNames.size(); i++) {
@@ -51,7 +52,7 @@ public:
   void paint(juce::Graphics &g) override;
   
 private:
-  
+  bool AIready;
   void timerCallback() override;
   
   float currentOpacity = 1.0f;

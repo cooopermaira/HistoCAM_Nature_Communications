@@ -21,7 +21,7 @@ void AIOverlay::resized()
 }
 
 void AIOverlay::paint(juce::Graphics &g) {
-  if(parent->sCam && parent->sCam->classifying) {
+  if(parent->sCam && parent->sCam->classifying && AIready) {
     AIreadyButton->setVisible(true);
   }
     /*
@@ -49,7 +49,7 @@ void AIOverlay::buttonClicked(juce::Button* button)
 {
   if (button == AIreadyButton.get())
   {
-    std::cout << "DO SOMETHING\n";
+    AIready = false;
   }
 
   resized();
