@@ -16,7 +16,7 @@ namespace pathCam {
     minPixelDistanceBetweenFrames = 200;
 
     imagePyramid.reset(new MRTiledImage(parent));
-    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid);
+    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid,parent->tileSize,parent->tileSize,0);
     imagePyramid->level.push_back(current);
     parent->MRimage->add(imagePyramid);
 
@@ -346,8 +346,8 @@ namespace pathCam {
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
-        //if (parent->has_flatfield(images[i]->label)) {
-        if (false) {
+        if (parent->has_flatfield(images[i]->label)) {
+        //if (false) {
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
           cv::pow(convertHolding, 1.09, convertHolding);
@@ -487,9 +487,11 @@ namespace pathCam {
       //      }
       auto stop = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-      if (duration < 250) {
-        Poco::Thread::sleep(250 - duration);
-      }
+
+//      //slow compositing for better timing with AI
+//      if (duration < 250) {
+//        Poco::Thread::sleep(250 - duration);
+//      }
     }
 
   }

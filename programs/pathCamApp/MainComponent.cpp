@@ -19,7 +19,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
         }
     }
 
-    imagePyramid.reset(new MRTiledImage);
+    //imagePyramid.reset(new MRTiledImage);
     MRimage.reset(new MRTiledImageSet);
     toolbar = new ToolbarComponent(this);
     view.reset(new fRectangle());

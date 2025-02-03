@@ -22,6 +22,12 @@ std::vector < TileQuery > MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect
   return level[i_scale]->getTiles(view);
 }
 
+MRTiledImage::MRTiledImage(pathCam::StreamCam *parent, unsigned int _tile_size) : parent(parent),tile_size(_tile_size){
+  if(tile_size == 0){
+    tile_size = parent->tileSize;
+  }
+}
+
 int MRTiledImage::get_class_for_tile(Point2i tile) {
   // if (tileCoordToTensorIndex.find(tileList[i].first) == tileCoordToTensorIndex.end()) {
   //   tileCoordToTensorIndex.insert({tileList[i].first, tileCoordToTensorIndex.size()});
