@@ -247,9 +247,9 @@ namespace pathCam {
       if (!previous->is_good()) { continue; }
 
       Match *m = new Match(previous, image);
-      matcher->match(m);
+      matcher->match(m,0);
 
-      int result = motion_est->findHomography(m, parent->estimator_type, 50, 0);
+      int result = motion_est->findHomography(m, parent->estimator_type, 25, 0);
 
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();

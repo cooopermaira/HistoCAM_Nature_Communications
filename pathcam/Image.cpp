@@ -20,7 +20,7 @@ namespace pathCam {
                                                                                                           image_file(
                                                                                                               Poco::Path()),
                                                                                                           blurVariance(
-                                                                                                              0),reg_full_scale(0.0){};
+                                                                                                              0) {};
 
   Image::~Image() {
     free_memory_RAW(true);
@@ -326,7 +326,7 @@ namespace pathCam {
     return image_Mat;
   }
 
-  void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real, bool additionalSiftReg) {
+  void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real, bool flatfield_first, Mat flatfield) {
     bool release = false;
     buffer_mutex.lock();
 
@@ -346,21 +346,25 @@ namespace pathCam {
     Size image_size = Size(width, height);
 
     reg_image = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
+    //temp.copyTo(reg_image);
     buffer_mutex.unlock();
 
     if (release) { free_memory_RAW(); }
 
+
+
     if (convert) {
+//      if(flatfield_first){
+//        cvtColor(reg_image,reg_image,COLOR_BayerBG2BGR);
+//        divide(reg_image, flatfield, reg_image, 1, CV_8U);
+//        cvtColor(reg_image,reg_image,COLOR_BGR2GRAY);
+//      }else {
         cvtColor(reg_image, reg_image, COLOR_BayerBG2GRAY);
+      //}
     }
     if (real) {
       reg_image.convertTo(reg_image, CV_32FC1);
     }
-
-    if(additionalSiftReg){
-      reg_image_uncropped = reg_image.clone();
-    }
-
     if (_reg_scale != 1.0) {
       image_size = Size(image_size.width * _reg_scale, image_size.height * _reg_scale);
       cv::resize(reg_image, reg_image, image_size);

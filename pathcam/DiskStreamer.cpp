@@ -13,9 +13,7 @@
 using Poco::DirectoryIterator;
 
 namespace pathCam {
-
     Mat ConvertBGR2Bayer(Mat BGRImage) {
-
         /*
         Assuming a Bayer filter that looks like this:
 
@@ -35,20 +33,15 @@ namespace pathCam {
 
         int channel;
 
-        for (int row = 0; row < BayerImage.rows; row++)
-        {
-            for (int col = 0; col < BayerImage.cols; col++)
-            {
-                if (row % 2 == 0)
-                {
+        for (int row = 0; row < BayerImage.rows; row++) {
+            for (int col = 0; col < BayerImage.cols; col++) {
+                if (row % 2 == 0) {
                     //even columns and even rows = blue = channel:0
-                    //even columns and uneven rows = green = channel:1 
+                    //even columns and uneven rows = green = channel:1
                     channel = (col % 2 == 0) ? 0 : 1;
-                }
-                else
-                {
+                } else {
                     //uneven columns and even rows = green = channel:1
-                    //uneven columns and uneven rows = red = channel:2 
+                    //uneven columns and uneven rows = red = channel:2
                     channel = (col % 2 == 0) ? 1 : 2;
                 }
 
@@ -60,74 +53,80 @@ namespace pathCam {
     }
 
 
-  DiskReader::DiskReader(StreamCam *parent) : parent(parent) {
-    parent->microscopeInput = true;
-  }
-
-  void DiskReader::run() {
-    std::ifstream infile(parent->input_images.toString().c_str());
-    std::string imageFile;
-    unsigned long image_index = 0;
-    while (infile >> imageFile) {
-      Image *image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
-      image->set_disk_file(imageFile);
-      parent->pass_image(image, image_index);
-      image_index++;
+    DiskReader::DiskReader(StreamCam *parent) : parent(parent) {
+        parent->microscopeInput = true;
     }
-    parent->microscopeInput = false;
-    std::cout << "disk images set " << std::endl;
-  }
 
-
-
-
-  void DebayerRunnable::run() {
-    Poco::Path o = outfile;
-    o.append(image->image_file.getFileName());
-    o.setExtension("Raw");
-    image->load_raw_from_disk();
-
-    bool convertAndSave = true;
-
-    if (!image->in_memory()) {
-      std::cout << "Issue loading image.\n";
-      return;
-    }
-    auto val = image->check_blur();
-    blur->at(sort_order) = val;
-    names->at(sort_order) = image->get_ImageFile().getFileName();
-
-    if (convertAndSave) {
-
-      //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
-      cv::Size image_size(image->width, image->height);
-      Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-
-      cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-      try {
-        cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
-
-        image_Mat.convertTo(image_Mat, CV_32FC3);
-
-        cv::pow(image_Mat, 1.09, image_Mat);
-
-        image_Mat.convertTo(image_Mat, CV_8UC3);
-        image_Mat = ConvertBGR2Bayer(image_Mat);
-
-        
-        std::fstream file;
-        file = std::fstream(o.toString(), std::ios::out | std::ios::binary);
-        if (file.fail()) {
-            throw new std::exception;
+    void DiskReader::run() {
+        std::ifstream infile(parent->input_images.toString().c_str());
+        std::string imageFile;
+        unsigned long image_index = 0;
+        while (infile >> imageFile) {
+            Image *image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
+            image->set_disk_file(imageFile);
+            parent->pass_image(image, image_index);
+            image_index++;
         }
-        file.write(reinterpret_cast<const char*>(image_Mat.data), image->width * image->height);
-        //imwrite(o.toString(), image_Mat);
-      }
-      catch (...) {
-        int k = 0;
-      }
+        parent->microscopeInput = false;
+        std::cout << "disk images set " << std::endl;
     }
-    image->free_memory_RAW();
-    int k = 0;
-  }
+
+
+    void DebayerRunnable::run() {
+        Poco::Path o = outfile;
+
+        image->load_raw_from_disk();
+
+        bool convertAndSave = true;
+
+        if (!image->in_memory()) {
+            std::cout << "Issue loading image.\n";
+            return;
+        }
+        auto val = image->check_blur();
+        blur->at(sort_order) = val;
+        names->at(sort_order) = image->get_ImageFile().getFileName();
+
+        if (convertAndSave) {
+            //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
+            cv::Size image_size(image->width, image->height);
+            Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+            Mat imwriteMat;
+
+            cvtColor(image_Mat, image_Mat, COLOR_BayerBG2RGB);
+            try {
+                cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
+
+                image_Mat.convertTo(image_Mat, CV_32FC3);
+
+                cv::pow(image_Mat, 1.08, image_Mat);
+
+                image_Mat.convertTo(image_Mat, CV_8UC3);
+
+                //add subdir for png
+                auto r = o;
+                // o.pushDirectory("png");
+                // o.setFileName(image->get_ImageFile().getFileName());
+                // o.setExtension("png");
+                // imwrite(o.toString(), image_Mat);
+                //
+                // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
+                image_Mat = ConvertBGR2Bayer(image_Mat);
+
+                //save .Raw
+                r.setFileName(image->get_ImageFile().getFileName());
+                r.setExtension("Raw");
+                std::fstream file;
+                file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
+                if (file.fail()) {
+                    throw new std::exception;
+                }
+                file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
+            } catch (...) {
+                int k = 0;
+            }
+        }
+        image->free_memory_RAW();
+        int k = 0;
+    }
 }

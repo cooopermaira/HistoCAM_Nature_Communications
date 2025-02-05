@@ -56,9 +56,9 @@ int main(int argc, char *argv[]) {
   auto convertImages = true;
   bool makeInput = true;
 
-  Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x;
+  Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x, flat_field40x;
   std::ifstream stream;
-  stream.open("D:/2_20/2x/cal/2x_cal.Raw", std::ios::binary);
+  stream.open("/media/max/Data/afb/cal/4x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -69,30 +69,30 @@ int main(int argc, char *argv[]) {
   flat_field2x.convertTo(flat_field2x, CV_32F);
   flat_field2x *= 1 / 170.0;
 
-  stream.open("D:/2_20/2x/cal/4x_cal.Raw", std::ios::binary);
+  stream.open("/media/max/Data/afb/cal/4x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field4x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field4x, flat_field4x, COLOR_BayerBG2BGR);
+  cvtColor(flat_field4x, flat_field4x, COLOR_BayerBG2RGB);
   flat_field4x.convertTo(flat_field4x, CV_32F);
   flat_field4x *= 1 / 170.0;
 
 
-  stream.open("D:/2_20/2x/cal/10x_cal.Raw", std::ios::binary);
+  stream.open("/media/max/Data/afb/cal/10x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field10x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2BGR);
+  cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2RGB);
   flat_field10x.convertTo(flat_field10x, CV_32F);
   flat_field10x *= 1 / 170.0;
 
-  stream.open("D:/2_20/2x/cal/20x_cal.Raw", std::ios::binary);
+  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -102,6 +102,17 @@ int main(int argc, char *argv[]) {
   cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2BGR);
   flat_field20x.convertTo(flat_field20x, CV_32F);
   flat_field20x *= 1 / 170.0;
+
+  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
+  {
+    char *raw_buffer = new char[6464 * 4852];
+    stream.read(raw_buffer, 6464 * 4852);
+    stream.close();
+    flat_field40x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
+  }
+  cvtColor(flat_field40x, flat_field40x, COLOR_BayerBG2RGB);
+  flat_field40x.convertTo(flat_field40x, CV_32F);
+  flat_field40x *= 1 / 170.0;
   //Should probably add fancier command line parsing
   if (argc < 3) {
     std::cout << "Missing input. Use:\n";
@@ -147,10 +158,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (renameFiles || makeInput) {
-      std::sort(images.begin(), images.end(), customComparator2);
+      std::sort(images.begin(), images.end(), customComparator);
     }
 
-    std::string outputfilepath = "D:/2_20/input2x.txt";
+    std::string outputfilepath = "/media/max/Data/afb/inputmultires.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -175,20 +186,22 @@ int main(int argc, char *argv[]) {
       }
       if (convertImages) {
         Mat flat_field;
-        if (i < 666) {
-          flat_field = flat_field2x;
-        } else if (i < 784 && i >= 666) {
-          flat_field = flat_field4x;
-        } else if (i >= 784 && i < 900) {
-          flat_field = flat_field10x;
-        } else if(i>= 900 && i <1209){
-          flat_field = flat_field4x;
-        }
-        else if (i >= 1209 && i < 1496) {
-          flat_field = flat_field10x;
-        }else{
-          flat_field = flat_field20x;
-        }
+         if (i <= 140) {
+           flat_field = flat_field4x;
+         } else if (i > 140 && i <= 349) {
+           flat_field = flat_field10x;
+         } else {
+           flat_field = flat_field40x;
+
+         } //else if(i>= 900 && i <1209){
+        //   flat_field = flat_field4x;
+        // }
+        // else if (i >= 1209 && i < 1496) {
+        //   flat_field = flat_field10x;
+        // }else{
+        //   flat_field = flat_field20x;
+        // }
+        //flat_field = flat_field4x;
         auto *dr = new pathCam::DebayerRunnable(images[i], flat_field, outFile, blur, names, i);
         jq.add_runnable(dr, i);
       }

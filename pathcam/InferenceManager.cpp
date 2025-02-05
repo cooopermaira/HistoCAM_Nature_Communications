@@ -17,29 +17,37 @@
 //#include <bits/fs_fwd.h>
 
 #include "pathCam.h"
+//#include "Poco/FileStream.h"
 
 namespace pathCam {
     InferenceManager::InferenceManager(StreamCam *parent) : parent(parent){
 
 
         //load slide aggregator
-//         if (parent->aggregating) {
-// #ifdef WITH_MPS
-//             //on its own thread doesnt work on apple
-//             //https://github.com/python/cpython/issues/123022
-//             initializeModel();
-// #else
-//             auto initRunnable = new InferenceInitRunner(this);
-//             thread.start(initRunnable);
-//
-// #endif
-//             //initialize_aggregator();
-//         }
+        //         if (parent->aggregating) {
+        // #ifdef WITH_MPS
+        //             //on its own thread doesnt work on apple
+        //             //https://github.com/python/cpython/issues/123022
+        //             initializeModel();
+        // #else
+        //             auto initRunnable = new InferenceInitRunner(this);
+        //             thread.start(initRunnable);
+        //
+        // #endif
+        //             //initialize_aggregator();
+        //         }
 
         //coord shifting values
         minx = 0;
         miny = 0;
 
+        embedFileOut = parent->slide_encoder_path.toString()+"/tileEmbeds.pt";
+        coordsFileOut = parent->slide_encoder_path.toString()+"/coords.pt";
+        signalFileOut = parent->slide_encoder_path.toString()+"/pSignal.txt";
+
+        reportFileIn = parent->slide_encoder_path.toString()+"/response.txt";
+        embedFileIn = parent->slide_encoder_path.toString()+"/response.pt";
+        signalFileIn = parent->slide_encoder_path.toString()+"/cSignal.txt";
 
         tileCoordToTensorIndex = std::map<Point2i,unsigned long,PointComparator>();
     }
@@ -64,7 +72,7 @@ namespace pathCam {
             std::cout << "GPU not available. Using CPU." << std::endl;
         }
 
-        
+
         //empty tileEmbeds, just needs to be initialized
         torch::Tensor tileEmbeds;
 
@@ -156,22 +164,16 @@ namespace pathCam {
         std::cout<<"Tile Embedding Complete"<<std::endl;
         parent->tileEmbeddingComplete = true;
 
+
+        //create coords tensor for handoff
+        torch::Tensor coordsTensor = torch::empty({long(tileCoordToTensorIndex.size()), 2}, torch::TensorOptions().dtype(torch::kFloat32));
+        for (const auto &[key,value]: tileCoordToTensorIndex) {
+            coordsTensor[value][0] = key.x - minx;
+            coordsTensor[value][1] = key.y - miny;
+        }
+
         if (parent->aggregatingHandoff) {
             //file exchange
-            std::string embedFileOut(parent->slide_encoder_path.toString()+"/tileEmbeds.pt");
-            std::string coordsFileOut(parent->slide_encoder_path.toString()+"/coords.pt");
-            std::string signalFileOut(parent->slide_encoder_path.toString()+"/pSignal.txt");
-
-            std::string embedFileIn(parent->slide_encoder_path.toString()+"/response.pt");
-            std::string signalFileIn(parent->slide_encoder_path.toString()+"/cSignal.txt");
-
-
-            //create coords tensor for handoff
-            torch::Tensor coordsTensor = torch::empty({long(tileCoordToTensorIndex.size()), 2}, torch::TensorOptions().dtype(torch::kFloat32));
-            for (const auto &[key,value]: tileCoordToTensorIndex) {
-                coordsTensor[value][0] = key.x - minx;
-                coordsTensor[value][1] = key.y - miny;
-            }
 
             //pack as disk savable tensors
             auto pickledEmbed = torch::pickle_save(tileEmbeds);
@@ -193,20 +195,24 @@ namespace pathCam {
                 continue;
             }
 
+        }
+
+        if (parent->classifying) {
+
             //load response, embeds are at index specified by tileCoordToTensorIndex
             std::ifstream fin(embedFileIn,std::ios::binary);
             std::vector<char> buffer((std::istreambuf_iterator<char>(fin)),std::istreambuf_iterator<char>());
             torch::Tensor aggregatedEmbeds = torch::pickle_load(buffer).toTensor();
 
+
             //reset dir
             remove(signalFileIn.c_str());
             remove(embedFileIn.c_str());
 
+
             //update tileEmbeds after attention
             tileEmbeds = torch::cat({aggregatedEmbeds,coordsTensor},1).to(torch::kF32);
-        }
 
-        if (parent->classifying) {
 
             //setup classifier model
             auto val = parent->classifier_path.toString();
@@ -228,6 +234,24 @@ namespace pathCam {
             parent->classifyingComplete = true;
             parent->update_observers();
         }
-    }
 
+        if (parent->reportText){
+            try {
+                std::ifstream file(reportFileIn);
+
+                std::stringstream buffer;
+                buffer <<file.rdbuf();
+
+                //reset dir
+                remove(signalFileIn.c_str());
+                remove(reportFileIn.c_str());
+
+                std::cout<<buffer.str()<<std::endl;
+
+            } catch (const Poco::Exception& exc) {
+                std::cerr << "Error reading file: " << exc.displayText() << std::endl;
+            }
+        }
+
+    }
 }

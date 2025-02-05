@@ -124,7 +124,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/Users/coopermaira/desktop/tiledImage.png");
+      i->save_pyramid_as_image("/home/max/10x_afb.png");
 
     }
   }

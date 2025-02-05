@@ -75,8 +75,8 @@ public:
   Dense2DArray<Mat*> tiles;
   cv::Rect_<float> bounds;
 
-  TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 224,
-             unsigned int logic_size = 224, int levelWithinPyramid = 0);
+  TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
+             unsigned int logic_size = 256, int levelWithinPyramid = 0);
 
   ~TiledImage() {};
 

@@ -12,14 +12,19 @@ cv::Rect_<T> rect_mult(cv::Rect_<T> r, T s) {
   return cv::Rect_<T>(r.x * s, r.y * s, r.width * s, r.height * s);
 }
 
-TiledImage::TiledImage(std::shared_ptr<MRTiledImage> parent, unsigned int tile_size, unsigned int logic_size,
-                       int levelWithinPyramid) : tile_size(tile_size),
-                                                 logic_size(logic_size),
-                                                 logicRatio((float) tile_size / (float) logic_size),
+TiledImage::TiledImage(std::shared_ptr<MRTiledImage> parent, unsigned int _tile_size, unsigned int _logic_size,
+                       int levelWithinPyramid) : tile_size(_tile_size),
+                                                 logic_size(_logic_size),
+                                                 logicRatio((float) _tile_size / (float) _logic_size),
                                                  levelWithinPyramid(levelWithinPyramid),
                                                  tiles(-4096 * logicRatio, 4096 * logicRatio, -4096 * logicRatio,
                                                        4096 * logicRatio),
-                                                 parent(parent) {};
+                                                 parent(parent)
+                                                 {
+                                                   if(tile_size == 0){
+                                                     tile_size = parent->tile_size;
+                                                   }
+                                                 };
 
 void TiledImage::insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
                                   std::vector<Point2i> retileIndices) {
