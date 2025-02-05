@@ -45,6 +45,7 @@ namespace pathCam {
     Poco::Path slide_encoder_path;
     Poco::Path python_venv_path;
     Poco::Path classifier_path;
+    Poco::Path report_text_path;
 
 
     //Registration Params
@@ -57,6 +58,7 @@ namespace pathCam {
     bool aggregatingHandoff;
     bool pyVenv;
     bool classifying;
+    bool reportText;
     bool classifyingComplete = false;
 
     int interpolation;

@@ -344,10 +344,13 @@ namespace pathCam {
       } else {
         images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+        //imwrite("/home/max/testbefore.png", image_Mat);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+        //imwrite("/home/max/testafter.png", threeChannelPreallocated);
+
         images[i]->free_memory_RAW();
-        if (parent->has_flatfield(images[i]->label)) {
-        //if (false) {
+        //if (parent->has_flatfield(images[i]->label)) {
+        if (false) {
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
           cv::pow(convertHolding, 1.09, convertHolding);
@@ -627,6 +630,10 @@ namespace pathCam {
           } else if (y == firstTile || y == lastTile) {
             result.push_back(tilePoint);
             falselyClaimedTiles.push_back(tilePoint);
+            if (tilePoint.x < minTilex) { minTilex = tilePoint.x; }
+            if (tilePoint.x > maxTilex) { maxTilex = tilePoint.x; }
+            if (tilePoint.y < minTiley) { minTiley = tilePoint.y; }
+            if (tilePoint.y > maxTiley) { maxTiley = tilePoint.y; }
           } else {
             falselyClaimedTiles.push_back(tilePoint);
           }
@@ -827,6 +834,8 @@ namespace pathCam {
         }
       }
     }
+
+    resize(pyramidImage, pyramidImage, pyramidSize / 2);
     //currently hardcoded, maybe add an output directory in config?
     String path = "pyramidImage" + std::to_string(componentIndex) + "_" + std::to_string(imagePyramid->scale) +
                   ".png";

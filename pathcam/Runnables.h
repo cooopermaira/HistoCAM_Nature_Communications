@@ -141,6 +141,14 @@ namespace pathCam {
     std::vector<std::vector<float>>coordsVec;
     std::vector<std::vector<float>> resultsVec;
 
+    std::string embedFileOut;
+    std::string coordsFileOut;
+    std::string signalFileOut;
+
+    std::string reportFileIn;
+    std::string embedFileIn;
+    std::string signalFileIn;
+
   public:
 
     explicit InferenceManager(StreamCam *parent);

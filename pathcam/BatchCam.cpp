@@ -153,6 +153,16 @@ namespace pathCam {
           index++;
         }
       }
+      else {
+        classifying = false;
+      }
+      if (pConf->has(("io.inferencing.text_report"))) {
+          reportText = true;
+          report_text_path = Path(pConf->getString(("io.inferencing.text_report")));
+      }
+      else {
+        reportText = false;
+      }
 
       if (pConf->has("io.output_log")) {
         std::string temp = pConf->getString("io.output_log");
