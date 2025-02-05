@@ -137,17 +137,27 @@ namespace pathCam {
     auto d = m->H.at<double>(1, 1);
     auto a2 = m->H.at<double>(0, 2);
     auto d2 = m->H.at<double>(1, 2);
-    m->t_x = a * a2 * (1.0 / m->image_2->get_reg_scale());
-    m->t_y = d * d2 * (1.0 / m->image_2->get_reg_scale());
+
+    m->t_x = a2 * (1.0 / m->image_2->get_reg_scale());
+    m->t_y = d2 * (1.0 / m->image_2->get_reg_scale());
     m->scale = (a + d) / 2;
+
+    if(flag == 1){
+      m->t_x *= a;
+      m->t_y *= d;
+
+//      m->t_x += (1 - a) * (m->image_2->reg_crop_initial / 4.0) * double(m->image_2->width);
+//      m->t_y += (1 - d) * (m->image_2->reg_crop_initial / 4.0) * double(m->image_2->height);
+    }
     return 1;
   }
 
   void MotionEstimator::phaseCorrelate(pathCam::Match *m, Image *image_1, Image *image_2) {
 
     Point2d p = cv::phaseCorrelate(image_1->get_reg_image(), image_2->get_reg_image());
-    m->t_x = p.x * (1.0 / image_2->get_reg_scale());
-    m->t_y = p.y * (1.0 / image_2->get_reg_scale());
+    double adj = (image_2->reg_crop_initial / 2.0) * (1 - image_2->get_reg_scale());
+    m->t_x = p.x * (1.0 / image_2->get_reg_scale()) + adj * double(image_2->width);
+    m->t_y = p.y * (1.0 / image_2->get_reg_scale()) + adj * double(image_2->height);
 
   }
 

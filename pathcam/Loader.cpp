@@ -59,20 +59,14 @@ namespace pathCam {
     if (image->is_good()) {
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
-                              parent->real,true,parent->get_flatfield(image->label));
+                              parent->real, additionalSiftReg);
 
 
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
-      //image->build_whitebalance_Mat(parent);
-
-
-
-
       image->free_memory_RAW();
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
-      //pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(7, parent->use_FREAK);
 
       switch (parent->feature_type) {
         case _SIFT:
@@ -112,7 +106,7 @@ namespace pathCam {
 
       if(additionalSiftReg){
         //image->create_reg_image(1,1,parent->debayer,parent->interpolation,parent->real);
-        FeatureDetector *detector2 = new pathCam::FeatureDetector(7, parent->use_FREAK);
+        auto detector2 = new pathCam::FeatureDetector(7, parent->use_FREAK);
         detector2->detect_and_compute(image,1);
       }
 
@@ -137,6 +131,7 @@ namespace pathCam {
   bool FeatureDetector::detect_and_compute(pathCam::Image *image, int flag) {
 
     std::vector<cv::KeyPoint> *points;
+    Mat reg_image;
     Mat descriptors;
     switch (flag){
       case 0:
@@ -144,6 +139,7 @@ namespace pathCam {
         break;
       case 1:
         points = &image->keypointsMultilevel;
+        reg_image = image->get_reg_image(true);
         break;
       case 2:
         points = &image->keypointsFull;
@@ -151,16 +147,16 @@ namespace pathCam {
     }
 
     if(use_FREAK){
-      detector->detect(image->get_reg_image(), *points);
-      extractor->compute( image->get_reg_image(), *points, descriptors  );
+      detector->detect(reg_image, *points);
+      extractor->compute( reg_image, *points, descriptors  );
     }else{
       if(image->label == Image::_2X){
 
-        detector->detectAndCompute(image->get_reg_image(),
+        detector->detectAndCompute(reg_image,
                                    image->parent->regCircleMask, *points,
                                    descriptors );
       }
-      detector->detectAndCompute(image->get_reg_image(),
+      detector->detectAndCompute(reg_image,
                                  noArray(), *points,
                                  descriptors );
     }
