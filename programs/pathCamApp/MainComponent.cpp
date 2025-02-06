@@ -138,6 +138,12 @@ void MainComponent::update()  {
   }
 }
 
+void MainComponent::refreshImage() {
+  imageview->refreshImage();
+  capture->refreshImage();
+  annotate->refreshImage();
+}
+
 void MainComponent::loadImage(std::string path) {
 
     (new LoadingThread(this, path))->launchThread();

@@ -16,7 +16,7 @@ namespace pathCam {
     minPixelDistanceBetweenFrames = 200;
 
     imagePyramid.reset(new MRTiledImage(parent));
-    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid,parent->tileSize,parent->tileSize,0);
+    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid);
     imagePyramid->level.push_back(current);
     parent->MRimage->add(imagePyramid);
 
@@ -344,10 +344,7 @@ namespace pathCam {
       } else {
         images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-        //imwrite("/home/max/testbefore.png", image_Mat);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
-        //imwrite("/home/max/testafter.png", threeChannelPreallocated);
-
         images[i]->free_memory_RAW();
         if (parent->has_flatfield(images[i]->label)) {
         //if (false) {
@@ -488,10 +485,8 @@ namespace pathCam {
       //        save_pyramid_as_image();
       //        int k = 0;
       //      }
-      auto stop = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-
-//      //slow compositing for better timing with AI
+//      auto stop = std::chrono::high_resolution_clock::now();
+//      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 //      if (duration < 250) {
 //        Poco::Thread::sleep(250 - duration);
 //      }
@@ -630,10 +625,6 @@ namespace pathCam {
           } else if (y == firstTile || y == lastTile) {
             result.push_back(tilePoint);
             falselyClaimedTiles.push_back(tilePoint);
-            if (tilePoint.x < minTilex) { minTilex = tilePoint.x; }
-            if (tilePoint.x > maxTilex) { maxTilex = tilePoint.x; }
-            if (tilePoint.y < minTiley) { minTiley = tilePoint.y; }
-            if (tilePoint.y > maxTiley) { maxTiley = tilePoint.y; }
           } else {
             falselyClaimedTiles.push_back(tilePoint);
           }
@@ -834,8 +825,6 @@ namespace pathCam {
         }
       }
     }
-
-    resize(pyramidImage, pyramidImage, pyramidSize / 2);
     //currently hardcoded, maybe add an output directory in config?
     String path = "pyramidImage" + std::to_string(componentIndex) + "_" + std::to_string(imagePyramid->scale) +
                   ".png";
