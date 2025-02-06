@@ -85,7 +85,8 @@ public:
   }
   
   bool empty(){ return images.empty(); }
-  
+
+  cv::Rect_<float> get_component_bounds(int _component_index){return images[_component_index]->bounds;}
   void update_bounds();
 
 private:

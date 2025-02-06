@@ -349,8 +349,8 @@ namespace pathCam {
         //imwrite("/home/max/testafter.png", threeChannelPreallocated);
 
         images[i]->free_memory_RAW();
-        //if (parent->has_flatfield(images[i]->label)) {
-        if (false) {
+        if (parent->has_flatfield(images[i]->label)) {
+        //if (false) {
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
           cv::pow(convertHolding, 1.09, convertHolding);
@@ -480,7 +480,7 @@ namespace pathCam {
       float h = parent->image_height * imagePyramid->scale;
       bool showAsCircle = images.back()->label == Image::_2X;
 
-      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle);
+      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex);
       //parent->update_observers();
       parent->notify_observers();
 

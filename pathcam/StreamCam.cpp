@@ -136,15 +136,17 @@ namespace pathCam {
     return true;
   }
 
-  void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle) {
+  void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index) {
     lastFrameMutex->lock();
     lastFrame = _rectInScale1Space;
+    lastComponentIndex = _component_index;
     showAsCircle = _showAsCircle;
     lastFrameMutex->unlock();
   }
 
-  void StreamCam::get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &_showAsCircle) {
+  void StreamCam::get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &_showAsCircle, int& _lastComponentIndex) {
     lastFrameMutex->lock();
+    _lastComponentIndex = lastComponentIndex;
     _showAsCircle = showAsCircle;
     _rectInScale1Space = lastFrame;
     lastFrameMutex->unlock();

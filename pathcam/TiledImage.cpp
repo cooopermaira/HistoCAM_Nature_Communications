@@ -191,6 +191,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
     if (levelWithinPyramid + 1 < parent->level.size() - 1) {
       parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirCV(theirROI));
     }
+
   }
   catch (cv::Exception &e) {
     int k = 0;

@@ -9,10 +9,10 @@
 
 class drawThreadRunnable : public Poco::Runnable {
 public:
-  drawThreadRunnable(MainComponent* parent, Poco::Thread& sCamThread):parent(parent),sCamThread(sCamThread){};
+  drawThreadRunnable(MainComponent *parent, Poco::Thread &sCamThread) : parent(parent), sCamThread(sCamThread) {};
 
-  virtual void run(){
-    while(sCamThread.isRunning()){
+  virtual void run() {
+    while (sCamThread.isRunning()) {
       parent->update();
       Poco::Thread::sleep(100);
     }
@@ -20,8 +20,8 @@ public:
   }
 
 private:
-  MainComponent* parent;
-  Poco::Thread& sCamThread;
+  MainComponent *parent;
+  Poco::Thread &sCamThread;
 };
 
 class sCamPocoRunnable : public Poco::Runnable {
@@ -62,41 +62,41 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   // addAndMakeVisible(reportOverlay.get());
 }
 
-void CaptureComponent::drawSlide(juce::Graphics& g, float scale) {
-    ImageViewComponent::drawSlide(g, scale);
+void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
+  ImageViewComponent::drawSlide(g, scale);
 
-    if (view->isEmpty() || MRImage->empty()) { return; }
+  if (view->isEmpty() || MRImage->empty()) { return; }
 
-    cv::Rect_<float> frameBox;
-    bool showAsCircle;
+  cv::Rect_<float> frameBox;
+  bool showAsCircle;
 
 #ifdef WITH_SPINNAKER
-    if (recording) {
-        bcam->sCam->get_last_frame(frameBox, showAsCircle);
-    }
+  if (recording) {
+      bcam->sCam->get_last_frame(frameBox, showAsCircle);
+  }
 #endif
 
-    if (simulating) {
-        sCam->get_last_frame(frameBox, showAsCircle);
-    }
+  if (simulating) {
+    int ignore;
+    sCam->get_last_frame(frameBox, showAsCircle, ignore);
+  }
 
-    auto bounds = RectCtoJ < float >(frameBox);
-    bounds.setPosition(bounds.getPosition() - view->getPosition());
+  auto bounds = RectCtoJ<float>(frameBox);
+  bounds.setPosition(bounds.getPosition() - view->getPosition());
 
-    bounds *= view2screenScale(*view) * scale;
+  bounds *= view2screenScale(*view) * scale;
 
-    g.setColour(juce::Colours::red);
+  g.setColour(juce::Colours::red);
 
-    if (showAsCircle) {
-        auto center = bounds.getCentre();
-        fPoint radius = scopeRadius * view2screenScale(*view) * scale;;
-        center -= radius;
-        g.drawEllipse(center.getX(), center.getY(), 2 * radius.getX(), 2 * radius.getY(), 3);
+  if (showAsCircle) {
+    auto center = bounds.getCentre();
+    fPoint radius = scopeRadius * view2screenScale(*view) * scale;;
+    center -= radius;
+    g.drawEllipse(center.getX(), center.getY(), 2 * radius.getX(), 2 * radius.getY(), 3);
 
-    }
-    else {
-        g.drawRect(bounds, 3);
-    }
+  } else {
+    g.drawRect(bounds, 3);
+  }
 
 }
 
@@ -133,7 +133,7 @@ void CaptureComponent::startSimulating() {
   parent->annotate->setImage(parent->MRimage);
 
   compositeThread.start(new sCamPocoRunnable(this));
-  updateDrawThread.start(new drawThreadRunnable(parent,compositeThread));
+  updateDrawThread.start(new drawThreadRunnable(parent, compositeThread));
 
   aiOverlay->resized();
   //reportOverlay->resized();

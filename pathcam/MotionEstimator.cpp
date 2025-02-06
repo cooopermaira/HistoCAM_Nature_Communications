@@ -137,9 +137,16 @@ namespace pathCam {
     auto d = m->H.at<double>(1, 1);
     auto a2 = m->H.at<double>(0, 2);
     auto d2 = m->H.at<double>(1, 2);
-    m->t_x = a * a2 * (1.0 / m->image_2->get_reg_scale());
-    m->t_y = d * d2 * (1.0 / m->image_2->get_reg_scale());
+    m->t_x = a2 * (1.0 / m->image_2->get_reg_scale());
+    m->t_y = d2 * (1.0 / m->image_2->get_reg_scale());
     m->scale = (a + d) / 2;
+    if(flag == 1){
+      m->t_x *= a;
+      m->t_x += (m->image_2->reg_crop_initial / 4.0) * (1 - a) * m->image_2->width;
+
+      m->t_y *= d;
+      m->t_y += (m->image_2->reg_crop_initial / 4.0) * (1 - d) * m->image_2->height;
+    }
     return 1;
   }
 

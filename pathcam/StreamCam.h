@@ -99,6 +99,7 @@ namespace pathCam {
     Poco::FastMutex *inferenceQMutex;
 
     cv::Rect_<float> lastFrame;
+    int lastComponentIndex;
     bool showAsCircle;
 
     std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
@@ -128,9 +129,9 @@ namespace pathCam {
 
     Mat get_flatfield(int label);
 
-    void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle);
+    void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index);
 
-    void get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &showAsCircle);
+    void get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &showAsCircle, int& _lastComponentIndex);
 
     void pass_image(Image *, unsigned long _image_index = 0, bool saveImg = false);
 
