@@ -28,17 +28,13 @@ MRTiledImage::MRTiledImage(pathCam::StreamCam *parent, unsigned int _tile_size) 
   }
 }
 
-int MRTiledImage::get_class_for_tile(Point2i tile) {
-  // if (tileCoordToTensorIndex.find(tileList[i].first) == tileCoordToTensorIndex.end()) {
-  //   tileCoordToTensorIndex.insert({tileList[i].first, tileCoordToTensorIndex.size()});
-  // }
+int MRTiledImage::get_class_for_tile(std::tuple<int,int,unsigned> _tile) {
   if (parent) {
-    if (parent->tileCoordToClass.find(tile) != parent->tileCoordToClass.end()) {
-      return parent->tileCoordToClass[tile];
+    if (parent->tileCoordToClass.find(_tile) != parent->tileCoordToClass.end()) {
+      return parent->tileCoordToClass[_tile];
     }
   }
   return -1;
-
 }
 
 

@@ -259,9 +259,9 @@ namespace pathCam {
       return;
     }*/
 
-    //manually_set_label();
+    manually_set_label();
     //label = _10X;
-    label = _4X;
+    //label = _4X;
     //label = _2X;
     return;
     if (is_2x()) {
@@ -307,14 +307,25 @@ namespace pathCam {
 //    } else {
 //      label = Image::_20X;
 //    }
-    if(index < 413){
-      label = Image::_2X;
-    }else if(index >= 413 && index <777) {
-      label = _4X;
-    }else if(index >= 777 && index < 1358){
+
+////2_20new
+//    if(index < 413){
+//      label = Image::_2X;
+//    }else if(index >= 413 && index <777) {
+//      label = _4X;
+//    }else if(index >= 777 && index < 1358){
+//      label = Image::_10X;
+//    }else{
+//      label = Image::_20X;
+//    }
+
+//afb
+    if (index < 141) {
+      label = Image::_4X;
+    } else if (index >= 141 && index < 777) {
+      label = _10X;
+    } else if (index >= 777 && index < 1358) {
       label = Image::_10X;
-    }else{
-      label = Image::_20X;
     }
   }
 
@@ -327,7 +338,7 @@ namespace pathCam {
     return image_Mat;
   }
 
-  void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real, bool flatfield_first, Mat flatfield) {
+  void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real) {
     bool release = false;
     buffer_mutex.lock();
 

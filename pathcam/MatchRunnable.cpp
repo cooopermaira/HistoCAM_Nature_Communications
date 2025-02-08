@@ -72,8 +72,24 @@ namespace pathCam {
       Match *m = parent->matchM.match[image_idx][imgCompare->index];
       parent->resize_mmatch_mutex->unlock();
 
+      //debug afb
+      if(imgCompare->index == 140 && selfImage->index == 141){
+        scale = 0.398183;
+        (1948.7497780729252, 1395.8952233600055);
+        matchedTo = imgCompare;
+        auto mtoRegInfo = parent->get_registration(140);
+        Point2f mtoOffset;
+        while(parent->composites.size() <= matchedTo->component_membership || !parent->get_scale_and_offset(mtoRegInfo->component_membership,mtoScale,mtoOffset)) {
+          Poco::Thread::sleep(50);
+        }
+        offset = Point2f((1948.749  + mtoRegInfo->absoluteCoords.x + mtoOffset.x) / scale ,
+                         (1395.895  + mtoRegInfo->absoluteCoords.y + mtoOffset.y) / scale) ;
+        parent->set_scale_and_offset(componentMembership, scale * mtoScale, offset);
+        return true;
+      }
+
       matcher->match(m, 1);
-      int result = motion_est->findHomography(m, parent->estimator_type, 100, 1);
+      int result = motion_est->findHomography(m, parent->estimator_type, 3, 1);
       if (result == 1) {
 
         matchedTo = otherCompImages[ii];

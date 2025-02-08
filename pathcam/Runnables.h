@@ -155,35 +155,13 @@ namespace pathCam {
     
     virtual void run();
 
-    PyObject* tensor_to_list(const torch::Tensor& tensor);
-    static torch::Tensor vector_to_tensor(const std::vector<std::vector<double>>& tensor);
-    static torch::Tensor vector_to_tensor(const std::vector<std::vector<float>>& tensor);
-    std::vector<std::vector<float>> pyList_to_vector(PyObject* pyList);
-
-    std::vector<std::vector<float>> tensor_to_vector(const torch::Tensor &tensor);
-
-
     Poco::Thread thread;
-
-    int minx;
-    int miny;
-    int cropedDim;
-    int embedSize;
+    std::vector<std::pair<int,int>> minShift;
 
     bool aggregatorReady = false;
 
-    std::map<Point2i,unsigned long,PointComparator> tileCoordToTensorIndex;
+    std::map<std::tuple<unsigned, unsigned, unsigned>,unsigned> tileCoordToTensorIndex;
 
-
-  };
-
-  class InferenceInitRunner:public Poco::Runnable {
-  public:
-    InferenceManager *parent;
-    InferenceInitRunner(InferenceManager *parent) :parent(parent) {};
-    void run() override {
-      //parent->initialize_aggregator2();
-    };
   };
 
 

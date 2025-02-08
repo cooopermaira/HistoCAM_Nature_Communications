@@ -343,15 +343,14 @@ namespace pathCam {
     return temp;
   }
 
-  std::vector<std::pair<Point2i, unsigned int>> StreamCam::get_tile_embed_Q_front() {
-    std::vector<std::pair<Point2i,unsigned int>> temp;
+  std::vector<std::tuple<int, int, unsigned int>> StreamCam::get_tile_embed_Q_front() {
+    std::vector<std::tuple<int, int, unsigned int>> temp;
 
     inferenceQMutex->lock();
     if (!tileEmbedQ.empty()) {
-      unsigned int component_index = tileEmbedQ.front().second;
+      unsigned int component_index = std::get<2>(tileEmbedQ.front());
 
-
-      while (!tileEmbedQ.empty() && tileEmbedQ.front().second == component_index && temp.size() < 512) {
+      while (!tileEmbedQ.empty() && std::get<2>(tileEmbedQ.front()) == component_index && temp.size() < 512) {
         temp.push_back(tileEmbedQ.front());
         tileEmbedQ.pop();
       }
@@ -365,9 +364,12 @@ namespace pathCam {
 
   }
 
-  void StreamCam::push_tile_embed_Q(std::pair<Point2i, unsigned int> _tileSet) {
+  void StreamCam::push_tile_embed_Q(std::vector<Point2i> &_tiles, unsigned int _componentIndex) {
     inferenceQMutex->lock();
-    tileEmbedQ.push(_tileSet);
+    for (auto tilePoint: _tiles) {
+      auto tpl = std::tuple<int,int,unsigned>(tilePoint.x,tilePoint.y,_componentIndex);
+      tileEmbedQ.push(tpl);
+    }
     inferenceQMutex->unlock();
     inferenceWait.set();
   }

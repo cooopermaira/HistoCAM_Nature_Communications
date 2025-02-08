@@ -13,9 +13,12 @@
 class AnnotateComponent  : public juce::Component {
     
 public:
+  MainComponent* parent;
+
   AnnotateComponent(std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
-                    OwnedArray<Drawable> &iconsFromZipFile): mode(Annotation::_NONE) {
+                    OwnedArray<Drawable> &iconsFromZipFile,
+                    MainComponent* parent): parent(parent), mode(Annotation::_NONE) {
     
     annotations.reset( new std::vector < std::shared_ptr<  Annotation > >());
     
@@ -136,6 +139,8 @@ private:
   std::unique_ptr< AnnoViewComponent > rightComponent;
   std::unique_ptr<juce::StretchableLayoutResizerBar> resizerBar;
   juce::StretchableLayoutManager layout;
+
+
   
   int mode;
 

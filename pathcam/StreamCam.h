@@ -103,7 +103,7 @@ namespace pathCam {
     bool showAsCircle;
 
     std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
-    std::map<Point2i,int,PointComparator> tileCoordToClass;
+    std::map<std::tuple<int,int,unsigned>,int> tileCoordToClass;
 
     Mat flat_field2X;
     Mat flat_field4X;
@@ -178,9 +178,9 @@ namespace pathCam {
 
     std::vector<RegInfo*> get_Q_front();
 
-    std::vector<std::pair<Point2i,unsigned int>> get_tile_embed_Q_front();
+    std::vector<std::tuple<int,int,unsigned int>> get_tile_embed_Q_front();
 
-    void push_tile_embed_Q(std::pair<Point2i,unsigned int> tileSet);
+    void push_tile_embed_Q(std::vector<Point2i>& _tiles, unsigned int _componentIndex);
 
     Image *get_Q_front_Spin();
 
@@ -197,7 +197,8 @@ namespace pathCam {
     std::vector<bool> visited;
 
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
-    UniqueQueue<std::pair<Point2i,unsigned int>,PairHash> tileEmbedQ;
+    //UniqueQueue<std::pair<Point2i,unsigned int>,PairHash> tileEmbedQ;
+    UniqueQueue<std::tuple<int,int,unsigned>,TupleHash>tileEmbedQ;
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;

@@ -10,7 +10,8 @@
 
 namespace pathCam {
 
-  CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),rebuildJobsOutstanding(true) {};
+  CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),
+                                                          rebuildJobsOutstanding(true) {};
 
   void CompositeManager::run() {
     unsigned long duration = 0;
@@ -37,16 +38,16 @@ namespace pathCam {
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
           //perform_global_alignment();
-          if(rebuildJobsOutstanding > 0) {
+          if (rebuildJobsOutstanding > 0) {
             rebuildJobsComplete.wait();
           }
           parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
           parent->newComponentQ.pop();
 
-        }else{
+        } else {
 
-        check_render_info();
-        Poco::Thread::sleep(100);
+          check_render_info();
+          Poco::Thread::sleep(100);
         }
 
       } else {
@@ -55,7 +56,7 @@ namespace pathCam {
         if (isNewComp) {
           if (indexes.front()->index > std::get<0>(newComp)) {
             //perform_global_alignment();
-            if(rebuildJobsOutstanding > 0) {
+            if (rebuildJobsOutstanding > 0) {
               rebuildJobsComplete.wait();
             }
             parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
@@ -70,7 +71,7 @@ namespace pathCam {
         }
 
         unsigned int current_component = indexes[0]->component_membership;
-        std::vector<RegInfo*> new_info;
+        std::vector<RegInfo *> new_info;
 
         //sort the new frames by component and pass them to their respective components for compositing.
         for (int i = 0; i < indexes.size(); i++) {
@@ -100,16 +101,14 @@ namespace pathCam {
     //perform_global_alignment();
     //rebuildJobsComplete.wait();
     //save_components_to_disk();
-    std::cout<<"CM duration: "+std::to_string(duration)<<std::endl;
+    std::cout << "CM duration: " + std::to_string(duration) << std::endl;
     parent->compositing = false;
     parent->inferenceWait.set();
   }
 
   void CompositeManager::push_remaining_tiles_for_inference() {
-    for (auto i:parent->composites) {
-      for (auto tilePoint: i->queuedTiles) {
-        parent->push_tile_embed_Q({tilePoint, i->componentIndex});
-      }
+    for (auto i: parent->composites) {
+      parent->push_tile_embed_Q(i->queuedTiles, i->componentIndex);
     }
   }
 
@@ -124,7 +123,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/home/max/10x_afb.png");
+      i->save_pyramid_as_image("/Users/coopermaira/Desktop/4x_afb.png");
 
     }
   }
@@ -132,13 +131,13 @@ namespace pathCam {
   void CompositeManager::align_new_comp() {
     parent->newComponentQ.pop();
     perform_global_alignment();
-    if(rebuildJobsOutstanding > 0) {
+    if (rebuildJobsOutstanding > 0) {
       rebuildJobsComplete.wait();
     }
   }
 
   void CompositeManager::check_render_info() {
-    for (auto cmp : parent->composites){
+    for (auto cmp: parent->composites) {
       cmp->check_set_render_info();
     }
   }
@@ -146,18 +145,19 @@ namespace pathCam {
   void CompositeManager::decrement_rebuild_jobs_outstanding() {
     rebuildJobsOutstanding--;
     parent->notify_observers();
-    if(rebuildJobsOutstanding == 0){
+    if (rebuildJobsOutstanding == 0) {
       rebuildJobsComplete.set();
     }
   }
 
-  RebuildRunnable::RebuildRunnable(pathCam::CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex, std::vector<Point2i> _rebuildTiles, Mat _polyMaskOutput) :
-  dtVertex(_dtVertex),
-  imageIndex(_imageIndex),
-  composite(_composite),
-  rebuildTiles(_rebuildTiles),
-  polyMaskOutput(_polyMaskOutput),
-  RunnableIntermediate(0,0){
+  RebuildRunnable::RebuildRunnable(pathCam::CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex,
+                                   std::vector<Point2i> _rebuildTiles, Mat _polyMaskOutput) :
+      dtVertex(_dtVertex),
+      imageIndex(_imageIndex),
+      composite(_composite),
+      rebuildTiles(_rebuildTiles),
+      polyMaskOutput(_polyMaskOutput),
+      RunnableIntermediate(0, 0) {
     cm = composite->parent->cm;
   }
 
@@ -170,50 +170,48 @@ namespace pathCam {
     Mat3b threeChannelPreallocated;
     Mat4b fourChannelPreallocated;
 
-    if(image->readyImage.data){
+    if (image->readyImage.data) {
       channels[0] = image->readyImage;
-    }else{
+    } else {
 
-    Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-
-
-    cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+      Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
 
 
+      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
 
 
-    channels[0] = threeChannelPreallocated; //3 channel
+      channels[0] = threeChannelPreallocated; //3 channel
     }
 
     image->free_memory_RAW();
 
     if (image->label == Image::_2X) {//flat field correction if needed
-      if(!image->readyImage.data){
+      if (!image->readyImage.data) {
         auto center = Point2i(composite->image_size.width / 2, composite->image_size.height / 2);
         auto bb = Rect(center.x - composite->parent->scope_radius - 10, center.y - composite->parent->scope_radius - 10,
-    2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
+                       2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
         cv::divide(threeChannelPreallocated(bb), composite->flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
       }
       channels[1] = composite->circleMask * 255;           //alpha channel
 
-    }else if(image->label == Image::_4X){
-      if(!image->readyImage.data){
+    } else if (image->label == Image::_4X) {
+      if (!image->readyImage.data) {
         divide(threeChannelPreallocated, composite->parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
       }
-      channels[1] = Mat(image->height,image->width,CV_8U,Scalar(255));
+      channels[1] = Mat(image->height, image->width, CV_8U, Scalar(255));
 
-    }else{
+    } else {
       //divide(threeChannelPreallocated, composite->parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
-      channels[1] = Mat(image->height,image->width,CV_8U,Scalar(255));
+      channels[1] = Mat(image->height, image->width, CV_8U, Scalar(255));
 
     }
 
     merge(channels, fourChannelPreallocated);
 
     auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
-    composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated,imageBox,rebuildTiles);
+    composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated, imageBox, rebuildTiles);
 
-    if(image->readyImage.data){
+    if (image->readyImage.data) {
       image->readyImage.release();
     }
 

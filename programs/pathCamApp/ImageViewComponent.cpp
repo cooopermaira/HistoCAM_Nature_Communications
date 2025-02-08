@@ -4,7 +4,7 @@
 //==============================================================================
 ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
                                        StringArray &iconNames,
-                                       OwnedArray<Drawable> &iconsFromZipFile) : MRImage(NULL), view(view),
+                                       OwnedArray<Drawable> &iconsFromZipFile, MainComponent* parent) : parent(parent), MRImage(NULL), view(view),
                                                                                  shade_levels(false) {
   setOpaque(true); //telling juce that there is nothingi to render underneath
 
@@ -34,12 +34,6 @@ ImageViewComponent::~ImageViewComponent() {
 
 void ImageViewComponent::refreshImage() {
   const ScopedLock lock(mutex);
-  horizontalScrollBar.setRangeLimits(MRImage->bounds.x, MRImage->bounds.width);
-  verticalScrollBar.setRangeLimits(MRImage->bounds.y, MRImage->bounds.height);
-
-  horizontalScrollBar.setVisible(true);
-  verticalScrollBar.setVisible(true);
-
   zoomAndCenter();
   repaint();
 }
@@ -170,14 +164,39 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
           memcpy(bitmap_data.data, tile.data, tile.cols * tile.rows * 4);
         }
         g.drawImage(im, bounds);
+//        if(!MRImage->images.empty()){
+//          auto sCam = MRImage->images[0]->parent;
+//          if (sCam->classifyingComplete && shadeClasses) {
+//            //get class for color
+//            auto tileCoords = Point2i(tiles[i].i, tiles[i].j);
+//            int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
+//
+//            //draw it
+//            Colour tileColor;
+//            if (classScore == 0) {
+//              tileColor = Colour(uint8(50), 50, 50, uint8(20));
+//            } else {
+//              auto tileClassInfo = sCam->classesInfo[classScore - 1];
+//              tileColor = Colour(uint8(tileClassInfo.r), tileClassInfo.g, tileClassInfo.b, uint8(100));
+//            }
+//
+//            g.setColour(tileColor);
+//            g.fillRect(bounds);
+//          }
+//        }
       }
     }
     if (MRImage->images.size() > 0) {
       auto sCam = MRImage->images[0]->parent;
+
       if (sCam->classifyingComplete && shadeClasses) {
+
         auto baseTiles = MRImage->images[i]->
             getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()), true);
+
         for (auto tile: baseTiles) {
+
+          if(!tile.image.data){continue;}
           //get draw bounds of base level tile
           auto bounds = RectCtoJ<float>(tile.bounds);
           bounds *= view2screenScale(imageview) * scale;
@@ -185,8 +204,9 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
           tile.bounds = RectJtoC<float>(bounds);
 
           //get class for color
-          auto tileCoords = Point2i(tile.i, tile.j);
+          auto tileCoords = std::tuple<int,int,unsigned>(tile.i, tile.j, i);
           int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
+          if(classScore == -1){continue;}
 
           //draw it
           Colour tileColor;
@@ -232,17 +252,17 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     }
 
 
-    //#ifdef DEBUG
-    //    for (unsigned int t = 0; t < tiles.size(); t++) {
-    //        auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
-    //        g.setColour(juce::Colours::greenyellow);
-    //        g.drawRect(bounds, 3);
-    //        std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-    //        g.setFont(20);
-    //        g.drawText(ij, bounds.getCentreX() - 50,
-    //                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
-    //    }
-    //#endif
+    #ifdef DEBUG
+        for (unsigned int t = 0; t < tiles.size(); t++) {
+            auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
+            g.setColour(juce::Colours::greenyellow);
+            g.drawRect(bounds, 3);
+            std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+            g.setFont(20);
+            g.drawText(ij, bounds.getCentreX() - 50,
+                       bounds.getCentreY() - 15, 100, 30, Justification::centred);
+        }
+    #endif
   }
 
 }
@@ -324,18 +344,47 @@ void ImageViewComponent::resized() {
 }
 
 void ImageViewComponent::zoomAndCenter() {
-  if (!MRImage || !isVisible()) { return; }
+  if (!MRImage || MRImage->images.empty() ||!isVisible()) { return; }
+
+  Rect_<float> bounds;
+  bool showAsCircle;
+  int component;
+  parent->capture->sCam->get_last_frame(bounds,showAsCircle,component);
+  auto lastComponentImg = MRImage->images[component];
+
+//  horizontalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x, (*lastComponentImg).scale * (*lastComponentImg).bounds.width);
+//  verticalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.y + (*lastComponentImg).bounds.y, (*lastComponentImg).scale * (*lastComponentImg).bounds.height);
+//
+//  horizontalScrollBar.setVisible(true);
+//  verticalScrollBar.setVisible(true);
+
   juce::Rectangle<int> b = getLocalBounds();
   *view = fRectangle(b.getX(), b.getY(), b.getWidth(), b.getHeight());
-  //view.reset(new fRectangle(b.getX(),b.getY(),b.getWidth(),b.getHeight()));
+
+
+
+//  auto compBounds = Rect_<float>((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x,
+//                             (*lastComponentImg).scale * (*lastComponentImg).offset.y + (*lastComponentImg).bounds.y,
+//                             (*lastComponentImg).scale * (*lastComponentImg).bounds.width,
+//                             (*lastComponentImg).scale * (*lastComponentImg).bounds.height);
+//  //view->setCentre(RectCtoJ((*lastComponentImg).bounds).getCentre());
+//  view->setCentre(RectCtoJ(compBounds).getCentre());
+//
+//  float scale = max((float) (*lastComponentImg).scale * (*lastComponentImg).bounds.width /
+//                    (float) view->getHorizontalRange().getLength(),
+//                    (float) (*lastComponentImg).scale * (*lastComponentImg).bounds.height /
+//                    (float) view->getVerticalRange().getLength());
+//
+//  scaleCenter(fPoint(scale, scale));
+
   view->setCentre(RectCtoJ(MRImage->bounds).getCentre());
 
-  float scale = max((float) MRImage->bounds.width /
-                    (float) view->getHorizontalRange().getLength(),
-                    (float) MRImage->bounds.height /
-                    (float) view->getVerticalRange().getLength());
+  float scale = max((float)MRImage->bounds.width/
+                    (float)view->getHorizontalRange().getLength(),
+                    (float)MRImage->bounds.height/
+                    (float)view->getVerticalRange().getLength());
 
-  scaleCenter(fPoint(scale, scale));
+  scaleCenter(fPoint(scale,scale));
 }
 
 juce::Image ImageViewComponent::createCheckerboardImage(int width,

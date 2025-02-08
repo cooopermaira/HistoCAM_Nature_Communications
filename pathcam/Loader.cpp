@@ -59,7 +59,7 @@ namespace pathCam {
     if (image->is_good()) {
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
-                              parent->real, additionalSiftReg);
+                              parent->real);
 
 
       image->reg_scale_initial = parent->scale_factor;
@@ -136,10 +136,11 @@ namespace pathCam {
     switch (flag){
       case 0:
         points = &image->keypoints;
+        reg_image = image->get_reg_image();
         break;
       case 1:
         points = &image->keypointsMultilevel;
-        reg_image = image->get_reg_image(true);
+        reg_image = image->get_reg_image();
         break;
       case 2:
         points = &image->keypointsFull;

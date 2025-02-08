@@ -11,20 +11,14 @@
 #include "JuceHeader.h"
 
 class AnnotateComponent;
-
+class MainComponent;
 class AnnoViewComponent  : public ImageViewComponent {
 public:
   AnnoViewComponent(AnnotateComponent *parent,
                     std::shared_ptr < fRectangle > view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile,
-                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations): ImageViewComponent(view,iconNames,iconsFromZipFile), parent(parent), annotations(annotations)
-  {
-      
-      annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
-      addAndMakeVisible (annotateOverlay.get());
-                                       
-  }
+                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations);
   
   void resized() override
   {

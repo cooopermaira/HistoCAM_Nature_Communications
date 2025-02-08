@@ -16,7 +16,7 @@ namespace pathCam {
     minPixelDistanceBetweenFrames = 200;
 
     imagePyramid.reset(new MRTiledImage(parent));
-    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid);
+    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid,parent->tileSize,parent->tileSize,0);
     imagePyramid->level.push_back(current);
     parent->MRimage->add(imagePyramid);
 
@@ -346,8 +346,8 @@ namespace pathCam {
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
-        if (parent->has_flatfield(images[i]->label)) {
-        //if (false) {
+        //if (parent->has_flatfield(images[i]->label)) {
+        if (false) {
           auto ff = parent->get_flatfield(images[i]->label);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
           cv::pow(convertHolding, 1.09, convertHolding);
@@ -459,10 +459,8 @@ namespace pathCam {
 
 
         auto pushForInferencing = push_for_inferencing(tiles);
+        parent->push_tile_embed_Q(pushForInferencing,componentIndex);
 
-        for (auto tilePoint: pushForInferencing) {
-          parent->push_tile_embed_Q({tilePoint, componentIndex});
-        }
       }
       //update pyramid bounds, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
@@ -608,10 +606,7 @@ namespace pathCam {
 
       for (int y = rowBoundFalseLow; y <= rowBoundFalseHigh; y++) {
         auto tilePoint = Point2i(x, y);
-        //debug
-        if (tilePoint == Point2i(17, 7)) {
-          int k = 0;
-        }
+
         auto loc = std::find(falselyClaimedTiles.begin(), falselyClaimedTiles.end(), tilePoint);
 
         if (loc != falselyClaimedTiles.end()) {
@@ -620,13 +615,33 @@ namespace pathCam {
             falselyClaimedTiles.erase(loc);
           }
         } else if (columnIntersectsMask) {
-          if (y > firstTile && y < lastTile) {
-            result.push_back(tilePoint);
-          } else if (y == firstTile || y == lastTile) {
-            result.push_back(tilePoint);
-            falselyClaimedTiles.push_back(tilePoint);
-          } else {
-            falselyClaimedTiles.push_back(tilePoint);
+
+          bool canAdd = false;
+          for(int idx = 0; idx < 4; idx++){
+
+            int x = tilePoint.x * imagePyramid->tile_size + (idx % 2 == 0 ? imagePyramid->tile_size : 0);
+            int y = tilePoint.y * imagePyramid->tile_size + (idx % 3 == 0 ? imagePyramid->tile_size : 0);
+
+            if(abs(absCoord.x + image_size.width / 2 - x) < image_size.width / 2
+              && abs(absCoord.y + image_size.height / 2 - y) < image_size.height / 2){
+              canAdd = true;
+              break;
+            }
+          }
+
+          if(canAdd) {
+            if (y > firstTile && y < lastTile) {
+              result.push_back(tilePoint);
+            } else if (y == firstTile || y == lastTile) {
+              result.push_back(tilePoint);
+              falselyClaimedTiles.push_back(tilePoint);
+              if (tilePoint.x < minTilex) { minTilex = tilePoint.x; }
+              if (tilePoint.x > maxTilex) { maxTilex = tilePoint.x; }
+              if (tilePoint.y < minTiley) { minTiley = tilePoint.y; }
+              if (tilePoint.y > maxTiley) { maxTiley = tilePoint.y; }
+            } else {
+              falselyClaimedTiles.push_back(tilePoint);
+            }
           }
         }
       }

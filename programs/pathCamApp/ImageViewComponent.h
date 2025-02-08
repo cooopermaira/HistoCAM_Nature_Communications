@@ -18,7 +18,7 @@ public:
   //==============================================================================
   ImageViewComponent(std::shared_ptr < fRectangle > view,
                      StringArray &iconNames,
-                     OwnedArray<Drawable> &iconsFromZipFile);
+                     OwnedArray<Drawable> &iconsFromZipFile,MainComponent* parent);
   ~ImageViewComponent() override;
   
   //==============================================================================
@@ -58,7 +58,7 @@ public:
   
 protected:
   std::shared_ptr< MRTiledImageSet > MRImage;
-
+  MainComponent* parent;
   std::atomic<bool> newData;
   bool shade_levels;
   cv::Mat greenShade;

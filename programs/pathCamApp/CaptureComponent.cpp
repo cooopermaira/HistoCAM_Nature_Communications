@@ -50,7 +50,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
                                    StringArray &iconNames,
                                    OwnedArray<Drawable> &iconsFromZipFile, Poco::Util::LayeredConfiguration::Ptr config,
                                    MainComponent *parent) : config(config), parent(parent),
-                                                            ImageViewComponent(view, iconNames, iconsFromZipFile),
+                                                            ImageViewComponent(view, iconNames, iconsFromZipFile,parent),
                                                             recording(false), simulating(false) {
 
 

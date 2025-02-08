@@ -7,6 +7,15 @@
 
 #include "JuceHeader.h"
 
+AnnoViewComponent::AnnoViewComponent(AnnotateComponent *parent, std::shared_ptr<fRectangle> view,
+                                     juce::StringArray &iconNames, OwnedArray<juce::Drawable> &iconsFromZipFile,
+                                     std::shared_ptr<std::vector<std::shared_ptr<Annotation>>> annotations) : ImageViewComponent(view,iconNames,iconsFromZipFile,parent->parent), parent(parent), annotations(annotations)
+{
+
+  annotateOverlay.reset (new AnnotateOverlay (this, iconNames, iconsFromZipFile));
+  addAndMakeVisible (annotateOverlay.get());
+
+}
 
 void AnnoViewComponent::toggleMode(int mode){ parent->toggleMode(mode); }
 void AnnoViewComponent::setMode(int mode){ parent->setMode(mode); }

@@ -33,7 +33,7 @@ public:
 
   void insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
 
-  int get_class_for_tile(Point2i tile);
+  int get_class_for_tile(std::tuple<int,int,unsigned> _tile);
   
   void build(cv::Mat &image_in);
 

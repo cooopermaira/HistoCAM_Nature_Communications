@@ -23,11 +23,11 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
     MRimage.reset(new MRTiledImageSet);
     toolbar = new ToolbarComponent(this);
     view.reset(new fRectangle());
-    imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile);
+    imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile,this);
     capture = new CaptureComponent(view, iconNames, iconsFromZipFile, config, this); //pass reference to bcam
 
     //capture->bcam->set_MainComponent_reference(this);
-    annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile);
+    annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile, this);
 
     addAndMakeVisible(imageview);
     addAndMakeVisible(toolbar);
@@ -138,11 +138,7 @@ void MainComponent::update()  {
   }
 }
 
-void MainComponent::refreshImage() {
-  imageview->refreshImage();
-  capture->refreshImage();
-  annotate->refreshImage();
-}
+
 
 void MainComponent::loadImage(std::string path) {
 

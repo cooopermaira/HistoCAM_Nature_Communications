@@ -137,6 +137,20 @@ namespace pathCam {
     }
   };
 
+  struct TupleHash {
+    template <typename T>
+    static void hash_combine(std::size_t& seed, const T& value) {
+      seed ^= std::hash<T>{}(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+
+    std::size_t operator()(const std::tuple<int, int, unsigned>& key) const {
+      std::size_t seed = 0;
+      hash_combine(seed, std::get<0>(key));
+      hash_combine(seed, std::get<1>(key));
+      hash_combine(seed, std::get<2>(key));
+      return seed;
+    }
+  };
 
 
 
