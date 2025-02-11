@@ -149,18 +149,25 @@ namespace pathCam {
     std::string embedFileIn;
     std::string signalFileIn;
 
+    torch::Device device;
+    torch::Tensor tileEmbeds;
+
+    Poco::FastMutex tileEmbedMutex;
+
   public:
 
     explicit InferenceManager(StreamCam *parent);
     
     virtual void run();
 
+    void run_agg_classify();
+
     Poco::Thread thread;
     std::vector<std::pair<int,int>> minShift;
 
     bool aggregatorReady = false;
 
-    std::map<std::tuple<unsigned, unsigned, unsigned>,unsigned> tileCoordToTensorIndex;
+    std::map<std::tuple<int, int, unsigned>,unsigned> tileCoordToTensorIndex;
 
   };
 

@@ -841,7 +841,7 @@ namespace pathCam {
       }
     }
     //currently hardcoded, maybe add an output directory in config?
-    String path = "pyramidImage" + std::to_string(componentIndex) + "_" + std::to_string(imagePyramid->scale) +
+    String path = "/Users/coopermaira/Desktop/pyramidImage" + std::to_string(componentIndex) + "_" + std::to_string(imagePyramid->scale) +
                   ".png";
     //only write pixels with information
     //imwrite(path, pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));

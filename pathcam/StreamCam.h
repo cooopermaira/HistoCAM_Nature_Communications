@@ -102,6 +102,8 @@ namespace pathCam {
     int lastComponentIndex;
     bool showAsCircle;
 
+    bool microscopeInput;
+
     std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
     std::map<std::tuple<int,int,unsigned>,int> tileCoordToClass;
 
@@ -145,8 +147,6 @@ namespace pathCam {
 
     bool get_scale_and_offset(unsigned int component_index, double &_scale, Point2f &_offset);
 
-    bool microscopeInput;
-
     std::shared_ptr<MRTiledImageSet> get_image_reference();
 
     void add_observer(DataObserver *new_observer) {
@@ -157,14 +157,11 @@ namespace pathCam {
 
     void notify_observers();
 
-  public:
     unsigned int increment_and_get_components() { return components++; }
 
     void add_image(Image *image, unsigned long index);
 
     void add_registration(RegInfo* regInfo);
-
-    bool get_registration(unsigned long image_idx, RegInfo* res);
 
     RegInfo* get_registration(unsigned long image_idx);
 
@@ -192,6 +189,8 @@ namespace pathCam {
 
     void add_new_component_Q(unsigned long image_index, cv::Size image_size);
 
+    void run_agg_classify();
+
     //std::vector < double > variancesForDebug;
     std::vector<CompositeVoronoi *> composites;
     std::vector<bool> visited;
@@ -216,9 +215,8 @@ namespace pathCam {
     Poco::Thread disk_thread, Q_thread, composite_thread, inference_thread;
 
     Poco::Event inferenceWait;
+    Poco::Event compositeWait;
 
-    //debug inference
-    int duplicateInferenceCount = 0;
   };
 
 }

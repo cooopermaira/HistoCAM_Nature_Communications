@@ -61,6 +61,8 @@ namespace pathCam {
     bool reportText;
     bool classifyingComplete = false;
 
+    std::string classes_title;
+
     int interpolation;
     int feature_type;
     unsigned int tileSize;

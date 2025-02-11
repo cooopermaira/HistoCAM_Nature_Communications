@@ -4,8 +4,11 @@
 //==============================================================================
 ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
                                        StringArray &iconNames,
-                                       OwnedArray<Drawable> &iconsFromZipFile, MainComponent* parent) : parent(parent), MRImage(NULL), view(view),
-                                                                                 shade_levels(false) {
+                                       OwnedArray<Drawable> &iconsFromZipFile, MainComponent *parent) : parent(parent),
+                                                                                                        MRImage(NULL),
+                                                                                                        view(view),
+                                                                                                        shadeLevels(
+                                                                                                            false) {
   setOpaque(true); //telling juce that there is nothingi to render underneath
 
   controlsOverlay.reset(new ImageViewOverlay(this, iconNames, iconsFromZipFile));
@@ -27,6 +30,8 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
 
   addChildComponent(horizontalScrollBar);
   addChildComponent(verticalScrollBar);
+
+  shadeClasses = false;
 }
 
 ImageViewComponent::~ImageViewComponent() {
@@ -92,8 +97,13 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     repaint();
     return true; // Key press handled
   }
+  if (key == juce::KeyPress::createFromDescription("a")) {
+    shadeClasses = !shadeClasses;
+    repaint();
+    return true;
+  }
   if (key == juce::KeyPress::createFromDescription("s")) {
-    shade_levels = !shade_levels;
+    shadeLevels = !shadeLevels;
     repaint();
     return true; // Key press handled
   }
@@ -123,9 +133,11 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRa
 }
 
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
-  bool shadeClasses = true;
+
+  bool canShadeClasses = false;
 
   for (unsigned int i = 0; i < MRImage->images.size(); i++) {
+    g.setColour(juce::Colours::white);
     if (MRImage->images[i]->scale == 0) { continue; }
     auto imageview = *view;
     imageview *= 1.0 / MRImage->images[i]->scale;
@@ -144,7 +156,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
         jassert(tile.step == bitmap_data.lineStride);
 
-        if (shade_levels) {
+        if (shadeLevels) {
           if (!greenShade.data) {
             greenShade = Mat(tile.rows, tile.cols, CV_8UC3, cv::Scalar(0, 255, 0));
             channels.resize(2);
@@ -164,107 +176,106 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
           memcpy(bitmap_data.data, tile.data, tile.cols * tile.rows * 4);
         }
         g.drawImage(im, bounds);
-//        if(!MRImage->images.empty()){
-//          auto sCam = MRImage->images[0]->parent;
-//          if (sCam->classifyingComplete && shadeClasses) {
-//            //get class for color
-//            auto tileCoords = Point2i(tiles[i].i, tiles[i].j);
-//            int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
-//
-//            //draw it
-//            Colour tileColor;
-//            if (classScore == 0) {
-//              tileColor = Colour(uint8(50), 50, 50, uint8(20));
-//            } else {
-//              auto tileClassInfo = sCam->classesInfo[classScore - 1];
-//              tileColor = Colour(uint8(tileClassInfo.r), tileClassInfo.g, tileClassInfo.b, uint8(100));
-//            }
-//
-//            g.setColour(tileColor);
-//            g.fillRect(bounds);
-//          }
-//        }
       }
     }
-    if (MRImage->images.size() > 0) {
+
+    //tile classification
+    if (MRImage->images.size() > 0 && shadeClasses) {
       auto sCam = MRImage->images[0]->parent;
 
-      if (sCam->classifyingComplete && shadeClasses) {
+      auto baseTiles = MRImage->images[i]->
+          getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()), true);
 
-        auto baseTiles = MRImage->images[i]->
-            getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()), true);
+      for (auto tile: baseTiles) {
 
-        for (auto tile: baseTiles) {
+        if (!tile.image.data) { continue; }
+        //get draw bounds of base level tile
+        auto bounds = RectCtoJ<float>(tile.bounds);
+        bounds *= view2screenScale(imageview) * scale;
+        bounds.expand(0.5, 0.5);
+        tile.bounds = RectJtoC<float>(bounds);
 
-          if(!tile.image.data){continue;}
-          //get draw bounds of base level tile
-          auto bounds = RectCtoJ<float>(tile.bounds);
-          bounds *= view2screenScale(imageview) * scale;
-          bounds.expand(0.5, 0.5);
-          tile.bounds = RectJtoC<float>(bounds);
+        //get class for color
+        auto tileCoords = std::tuple<int, int, unsigned>(tile.i, tile.j, i);
+        int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
+        if (classScore == -1) { continue; }
 
-          //get class for color
-          auto tileCoords = std::tuple<int,int,unsigned>(tile.i, tile.j, i);
-          int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
-          if(classScore == -1){continue;}
-
-          //draw it
-          Colour tileColor;
-          if (classScore == 0) {
-            tileColor = Colour(uint8(50), 50, 50, uint8(20));
-          } else {
-            auto tileClassInfo = sCam->classesInfo[classScore - 1];
-            tileColor = Colour(uint8(tileClassInfo.r), tileClassInfo.g, tileClassInfo.b, uint8(100));
-          }
-
-          g.setColour(tileColor);
-          g.fillRect(bounds);
+        //draw it
+        Colour tileColor;
+        if (classScore == 0) {
+          tileColor = Colour(uint8(50), 50, 50, uint8(20));
+        } else {
+          auto tileClassInfo = sCam->classesInfo[classScore - 1];
+          tileColor = Colour(uint8(tileClassInfo.r), tileClassInfo.g, tileClassInfo.b, uint8(100));
         }
 
-        // Define buffer space from the edges
-        int padding = 100;
-        int squareSize = 30; // Size of the square
-        int textPadding = 10; // Space between the square and the text
-        int linePadding = 10; // Space between lines
-
-        // Loop through the dynamically loaded classes
-        for (size_t i = 0; i < sCam->classesInfo.size(); i++) {
-          int xPosition = getWidth() - padding - squareSize - textPadding;
-          int yPosition = getHeight() - padding - (i * squareSize) - (i * linePadding);
-
-          // Extract color and name from ClassInfo
-          Colour color(uint8(sCam->classesInfo[i].r), sCam->classesInfo[i].g, sCam->classesInfo[i].b);
-
-          // Set the color for the square
-          g.setColour(color);
-          g.fillRect(xPosition, yPosition, squareSize, squareSize);
-
-          // Set text color and font
-          g.setColour(Colours::black);
-          g.setFont(Font(24.0));
-
-          // Draw class label
-          g.drawText(sCam->classesInfo[i].name, xPosition + squareSize + textPadding, yPosition, 100,
-                     squareSize,
-                     Justification::centredLeft, true);
-        }
+        g.setColour(tileColor);
+        g.fillRect(bounds);
       }
+
     }
 
 
-    #ifdef DEBUG
-        for (unsigned int t = 0; t < tiles.size(); t++) {
-            auto bounds = RectCtoJ < float >(tiles[t].bounds) * scale;
-            g.setColour(juce::Colours::greenyellow);
-            g.drawRect(bounds, 3);
-            std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-            g.setFont(20);
-            g.drawText(ij, bounds.getCentreX() - 50,
-                       bounds.getCentreY() - 15, 100, 30, Justification::centred);
-        }
-    #endif
-  }
+//#ifdef DEBUG
+//  for (unsigned int t = 0; t < tiles.size(); t++) {
+//      auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
+//      g.setColour(juce::Colours::greenyellow);
+//      g.drawRect(bounds, 3);
+//      std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+//      g.setFont(20);
+//      g.drawText(ij, bounds.getCentreX() - 50,
+//                 bounds.getCentreY() - 15, 100, 30, Justification::centred);
+//   }
+//#endif
 
+  }
+  //Define buffer space from the edges
+  if (MRImage->images.size() > 0 && shadeClasses) {
+    auto sCam = MRImage->images[0]->parent;
+    int paddingX = 100;
+    int paddingY = 150;
+    int squareSize = 30; // Size of the square
+    int textPadding = 10; // Space between the square and the text
+    int linePadding = 10; // Space between lines
+
+
+    // Loop through the dynamically loaded classes
+    int i = 0;
+    do {
+      int xPosition = getWidth() - paddingX - squareSize - textPadding;
+      int yPosition = getHeight() - paddingY - i * squareSize - i * linePadding;
+
+      // Extract color and name from ClassInfo
+      Colour color(uint8(sCam->classesInfo[i].r), sCam->classesInfo[i].g, sCam->classesInfo[i].b);
+
+      // Set the color for the square
+      g.setColour(color);
+      g.fillRect(xPosition, yPosition, squareSize, squareSize);
+
+      // Set text color and font
+      g.setColour(Colours::black);
+      g.setFont(Font(24.0));
+
+      // Draw class label
+      g.drawText(sCam->classesInfo[i].name, xPosition + squareSize + textPadding, yPosition, 100,
+                 squareSize,
+                 Justification::centredLeft, true);
+      i++;
+    } while (i < sCam->classesInfo.size());
+
+    //draw title
+    int xPosition = getWidth() - paddingX - squareSize - textPadding;
+    int yPosition = getHeight() - paddingY - i * squareSize - i * linePadding;
+
+    // Set text color and font
+    g.setColour(Colours::black);
+    g.setFont(Font(24.0));
+
+    // Draw class label
+    g.drawText(sCam->classes_title, xPosition + squareSize + textPadding, yPosition, 100,
+               squareSize,
+               Justification::centredLeft, true);
+  }
 }
 
 
@@ -280,7 +291,7 @@ void ImageViewComponent::paint(juce::Graphics &g) {
   }
 
 
-  if (shade_levels) {
+  if (shadeLevels) {
     // Define the buffer space from the edges
     int padding = 100;
 
@@ -344,12 +355,12 @@ void ImageViewComponent::resized() {
 }
 
 void ImageViewComponent::zoomAndCenter() {
-  if (!MRImage || MRImage->images.empty() ||!isVisible()) { return; }
+  if (!MRImage || MRImage->images.empty() || !isVisible()) { return; }
 
   Rect_<float> bounds;
   bool showAsCircle;
   int component;
-  parent->capture->sCam->get_last_frame(bounds,showAsCircle,component);
+  parent->capture->sCam->get_last_frame(bounds, showAsCircle, component);
   auto lastComponentImg = MRImage->images[component];
 
 //  horizontalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x, (*lastComponentImg).scale * (*lastComponentImg).bounds.width);
@@ -379,12 +390,12 @@ void ImageViewComponent::zoomAndCenter() {
 
   view->setCentre(RectCtoJ(MRImage->bounds).getCentre());
 
-  float scale = max((float)MRImage->bounds.width/
-                    (float)view->getHorizontalRange().getLength(),
-                    (float)MRImage->bounds.height/
-                    (float)view->getVerticalRange().getLength());
+  float scale = max((float) MRImage->bounds.width /
+                    (float) view->getHorizontalRange().getLength(),
+                    (float) MRImage->bounds.height /
+                    (float) view->getVerticalRange().getLength());
 
-  scaleCenter(fPoint(scale,scale));
+  scaleCenter(fPoint(scale, scale));
 }
 
 juce::Image ImageViewComponent::createCheckerboardImage(int width,

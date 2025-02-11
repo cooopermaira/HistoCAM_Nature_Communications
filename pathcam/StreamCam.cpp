@@ -30,7 +30,8 @@ namespace pathCam {
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
-                                                           inferenceWait(false),
+                                                           inferenceWait(true),
+                                                           compositeWait(true),
                                                            microscopeInput(true){
       //inferencing = false;
     if (inferencing) {
@@ -228,19 +229,6 @@ namespace pathCam {
     image->regInfo = regInfo;
   }
 
-  bool StreamCam::get_registration(unsigned long image_idx, RegInfo *res) {
-    reg_results_mutex->readLock();
-
-    if (reg_results.size() <= image_idx || reg_results[image_idx] == nullptr) {
-      reg_results_mutex->unlock();
-      return false;
-    }
-
-    *res = *reg_results[image_idx];
-    reg_results_mutex->unlock();
-    return true;
-  }
-
 
   std::vector<Image *> StreamCam::get_image_refs(std::vector<unsigned long int> indexes) {
     std::vector<Image *> temp;
@@ -290,23 +278,36 @@ namespace pathCam {
     ri->index = image_index;
     ri->matchedTo = image_index; //this is a root image, it has no match
 
-    //delete these pointers when destroyed
     auto *temp = new CompositeVoronoi(this, image_size, component_index);
     component_mutex->lock();
     composites.push_back(temp);
-    if (composites.size() == 1) {
+
+    if (composites.size() - 1 == 0) {
+
       ri->set_abc(Vec2(0, 0), component_index, true);
       set_scale_and_offset(0, 1, Point2f(0, 0));
+
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
       temp->update(std::vector<RegInfo *>{reg_results[image_index]});
+
     } else {
+
       temp->store_new_info(ri);
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0, 0));
+
     }
     component_mutex->unlock();
 
+  }
+
+  void StreamCam::run_agg_classify() {
+    if(inferencing && classifying){
+      im->run_agg_classify();
+      std::this_thread::sleep_for(std::chrono::seconds(2));
+      compositeWait.set();
+    }
   }
 
   void StreamCam::update_observers()  {
@@ -365,13 +366,15 @@ namespace pathCam {
   }
 
   void StreamCam::push_tile_embed_Q(std::vector<Point2i> &_tiles, unsigned int _componentIndex) {
-    inferenceQMutex->lock();
-    for (auto tilePoint: _tiles) {
-      auto tpl = std::tuple<int,int,unsigned>(tilePoint.x,tilePoint.y,_componentIndex);
-      tileEmbedQ.push(tpl);
+    if(inferencing) {
+      inferenceQMutex->lock();
+      for (auto tilePoint: _tiles) {
+        auto tpl = std::tuple<int, int, unsigned>(tilePoint.x, tilePoint.y, _componentIndex);
+        tileEmbedQ.push(tpl);
+      }
+      inferenceQMutex->unlock();
+      inferenceWait.set();
     }
-    inferenceQMutex->unlock();
-    inferenceWait.set();
   }
 
   Image *StreamCam::get_Q_front_Spin() {

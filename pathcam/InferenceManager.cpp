@@ -20,7 +20,8 @@
 //#include "Poco/FileStream.h"
 
 namespace pathCam {
-  InferenceManager::InferenceManager(StreamCam *parent) : parent(parent) {
+  InferenceManager::InferenceManager(StreamCam *parent) : parent(parent), device(torch::Device(torch::kCPU)),
+                                                          tileEmbedMutex(Poco::FastMutex()) {
 
 
     //load slide aggregator
@@ -49,9 +50,7 @@ namespace pathCam {
 
 
   void InferenceManager::run() {
-
     torch::NoGradGuard noGrad;
-    auto device = torch::Device(torch::kCPU);
 
     if (torch::cuda::is_available()) {
       std::cout << "Using GPU (CUDA)" << std::endl;
@@ -67,9 +66,6 @@ namespace pathCam {
       std::cout << "GPU not available. Using CPU." << std::endl;
     }
 
-
-    //empty tileEmbeds, just needs to be initialized
-    torch::Tensor tileEmbeds;
 
     {
       // Load the tile encoder TorchScript model and move it to the selected device
@@ -92,8 +88,8 @@ namespace pathCam {
 
           //keep track of component membership
           unsigned int component = std::get<2>(tileList[0]);
-          if(minShift.size() < component + 1){
-            minShift.push_back({0,0});
+          if (minShift.size() < component + 1) {
+            minShift.push_back({0, 0});
           }
 
           //get reference to pyramid tiles
@@ -102,6 +98,7 @@ namespace pathCam {
           auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), tileSize, tileSize, 3},
                                            torch::kFloat32).to(device);
 
+          tileEmbedMutex.lock();
           for (int i = 0; i < numImages; i++) {
 
             //add to coord dict
@@ -110,11 +107,16 @@ namespace pathCam {
             }
 
             //adjust mins (later used for adjustment)
-            if (std::get<0>(tileList[i]) < minShift[component].first) { minShift[component].first = std::get<0>(tileList[i]); }
-            if (std::get<1>(tileList[i]) < minShift[component].second) { minShift[component].second = std::get<1>(tileList[i]); }
+            if (std::get<0>(tileList[i]) < minShift[component].first) {
+              minShift[component].first = std::get<0>(tileList[i]);
+            }
+            if (std::get<1>(tileList[i]) < minShift[component].second) {
+              minShift[component].second = std::get<1>(tileList[i]);
+            }
 
             //for some reason, removing this convert and doing from_blob right from tile makes it slower
-            cvtColor(pyramidLevel->getTile(std::get<0>(tileList[i]), std::get<1>(tileList[i])), threeChannelPreallocated,
+            cvtColor(pyramidLevel->getTile(std::get<0>(tileList[i]), std::get<1>(tileList[i])),
+                     threeChannelPreallocated,
                      COLOR_BGRA2RGB);
 
 
@@ -154,6 +156,8 @@ namespace pathCam {
               tileEmbeds[locationInList] = output[i];
             }
           }
+
+          tileEmbedMutex.unlock();
           std::cout << "Processed " + std::to_string(tileList.size()) << std::endl;
         }
 
@@ -165,6 +169,31 @@ namespace pathCam {
     std::cout << "Tile Embedding Complete" << std::endl;
     parent->tileEmbeddingComplete = true;
 
+
+    if (parent->reportText) {
+      try {
+        std::ifstream file(reportFileIn);
+
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+
+        //reset dir
+        remove(signalFileIn.c_str());
+        remove(reportFileIn.c_str());
+
+        std::cout << buffer.str() << std::endl;
+
+      } catch (const Poco::Exception &exc) {
+        std::cerr << "Error reading file: " << exc.displayText() << std::endl;
+      }
+    }
+
+  }
+
+  void InferenceManager::run_agg_classify() {
+    torch::NoGradGuard noGrad;
+    Poco::ScopedLock<Poco::FastMutex> lock(tileEmbedMutex);
+    torch::Tensor embedsToClassify;
 
     //create coords tensor for handoff
     torch::Tensor coordsTensor = torch::empty({long(tileCoordToTensorIndex.size()), 3},
@@ -179,10 +208,12 @@ namespace pathCam {
       //file exchange
 
       //pack as disk savable tensors
+      tileEmbeds = tileEmbeds.to(torch::kCPU);
       auto pickledEmbed = torch::pickle_save(tileEmbeds);
       std::ofstream feout = std::ofstream(embedFileOut);
       feout.write(pickledEmbed.data(), pickledEmbed.size());
       feout.close();
+      tileEmbeds = tileEmbeds.to(device);
 
       auto pickledCoords = torch::pickle_save(coordsTensor);
       std::ofstream fcout = std::ofstream(coordsFileOut);
@@ -202,55 +233,35 @@ namespace pathCam {
       std::vector<char> buffer((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
       torch::Tensor aggregatedEmbeds = torch::pickle_load(buffer).toTensor();
       //update tileEmbeds after attention
-      tileEmbeds = torch::cat({aggregatedEmbeds, coordsTensor}, 1).to(torch::kF32);
+      embedsToClassify = torch::cat({aggregatedEmbeds, coordsTensor}, 1).to(device).to(torch::kF32);
 
       //reset dir
       remove(signalFileIn.c_str());
       remove(embedFileIn.c_str());
     } else {
-      tileEmbeds = torch::cat({tileEmbeds, coordsTensor}, 1).to(torch::kF32);
+      coordsTensor = coordsTensor.to(device);
+      embedsToClassify = torch::cat({tileEmbeds, coordsTensor}, 1).to(torch::kF32);
     }
 
-    if (parent->classifying) {
 
-      //setup classifier model
-      auto val = parent->classifier_path.toString();
-      auto classifier = torch::jit::load(val);
-      classifier.eval();
-      classifier.to(device);
-      tileEmbeds = tileEmbeds.to(device);
+    //setup classifier model
+    auto val = parent->classifier_path.toString();
+    auto classifier = torch::jit::load(val);
+    classifier.eval();
+    classifier.to(device);
 
 
-      //run and argmax
-      auto classes = classifier.forward({tileEmbeds}).toTensor();
-      classes = std::get<1>(classes.max(1));
-      classes = classes.to(torch::kCPU);
+    //run and argmax
+    auto classes = classifier.forward({embedsToClassify}).toTensor();
+    classes = std::get<1>(classes.max(1));
+    classes = classes.to(torch::kCPU);
 
-      //build tile to class dict
-      for (auto [key, value]: tileCoordToTensorIndex) {
-        parent->tileCoordToClass[key] = classes[value].item<int>();
-      }
-      parent->classifyingComplete = true;
-      parent->update_observers();
+    //build tile to class dict
+    for (auto [key, value]: tileCoordToTensorIndex) {
+      parent->tileCoordToClass[key] = classes[value].item<int>();
     }
 
-    if (parent->reportText) {
-      try {
-        std::ifstream file(reportFileIn);
-
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-
-        //reset dir
-        remove(signalFileIn.c_str());
-        remove(reportFileIn.c_str());
-
-        std::cout << buffer.str() << std::endl;
-
-      } catch (const Poco::Exception &exc) {
-        std::cerr << "Error reading file: " << exc.displayText() << std::endl;
-      }
-    }
+    parent->update_observers();
 
   }
 }

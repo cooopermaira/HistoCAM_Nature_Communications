@@ -198,6 +198,7 @@ private:
     }
     
     area = std::abs(area / 2.0);
+    int k = 0;
   }
   
 };

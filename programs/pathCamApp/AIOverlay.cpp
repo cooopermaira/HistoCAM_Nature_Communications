@@ -6,7 +6,31 @@
 //
 
 #include "JuceHeader.h"
+AIOverlay::  AIOverlay(CaptureComponent *parent,
+                       StringArray &iconNames,
+                       OwnedArray<Drawable> &iconsFromZipFile) : parent(parent) {
+  AIready = true;
 
+
+  for (int i = 0; i < iconNames.size(); i++) {
+
+    if (iconNames[i] == "AI_ready.svg") {
+      AIreadyButton.reset(new SvgButton("AI_ready", iconsFromZipFile[i]));
+      AIreadyButton->addListener(this);
+      addAndMakeVisible(*AIreadyButton);
+    }
+
+    if (iconNames[i] == "AI_thinking.svg") {
+      AIthinkingButton.reset(new SvgButton("AI_thinking", iconsFromZipFile[i]));
+      AIthinkingButton->addListener(this);
+      addAndMakeVisible(*AIthinkingButton);
+    }
+
+  }
+
+  startTimerHz(30);
+
+}
 
 void AIOverlay::resized()
 {
@@ -49,9 +73,16 @@ void AIOverlay::buttonClicked(juce::Button* button)
 {
   if (button == AIreadyButton.get())
   {
-    AIready = false;
+    if(sCam){
+      if(t.joinable()){
+        t.join();
+      }
+      t = std::thread([strmCam = sCam](){
+        strmCam->run_agg_classify();
+      });
+    }
+    parent->parent->capture->shadeClasses = true;
   }
-
   resized();
 }
 
@@ -82,3 +113,9 @@ void AIOverlay::timerCallback()
   
   repaint(); // Trigger a repaint to show the updated opacity
 }
+
+//void AIOverlay::set_sCam(std::shared_ptr<pathCam::StreamCam> sCam) {
+//  aic_r = new AIClassify(sCam);
+//}
+
+

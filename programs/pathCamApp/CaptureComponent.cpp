@@ -126,6 +126,7 @@ void CaptureComponent::startSimulating() {
   sCam.reset(new pathCam::StreamCam(config));
   sCam->add_observer(parent);
   scopeRadius = sCam->get_scope_radius();
+  aiOverlay->set_sCam(sCam);
 
   parent->MRimage = sCam->get_image_reference();
   parent->imageview->setImage(parent->MRimage);

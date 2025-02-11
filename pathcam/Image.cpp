@@ -322,10 +322,10 @@ namespace pathCam {
 //afb
     if (index < 141) {
       label = Image::_4X;
-    } else if (index >= 141 && index < 777) {
+    } else if (index >= 141 && index < 315) {
       label = _10X;
-    } else if (index >= 777 && index < 1358) {
-      label = Image::_10X;
+    } else if (index >= 315 && index < 1358) {
+      label = Image::_40X;
     }
   }
 

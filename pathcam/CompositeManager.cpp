@@ -37,9 +37,18 @@ namespace pathCam {
       //if nothing in the Q but termination condition not met, wait
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
-          //perform_global_alignment();
-          if (rebuildJobsOutstanding > 0) {
-            rebuildJobsComplete.wait();
+//          perform_global_alignment();
+//          if (rebuildJobsOutstanding > 0) {
+//            rebuildJobsComplete.wait();
+//          }
+          if (parent->inferencing) {
+
+            push_remaining_tiles_for_inference();
+
+            if (!parent->composites.empty()) {
+              //parent->composites[parent->composites.size() - 1]->save_pyramid_as_image();
+              parent->compositeWait.wait();
+            }
           }
           parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
           parent->newComponentQ.pop();
@@ -109,7 +118,9 @@ namespace pathCam {
   void CompositeManager::push_remaining_tiles_for_inference() {
     for (auto i: parent->composites) {
       parent->push_tile_embed_Q(i->queuedTiles, i->componentIndex);
+      i->queuedTiles.clear();
     }
+    parent->inferenceWait.set();
   }
 
 
@@ -123,7 +134,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/Users/coopermaira/Desktop/4x_afb.png");
+      i->save_pyramid_as_image();
 
     }
   }

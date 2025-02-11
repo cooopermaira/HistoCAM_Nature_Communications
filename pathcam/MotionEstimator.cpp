@@ -45,6 +45,7 @@ namespace pathCam {
     absoluteCoords = _absoluteCoords;
     component_membership = _componentMembership;
     resolved = true;
+    waitOnResolve.set();
     accessMutex->unlock();
 
     auto image = parent->get_image_ref(index);

@@ -135,6 +135,9 @@ namespace pathCam {
         classifying = true;
         classifier_path = Path(pConf->getString("io.inferencing.classify.classifier"));
 
+        if(pConf->has("io.inferencing.classify.classes_title")){
+          classes_title = pConf->getString("io.inferencing.classify.classes_title");
+        }
         int index = 0;
         while (pConf->has("io.inferencing.classify.classes.class[" + std::to_string(index) + "].id")) {
           ClassInfo classInfo;

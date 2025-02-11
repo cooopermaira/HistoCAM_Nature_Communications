@@ -15,6 +15,9 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
   
   
 public:
+
+  bool shadeLevels;
+  bool shadeClasses;
   //==============================================================================
   ImageViewComponent(std::shared_ptr < fRectangle > view,
                      StringArray &iconNames,
@@ -60,7 +63,6 @@ protected:
   std::shared_ptr< MRTiledImageSet > MRImage;
   MainComponent* parent;
   std::atomic<bool> newData;
-  bool shade_levels;
   cv::Mat greenShade;
   cv::Mat holding1;
   cv::Mat holding2;
@@ -98,7 +100,7 @@ protected:
     updateScrollbar();
   }
   
-protected:
+
   inline fPoint screen2viewScale(fRectangle myview){
     if(!MRImage){ return fPoint(); }
     return fPoint(myview.getHorizontalRange().getLength()/getLocalBounds().getHorizontalRange().getLength(),
