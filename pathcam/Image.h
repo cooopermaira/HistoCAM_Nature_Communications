@@ -90,8 +90,8 @@ namespace pathCam {
 
     float debayer(int x, int y);
 
-    std::string get_label() {
-      switch (label) {
+    std::string static get_label(unsigned int _label) {
+      switch (_label) {
         case _NOLABEL:
           return "No label";
           break;
@@ -128,7 +128,7 @@ namespace pathCam {
         case _LENS_CHANGE:
           return "Lens Change";
       }
-label = _NOLABEL;
+
       return "No label";
 
     }

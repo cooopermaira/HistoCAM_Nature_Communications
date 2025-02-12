@@ -69,6 +69,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
   cv::Rect_<float> frameBox;
   bool showAsCircle;
+  std::string magLabel;
 
 #ifdef WITH_SPINNAKER
   if (recording) {
@@ -78,7 +79,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
   if (simulating) {
     int ignore;
-    sCam->get_last_frame(frameBox, showAsCircle, ignore);
+    sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel);
   }
 
   auto bounds = RectCtoJ<float>(frameBox);
@@ -97,6 +98,15 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
   } else {
     g.drawRect(bounds, 3);
   }
+
+  //print objective level
+  g.setColour(juce::Colours::red);
+
+  g.setFont(15);
+  g.drawText("current objective",5,getHeight()-30,110,Justification::centredLeft,true);
+
+  g.setFont(40.0);
+  g.drawText(magLabel,20,getHeight() - 50, 100, Justification::centredLeft,true);
 
 }
 

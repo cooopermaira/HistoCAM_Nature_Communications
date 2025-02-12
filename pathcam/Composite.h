@@ -148,6 +148,7 @@ namespace pathCam {
 
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
+    unsigned int componentMagLabel;
     unsigned int componentIndex;
     long firstImageIdx = -1;
     bool needsAlignment = false;
@@ -161,6 +162,8 @@ namespace pathCam {
     int maxTilex = 0;
     int minTiley = 0;
     int maxTiley = 0;
+
+    void deduce_label();
 
     void store_new_info(RegInfo* _new_info);
 

@@ -137,19 +137,23 @@ namespace pathCam {
     return true;
   }
 
-  void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index) {
+  void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index,
+                                    std::string _label) {
     lastFrameMutex->lock();
     lastFrame = _rectInScale1Space;
     lastComponentIndex = _component_index;
     showAsCircle = _showAsCircle;
+    lastLabel = _label;
     lastFrameMutex->unlock();
   }
 
-  void StreamCam::get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &_showAsCircle, int& _lastComponentIndex) {
+  void StreamCam::get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &_showAsCircle, int &_lastComponentIndex,
+                                 std::string &_magLabel) {
     lastFrameMutex->lock();
     _lastComponentIndex = lastComponentIndex;
     _showAsCircle = showAsCircle;
     _rectInScale1Space = lastFrame;
+    _magLabel = lastLabel;
     lastFrameMutex->unlock();
   }
 
@@ -282,11 +286,20 @@ namespace pathCam {
     component_mutex->lock();
     composites.push_back(temp);
 
-    if (composites.size() - 1 == 0) {
+    if (composites.size() - 1 == 0) {//first component added
 
+      //set component mag level
+      if(initialLabel == 0){
+        temp->componentMagLabel = get_image_ref(image_index)->label;
+      }else {
+        temp->componentMagLabel = initialLabel;
+      }
+
+      //set absolute coords of initial image
       ri->set_abc(Vec2(0, 0), component_index, true);
       set_scale_and_offset(0, 1, Point2f(0, 0));
 
+      //set component scale and offset to be 1 and origin
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
       temp->update(std::vector<RegInfo *>{reg_results[image_index]});
@@ -302,6 +315,7 @@ namespace pathCam {
 
   }
 
+  //demo
   void StreamCam::run_agg_classify() {
     if(inferencing && classifying){
       im->run_agg_classify();

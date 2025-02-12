@@ -76,9 +76,32 @@ namespace pathCam {
         imagePyramid->set_offset(offset);
 
         storedNewInfo->set_abc(Vec2(0, 0), componentIndex, true);
-        //update_from_stored_info();
+        deduce_label();
       }
     }
+  }
+
+  void CompositeVoronoi::deduce_label() {
+    assert(parent->composites[0]->componentMagLabel != 0);
+
+    double initialComponentTrueScale = parent->labelScales[parent->composites[0]->componentMagLabel];
+    double selfTrueScale = imagePyramid->scale * initialComponentTrueScale;
+
+    double closest = parent->labelScales[0];
+    double minDiff = std::abs(selfTrueScale - parent->labelScales[0]);
+
+    // Find the closest value
+    for (int i = 1; i < parent->labelScales.size(); i++){
+      double diff = std::abs(selfTrueScale - parent->labelScales[i]);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = parent->labelScales[i];
+      }else{
+        componentMagLabel = i - 1;
+        return;
+      }
+    }
+    componentMagLabel = parent->labelScales.size() - 1;
   }
 
   void CompositeVoronoi::self_reset() {
@@ -475,7 +498,7 @@ namespace pathCam {
       float h = parent->image_height * imagePyramid->scale;
       bool showAsCircle = images.back()->label == Image::_2X;
 
-      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex);
+      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex, Image::get_label(componentMagLabel));
       //parent->update_observers();
       parent->notify_observers();
 

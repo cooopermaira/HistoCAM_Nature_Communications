@@ -357,11 +357,12 @@ void ImageViewComponent::resized() {
 void ImageViewComponent::zoomAndCenter() {
   if (!MRImage || MRImage->images.empty() || !isVisible()) { return; }
 
-  Rect_<float> bounds;
-  bool showAsCircle;
-  int component;
-  parent->capture->sCam->get_last_frame(bounds, showAsCircle, component);
-  auto lastComponentImg = MRImage->images[component];
+//  Rect_<float> bounds;
+//  bool showAsCircle;
+//  int component;
+//  std::string magLabel;
+//  parent->capture->sCam->get_last_frame(bounds, showAsCircle, component, magLabel);
+//  auto lastComponentImg = MRImage->images[component];
 
 //  horizontalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x, (*lastComponentImg).scale * (*lastComponentImg).bounds.width);
 //  verticalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.y + (*lastComponentImg).bounds.y, (*lastComponentImg).scale * (*lastComponentImg).bounds.height);

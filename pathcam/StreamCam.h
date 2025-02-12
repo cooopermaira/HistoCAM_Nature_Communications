@@ -100,9 +100,12 @@ namespace pathCam {
 
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
+    std::string lastLabel;
     bool showAsCircle;
 
     bool microscopeInput;
+
+    std::vector<double> labelScales = { -10.0, 1.0, 0.5, 0.2, 0.1, 0.05 };
 
     std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
     std::map<std::tuple<int,int,unsigned>,int> tileCoordToClass;
@@ -131,9 +134,11 @@ namespace pathCam {
 
     Mat get_flatfield(int label);
 
-    void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index);
+    void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index,
+                           std::string _label);
 
-    void get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &showAsCircle, int& _lastComponentIndex);
+    void get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &showAsCircle, int &_lastComponentIndex,
+                        std::string &_magLabel);
 
     void pass_image(Image *, unsigned long _image_index = 0, bool saveImg = false);
 

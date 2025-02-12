@@ -63,6 +63,7 @@ namespace pathCam {
 
     std::string classes_title;
 
+    int initialLabel;
     int interpolation;
     int feature_type;
     unsigned int tileSize;

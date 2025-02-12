@@ -167,6 +167,9 @@ namespace pathCam {
         reportText = false;
       }
 
+      if(pConf->has("capture.initial_objective")){
+        initialLabel = pConf->getInt("capture.initial_objective");
+      }
       if (pConf->has("io.output_log")) {
         std::string temp = pConf->getString("io.output_log");
         Path temp_log = Path(temp);

@@ -148,8 +148,8 @@ namespace pathCam {
   }
 
   void CompositeManager::check_render_info() {
-    for (auto cmp: parent->composites) {
-      cmp->check_set_render_info();
+    for (int i = 1; i < parent->composites.size(); i++) {
+      parent->composites[i]->check_set_render_info();
     }
   }
 
