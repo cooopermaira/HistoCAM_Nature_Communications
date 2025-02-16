@@ -93,35 +93,35 @@ namespace pathCam {
             Mat image_Mat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
             Mat imwriteMat;
 
-            cvtColor(image_Mat, image_Mat, COLOR_BayerBG2RGB);
+            //cvtColor(image_Mat, image_Mat, COLOR_BayerBG2RGB);
             try {
-                cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_8U);
+                cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_32FC3);
 
-                image_Mat.convertTo(image_Mat, CV_32FC3);
+                //image_Mat.convertTo(image_Mat, CV_32FC3);
 
                 cv::pow(image_Mat, 1.08, image_Mat);
 
                 image_Mat.convertTo(image_Mat, CV_8UC3);
-
+                cvtColor(image_Mat, image_Mat, COLOR_BayerBG2RGB);
                 //add subdir for png
                 auto r = o;
-                // o.pushDirectory("png");
-                // o.setFileName(image->get_ImageFile().getFileName());
-                // o.setExtension("png");
-                // imwrite(o.toString(), image_Mat);
+
+                 o.setFileName(image->get_ImageFile().getFileName());
+                 o.setExtension("png");
+                 imwrite(o.toString(), image_Mat);
                 //
                 // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
-                image_Mat = ConvertBGR2Bayer(image_Mat);
+                //image_Mat = ConvertBGR2Bayer(image_Mat);
 
                 //save .Raw
-                r.setFileName(image->get_ImageFile().getFileName());
-                r.setExtension("Raw");
-                std::fstream file;
-                file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
-                if (file.fail()) {
-                    throw new std::exception;
-                }
-                file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
+//                r.setFileName(image->get_ImageFile().getFileName());
+//                r.setExtension("Raw");
+//                std::fstream file;
+//                file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
+//                if (file.fail()) {
+//                    throw new std::exception;
+//                }
+//                file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
             } catch (...) {
                 int k = 0;
             }

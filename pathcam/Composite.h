@@ -77,6 +77,7 @@ namespace pathCam {
     unsigned long lastAcceptedImageIndex;
     unsigned int minPixelDistanceBetweenFrames;
     Vec2 lastAcceptedImageAbC;
+    Vec2 lastImageAbC;
     Mat circleMask;
     Mat rectMask;
     Mat polyMaskOutput;
@@ -158,9 +159,9 @@ namespace pathCam {
     std::map<int, unsigned long> delaunayMembers;
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
-    int minTilex = 0;
+    int minTilex = 1000;
     int maxTilex = 0;
-    int minTiley = 0;
+    int minTiley = 1000;
     int maxTiley = 0;
 
     void deduce_label();
@@ -182,7 +183,8 @@ namespace pathCam {
     std::map<std::string,int> tileToSumNonZero;
     bool rebuildTile(Point2i tile,int sum);
     void notify_job_complete();
-    void save_pyramid_as_image(std::string _fileName = "", bool _withGridAndIndexes = false);
+    void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false ,bool _withGridAndIndexes = false, bool _withEffectedTiles = true,std::vector<Point2i> effectedTiles = {});
+    void debug_draw_voronoi(Mat &img, Subdiv2D &subdiv,bool _drawIntersect,Point2i _intrCenter = Point2i(0,0));
 
   protected:
     //std::vector<std::pair<int,int>> falselyClaimedTiles;

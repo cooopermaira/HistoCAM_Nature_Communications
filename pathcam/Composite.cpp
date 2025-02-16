@@ -13,10 +13,11 @@ namespace pathCam {
                                      unsigned int component_index) : Composite(
       parent), componentIndex(component_index),
                                                                      wakeEvent(true), image_size(image_size) {
-    minPixelDistanceBetweenFrames = 200;
+    minPixelDistanceBetweenFrames = 500;
 
     imagePyramid.reset(new MRTiledImage(parent));
-    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid,parent->tileSize,parent->tileSize,0);
+    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid, parent->tileSize, parent->tileSize,
+                                                                       0);
     imagePyramid->level.push_back(current);
     parent->MRimage->add(imagePyramid);
 
@@ -40,6 +41,7 @@ namespace pathCam {
 
     //first added image will be at (0,0), this value guarantees it is accepted
     lastAcceptedImageAbC = Vec2(99999, 99999);
+    lastImageAbC = lastAcceptedImageAbC;
   }
 
 
@@ -91,12 +93,12 @@ namespace pathCam {
     double minDiff = std::abs(selfTrueScale - parent->labelScales[0]);
 
     // Find the closest value
-    for (int i = 1; i < parent->labelScales.size(); i++){
+    for (int i = 1; i < parent->labelScales.size(); i++) {
       double diff = std::abs(selfTrueScale - parent->labelScales[i]);
       if (diff < minDiff) {
         minDiff = diff;
         closest = parent->labelScales[i];
-      }else{
+      } else {
         componentMagLabel = i - 1;
         return;
       }
@@ -281,7 +283,7 @@ namespace pathCam {
 
     //test for exclusion of frame via rollback
     int nonzeroMin;
-    if (_image->label == Image::_2X) {
+    if (componentMagLabel == Image::_2X) {
       polyMaskOutput = polyMaskOutput.mul(circleMask);
     }
     //      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.00;
@@ -305,9 +307,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add) {
-    //debug (figures)
-    //unsigned long fig_ind = 270;
-    //unsigned long fig_ind = 9;
+    int fig_ind = 270;
     auto start = std::chrono::high_resolution_clock::now();
 
     // get a copy of references to all images at once so that only one mutex lock is needed
@@ -317,11 +317,6 @@ namespace pathCam {
     }
     std::vector<Image *> images = parent->get_image_refs(indexes);
     bool update = false;
-
-    //debug (figure making)
-    //    if(images[0]->index >= fig_ind){
-    //      minPixelDistanceBetweenFrames = 1000;
-    //    }
 
     for (int i = 0; i < images.size(); i++) {
       //verify minimum number of pixels has been covered since last added image
@@ -333,6 +328,7 @@ namespace pathCam {
         continue;
       }
 
+
       //correct placement of last added image
       if (!memberImages.empty() && !_force_add) {
         //put in reverse match runnable
@@ -342,8 +338,8 @@ namespace pathCam {
         wakeEvent.wait();
       }
 
-      lastAcceptedImageIndex = images[i]->index;
       lastAcceptedImageAbC = new_info[i]->absoluteCoords;
+      lastAcceptedImageIndex = new_info[i]->index;
 
       //add point to delaunay triangulation
       std::vector<Point2i> face;
@@ -369,11 +365,11 @@ namespace pathCam {
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
-        //if (parent->has_flatfield(images[i]->label)) {
-        if (false) {
-          auto ff = parent->get_flatfield(images[i]->label);
+        if (componentMagLabel != 0) {
+          //if (false) {
+          auto ff = parent->get_flatfield(componentMagLabel);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
-          cv::pow(convertHolding, 1.09, convertHolding);
+          cv::pow(convertHolding, 1.07, convertHolding);
           convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
@@ -381,76 +377,6 @@ namespace pathCam {
 
       channels[1] = rectMask; //alpha channel
       merge(channels, fourChannelPreallocated);
-
-      //debug
-      //debug_draw_voronoi_face(fourChannelPreallocated, face, 2);
-      //imwrite(std::to_string(images[i]->index)+".png",fourChannelPreallocated);
-      //save_pyramid_as_image();
-      //debug_write_contribution_on_grid("test1.png",images[i]->absoluteCoords,fourChannelPreallocated,polyMaskOutput);
-
-      //drawing next frame in some form
-      //if(images[0]->index >= fig_ind){
-      //      if(images[0]->index < fig_ind){
-      //        freshMask.copyTo(polyMaskOutput);
-      //        //circleMask.copyTo(polyMaskOutput);
-      //        double beta = 0.3619;
-      //        Mat greenshade = Mat::zeros(image_size,CV_8UC4);
-      //        //greenshade.setTo(cv::Scalar(200 * beta,150 * (1 - beta),100 * beta,255 ),polyMaskOutput);
-      //        //fourChannelPreallocated = fourChannelPreallocated * (1 - beta) + greenshade * beta;
-      //
-      //        face.clear();
-      //        auto absC = Point(0,0);
-      //        face.push_back(absC);
-      //        absC.x += image_size.width;
-      //        face.push_back(absC);
-      //        absC.y += image_size.height;
-      //        face.push_back(absC);
-      //        absC.x -= image_size.width;
-      //        face.push_back(absC);
-      //        //fourChannelPreallocated = greenshade;
-      //        //circle(polyMaskOutput,Point2i(image_size.width / 2, image_size.height/2+50),parent->scope_radius,Scalar(255),-1);
-      //        circle(polyMaskOutput,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(255),-1);
-      //        int shadewidth = 100;
-      //        for( int i = 0; i <= shadewidth; i++){
-      //          int incrval = (i * 255)/200;
-      //          auto shade = Scalar( incrval, incrval, incrval,0);
-      //          circle(greenshade,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius - shadewidth+i,shade,1);
-      //        }
-      //        fourChannelPreallocated -= greenshade;
-      //
-      //        //circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2+50),parent->scope_radius,Scalar(120,120,120,255),-1);
-      //        //circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(220 - incrval,220 - incrval,220 - incrval,255),-1);
-      //
-      //      }
-      //      if(images[0]->index >= fig_ind){
-      //        circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,255,255),50);
-      //      }
-
-      //voronoi
-      //      fourChannelPreallocated *= 0.1;
-      //      if (images[0]->index >= fig_ind) {
-      //        double beta = 0.3619;
-      //        Mat greenshade = Mat::zeros(image_size, CV_8UC4);
-      //        greenshade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta, 255), polyMaskOutput);
-      //        fourChannelPreallocated = fourChannelPreallocated * (1 - beta) + greenshade * beta;
-      //      }
-      //      circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),15,Scalar(0,0,0,255),30);
-      //      debug_draw_voronoi_face(fourChannelPreallocated, face, 20);
-
-      //save last frame w mask
-      //      if(images[0]->index >= fig_ind){
-      //        Mat frame = Mat::zeros(image_size,CV_8UC4);
-      //
-      //        circle(fourChannelPreallocated,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,0,255),50);
-      //
-      //        circle(frame,Point2i(image_size.width / 2, image_size.height/2),parent->scope_radius,Scalar(0,0,255,255),50);
-      //
-      //        debug_draw_voronoi_face(fourChannelPreallocated,face,50);
-      //        fourChannelPreallocated.copyTo(frame,polyMaskOutput);
-      //        imwrite("frame.png",frame);
-      //        int k = 0;
-      //      }
-
 
       images[i]->readyImage.release();
 
@@ -463,31 +389,46 @@ namespace pathCam {
       auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
                                        images[i]->height);
 
-      if (images[i]->label == Image::_2X) {
+      if (componentMagLabel == Image::_2X) {
         calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
-        //calculate_effected_tiles_count_nonzero(polyMaskOutput, effectedTiles, images[i]->absoluteCoords);
       } else {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
         imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
       }
 
-      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-      imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
+      if(images[i]->index >= fig_ind) {
+        Mat voronoi = Mat::zeros(max_offset.y - root_offset.y, max_offset.x - root_offset.x, CV_8UC4);
+        auto voronoi1 = voronoi.clone();
+        auto center = Point2i(images.back()->absoluteCoords.x + image_size.width / 2 - root_offset.x,
+                              images.back()->absoluteCoords.y + image_size.height / 2 - root_offset.y);
+        debug_draw_voronoi(voronoi1, subdiv, true, center);
+        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_intersect_" +
+                std::to_string(images.back()->index) + ".png", voronoi1);
+        debug_draw_voronoi(voronoi, subdiv, false);
+        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_" +
+                std::to_string(images.back()->index) + ".png", voronoi);
 
+        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/tiles_"
+                              + std::to_string(images.back()->index) + ".png", true, false, true, effectedTiles);
+      }
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
+
+      if(images[i]->index >= fig_ind) {
+        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
+                              + std::to_string(images.back()->index) + ".png", true, false, false);
+      }
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
         tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
         tiles.insert(tiles.end(), effectedTiles.begin(), effectedTiles.end());
         tiles.insert(tiles.end(), effectedTilesNoMask.begin(), effectedTilesNoMask.end());
 
-
         auto pushForInferencing = push_for_inferencing(tiles);
-        parent->push_tile_embed_Q(pushForInferencing,componentIndex);
-
+        parent->push_tile_embed_Q(pushForInferencing, componentIndex);
       }
       //update pyramid bounds, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
-      freshMask.copyTo(polyMaskOutput);
+      polyMaskOutput = freshMask.clone();
     }
 
     //highlight bounds of last frame
@@ -496,16 +437,13 @@ namespace pathCam {
       float y = (imagePyramid->offset.y + images.back()->absoluteCoords.y) * imagePyramid->scale;
       float w = parent->image_width * imagePyramid->scale;
       float h = parent->image_height * imagePyramid->scale;
-      bool showAsCircle = images.back()->label == Image::_2X;
+      bool showAsCircle = (componentMagLabel == Image::_2X);
 
-      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex, Image::get_label(componentMagLabel));
-      //parent->update_observers();
+      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
+                                Image::get_label(componentMagLabel));
+
       parent->notify_observers();
 
-      //      if (images[0]->index >= fig_ind ) {
-      //        save_pyramid_as_image();
-      //        int k = 0;
-      //      }
 //      auto stop = std::chrono::high_resolution_clock::now();
 //      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 //      if (duration < 250) {
@@ -640,19 +578,19 @@ namespace pathCam {
         } else if (columnIntersectsMask) {
 
           bool canAdd = false;
-          for(int idx = 0; idx < 4; idx++){
+          for (int idx = 0; idx < 4; idx++) {
 
             int x = tilePoint.x * imagePyramid->tile_size + (idx % 2 == 0 ? imagePyramid->tile_size : 0);
             int y = tilePoint.y * imagePyramid->tile_size + (idx % 3 == 0 ? imagePyramid->tile_size : 0);
 
-            if(abs(absCoord.x + image_size.width / 2 - x) < image_size.width / 2
-              && abs(absCoord.y + image_size.height / 2 - y) < image_size.height / 2){
+            if (abs(absCoord.x + image_size.width / 2 - x) < image_size.width / 2
+                && abs(absCoord.y + image_size.height / 2 - y) < image_size.height / 2) {
               canAdd = true;
               break;
             }
           }
 
-          if(canAdd) {
+          if (canAdd) {
             if (y > firstTile && y < lastTile) {
               result.push_back(tilePoint);
             } else if (y == firstTile || y == lastTile) {
@@ -819,43 +757,126 @@ namespace pathCam {
     }
   }
 
+  void
+  CompositeVoronoi::debug_draw_voronoi(cv::Mat &img, cv::Subdiv2D &subdiv, bool _drawIntersect, Point2i _intrCenter) {
+    std::vector<std::vector<cv::Point2f>> facets;
+    std::vector<cv::Point2f> centers;
+    subdiv.getVoronoiFacetList(std::vector<int>(), facets, centers);
+    if (_drawIntersect) {
+      auto copyMatCirc = img.clone();
+      auto copyMatPoly = img.clone();
 
-  void CompositeVoronoi::save_pyramid_as_image(std::string _fileName, bool _withGridAndIndexes) {
-    _withGridAndIndexes = true;
+      circle(copyMatCirc, _intrCenter, parent->scope_radius, Scalar(1, 1, 1, 1), -1);
 
-    auto rootoffsetPoint = Point2f(root_offset.x, root_offset.y);
-    auto maxOffsetPoint = Point2f(max_offset.x, max_offset.y);
+      std::vector<cv::Point> poly;
+      for (cv::Point2f p: facets.back()) {
+        p.x -= root_offset.x;
+        p.y -= root_offset.y;
+
+        p.x += image_size.width / 2;
+        p.y += image_size.height / 2;
+        poly.push_back(p);
+      }
+      if (!poly.empty()) {
+        cv::fillConvexPoly(copyMatPoly, poly, cv::Scalar(120, 120, 120, 255));
+      }
+
+      copyMatCirc = copyMatCirc.mul(copyMatPoly);
+      copyMatCirc.copyTo(img);
+    }
+
+    for (size_t i = 0; i < facets.size(); i++) {
+      std::vector<cv::Point> poly;
+      for (cv::Point2f p: facets[i]) {
+        p.x -= root_offset.x;
+        p.y -= root_offset.y;
+
+        p.x += image_size.width / 2;
+        p.y += image_size.height / 2;
+        poly.push_back(p);
+      }
+      centers[i].x -= root_offset.x;
+      centers[i].y -= root_offset.y;
+
+      centers[i].x += image_size.width / 2;
+      centers[i].y += image_size.height / 2;
+
+      if (!poly.empty()) {
+        cv::polylines(img, poly, true, cv::Scalar(0, 0, 0, 255), 40, cv::LINE_AA);
+      }
+      if (i == 0) {
+        cv::circle(img, centers[i], 150, Scalar(0, 255, 0, 255), cv::FILLED, cv::LINE_AA);
+      } else if (facets.size() > 1 && i == facets.size() - 1) {
+        cv::circle(img, centers[i], 150, Scalar(0, 140, 255, 255), cv::FILLED, cv::LINE_AA);
+      } else {
+        cv::circle(img, centers[i], 150, cv::Scalar(255, 200, 0, 255), cv::FILLED, cv::LINE_AA);
+      }
+      cv::rectangle(img, cv::Point(10, 10), cv::Point(img.cols - 20, img.rows - 20), cv::Scalar(0, 0, 0, 255), 50);
+
+    }
+  }
+
+
+  void CompositeVoronoi::save_pyramid_as_image(std::string _fileName, bool _withGrid, bool _withGridAndIndexes,
+                                               bool _withEffectedTiles, std::vector<Point2i> effectedTiles) {
+    int lineThickness = 40;
     auto level = imagePyramid->level[0];
-    auto ul = Point2i(minTilex, minTiley);
-    auto lr = Point2i(maxTilex, maxTiley);
+
+//    auto ul = Point2i(minTilex, minTiley);
+//    auto lr = Point2i(maxTilex, maxTiley);
+    auto ul = imagePyramid->level[0]->getIJ(Point2f(root_offset.x, root_offset.y));
+    auto lr = imagePyramid->level[0]->getIJ(Point2f(max_offset.x, max_offset.y));
+
     int tile_size = level->getTileSize();
+
     int width = (lr.x + 1 - ul.x) * tile_size;
-    width = std::abs(width);
     int height = (lr.y + 1 - ul.y) * tile_size;
+
+    width = std::abs(width);
     height = std::abs(height);
+
     Size pyramidSize = Size(width, height);
     Mat pyramidImage = Mat(pyramidSize, CV_8UC4);
+
     //we need to shift the x and y tiles so we aren't writing to negtive coordinates
     int x_offset = -ul.x;
     int y_offset = -ul.y;
 
-    for (int i = ul.x; i <= lr.x; i++) {
-      for (int j = ul.y; j <= lr.y; j++) {
+    Mat tile;
+    Mat greyBlend = Mat(Size(tile_size, tile_size), CV_8UC4, Scalar(120, 120, 120, 255));
+    for (int x = ul.x; x <= lr.x; x++) {
+      for (int y = ul.y; y <= lr.y; y++) {
         try {
-          Mat tile = level->getTile(i, j);
-          if (_withGridAndIndexes) {
-            cv::line(tile, cv::Point(0, 0), cv::Point(0, tile_size - 1), Scalar(0, 0, 0, 255));
-            cv::line(tile, cv::Point(0, tile_size - 1), cv::Point(tile_size - 1, tile_size - 1),
-                     Scalar(0, 0, 0, 255));
-            cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(tile_size - 1, tile_size - 1),
-                     Scalar(0, 0, 0, 255));
-            cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(0, 0), Scalar(0, 0, 0, 255));
-            putText(tile, "(" + std::to_string(i + x_offset) + "," + std::to_string(j + y_offset) + ")",
-                    Point(10, 50),
-                    FONT_HERSHEY_PLAIN, 3, Scalar(0, 0, 0, 255), 5);
+          if (_withEffectedTiles) {
+            if (imagePyramid->level[0]->tiles(x, y) == NULL) {
+              tile = Mat(Size(tile_size, tile_size), CV_8UC4, Scalar(0, 0, 0, 0));
+            } else {
+              tile = level->getTile(x, y).clone();
+            }
+            auto searchForTile = Point2i(x, y);
+            if (std::find(effectedTiles.begin(), effectedTiles.end(), Point2i(x, y)) != effectedTiles.end()) {
+              tile = 0.5 * tile + 0.5 * greyBlend;
+            }
+          } else {
+            tile = level->getTile(x, y).clone();
           }
-          //imwrite(std::to_string(componentIndex) + "_" + std::to_string(i) + "_" + std::to_string(j) + ".png", tile);
-          tile.copyTo(pyramidImage(Rect((i + x_offset) * tile.cols, (j + y_offset) * tile.rows, tile.cols,
+
+          if (_withGrid) {
+            cv::line(tile, cv::Point(0, 0), cv::Point(0, tile_size - 1), Scalar(0, 0, 0, 255), lineThickness);
+            cv::line(tile, cv::Point(0, tile_size - 1), cv::Point(tile_size - 1, tile_size - 1),
+                     Scalar(0, 0, 0, 255), lineThickness);
+            cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(tile_size - 1, tile_size - 1),
+                     Scalar(0, 0, 0, 255), lineThickness);
+            cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(0, 0), Scalar(0, 0, 0, 255), lineThickness);
+
+            if (_withGridAndIndexes) {
+              putText(tile, "(" + std::to_string(x + x_offset) + "," + std::to_string(y + y_offset) + ")",
+                      Point(10, 50),
+                      FONT_HERSHEY_PLAIN, 3, Scalar(0, 0, 0, 255), 5);
+            }
+          }
+          //imwrite(std::to_string(componentIndex) + "_" + std::to_string(x) + "_" + std::to_string(y) + ".png", tile);
+          tile.copyTo(pyramidImage(Rect((x + x_offset) * tile.cols, (y + y_offset) * tile.rows, tile.cols,
                                         tile.rows)));
         } catch (const cv::Exception &e) {
           auto k = e.what();
@@ -863,8 +884,11 @@ namespace pathCam {
         }
       }
     }
+    rectangle(pyramidImage,Point2i(10,10),Point2i(pyramidImage.cols - 20,pyramidImage.rows - 20),
+              Scalar(0,0,0,255),2*lineThickness);
     //currently hardcoded, maybe add an output directory in config?
-    String path = "/Users/coopermaira/Desktop/pyramidImage" + std::to_string(componentIndex) + "_" + std::to_string(imagePyramid->scale) +
+    String path = "/Users/coopermaira/Desktop/pyramidImage" + std::to_string(componentIndex) + "_" +
+                  std::to_string(imagePyramid->scale) +
                   ".png";
     //only write pixels with information
     //imwrite(path, pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));

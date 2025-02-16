@@ -249,6 +249,11 @@ namespace pathCam {
       return false;
     }
 
+    if(pConf->has("display.tile_size")){
+      tileSize = pConf->getUInt("display.tile_size");
+    }else{
+      tileSize = 224;
+    }
 
     if (pConf->has("registration")) {
       if (pConf->has("registration.detector")) {
@@ -395,11 +400,7 @@ namespace pathCam {
       }
 
       if (pConf->has("registration.image")) {
-        if(pConf->has("registration.image.tile_size")){
-          tileSize = pConf->getUInt("registration.image.tile_size");
-        }else{
-          tileSize = 224;
-        }
+
         if (pConf->has("registration.image.crop")) {
           double temp = crop_factor;
           try {

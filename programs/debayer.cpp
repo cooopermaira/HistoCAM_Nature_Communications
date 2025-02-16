@@ -58,61 +58,63 @@ int main(int argc, char *argv[]) {
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x, flat_field40x;
   std::ifstream stream;
-  stream.open("/media/max/Data/afb/cal/4x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/cal/2x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field2x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field2x, flat_field2x, COLOR_BayerBG2BGR);
+  //cvtColor(flat_field2x, flat_field2x, COLOR_BayerBG2BGR);
   flat_field2x.convertTo(flat_field2x, CV_32F);
   flat_field2x *= 1 / 170.0;
 
-  stream.open("/media/max/Data/afb/cal/4x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/cal/4x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field4x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field4x, flat_field4x, COLOR_BayerBG2RGB);
+  //cvtColor(flat_field4x, flat_field4x, COLOR_BayerBG2RGB);
   flat_field4x.convertTo(flat_field4x, CV_32F);
   flat_field4x *= 1 / 170.0;
 
 
-  stream.open("/media/max/Data/afb/cal/10x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/cal/10x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field10x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2RGB);
+  //cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2RGB);
   flat_field10x.convertTo(flat_field10x, CV_32F);
   flat_field10x *= 1 / 170.0;
 
-  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/cal/20x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field20x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2BGR);
+  //cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2BGR);
   flat_field20x.convertTo(flat_field20x, CV_32F);
   flat_field20x *= 1 / 170.0;
 
-  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
-  {
-    char *raw_buffer = new char[6464 * 4852];
-    stream.read(raw_buffer, 6464 * 4852);
-    stream.close();
-    flat_field40x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
-  }
-  cvtColor(flat_field40x, flat_field40x, COLOR_BayerBG2RGB);
-  flat_field40x.convertTo(flat_field40x, CV_32F);
-  flat_field40x *= 1 / 170.0;
+//  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
+//  {
+//    char *raw_buffer = new char[6464 * 4852];
+//    stream.read(raw_buffer, 6464 * 4852);
+//    stream.close();
+//    flat_field40x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
+//  }
+//  cvtColor(flat_field40x, flat_field40x, COLOR_BayerBG2RGB);
+//  flat_field40x.convertTo(flat_field40x, CV_32F);
+//  flat_field40x *= 1 / 170.0;
+
+
   //Should probably add fancier command line parsing
   if (argc < 3) {
     std::cout << "Missing input. Use:\n";
@@ -161,7 +163,7 @@ int main(int argc, char *argv[]) {
       std::sort(images.begin(), images.end(), customComparator);
     }
 
-    std::string outputfilepath = "/media/max/Data/afb/inputmultires.txt";
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/inputdebayertest.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -185,24 +187,18 @@ int main(int argc, char *argv[]) {
         outputFile << images[i]->image_file.toString() << std::endl;
       }
       if (convertImages) {
-        Mat flat_field;
-         if (i <= 140) {
-           flat_field = flat_field4x;
-         } else if (i > 140 && i <= 349) {
-           flat_field = flat_field10x;
-         } else {
-           flat_field = flat_field40x;
+        Mat ff;
 
-         } //else if(i>= 900 && i <1209){
-        //   flat_field = flat_field4x;
-        // }
-        // else if (i >= 1209 && i < 1496) {
-        //   flat_field = flat_field10x;
-        // }else{
-        //   flat_field = flat_field20x;
-        // }
-        //flat_field = flat_field4x;
-        auto *dr = new pathCam::DebayerRunnable(images[i], flat_field, outFile, blur, names, i);
+    if(i < 413){
+      ff = flat_field2x;
+    }else if(i >= 413 && i <777) {
+      ff = flat_field4x;
+    }else if(i >= 777 && i < 1358){
+      ff = flat_field10x;
+    }else{
+      ff = flat_field20x;
+    }
+        auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
         jq.add_runnable(dr, i);
       }
     }

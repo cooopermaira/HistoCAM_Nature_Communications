@@ -82,6 +82,8 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
     sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel);
   }
 
+  if (!simulating && !recording){return;}
+
   auto bounds = RectCtoJ<float>(frameBox);
   bounds.setPosition(bounds.getPosition() - view->getPosition());
 
