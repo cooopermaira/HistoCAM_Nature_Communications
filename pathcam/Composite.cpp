@@ -396,27 +396,27 @@ namespace pathCam {
         imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
       }
 
-      if(images[i]->index >= fig_ind) {
-        Mat voronoi = Mat::zeros(max_offset.y - root_offset.y, max_offset.x - root_offset.x, CV_8UC4);
-        auto voronoi1 = voronoi.clone();
-        auto center = Point2i(images.back()->absoluteCoords.x + image_size.width / 2 - root_offset.x,
-                              images.back()->absoluteCoords.y + image_size.height / 2 - root_offset.y);
-        debug_draw_voronoi(voronoi1, subdiv, true, center);
-        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_intersect_" +
-                std::to_string(images.back()->index) + ".png", voronoi1);
-        debug_draw_voronoi(voronoi, subdiv, false);
-        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_" +
-                std::to_string(images.back()->index) + ".png", voronoi);
-
-        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/tiles_"
-                              + std::to_string(images.back()->index) + ".png", true, false, true, effectedTiles);
-      }
+//      if(images[i]->index >= fig_ind) {
+//        Mat voronoi = Mat::zeros(max_offset.y - root_offset.y, max_offset.x - root_offset.x, CV_8UC4);
+//        auto voronoi1 = voronoi.clone();
+//        auto center = Point2i(images.back()->absoluteCoords.x + image_size.width / 2 - root_offset.x,
+//                              images.back()->absoluteCoords.y + image_size.height / 2 - root_offset.y);
+//        debug_draw_voronoi(voronoi1, subdiv, true, center);
+//        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_intersect_" +
+//                std::to_string(images.back()->index) + ".png", voronoi1);
+//        debug_draw_voronoi(voronoi, subdiv, false);
+//        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_" +
+//                std::to_string(images.back()->index) + ".png", voronoi);
+//
+//        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/tiles_"
+//                              + std::to_string(images.back()->index) + ".png", true, false, true, effectedTiles);
+//      }
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
 
-      if(images[i]->index >= fig_ind) {
-        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
-                              + std::to_string(images.back()->index) + ".png", true, false, false);
-      }
+//      if(images[i]->index >= fig_ind) {
+//        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
+//                              + std::to_string(images.back()->index) + ".png", true, false, false);
+//      }
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
         tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());

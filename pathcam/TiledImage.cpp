@@ -19,15 +19,14 @@ TiledImage::TiledImage(std::shared_ptr<MRTiledImage> parent, unsigned int _tile_
                                                  levelWithinPyramid(levelWithinPyramid),
                                                  tiles(-4096 * logicRatio, 4096 * logicRatio, -4096 * logicRatio,
                                                        4096 * logicRatio),
-                                                 parent(parent)
-                                                 {
-                                                   if(tile_size == 0){
-                                                     tile_size = parent->tile_size;
-                                                   }
-                                                 };
+                                                 parent(parent) {
+  if (tile_size == 0) {
+    tile_size = parent->tile_size;
+  }
+};
 
 void TiledImage::insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
-                                  std::vector<Point2i> retileIndices) {
+                                   std::vector<Point2i> retileIndices) {
 
   unsigned int width = image_in.cols;
   unsigned int height = image_in.rows;
@@ -126,25 +125,37 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
     Mat matROI;
     Mat temp;
     Rect tileROI;
-    try {
-      matROI = mat(ROIrect);
 
-      temp = getTile(x, y);
+    matROI = mat(ROIrect);
 
-      tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
-                         matROI.rows);
 
-      if (mask.data) {
-        matROI.copyTo(temp(tileROI), mask(ROIrect));
-      }else{
-        matROI.copyTo(temp(tileROI));
-      }
+    temp = getTile(x, y);
 
-      assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
+    tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
+                       matROI.rows);
+
+    if (mask.data) {
+      matROI.copyTo(temp(tileROI), mask(ROIrect));
+    } else {
+      matROI.copyTo(temp(tileROI));
     }
-    catch (cv::Exception &e) {
-      int k = 0;
-    }
+//
+//      //debug
+//      auto white = Mat(matROI.rows, matROI.cols, CV_8U,Scalar(255));
+//      white -= mask(ROIrect);
+//      auto receive = Mat(matROI.rows, matROI.cols, CV_8UC4,Scalar(0,0,0,0));
+//      matROI.copyTo(receive(tileROI),mask(ROIrect));
+//
+//      rectangle(white,Point(5,5),Point(white.cols - 5, white.rows - 5),Scalar(0),15);
+//      rectangle(receive,Point(5,5),Point(white.cols - 5, white.rows - 5),Scalar(0,0,0,255),15);
+//      rectangle(matROI,Point(5,5),Point(white.cols - 5, white.rows - 5),Scalar(0,0,0,255),15);
+//
+//      imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/"+std::to_string(x)+"_"+std::to_string(y)+"imageROI.png",matROI);
+//      imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/"+std::to_string(x)+"_"+std::to_string(y)+"final.png",receive);
+//      imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/"+std::to_string(x)+"_"+std::to_string(y)+"maskROI.png",white);
+
+    assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
+
 
     tileUpwards(Point2i(x, y), tile_box, *tiles(x, y));
   }
@@ -224,10 +235,10 @@ void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
     for (int y = tL.y; y <= bR.y; y++) {
       //get tile
       Mat tile = getTile(x, y);
-      *tiles(x,y) = Mat::zeros(tile_size, tile_size, CV_8UC4);
+      *tiles(x, y) = Mat::zeros(tile_size, tile_size, CV_8UC4);
       Point_ loc = Point2i(x, y);
-      Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size,tile_size);
-      tileUpwards(loc, levelRegion, *tiles(x,y));
+      Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size, tile_size);
+      tileUpwards(loc, levelRegion, *tiles(x, y));
       /*
       //create vector of all 4 channes R, G, B and alpha
       std::vector<Mat> individualChannels(4);
@@ -338,36 +349,36 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
 void TiledImage::saveBaseTilesToDisk() {
   int minx = 0;
   int miny = 0;
-  for (int x = tiles.minX; x < tiles.minX + tiles.width; x++){
-    for (int y = tiles.minY; y < tiles.minY + tiles.width; y++){
-      if (tiles(x,y) != nullptr){
-        if(x < minx){
+  for (int x = tiles.minX; x < tiles.minX + tiles.width; x++) {
+    for (int y = tiles.minY; y < tiles.minY + tiles.width; y++) {
+      if (tiles(x, y) != nullptr) {
+        if (x < minx) {
           minx = x;
         }
-        if(y < miny){
+        if (y < miny) {
           miny = y;
         }
       }
     }
   }
 
-  for (int x = tiles.minX; x < tiles.minX + tiles.width; x++){
-    for (int y = tiles.minY; y < tiles.minY + tiles.width; y++){
-      if (tiles(x,y) != nullptr){
+  for (int x = tiles.minX; x < tiles.minX + tiles.width; x++) {
+    for (int y = tiles.minY; y < tiles.minY + tiles.width; y++) {
+      if (tiles(x, y) != nullptr) {
         assert(tile_size % 256 == 0);
-        for (int i = 0; i < pow(tile_size / 256,2); i++){
+        for (int i = 0; i < pow(tile_size / 256, 2); i++) {
           int xsubtile = i % (tile_size / 256);
           int ysubtile = i / (tile_size / 256);
-          auto roi = Rect(256 * xsubtile,256 * ysubtile, 256,256);
+          auto roi = Rect(256 * xsubtile, 256 * ysubtile, 256, 256);
 
-          int xloc = (x - minx) * (int)tile_size + xsubtile * 256;
-          int yloc = (y - miny) * (int)tile_size + ysubtile * 256;
+          int xloc = (x - minx) * (int) tile_size + xsubtile * 256;
+          int yloc = (y - miny) * (int) tile_size + ysubtile * 256;
 
-          Mat temp = *tiles(x,y);
+          Mat temp = *tiles(x, y);
           Mat gry;
-          cvtColor(temp(roi),gry,COLOR_BGR2GRAY);
-          if (countNonZero(gry) > 0.95 * 256 * 256){
-            std::string filename = std::to_string(xloc)+"x_"+std::to_string(yloc)+"y.png";
+          cvtColor(temp(roi), gry, COLOR_BGR2GRAY);
+          if (countNonZero(gry) > 0.95 * 256 * 256) {
+            std::string filename = std::to_string(xloc) + "x_" + std::to_string(yloc) + "y.png";
             cv::imwrite(filename, temp(roi));
           }
         }
