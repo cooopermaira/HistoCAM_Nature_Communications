@@ -369,13 +369,14 @@ namespace pathCam {
           //if (false) {
           auto ff = parent->get_flatfield(componentMagLabel);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
-          cv::pow(convertHolding, 1.07, convertHolding);
+          cv::pow(convertHolding, 1.085, convertHolding);
           convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
       }
 
-      channels[1] = rectMask; //alpha channel
+      //channels[1] = rectMask; //alpha channel
+      channels[1] = circleMask;
       merge(channels, fourChannelPreallocated);
 
       images[i]->readyImage.release();
@@ -385,6 +386,26 @@ namespace pathCam {
       std::vector<Point2i> effectedTiles2;
       std::vector<Point2i> effectedTilesNoMask;
 
+//debug
+//      auto shadewidth = 100.f;
+//      for(auto i = 0.f; i < shadewidth; i++) {
+//        auto circleWidth = 2.f;
+//        float incrval = i/shadewidth;
+//        auto shader = fourChannelPreallocated.clone();
+//        circle(shader,Point(image_size.width/2,image_size.height/2),parent->scope_radius - circleWidth * i,Scalar(40,40,40,255),circleWidth);
+//        fourChannelPreallocated = incrval*fourChannelPreallocated + (1.f-incrval)*shader;
+//
+//      }
+      //imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/image_in_no_ring_"
+      //                       + std::to_string(images.back()->index) + ".png",fourChannelPreallocated);
+//
+//      auto ul = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x,new_info.back()->absoluteCoords.y));
+//      auto lr = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x + image_size.width,new_info.back()->absoluteCoords.y+image_size.height));
+//      for (int x = ul.x;x <= lr.x; x++){
+//        for( int y = ul.y; y <= lr.y; y++){
+//          effectedTiles.push_back(Point(x,y));
+//        }
+//      }
 
       auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
                                        images[i]->height);
@@ -412,11 +433,12 @@ namespace pathCam {
 //                              + std::to_string(images.back()->index) + ".png", true, false, true, effectedTiles);
 //      }
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
+      //imagePyramid->insertTilesAtBase(fourChannelPreallocated, circleMask, imageBox, effectedTiles);
 
-//      if(images[i]->index >= fig_ind) {
-//        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
-//                              + std::to_string(images.back()->index) + ".png", true, false, false);
-//      }
+      if(images[i]->index >= fig_ind) {
+        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
+                              + std::to_string(images.back()->index) + "_no_grid_no_outline.png", false, false, false);
+      }
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
         tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
@@ -818,7 +840,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::save_pyramid_as_image(std::string _fileName, bool _withGrid, bool _withGridAndIndexes,
-                                               bool _withEffectedTiles, std::vector<Point2i> effectedTiles) {
+                                               bool _withEffectedTiles, bool _outline, std::vector<Point2i> effectedTiles) {
     int lineThickness = 40;
     auto level = imagePyramid->level[0];
 
@@ -884,8 +906,10 @@ namespace pathCam {
         }
       }
     }
-    rectangle(pyramidImage,Point2i(10,10),Point2i(pyramidImage.cols - 20,pyramidImage.rows - 20),
-              Scalar(0,0,0,255),2*lineThickness);
+    if(_outline) {
+      rectangle(pyramidImage, Point2i(10, 10), Point2i(pyramidImage.cols - 20, pyramidImage.rows - 20),
+                Scalar(0, 0, 0, 255), 2 * lineThickness);
+    }
     //currently hardcoded, maybe add an output directory in config?
     String path = "/Users/coopermaira/Desktop/pyramidImage" + std::to_string(componentIndex) + "_" +
                   std::to_string(imagePyramid->scale) +

@@ -183,7 +183,7 @@ namespace pathCam {
     std::map<std::string,int> tileToSumNonZero;
     bool rebuildTile(Point2i tile,int sum);
     void notify_job_complete();
-    void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false ,bool _withGridAndIndexes = false, bool _withEffectedTiles = true,std::vector<Point2i> effectedTiles = {});
+    void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false ,bool _withGridAndIndexes = false, bool _withEffectedTiles = true, bool _outline = false,std::vector<Point2i> effectedTiles = {});
     void debug_draw_voronoi(Mat &img, Subdiv2D &subdiv,bool _drawIntersect,Point2i _intrCenter = Point2i(0,0));
 
   protected:
