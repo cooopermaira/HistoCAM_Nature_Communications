@@ -21,7 +21,7 @@ namespace pathCam{
     std::vector<RunnableIntermediate*> jobRefs;
     Poco::Event *pathCamEvent;
 
-  protected:
+
     struct CompareRunnable {
       bool operator()(const RunnableIntermediate *a, const RunnableIntermediate *b);
     };

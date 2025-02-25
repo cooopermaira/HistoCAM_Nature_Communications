@@ -60,24 +60,19 @@ int main(int argc, char *argv[]) {
   std::ifstream stream;
   {
 
-    stream.open("/Users/coopermaira/Library/CloudStorage/Box-Box/PathCam/2_20_new/cal/2x_cal.Raw", std::ios::binary);
+    stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/cal/2x_cal.Raw", std::ios::binary);
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field2x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
-    imwrite("/Users/coopermaira/Desktop/ff.png", flat_field2x);
-
-    delete raw_buffer;
-    imwrite("/Users/coopermaira/Desktop/ff2.png", flat_field2x);
 
   }
   cvtColor(flat_field2x, flat_field2x, COLOR_BayerBG2BGR);
-  imwrite("/Users/coopermaira/Desktop/ff3.png", flat_field2x);
 
   flat_field2x.convertTo(flat_field2x, CV_32F);
   flat_field2x *= 1 / 170.0;
 
-  stream.open("/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/cal/4x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/cal/4x_cal.Raw", std::ios::binary);
 
   {
     char *raw_buffer = new char[6464 * 4852];
@@ -85,12 +80,12 @@ int main(int argc, char *argv[]) {
     stream.close();
     flat_field4x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field4x, flat_field4x, COLOR_BayerBG2RGB);
+  cvtColor(flat_field4x, flat_field4x, COLOR_BayerBG2BGR);
   flat_field4x.convertTo(flat_field4x, CV_32F);
   flat_field4x *= 1 / 170.0;
 
 
-  stream.open("/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/cal/10x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/cal/10x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -147,7 +142,7 @@ int main(int argc, char *argv[]) {
     names->resize(5000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(1, 1);
+    auto jq = pathCam::JobQueue(10, 10);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
@@ -169,10 +164,14 @@ int main(int argc, char *argv[]) {
     }
 
     if (renameFiles || makeInput) {
-      std::sort(images.begin(), images.end(), customComparator);
+      try {
+        std::sort(images.begin(), images.end(), customComparator2);
+      }catch(...){
+        std::sort(images.begin(), images.end(), customComparator);
+      }
     }
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/inputdebayertest.txt";
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/1at1/input_figures.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -197,16 +196,25 @@ int main(int argc, char *argv[]) {
       }
       if (convertImages) {
         Mat ff;
+        if(i<=1753){
+          ff = flat_field2x;
 
-    if(i < 420){
-      ff = flat_field2x;
-    }else if(i >= 420 && i <777) {
-      ff = flat_field4x;
-    }else if(i >= 777 && i < 1358){
-      ff = flat_field10x;
-    }else{
-      ff = flat_field20x;
-    }
+        }else if(i>1753 && i <=2404){
+          ff = flat_field4x;
+        }else{
+          ff = flat_field10x;
+        }
+
+//    if(i < 420){
+//      ff = flat_field2x;
+//    }else if(i >= 420 && i <777) {
+//      ff = flat_field4x;
+//    }else if(i >= 777 && i < 1358){
+//      ff = flat_field10x;
+//    }else{
+//      ff = flat_field20x;
+//    }
+
         auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
         jq.add_runnable(dr, i);
       }
@@ -215,8 +223,9 @@ int main(int argc, char *argv[]) {
 
     auto start = std::chrono::high_resolution_clock::now();
     while (!jq.is_empty()) {
-      jq.run_jobs(true);
+      jq.run_jobs(false);
     }
+    jq.pool->joinAll();
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << duration.count() << std::endl;

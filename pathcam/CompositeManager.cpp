@@ -109,7 +109,7 @@ namespace pathCam {
 
     //perform_global_alignment();
     //rebuildJobsComplete.wait();
-    //save_components_to_disk();
+    save_components_to_disk();
     std::cout << "CM duration: " + std::to_string(duration) << std::endl;
     parent->compositing = false;
     parent->inferenceWait.set();
@@ -134,7 +134,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image();
+      i->save_pyramid_as_image("/Users/coopermaira/Desktop/2x.png",false,false,false,false);
 
     }
   }

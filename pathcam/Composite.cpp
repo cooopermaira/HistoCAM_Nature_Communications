@@ -369,14 +369,13 @@ namespace pathCam {
           //if (false) {
           auto ff = parent->get_flatfield(componentMagLabel);
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
-          cv::pow(convertHolding, 1.085, convertHolding);
+          cv::pow(convertHolding, 1.1, convertHolding);
           convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
       }
 
-      //channels[1] = rectMask; //alpha channel
-      channels[1] = circleMask;
+      channels[1] = rectMask; //alpha channel
       merge(channels, fourChannelPreallocated);
 
       images[i]->readyImage.release();
@@ -399,23 +398,25 @@ namespace pathCam {
       //imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/image_in_no_ring_"
       //                       + std::to_string(images.back()->index) + ".png",fourChannelPreallocated);
 //
-//      auto ul = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x,new_info.back()->absoluteCoords.y));
-//      auto lr = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x + image_size.width,new_info.back()->absoluteCoords.y+image_size.height));
-//      for (int x = ul.x;x <= lr.x; x++){
-//        for( int y = ul.y; y <= lr.y; y++){
-//          effectedTiles.push_back(Point(x,y));
-//        }
-//      }
+      auto ul = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x,new_info.back()->absoluteCoords.y));
+      auto lr = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x + image_size.width,new_info.back()->absoluteCoords.y+image_size.height));
+      for (int x = ul.x;x <= lr.x; x++){
+        for( int y = ul.y; y <= lr.y; y++){
+          effectedTiles.push_back(Point(x,y));
+        }
+      }
+      //cv::rectangle(fourChannelPreallocated,Point(10,10),Point(image_size.width - 10,image_size.height-10),Scalar(0,0,0,255),20);
+
 
       auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
                                        images[i]->height);
 
-      if (componentMagLabel == Image::_2X) {
-        calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
-      } else {
-        calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
-        imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
-      }
+//      if (componentMagLabel == Image::_2X) {
+//        calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
+//      } else {
+//        calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
+//        imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
+//      }
 
 //      if(images[i]->index >= fig_ind) {
 //        Mat voronoi = Mat::zeros(max_offset.y - root_offset.y, max_offset.x - root_offset.x, CV_8UC4);
@@ -432,13 +433,13 @@ namespace pathCam {
 //        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/tiles_"
 //                              + std::to_string(images.back()->index) + ".png", true, false, true, effectedTiles);
 //      }
-      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-      //imagePyramid->insertTilesAtBase(fourChannelPreallocated, circleMask, imageBox, effectedTiles);
+      //imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, rectMask, imageBox, effectedTiles);
 
-      if(images[i]->index >= fig_ind) {
-        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
-                              + std::to_string(images.back()->index) + "_no_grid_no_outline.png", false, false, false);
-      }
+//      if(images[i]->index >= fig_ind) {
+//        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
+//                              + std::to_string(images.back()->index) + "_no_grid_no_outline.png", false, false, false);
+//      }
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
         tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
@@ -840,7 +841,8 @@ namespace pathCam {
 
 
   void CompositeVoronoi::save_pyramid_as_image(std::string _fileName, bool _withGrid, bool _withGridAndIndexes,
-                                               bool _withEffectedTiles, bool _outline, std::vector<Point2i> effectedTiles) {
+                                               bool _withEffectedTiles, bool _outline,
+                                               std::vector<Point2i> effectedTiles) {
     int lineThickness = 40;
     auto level = imagePyramid->level[0];
 
@@ -890,13 +892,14 @@ namespace pathCam {
             cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(tile_size - 1, tile_size - 1),
                      Scalar(0, 0, 0, 255), lineThickness);
             cv::line(tile, cv::Point(tile_size - 1, 0), cv::Point(0, 0), Scalar(0, 0, 0, 255), lineThickness);
-
-            if (_withGridAndIndexes) {
-              putText(tile, "(" + std::to_string(x + x_offset) + "," + std::to_string(y + y_offset) + ")",
-                      Point(10, 50),
-                      FONT_HERSHEY_PLAIN, 3, Scalar(0, 0, 0, 255), 5);
-            }
           }
+
+          if (_withGridAndIndexes) {
+            putText(tile, "(" + std::to_string(x + x_offset) + "," + std::to_string(y + y_offset) + ")",
+                    Point(10, 50),
+                    FONT_HERSHEY_PLAIN, 3, Scalar(0, 0, 0, 255), 5);
+          }
+
           //imwrite(std::to_string(componentIndex) + "_" + std::to_string(x) + "_" + std::to_string(y) + ".png", tile);
           tile.copyTo(pyramidImage(Rect((x + x_offset) * tile.cols, (y + y_offset) * tile.rows, tile.cols,
                                         tile.rows)));
@@ -906,7 +909,7 @@ namespace pathCam {
         }
       }
     }
-    if(_outline) {
+    if (_outline) {
       rectangle(pyramidImage, Point2i(10, 10), Point2i(pyramidImage.cols - 20, pyramidImage.rows - 20),
                 Scalar(0, 0, 0, 255), 2 * lineThickness);
     }

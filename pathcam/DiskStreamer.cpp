@@ -83,7 +83,7 @@ namespace pathCam {
       std::cout << "Issue loading image.\n";
       return;
     }
-    //auto val = image->check_blur();
+//    auto val = image->check_blur();
 //        blur->at(sort_order) = val;
 //        names->at(sort_order) = image->get_ImageFile().getFileName();
 
@@ -92,17 +92,16 @@ namespace pathCam {
         //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
         cv::Size image_size(image->width, image->height);
         Mat readMat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-        Mat image_Mat = cv::Mat(image_size, CV_8UC3);
-        cvtColor(readMat, image_Mat, COLOR_BayerBG2BGR);
+        Mat image_Mat;
+        cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
 //
 //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
 //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
 
 
+        divide(readMat, flatfield, image_Mat, 1, CV_32F);
 
-        cv::divide(image_Mat, flatfield, image_Mat, 1.0, CV_32F);
-
-        cv::pow(image_Mat, 1.085, image_Mat);
+        cv::pow(image_Mat, 1.1, image_Mat);
 
         image_Mat.convertTo(image_Mat, CV_8UC3);
 
