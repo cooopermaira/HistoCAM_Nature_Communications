@@ -73,8 +73,9 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
 
       //debug afb
-      if(imgCompare->index == 140 && selfImage->index == 141){
-        scale = 0.398183;
+
+      if(imgCompare->index == 1725 && selfImage->index == 1726){
+        scale = 0.497557;
         matchedTo = imgCompare;
         auto mtoRegInfo = parent->get_registration(140);
         if(!mtoRegInfo->resolved){
@@ -84,8 +85,8 @@ namespace pathCam {
         while(parent->composites.size() <= matchedTo->component_membership || !parent->get_scale_and_offset(mtoRegInfo->component_membership,mtoScale,mtoOffset)) {
           Poco::Thread::sleep(50);
         }
-        offset = Point2f((1967.749  + mtoRegInfo->absoluteCoords.x + mtoOffset.x) / scale ,
-                         (1405.895  + mtoRegInfo->absoluteCoords.y + mtoOffset.y) / scale) ;
+        offset = Point2f((1904.69  + mtoRegInfo->absoluteCoords.x + mtoOffset.x) / scale ,
+                         (2508.67  + mtoRegInfo->absoluteCoords.y + mtoOffset.y) / scale) ;
         parent->set_scale_and_offset(componentMembership, scale * mtoScale, offset);
         return true;
       }else if(imgCompare->index == 314 && selfImage->index == 315){

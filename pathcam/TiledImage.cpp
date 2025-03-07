@@ -395,6 +395,6 @@ Mat TiledImage::getTile(int x, int y) {
 
 void TiledImage::makeTile(int x, int y) {
   if (tiles(x, y) == NULL) {
-    tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
+    tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(255, 255, 255, 0));
   }
 }

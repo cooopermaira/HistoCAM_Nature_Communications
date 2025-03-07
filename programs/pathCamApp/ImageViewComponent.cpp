@@ -162,7 +162,11 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
             channels.resize(2);
             channels[0] = greenShade;
           }
-          double beta = (log2(1.0 / MRImage->images[i]->scale) / 3.4) * 0.7 + 0.05;
+          double val;
+          int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
+          maglab == 1 ? val = 1.0 : maglab==2? val = 0.5: maglab==3? val = 0.2  : maglab==4? val= 0.1:val = 1;
+          double beta = (log2(1.0 / val) / 3.4) * 0.7 + 0.05;
+
 
           greenShade.setTo(cv::Scalar(0, 0, 0));
           cv::extractChannel(tile, channels[1], 3);

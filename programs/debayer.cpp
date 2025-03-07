@@ -60,19 +60,19 @@ int main(int argc, char *argv[]) {
   std::ifstream stream;
   {
 
-    stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/cal/2x_cal.Raw", std::ios::binary);
+    stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/cal/2x_cal.Raw", std::ios::binary);
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field2x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
 
   }
-  cvtColor(flat_field2x, flat_field2x, COLOR_BayerBG2BGR);
+  cvtColor(flat_field2x, flat_field2x, COLOR_BayerBG2RGB);
 
   flat_field2x.convertTo(flat_field2x, CV_32F);
   flat_field2x *= 1 / 170.0;
 
-  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/cal/4x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/cal/4x_cal.Raw", std::ios::binary);
 
   {
     char *raw_buffer = new char[6464 * 4852];
@@ -85,25 +85,25 @@ int main(int argc, char *argv[]) {
   flat_field4x *= 1 / 170.0;
 
 
-  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/cal/10x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/cal/10x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field10x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2RGB);
+  cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2BGR);
   flat_field10x.convertTo(flat_field10x, CV_32F);
   flat_field10x *= 1 / 170.0;
 
-  stream.open("/Users/coopermaira/Desktop/pathcam_data/2_20_new/2_20_new/cal/20x_cal.Raw", std::ios::binary);
+  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/cal/20x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
     stream.close();
     flat_field20x = cv::Mat(cv::Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
   }
-  cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2RGB);
+  cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2BGR);
   flat_field20x.convertTo(flat_field20x, CV_32F);
   flat_field20x *= 1 / 170.0;
 
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     names->resize(5000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(10, 10);
+    auto jq = pathCam::JobQueue(15, 15);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/1at1/input_figures.txt";
+    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/input10x.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -197,13 +197,12 @@ int main(int argc, char *argv[]) {
       if (convertImages) {
         Mat ff;
         if(i<=1753){
-          ff = flat_field2x;
-
-        }else if(i>1753 && i <=2404){
           ff = flat_field4x;
-        }else{
-          ff = flat_field10x;
-        }
+        }//else if(i>1753 && i <=2404){
+//          ff = flat_field4x;
+//        }else{
+//          ff = flat_field10x;
+//        }
 
 //    if(i < 420){
 //      ff = flat_field2x;
@@ -214,7 +213,7 @@ int main(int argc, char *argv[]) {
 //    }else{
 //      ff = flat_field20x;
 //    }
-
+        ff = flat_field20x;
         auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
         jq.add_runnable(dr, i);
       }

@@ -307,7 +307,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add) {
-    int fig_ind = 270;
+
     auto start = std::chrono::high_resolution_clock::now();
 
     // get a copy of references to all images at once so that only one mutex lock is needed
@@ -366,16 +366,18 @@ namespace pathCam {
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
         if (componentMagLabel != 0) {
-          //if (false) {
           auto ff = parent->get_flatfield(componentMagLabel);
+          //flatfield correct
           divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
+          //brighten
           cv::pow(convertHolding, 1.1, convertHolding);
           convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
       }
 
-      channels[1] = rectMask; //alpha channel
+      //add alpha channel
+      channels[1] = rectMask;
       merge(channels, fourChannelPreallocated);
 
       images[i]->readyImage.release();
@@ -385,61 +387,19 @@ namespace pathCam {
       std::vector<Point2i> effectedTiles2;
       std::vector<Point2i> effectedTilesNoMask;
 
-//debug
-//      auto shadewidth = 100.f;
-//      for(auto i = 0.f; i < shadewidth; i++) {
-//        auto circleWidth = 2.f;
-//        float incrval = i/shadewidth;
-//        auto shader = fourChannelPreallocated.clone();
-//        circle(shader,Point(image_size.width/2,image_size.height/2),parent->scope_radius - circleWidth * i,Scalar(40,40,40,255),circleWidth);
-//        fourChannelPreallocated = incrval*fourChannelPreallocated + (1.f-incrval)*shader;
-//
-//      }
-      //imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/image_in_no_ring_"
-      //                       + std::to_string(images.back()->index) + ".png",fourChannelPreallocated);
-//
-      auto ul = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x,new_info.back()->absoluteCoords.y));
-      auto lr = imagePyramid->level[0]->getIJ(Point(new_info.back()->absoluteCoords.x + image_size.width,new_info.back()->absoluteCoords.y+image_size.height));
-      for (int x = ul.x;x <= lr.x; x++){
-        for( int y = ul.y; y <= lr.y; y++){
-          effectedTiles.push_back(Point(x,y));
-        }
-      }
-      //cv::rectangle(fourChannelPreallocated,Point(10,10),Point(image_size.width - 10,image_size.height-10),Scalar(0,0,0,255),20);
-
 
       auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
                                        images[i]->height);
 
-//      if (componentMagLabel == Image::_2X) {
-//        calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
-//      } else {
-//        calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
-//        imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
-//      }
+      if (componentMagLabel == Image::_2X) {
+        calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
+      } else {
+        calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
+        imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
+      }
 
-//      if(images[i]->index >= fig_ind) {
-//        Mat voronoi = Mat::zeros(max_offset.y - root_offset.y, max_offset.x - root_offset.x, CV_8UC4);
-//        auto voronoi1 = voronoi.clone();
-//        auto center = Point2i(images.back()->absoluteCoords.x + image_size.width / 2 - root_offset.x,
-//                              images.back()->absoluteCoords.y + image_size.height / 2 - root_offset.y);
-//        debug_draw_voronoi(voronoi1, subdiv, true, center);
-//        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_intersect_" +
-//                std::to_string(images.back()->index) + ".png", voronoi1);
-//        debug_draw_voronoi(voronoi, subdiv, false);
-//        imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/voronoi_" +
-//                std::to_string(images.back()->index) + ".png", voronoi);
-//
-//        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/tiles_"
-//                              + std::to_string(images.back()->index) + ".png", true, false, true, effectedTiles);
-//      }
-      //imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-      imagePyramid->insertTilesAtBase(fourChannelPreallocated, rectMask, imageBox, effectedTiles);
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
 
-//      if(images[i]->index >= fig_ind) {
-//        save_pyramid_as_image("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/imageIn_"
-//                              + std::to_string(images.back()->index) + "_no_grid_no_outline.png", false, false, false);
-//      }
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
         tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
@@ -781,10 +741,15 @@ namespace pathCam {
   }
 
   void
-  CompositeVoronoi::debug_draw_voronoi(cv::Mat &img, cv::Subdiv2D &subdiv, bool _drawIntersect, Point2i _intrCenter) {
+  CompositeVoronoi::debug_draw_voronoi(cv::Mat &img, cv::Subdiv2D &subdiv, bool _drawPathInsteadOfFaces, bool _drawIntersect, Point2i _intrCenter) {
     std::vector<std::vector<cv::Point2f>> facets;
     std::vector<cv::Point2f> centers;
     subdiv.getVoronoiFacetList(std::vector<int>(), facets, centers);
+
+    auto endColor = Scalar(130, 255, 130, 255);
+    auto midColor = Scalar (0,255,255,255);
+    auto startColor = Scalar(130, 130, 255, 255);
+
     if (_drawIntersect) {
       auto copyMatCirc = img.clone();
       auto copyMatPoly = img.clone();
@@ -808,7 +773,7 @@ namespace pathCam {
       copyMatCirc.copyTo(img);
     }
 
-    for (size_t i = 0; i < facets.size(); i++) {
+    for (double i = 0; i < facets.size(); i++) {
       std::vector<cv::Point> poly;
       for (cv::Point2f p: facets[i]) {
         p.x -= root_offset.x;
@@ -824,18 +789,33 @@ namespace pathCam {
       centers[i].x += image_size.width / 2;
       centers[i].y += image_size.height / 2;
 
-      if (!poly.empty()) {
-        cv::polylines(img, poly, true, cv::Scalar(0, 0, 0, 255), 40, cv::LINE_AA);
-      }
-      if (i == 0) {
-        cv::circle(img, centers[i], 150, Scalar(0, 255, 0, 255), cv::FILLED, cv::LINE_AA);
-      } else if (facets.size() > 1 && i == facets.size() - 1) {
-        cv::circle(img, centers[i], 150, Scalar(0, 140, 255, 255), cv::FILLED, cv::LINE_AA);
-      } else {
-        cv::circle(img, centers[i], 150, cv::Scalar(255, 200, 0, 255), cv::FILLED, cv::LINE_AA);
-      }
-      cv::rectangle(img, cv::Point(10, 10), cv::Point(img.cols - 20, img.rows - 20), cv::Scalar(0, 0, 0, 255), 50);
+      if(!_drawPathInsteadOfFaces) {
+        if (!poly.empty()) {
+          cv::polylines(img, poly, true, cv::Scalar(0, 0, 0, 255), 40, cv::LINE_AA);
+        }
+        if (i == 0) {
+          cv::circle(img, centers[i], 150, Scalar(0, 255, 0, 255), cv::FILLED, cv::LINE_AA);
+        } else if (facets.size() > 1 && i == facets.size() - 1) {
+          cv::circle(img, centers[i], 150, Scalar(0, 140, 255, 255), cv::FILLED, cv::LINE_AA);
+        } else {
+          cv::circle(img, centers[i], 150, cv::Scalar(255, 200, 0, 255), cv::FILLED, cv::LINE_AA);
+        }
+        cv::rectangle(img, cv::Point(10, 10), cv::Point(img.cols - 20, img.rows - 20), cv::Scalar(0, 0, 0, 255), 50);
+      }else{
+        if(i == 0){
+          circle(img,centers[0],300,startColor,-1);
+          continue;
+        }
+        double colorIndeptVar = (i/double(facets.size()/2)); //spans from 0 to 2
+        double colorShare1 = max(0.0 , 1.0 - colorIndeptVar); //spans 1 to 0 at 50% of domain, stays 0 from 50% to end
+        double colorShare3 = max(0.0, colorIndeptVar - 1.0);
+        double colorShare2 = 1.0 - max(colorShare1,colorShare3);
 
+        line(img,centers[i],centers[i - 1],colorShare1*startColor + colorShare2 * midColor + colorShare3 * endColor,150);
+        if(i+1 == facets.size()){
+          circle(img,centers.back(),300,endColor,-1);
+        }
+      }
     }
   }
 
@@ -900,6 +880,18 @@ namespace pathCam {
                     FONT_HERSHEY_PLAIN, 3, Scalar(0, 0, 0, 255), 5);
           }
 
+          Mat mask;
+          cv::extractChannel(tile,mask,3);
+          double val;
+          int maglab = componentMagLabel;
+          maglab == 1 ? val = 1.0 : maglab==2? val = 0.5: maglab==3? val = 0.2  : maglab==4? val= 0.1:val = 1;
+          double beta = (log2(1.0 / val) / 3.4) * 0.7 + 0.05;
+          auto greenShade = Mat(tile.rows, tile.cols, CV_8UC3,Scalar(200* beta,150*(1-beta),100*beta));
+          std::vector<Mat> v = {greenShade,mask};
+          merge(v,greenShade);
+
+          tile = beta * greenShade + (1 - beta) * tile;
+
           //imwrite(std::to_string(componentIndex) + "_" + std::to_string(x) + "_" + std::to_string(y) + ".png", tile);
           tile.copyTo(pyramidImage(Rect((x + x_offset) * tile.cols, (y + y_offset) * tile.rows, tile.cols,
                                         tile.rows)));
@@ -919,6 +911,7 @@ namespace pathCam {
                   ".png";
     //only write pixels with information
     //imwrite(path, pyramidImage(Rect(left_offset, top_offset, width - left_offset - right_offset, height - top_offset - bottom_offset)));
+    //debug_draw_voronoi(pyramidImage,subdiv,true);
     if (_fileName != "") {
       imwrite(_fileName, pyramidImage);
     } else {

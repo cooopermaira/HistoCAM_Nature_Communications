@@ -435,7 +435,7 @@ namespace pathCam {
         if (pConf->has("registration.image.scope_radius")) {
           unsigned int temp = scope_radius;
           try {
-            scope_radius = pConf->getUInt("registration.image.scope_radius") - 50;
+            scope_radius = pConf->getUInt("registration.image.scope_radius") - 100;
           } catch (std::string bad_input) {
             logger->warning("Bad input for scope radius: " + bad_input + ".");
             scope_radius = temp;

@@ -93,7 +93,7 @@ namespace pathCam {
         cv::Size image_size(image->width, image->height);
         Mat readMat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
         Mat image_Mat;
-        cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+        cvtColor(readMat, readMat, COLOR_BayerBG2RGB);
 //
 //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
 //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
@@ -113,17 +113,21 @@ namespace pathCam {
         imwrite(o.toString(), image_Mat);
         //
         // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
-        //image_Mat = ConvertBGR2Bayer(image_Mat);
-
-        //save .Raw
-//                r.setFileName(image->get_ImageFile().getFileName());
-//                r.setExtension("Raw");
-//                std::fstream file;
-//                file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
-//                if (file.fail()) {
-//                    throw new std::exception;
-//                }
-//                file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
+//        image_Mat = ConvertBGR2Bayer(image_Mat);
+//
+//        //save .Raw
+//        auto name = std::stoi(image->get_ImageFile().getBaseName());
+//        name += 250;
+//
+//
+//        r.setFileName(std::to_string(name));
+//        r.setExtension("Raw");
+//        std::fstream file;
+//        file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
+//        if (file.fail()) {
+//          throw new std::exception;
+//        }
+//        file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
       } catch (...) {
         int k = 0;
       }
