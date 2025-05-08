@@ -1,7 +1,13 @@
-FROM python:3.11-slim
+#FROM nvidia/cuda:12.6.0-base-ubuntu22.04 AS build
+FROM nvidia/cuda:12.6.0-devel-ubuntu22.04 AS build
+#FROM python:3.11-slim
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-dev \
+    python-is-python3 \
+    python3-pip \
     apache2-dev \
     build-essential \
     cmake \
@@ -59,24 +65,24 @@ RUN apt-get update && \
 ENV CUDA_VERSION="12.6" \
     OPENCV_VERSION="4.11.0" \
     TORCH_VERSION="2.6.0" \
-    TORCH_CUDA_ARCH_LIST="7.5"
+    TORCH_CUDA_ARCH_LIST="8.6;8.9"
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gpg-agent && \
-    curl -OLJ https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-keyring_1.1-1_all.deb && \
-    dpkg -i cuda-keyring_1.1-1_all.deb && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    cuda-cudart-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    cuda-cupti-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    cuda-libraries-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    cuda-libraries-dev-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    cuda-nvcc-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    cuda-nvml-dev-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    cuda-nvrtc-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    cuda-nvtx-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
-    && \
-    true
+#RUN apt-get update && \
+#    apt-get install -y --no-install-recommends gpg-agent && \
+#    curl -OLJ https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-keyring_1.1-1_all.deb && \
+#    dpkg -i cuda-keyring_1.1-1_all.deb && \
+#    apt-get update && \
+#    apt-get install -y --no-install-recommends \
+#    cuda-cudart-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    cuda-cupti-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    cuda-libraries-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    cuda-libraries-dev-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    cuda-nvcc-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    cuda-nvml-dev-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    cuda-nvrtc-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    cuda-nvtx-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
+#    && \
+#    true
 
 ENV CUDA_PATH=/usr/local/cuda \
     CUDA_HOME=/usr/local/cuda-${CUDA_VERSION} \
@@ -110,8 +116,21 @@ RUN mkdir -p /opt && \
     cmake \
     -DBUILD_SHARED_LIBS=ON \
     -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
+    -DCMAKE_BUILD_TYPE=RELEASE \
+    -DBUILD_opencv_python3=ON \
+    -DOPENCV_GENERATE_PKGCONFIG=ON \
+    -DWITH_CUDA=ON \
+    -DWITH_CUDNN=ON \
+    -DCUDA_ARCH_BIN=${TORCH_CUDA_ARCH_LIST} \
+    -DCUDA_ARCH_PTX="" \
+    -DWITH_CUBLAS=ON \
+    -DBUILD_CUDA_STUBS=ON \
+    -DENABLE_FAST_MATH=ON \
+    -DCUDA_FAST_MATH=ON \
+    -DOPENCV_DNN_OPENVINO=ON \
+    -DBUILD_opencv_cudacodec=OFF \
     .. && \
-    cmake --build . -- -j `nproc` && \
+    cmake --build . -- -j15 && \
     cmake --build . --target install
 
 RUN mkdir -p /opt/pathcam
@@ -126,19 +145,20 @@ RUN cd /opt/pathcam && \
     cd _build && \
     cmake \
     -DTorch_DIR=/opt/pytorch/torch/share/cmake/Torch \
-    -DPython3_INCLUDE_DIR=/usr/local/include/python3.11 \
-    -DPython3_LIBRARY_DIR=/usr/local/lib \
-    -DPython3_LIB=/usr/local/lib/libpython3.11.so \
-    -DCMAKE_CUDA_COMPILER="/usr/local/cuda-${CUDA_VERSION}/bin/nvcc" \
-    -DCUDAToolkit_ROOT_DIR="/usr/local/cuda-${CUDA_VERSION}" \
-    -DCUDA_NVCC_EXECUTABLE="/usr/local/cuda-${CUDA_VERSION}/bin/nvcc" \
-    -DCUDA_INCLUDE_DIRS="/usr/local/cuda-${CUDA_VERSION}/include" \
-    -DCUDA_CUDART_LIBRARY="/usr/local/cuda-${CUDA_VERSION}/lib64/libcudart.so" \
+    -DPython3_INCLUDE_DIR=/usr/include/python3.11 \
+    -DPython3_LIBRARY_DIR=/usr/lib \
+    -DPython3_LIB=/usr/lib/x86_64-linux-gnu/libpython3.11.so.1.0 \
+    -DCMAKE_CUDA_COMPILER="${CUDA_PATH}/bin/nvcc" \
+    -DCUDAToolkit_ROOT_DIR="${CUDA_PATH}" \
+    -DCUDA_NVCC_EXECUTABLE="${CUDA_PATH}/bin/nvcc" \
+    -DCUDA_INCLUDE_DIRS="${CUDA_PATH}/include" \
+    -DCUDA_CUDART_LIBRARY="${CUDA_PATH}/lib64/libcudart.so" \
     .. && \
-    cmake --build . -- -j `nproc` && \
+    cmake --build . -- -j15 && \
     cmake --build . --target install && \
     true
 
+RUN apt-get install -y gdb
 ENV LD_LIBRARY_PATH="/opt/pathcam/_build/lib:$LD_LIBRARY_PATH"
 
 WORKDIR /opt/pathcam/_build/bin

@@ -14,7 +14,13 @@
 #include <queue>
 //#include <Python.h>
 
+
 #include "opencv2/core.hpp"
+#ifdef HAVE_OPENCV_CUDAARITHM
+#include "opencv2/core/cuda.hpp"
+#endif
+
+
 
 #ifdef HAVE_OPENCV_XFEATURES2D
 #include "opencv2/calib3d.hpp"

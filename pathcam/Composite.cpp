@@ -13,6 +13,30 @@ namespace pathCam {
                                      unsigned int component_index) : Composite(
       parent), componentIndex(component_index),
                                                                      wakeEvent(true), image_size(image_size) {
+
+    std::cout<<cv::getBuildInformation()<<std::endl;
+
+    int deviceCount = cv::cuda::getCudaEnabledDeviceCount();
+
+    if (deviceCount == 0) {
+        std::cout << "No CUDA-enabled devices found." << std::endl;
+
+    }
+
+    std::cout << "Number of CUDA devices: " << deviceCount << std::endl;
+
+    for (int i = 0; i < deviceCount; ++i) {
+        cv::cuda::DeviceInfo dev_info(i);
+        std::cout << "Device " << i << ": " << dev_info.name() << std::endl;
+        std::cout << "  Compute capability: " << dev_info.majorVersion() << "." << dev_info.minorVersion() << std::endl;
+        std::cout << "  Total memory: " << dev_info.totalMemory() / (1024 * 1024) << " MB" << std::endl;
+        std::cout << "  Supports shared memory: " << (dev_info.sharedMemPerBlock() > 0 ? "Yes" : "No") << std::endl;
+        std::cout << "  Multi processor count: " << dev_info.multiProcessorCount() << std::endl;
+        std::cout << "  Supports CUDA: " << (dev_info.isCompatible() ? "Yes" : "No") << std::endl;
+        std::cout << std::endl;
+    }
+
+
     minPixelDistanceBetweenFrames = 500;
 
     imagePyramid.reset(new MRTiledImage(parent));

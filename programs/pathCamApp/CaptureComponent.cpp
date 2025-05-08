@@ -16,7 +16,6 @@ public:
       parent->update();
       Poco::Thread::sleep(100);
     }
-    int k = 0;
   }
 
 private:
