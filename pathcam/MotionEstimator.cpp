@@ -51,7 +51,8 @@ namespace pathCam {
     auto image = parent->get_image_ref(index);
     image->regInfo = this;
 
-    if (queue_for_compositing) {
+    bool proceed = queue_for_compositing && parent->sufficient_distance(absoluteCoords,component_membership);
+    if (proceed) {
       parent->push_compositeQ(this);
     }
 
@@ -75,6 +76,12 @@ namespace pathCam {
       auto theirOffset = Point2f((el.second->t_x / theirScale + absoluteCoords.x + myOffset.x) / theirScale,
                                  (el.second->t_y / theirScale + absoluteCoords.y + myOffset.y) / theirScale);
       parent->set_scale_and_offset(el.first, theirScale * myScale, theirOffset);
+    }
+
+
+    if(!proceed){
+      image->free_memory_RAW();
+      return;
     }
 
     if (parent->opencvWithCuda) {

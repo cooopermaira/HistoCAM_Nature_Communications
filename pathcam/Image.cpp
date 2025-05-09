@@ -357,8 +357,8 @@ namespace pathCam {
 
     Size image_size = Size(width, height);
 
-    reg_image = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
-    //temp.copyTo(reg_image);
+    Mat temp = cv::Mat(image_size, CV_8UC1, raw_buffer, Mat::AUTO_STEP);
+    reg_image = temp.clone();
     buffer_mutex.unlock();
 
     if (release) { free_memory_RAW(); }

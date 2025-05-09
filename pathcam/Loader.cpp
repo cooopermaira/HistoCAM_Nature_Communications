@@ -55,7 +55,7 @@ namespace pathCam {
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;
 
-      image->free_memory_RAW();
+
       pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
 
       switch (parent->feature_type) {
@@ -101,9 +101,7 @@ namespace pathCam {
       }
 
       image->release_reg_image();
-      image->free_memory_RAW();
-
-
+      //image->free_memory_RAW();
 
       parent->add_image(image, image_index);
       auto matchjob = new MatchRunnable(parent, image_index);

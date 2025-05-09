@@ -97,6 +97,7 @@ namespace pathCam {
     Poco::FastMutex *lastFrameMutex;
     Poco::FastMutex *scaleRepoMutex;
     Poco::FastMutex *inferenceQMutex;
+    Poco::FastMutex *pixelDistanceMutex;
 
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
@@ -107,6 +108,9 @@ namespace pathCam {
     bool recordingMode = false;
 
     bool opencvWithCuda = false;
+
+    int minPixelDistanceBetweenFrames;
+    std::vector<Vec2> lastAcceptedCoords;
 
     std::vector<double> labelScales = { -10.0, 1.0, 0.5, 0.2, 0.1, 0.05 };
 
@@ -129,6 +133,32 @@ namespace pathCam {
     DiskReader *dr;
     InferenceManager *im;
 
+    //std::vector < double > variancesForDebug;
+    std::vector<CompositeVoronoi *> composites;
+    std::vector<bool> visited;
+
+    std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
+    //UniqueQueue<std::pair<Point2i,unsigned int>,PairHash> tileEmbedQ;
+    UniqueQueue<std::tuple<int,int,unsigned>,TupleHash>tileEmbedQ;
+    std::queue<std::string> disk_image;
+    std::queue<char *> buffer;
+    std::queue<Image *> spin_image_buffer;
+
+    std::atomic<bool> compositing = true;
+    std::atomic<bool> tileEmbeddingComplete = false;
+    std::atomic<unsigned int> components = 0;
+    std::atomic<unsigned int> diskCount = 0;
+    std::atomic<unsigned int> loaderCount = 0;
+    std::atomic<unsigned int> matchableCount = 0;
+    std::atomic<unsigned int> regCount = 0;
+
+    std::vector<DataObserver *> observers;
+
+    Poco::Thread disk_thread, Q_thread, composite_thread, inference_thread;
+
+    Poco::Event inferenceWait;
+    Poco::Event compositeWait;
+
     bool run();
 
     bool spin_run();
@@ -144,6 +174,8 @@ namespace pathCam {
                         std::string &_magLabel);
 
     void pass_image(Image *, unsigned long _image_index = 0, bool saveImg = false);
+
+    bool sufficient_distance(pathCam::Vec2 _coordsInQuestion, int _componentIdx);
 
     void set_match(unsigned long image_idx, unsigned long prev_idx, Match *m);
 
@@ -199,31 +231,6 @@ namespace pathCam {
 
     void run_agg_classify();
 
-    //std::vector < double > variancesForDebug;
-    std::vector<CompositeVoronoi *> composites;
-    std::vector<bool> visited;
-
-    std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
-    //UniqueQueue<std::pair<Point2i,unsigned int>,PairHash> tileEmbedQ;
-    UniqueQueue<std::tuple<int,int,unsigned>,TupleHash>tileEmbedQ;
-    std::queue<std::string> disk_image;
-    std::queue<char *> buffer;
-    std::queue<Image *> spin_image_buffer;
-
-    std::atomic<bool> compositing = true;
-    std::atomic<bool> tileEmbeddingComplete = false;
-    std::atomic<unsigned int> components = 0;
-    std::atomic<unsigned int> diskCount = 0;
-    std::atomic<unsigned int> loaderCount = 0;
-    std::atomic<unsigned int> matchableCount = 0;
-    std::atomic<unsigned int> regCount = 0;
-
-    std::vector<DataObserver *> observers;
-
-    Poco::Thread disk_thread, Q_thread, composite_thread, inference_thread;
-
-    Poco::Event inferenceWait;
-    Poco::Event compositeWait;
 
   };
 

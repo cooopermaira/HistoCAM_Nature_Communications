@@ -27,6 +27,7 @@ namespace pathCam {
                                                            resize_buffer_mutex(new Poco::FastMutex()),
                                                            lastFrameMutex(new Poco::FastMutex()),
                                                            scaleRepoMutex(new Poco::FastMutex()),
+                                                           pixelDistanceMutex(new Poco::FastMutex()),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
@@ -38,6 +39,9 @@ namespace pathCam {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
     }
+
+    minPixelDistanceBetweenFrames = 200;
+    minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames,2);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     int deviceCount = cv::cuda::getCudaEnabledDeviceCount();
@@ -413,6 +417,27 @@ namespace pathCam {
     LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true, _saveImg);
     loaderCount++;
     JobQ->add_runnable(llr);
+  }
+
+  bool StreamCam::sufficient_distance(Vec2 _coordsInQuestion, int _componentIdx) {
+    bool answer = false;
+
+    pixelDistanceMutex->lock();
+
+    if(lastAcceptedCoords.size() < _componentIdx + 1){
+      lastAcceptedCoords.resize(_componentIdx + 1);
+      lastAcceptedCoords[_componentIdx] = _coordsInQuestion;
+      answer = true;
+    }else{
+      Vec2 v = lastAcceptedCoords[_componentIdx];
+      if(pow(v.x - _coordsInQuestion.x,2) + pow(v.y - _coordsInQuestion.y,2) >= minPixelDistanceBetweenFrames){
+        lastAcceptedCoords[_componentIdx] = _coordsInQuestion;
+        answer = true;
+      }
+    }
+
+    pixelDistanceMutex->unlock();
+    return answer;
   }
 
   void StreamCam::push_compositeQ(RegInfo *index) {

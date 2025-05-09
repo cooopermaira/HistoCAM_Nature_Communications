@@ -14,29 +14,7 @@ namespace pathCam {
       parent), componentIndex(component_index),
                                                                      wakeEvent(true), image_size(image_size) {
 
-
-    int deviceCount = cv::cuda::getCudaEnabledDeviceCount();
-
-    if (deviceCount == 0) {
-        std::cout << "No CUDA-enabled devices found." << std::endl;
-
-    }
-
-    std::cout << "Number of CUDA devices: " << deviceCount << std::endl;
-
-    for (int i = 0; i < deviceCount; ++i) {
-        cv::cuda::DeviceInfo dev_info(i);
-        std::cout << "Device " << i << ": " << dev_info.name() << std::endl;
-        std::cout << "  Compute capability: " << dev_info.majorVersion() << "." << dev_info.minorVersion() << std::endl;
-        std::cout << "  Total memory: " << dev_info.totalMemory() / (1024 * 1024) << " MB" << std::endl;
-        std::cout << "  Supports shared memory: " << (dev_info.sharedMemPerBlock() > 0 ? "Yes" : "No") << std::endl;
-        std::cout << "  Multi processor count: " << dev_info.multiProcessorCount() << std::endl;
-        std::cout << "  Supports CUDA: " << (dev_info.isCompatible() ? "Yes" : "No") << std::endl;
-        std::cout << std::endl;
-    }
-
-
-    minPixelDistanceBetweenFrames = 500;
+    minPixelDistanceBetweenFrames = 200;
 
     imagePyramid.reset(new MRTiledImage(parent));
     std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(imagePyramid, parent->tileSize, parent->tileSize,
@@ -63,8 +41,7 @@ namespace pathCam {
     freshMask = polyMaskOutput.clone();
 
     //first added image will be at (0,0), this value guarantees it is accepted
-    lastAcceptedImageAbC = Vec2(99999, 99999);
-    lastImageAbC = lastAcceptedImageAbC;
+    lastAcceptedImageIndex = 999999999;
   }
 
 
@@ -342,27 +319,21 @@ namespace pathCam {
     bool update = false;
 
     for (int i = 0; i < images.size(); i++) {
-      //verify minimum number of pixels has been covered since last added image
-      if (!_force_add && pow(lastAcceptedImageAbC.x - new_info[i]->absoluteCoords.x, 2) +
-                         pow(lastAcceptedImageAbC.y - new_info[i]->absoluteCoords.y, 2) <
-                         pow(minPixelDistanceBetweenFrames, 2)) {
-        memberImages.push_back({images[i], false});
-        images[i]->readyImage.release();
+
+      if(indexes[i] == lastAcceptedImageIndex){
         continue;
       }
-
+      lastAcceptedImageIndex = indexes[i];
 
       //correct placement of last added image
-      if (!memberImages.empty() && !_force_add) {
-        //put in reverse match runnable
-        auto rmr = new ReverseMatchRunnable(parent, images[i]->index, lastAcceptedImageIndex);
-        jobCount++;
-        parent->JobQ->add_runnable(rmr);
-        wakeEvent.wait();
-      }
+//      if (!memberImages.empty() && !_force_add) {
+//        //put in reverse match runnable
+//        auto rmr = new ReverseMatchRunnable(parent, images[i]->index, lastAcceptedImageIndex);
+//        jobCount++;
+//        parent->JobQ->add_runnable(rmr);
+//        wakeEvent.wait();
+//      }
 
-      lastAcceptedImageAbC = new_info[i]->absoluteCoords;
-      lastAcceptedImageIndex = new_info[i]->index;
 
       //add point to delaunay triangulation
       std::vector<Point2i> face;
@@ -384,7 +355,7 @@ namespace pathCam {
       if (images[i]->readyImage.data) {
         channels[0] = images[i]->readyImage;
       } else {
-        images[i]->load_raw_from_disk();
+        //images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
