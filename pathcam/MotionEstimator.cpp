@@ -55,6 +55,7 @@ namespace pathCam {
       parent->push_compositeQ(this);
     }
 
+
     for (auto cw: callersWaiting) {
       auto theirRelCoords = cw->relativeCoords;
       Vec2 theirAbCs;
@@ -74,6 +75,19 @@ namespace pathCam {
       auto theirOffset = Point2f((el.second->t_x / theirScale + absoluteCoords.x + myOffset.x) / theirScale,
                                  (el.second->t_y / theirScale + absoluteCoords.y + myOffset.y) / theirScale);
       parent->set_scale_and_offset(el.first, theirScale * myScale, theirOffset);
+    }
+
+    if (parent->opencvWithCuda) {
+      //push image data to gpu
+    }
+
+    if(parent->recordingMode){
+      std::fstream file;
+      file = std::fstream(image->image_file.toString(), std::ios::out | std::ios::binary);
+      if (file.fail()) {
+        throw new std::exception;
+      }
+      file.write(image->get_Raw(), image->width * image->height);
     }
 
   }

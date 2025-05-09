@@ -25,16 +25,6 @@ namespace pathCam {
     }
 
 
-    if(saveImg){
-      std::fstream file;
-      file = std::fstream(image->image_file.toString(), std::ios::out | std::ios::binary);
-      if (file.fail()) {
-        throw new std::exception;
-      }
-      file.write(image->get_Raw(), image->width * image->height);
-    }
-
-
     // if(image->check_blur() < 100){
     //   successful = true;
     //   parent->loaderCount--;

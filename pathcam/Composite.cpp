@@ -14,7 +14,6 @@ namespace pathCam {
       parent), componentIndex(component_index),
                                                                      wakeEvent(true), image_size(image_size) {
 
-    std::cout<<cv::getBuildInformation()<<std::endl;
 
     int deviceCount = cv::cuda::getCudaEnabledDeviceCount();
 

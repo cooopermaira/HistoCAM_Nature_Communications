@@ -39,6 +39,16 @@ namespace pathCam {
       im = new InferenceManager(this);
     }
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+    int deviceCount = cv::cuda::getCudaEnabledDeviceCount();
+
+    //if inferencing, we need one device for that and one for compositing
+    //if not, we only need one device for compositing
+    if (deviceCount > inferencing) {//bool converted to int
+      opencvWithCuda = true;
+    }
+#endif
+
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(10, 10);
 
@@ -187,7 +197,7 @@ namespace pathCam {
   bool StreamCam::spin_run() {
 
     std::cout << "spin_run started " << std::endl;
-
+    recordingMode = true;
 
     Q_thread.start(qm);
     composite_thread.start(cm);

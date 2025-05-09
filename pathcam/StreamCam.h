@@ -104,6 +104,9 @@ namespace pathCam {
     bool showAsCircle;
 
     bool microscopeInput;
+    bool recordingMode = false;
+
+    bool opencvWithCuda = false;
 
     std::vector<double> labelScales = { -10.0, 1.0, 0.5, 0.2, 0.1, 0.05 };
 
