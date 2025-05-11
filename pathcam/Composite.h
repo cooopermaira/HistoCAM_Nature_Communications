@@ -12,7 +12,7 @@
 #include <random>
 #include <numeric>
 #include "pathCam.h"
-//#include "TiledImage.h"
+
 
 namespace pathCam {
 
@@ -82,9 +82,21 @@ namespace pathCam {
     Mat rectMask;
     Mat polyMaskOutput;
     Mat freshMask;
-    Mat3b threeChannelPreallocated;
-    Mat4b fourChannelPreallocated;
+    Mat ff;
     Mat convertHolding;
+    Mat threeChannelPreallocated;
+    Mat fourChannelPreallocated;
+#ifdef HAVE_OPENCV_CUDAARITHM
+    cuda::GpuMat rectMaskGPU;
+    cuda::GpuMat circleMaskGPU;
+    cuda::GpuMat polyMaskGPU;
+    std::vector<cuda::GpuMat> channelsGPU;
+    cuda::GpuMat ffGPU;
+    cuda::GpuMat convertHoldingGPU;
+    cuda::GpuMat threeChannelPrealGPU;
+    cuda::GpuMat fourChannelPrealGPU;
+#endif
+
     Subdiv2D subdiv;
     cv::Size image_size;
     std::vector<Mat> channels;
@@ -105,6 +117,10 @@ namespace pathCam {
     void add_images_with_composite(std::vector<RegInfo*> new_info);
 
     void add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
+
+#ifdef HAVE_OPENCV_CUDAARITHM
+    void GPU_add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
+#endif
 
     void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
 
@@ -164,7 +180,10 @@ namespace pathCam {
     int minTiley = 1000;
     int maxTiley = 0;
 
+
     void deduce_label();
+
+    void get_flatfield();
 
     void store_new_info(RegInfo* _new_info);
 
@@ -191,8 +210,6 @@ namespace pathCam {
     std::vector<Point_<int>> falselyClaimedTiles;
     std::priority_queue<unsigned int> freeMasks;
     std::vector<Mat> masks;
-    std::vector<Mat> threeChanPreals;
-    std::vector<Mat> fourChanPreals;
     int removeCount = 0;
   };
 }

@@ -70,6 +70,10 @@ namespace pathCam {
       buffer_mutex.unlock();
     }
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+    bool move_buffer_to_gpu(int device);
+#endif
+
     bool is_mostly_black();
 
     bool is_mostly_white(cv::Mat ROI);
@@ -135,6 +139,8 @@ namespace pathCam {
 
     inline char *get_Raw() { return raw_buffer; }
 
+    inline char *get_raw_cuda(){ return raw_buffer_cuda; }
+
     inline Poco::Path get_ImageFile() { return image_file; }
 
     void create_reg_image(double reg_scale, double reg_crop, bool convert = true, int interpolation = cv::INTER_LINEAR,
@@ -149,21 +155,7 @@ namespace pathCam {
 
     inline void release_reg_image() { reg_image.release(); }
 
-    inline void free_memory_RAW(bool force = false) {
-      buffer_mutex.lock();
-      if (raw_buffer != 0) {
-        reference_count--;
-        if (force || reference_count == 0) {
-          if (mempool) {
-            mempool->release(raw_buffer);
-          } else {
-            delete[] raw_buffer;
-          }
-          raw_buffer = 0;
-        }
-      }
-      buffer_mutex.unlock();
-    }
+    void free_memory_RAW(bool force = false);
 
     
     Poco::Path image_file;
@@ -182,6 +174,9 @@ namespace pathCam {
 
 
     char *raw_buffer;
+#ifdef HAVE_OPENCV_CUDAARITHM
+    char *raw_buffer_cuda;
+#endif
     cv::Mat reg_image;
     cv::Mat reg_image_uncropped;
 

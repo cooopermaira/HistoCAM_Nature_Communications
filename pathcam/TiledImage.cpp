@@ -17,8 +17,8 @@ TiledImage::TiledImage(std::shared_ptr<MRTiledImage> parent, unsigned int _tile_
                                                  logic_size(_logic_size),
                                                  logicRatio((float) _tile_size / (float) _logic_size),
                                                  levelWithinPyramid(levelWithinPyramid),
-                                                 tiles(-4096 * logicRatio, 4096 * logicRatio, -4096 * logicRatio,
-                                                       4096 * logicRatio),
+                                                 tiles(-1024 * logicRatio, 1024 * logicRatio, -1024 * logicRatio,
+                                                       1024 * logicRatio),
                                                  parent(parent) {
   if (tile_size == 0) {
     tile_size = parent->tile_size;

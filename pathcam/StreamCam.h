@@ -108,6 +108,7 @@ namespace pathCam {
     bool recordingMode = false;
 
     bool opencvWithCuda = false;
+    int compositorCudaDevice;
 
     int minPixelDistanceBetweenFrames;
     std::vector<Vec2> lastAcceptedCoords;
@@ -163,9 +164,13 @@ namespace pathCam {
 
     bool spin_run();
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+    int GPU_select_cuda_device();
+#endif
+
     bool has_flatfield(int label);
 
-    Mat get_flatfield(int label);
+    std::string get_flatfield(int label);
 
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index,
                            std::string _label);

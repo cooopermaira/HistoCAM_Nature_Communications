@@ -72,6 +72,7 @@ private:
   float logicRatio;
 
 public:
+  
   Dense2DArray<Mat*> tiles;
   cv::Rect_<float> bounds;
 

@@ -16,6 +16,11 @@ namespace pathCam {
   void CompositeManager::run() {
     unsigned long duration = 0;
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+    if (parent->opencvWithCuda) {
+      cuda::setDevice(parent->compositorCudaDevice);
+    }
+#endif
 
     rebuildJobsOutstanding = 0;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
@@ -172,6 +177,7 @@ namespace pathCam {
       RunnableIntermediate(0, 0) {
     cm = composite->parent->cm;
   }
+
 
   void RebuildRunnable::run() {
     auto image = composite->parent->get_image_ref(imageIndex);

@@ -93,6 +93,7 @@ namespace pathCam {
     void push_remaining_tiles_for_inference();
 
     void decrement_rebuild_jobs_outstanding();
+
   };
 
   class RegistrationRunnable : public RunnableIntermediate {

@@ -84,9 +84,11 @@ namespace pathCam {
       return;
     }
 
+#ifdef HAVE_OPENCV_CUDAARITHM
     if (parent->opencvWithCuda) {
-      //push image data to gpu
+      image->move_buffer_to_gpu(parent->compositorCudaDevice);
     }
+#endif
 
     if(parent->recordingMode){
       std::fstream file;

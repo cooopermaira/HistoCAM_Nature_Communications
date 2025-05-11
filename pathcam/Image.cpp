@@ -26,6 +26,36 @@ namespace pathCam {
     free_memory_RAW(true);
   }
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+  bool Image::move_buffer_to_gpu(int device) {
+    if (raw_buffer == 0) {
+      return false;
+    }
+    cudaSetDevice(device);
+    size_t nBytes = parent->image_height * parent->image_width;
+    cudaMalloc(&raw_buffer_cuda,nBytes);
+    cudaMemcpy(raw_buffer_cuda,raw_buffer,nBytes,cudaMemcpyHostToDevice);
+    free_memory_RAW();
+    return true;
+  }
+#endif
+
+  void Image::free_memory_RAW(bool force) {
+    buffer_mutex.lock();
+    if (raw_buffer != 0) {
+      reference_count--;
+      if (force || reference_count == 0) {
+        if (mempool) {
+          mempool->release(raw_buffer);
+        } else {
+          delete[] raw_buffer;
+        }
+        raw_buffer = 0;
+      }
+    }
+    buffer_mutex.unlock();
+  }
+
   bool Image::is_mostly_black() {
     float threshold_value = 20.f;
     int checkPoints = 40;
@@ -361,7 +391,9 @@ namespace pathCam {
     reg_image = temp.clone();
     buffer_mutex.unlock();
 
-    if (release) { free_memory_RAW(); }
+    if (release) {
+        free_memory_RAW();
+    }
 
 
 

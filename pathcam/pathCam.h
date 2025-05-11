@@ -18,6 +18,9 @@
 #include "opencv2/core.hpp"
 #ifdef HAVE_OPENCV_CUDAARITHM
 #include "opencv2/core/cuda.hpp"
+#include "opencv2/cudaimgproc.hpp"
+#include "opencv2/cudaarithm.hpp"
+#include <cuda_runtime.h>
 #endif
 
 

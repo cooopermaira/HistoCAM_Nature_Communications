@@ -33,8 +33,8 @@ namespace pathCam {
                                                            dr(new DiskReader(this)),
                                                            inferenceWait(true),
                                                            compositeWait(true),
-                                                           microscopeInput(true){
-      //inferencing = false;
+                                                           microscopeInput(true) {
+    //inferencing = false;
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
@@ -50,6 +50,7 @@ namespace pathCam {
     //if not, we only need one device for compositing
     if (deviceCount > inferencing) {//bool converted to int
       opencvWithCuda = true;
+      compositorCudaDevice = GPU_select_cuda_device();
     }
 #endif
 
@@ -65,65 +66,6 @@ namespace pathCam {
     cv::circle(regCircleMask, cv::Point(float(image_width / 2) * scale_factor, float(image_height / 2) * scale_factor),
                scope_radius, cv::Scalar(255),
                -1);
-
-    if (flat_field_file_2x.getExtension() == "Raw") {
-      char *buffer = new char[6464 * 4852];
-      std::ifstream stream;
-      stream.open(flat_field_file_2x.toString(), std::ios::binary);
-      stream.read(buffer, 6464 * 4852);
-      flat_field2X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
-      cvtColor(flat_field2X, flat_field2X, COLOR_BayerBG2BGR);
-      delete buffer;
-    } else {
-      flat_field2X = cv::imread(flat_field_file_2x.toString());
-    }
-
-    flat_field2X.convertTo(flat_field2X, CV_32F);
-    flat_field2X *= 1 / 170.0;
-
-    if (flat_field_file_4x.getExtension() == "Raw") {
-      char *buffer = new char[6464 * 4852];
-      std::ifstream stream;
-      stream.open(flat_field_file_4x.toString(), std::ios::binary);
-      stream.read(buffer, 6464 * 4852);
-      flat_field4X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
-      cvtColor(flat_field4X, flat_field4X, COLOR_BayerBG2BGR);
-      delete buffer;
-    } else {
-      flat_field4X = cv::imread(flat_field_file_4x.toString());
-    }
-
-    flat_field4X.convertTo(flat_field4X, CV_32F);
-    flat_field4X *= 1 / 170.0;
-
-    if (flat_field_file_10x.getExtension() == "Raw") {
-      char *buffer = new char[6464 * 4852];
-      std::ifstream stream;
-      stream.open(flat_field_file_10x.toString(), std::ios::binary);
-      stream.read(buffer, 6464 * 4852);
-      flat_field10X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
-      cvtColor(flat_field10X, flat_field10X, COLOR_BayerBG2BGR);
-      delete buffer;
-    } else {
-      flat_field10X = cv::imread(flat_field_file_10x.toString());
-    }
-    flat_field10X.convertTo(flat_field10X, CV_32F);
-    flat_field10X *= 1 / 170.0;
-
-    if (flat_field_file_20x.getExtension() == "Raw") {
-      char *buffer = new char[6464 * 4852];
-      std::ifstream stream;
-      stream.open(flat_field_file_20x.toString(), std::ios::binary);
-      stream.read(buffer, 6464 * 4852);
-      flat_field20X = cv::Mat(cv::Size(6464, 4852), CV_8U, buffer, Mat::AUTO_STEP);
-      cvtColor(flat_field20X, flat_field20X, COLOR_BayerBG2BGR);
-      delete buffer;
-    } else {
-      flat_field20X = cv::imread(flat_field_file_20x.toString());
-    }
-    flat_field20X.convertTo(flat_field20X, CV_32F);
-    flat_field20X *= 1 / 170.0;
-
   }
 
   bool StreamCam::run() {
@@ -171,6 +113,43 @@ namespace pathCam {
     lastFrameMutex->unlock();
   }
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+
+  int StreamCam::GPU_select_cuda_device() {
+    int device_count = cuda::getCudaEnabledDeviceCount();
+    if (device_count == 0) {
+      throw std::runtime_error("No CUDA devices found");
+    }
+
+    struct DeviceInfoStruct {
+      int index;
+      int major;
+      int minor;
+      float capability() const { return major + minor / 10.0f; }
+    };
+
+    std::vector<DeviceInfoStruct> devices;
+    for (int i = 0; i < device_count; ++i) {
+      cuda::DeviceInfo dev_info(i);
+      devices.push_back({i, dev_info.majorVersion(), dev_info.minorVersion()});
+    }
+
+    // Sort devices by compute capability descending
+    std::sort(devices.begin(), devices.end(), [](const auto& a, const auto& b) {
+        return a.capability() > b.capability();
+    });
+
+    int selected = 0;
+    if (inferencing && devices.size() > 1) {
+      selected = devices[1].index;
+    } else {
+      selected = devices[0].index;
+    }
+
+    cuda::setDevice(selected);
+    return selected;
+  }
+#endif
 
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx, Match *m) {
     resize_mmatch_mutex->writeLock();
@@ -185,16 +164,16 @@ namespace pathCam {
     return false;
   }
 
-  Mat StreamCam::get_flatfield(int label) {
+  std::string StreamCam::get_flatfield(int label) {
     switch (label) {
       case Image::_2X:
-        return flat_field2X;
+        return flat_field_file_2x.toString();
       case Image::_4X:
-        return flat_field4X;
+        return flat_field_file_4x.toString();
       case Image::_10X:
-        return flat_field10X;
+        return flat_field_file_10x.toString();
       case Image::_20X:
-        return flat_field20X;
+        return flat_field_file_20x.toString();
     }
   }
 
@@ -300,24 +279,22 @@ namespace pathCam {
     component_mutex->lock();
     composites.push_back(temp);
 
-    if (composites.size() - 1 == 0) {//first component added
+    if (composites.size() == 1) {//first component added
 
       //set component mag level
       if(initialLabel == 0){
         temp->componentMagLabel = get_image_ref(image_index)->label;
       }else {
         temp->componentMagLabel = initialLabel;
+        temp->get_flatfield();
       }
 
-      //set absolute coords of initial image
-      ri->set_abc(Vec2(0, 0), component_index, true);
       set_scale_and_offset(0, 1, Point2f(0, 0));
 
       //set component scale and offset to be 1 and origin
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
-      temp->update(std::vector<RegInfo *>{reg_results[image_index]});
-
+      ri->set_abc(Vec2(0, 0), component_index, true);
     } else {
 
       temp->store_new_info(ri);
