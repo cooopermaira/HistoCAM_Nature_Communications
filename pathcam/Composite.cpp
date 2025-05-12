@@ -129,22 +129,16 @@ namespace pathCam {
         stream.read(buffer, nBytes);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-        Mat fflocal(image_size,CV_8U,buffer);
-        cvtColor(fflocal,fflocal,COLOR_BayerBG2BGR);
-        fflocal.convertTo(fflocal, CV_32F);
-        auto scale = 1/170.0;
-        fflocal *= scale;
-        ffGPU.upload(fflocal);
-        // cudaMalloc(&bufferCuda, nBytes);
-        // cudaMemcpy(bufferCuda, buffer, nBytes, cudaMemcpyHostToDevice);
-        //
-        // ffGPU = cuda::GpuMat(Size(parent->image_width, parent->image_height), CV_8U, bufferCuda);
-        //
-        // cuda::cvtColor(ffGPU, ffGPU, COLOR_BayerBG2BGR);
-        // ffGPU.convertTo(ffGPU,CV_64F);
-        // double scale = 1/170.0;
-        // cuda::multiply(ffGPU, Scalar(scale), ffGPU);
-        // ffGPU.convertTo(ffGPU,CV_32F);
+        cudaMalloc(&bufferCuda, nBytes);
+        cudaMemcpy(bufferCuda, buffer, nBytes, cudaMemcpyHostToDevice);
+
+        ffGPU = cuda::GpuMat(Size(parent->image_width, parent->image_height), CV_8U, bufferCuda);
+
+        cuda::cvtColor(ffGPU, ffGPU, COLOR_BayerBG2BGR);
+        ffGPU.convertTo(ffGPU,CV_32F);
+        double scale = 1/170.0;
+        cuda::multiply(ffGPU, Scalar(scale,scale,scale), ffGPU);
+
 #else
     ff = Mat(Size(6464, 4852), CV_8U, bufferCuda, Mat::AUTO_STEP);
     cvtColor(ff,ff,COLOR_BayerBG2BGR);
