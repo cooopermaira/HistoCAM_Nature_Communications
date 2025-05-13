@@ -72,7 +72,8 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
 #ifdef WITH_SPINNAKER
   if (recording) {
-      bcam->sCam->get_last_frame(frameBox, showAsCircle);
+    int ignore;
+    bcam->sCam->get_last_frame(frameBox, showAsCircle,ignore,magLabel);
   }
 #endif
 

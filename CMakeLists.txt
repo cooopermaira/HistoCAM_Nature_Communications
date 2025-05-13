@@ -134,6 +134,12 @@ IF (NOT OVERRRIDE_SPINNAKER)
                     "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinUpdate_v140.lib"
                     "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinVideo_v140.lib")
         ENDIF ()
+    ELSE ()
+        SET(BUILD_SPINNAKER "" ON)
+        add_compile_definitions(WITH_SPINNAKER)
+        include_directories("/opt/spinnaker/include")
+        SET(SPINNAKER_LIBRARIES "/opt/spinnaker/lib/libSpinnaker.so" "/opt/spinnaker/lib/libSpinUpdate.so" "/opt/spinnaker/lib/libSpinVideo.so")
+
     ENDIF ()
 ENDIF ()
 
