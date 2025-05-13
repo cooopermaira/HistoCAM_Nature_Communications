@@ -87,7 +87,7 @@ elseif (LINUX)
     set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
     set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
     set(CMAKE_CUDA_ARCHITECTURES "native")
-ENDIF()
+ENDIF ()
 
 link_directories(${Python3_INCLUDE_DIR})
 include_directories(${Python3_INCLUDE_DIR})
@@ -135,11 +135,12 @@ IF (NOT OVERRRIDE_SPINNAKER)
                     "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinVideo_v140.lib")
         ENDIF ()
     ELSE ()
-        SET(BUILD_SPINNAKER "" ON)
-        add_compile_definitions(WITH_SPINNAKER)
-        include_directories("/opt/spinnaker/include")
-        SET(SPINNAKER_LIBRARIES "/opt/spinnaker/lib/libSpinnaker.so" "/opt/spinnaker/lib/libSpinUpdate.so" "/opt/spinnaker/lib/libSpinVideo.so")
-
+        IF (EXISTS "/opt/spinnaker")
+            SET(BUILD_SPINNAKER "" ON)
+            add_compile_definitions(WITH_SPINNAKER)
+            include_directories("/opt/spinnaker/include")
+            SET(SPINNAKER_LIBRARIES "/opt/spinnaker/lib/libSpinnaker.so" "/opt/spinnaker/lib/libSpinUpdate.so" "/opt/spinnaker/lib/libSpinVideo.so")
+        endif ()
     ENDIF ()
 ENDIF ()
 
@@ -157,7 +158,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 include_directories(pathcam)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} )
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB})
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})
@@ -245,7 +246,6 @@ IF (BUILD_PATHCAM_GUI)
     )
 
 
-
     target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
 
     if (MSVC)
@@ -269,7 +269,7 @@ IF (BUILD_PATHCAM_GUI)
     endif ()
 
 
-    ENDIF ()
+ENDIF ()
 
 
 
