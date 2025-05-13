@@ -128,8 +128,12 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
 
     matROI = mat(ROIrect);
 
-
+#ifdef HAVE_OPENCV_CUDAARITHM
+    temp = Mat(tile_size,tile_size,CV_8UC4);
+    getTile(x,y).download(temp);
+#else
     temp = getTile(x, y);
+#endif
 
     tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                        matROI.rows);
@@ -163,49 +167,6 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
 }
 
 
-void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &myCV) {
-  try {
-    //find appropriate region of upper level
-    float xloc = myLevelRegion.x / 2.f;
-    float yloc = myLevelRegion.y / 2.f;
-    float width = myLevelRegion.width / 2.f;
-    float height = myLevelRegion.height / 2.f;
-    auto theirLevelRegion = cv::Rect_<float>(xloc, yloc, width, height);
-
-    //find appropriate tiles
-    Point2i theirTileIndex;
-    theirTileIndex.x = myTileIndex.x < 0 ? (myTileIndex.x - 1) / 2 : myTileIndex.x / 2;
-    theirTileIndex.y = myTileIndex.y < 0 ? (myTileIndex.y - 1) / 2 : myTileIndex.y / 2;
-
-    //make theirLevelRegion relative to tile
-    float theirTileRegionX = (long) theirLevelRegion.x % tile_size;
-    theirTileRegionX = theirTileRegionX < 0 ? theirTileRegionX + tile_size : theirTileRegionX;
-    float theirTileRegionY = (long) theirLevelRegion.y % tile_size;
-    theirTileRegionY = theirTileRegionY < 0 ? theirTileRegionY + tile_size : theirTileRegionY;
-
-    //calculate theirROI and grab tile
-    cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
-    auto theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
-
-    //resize self cv image into their cv image ROI
-    Mat temp1 = theirCV(theirROI);
-    assert(theirCV(theirROI).rows == myCV.rows / 2 && theirCV(theirROI).cols == myCV.cols / 2);
-    auto testSize = Size(theirCV(theirROI).cols, theirCV(theirROI).rows);
-    resize(myCV, theirCV(theirROI), testSize);
-
-
-    //continue up pyramid
-    if (levelWithinPyramid + 1 < parent->level.size() - 1) {
-      parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirCV(theirROI));
-    }
-
-  }
-  catch (cv::Exception &e) {
-    int k = 0;
-  }
-}
-
-
 void TiledImage::matToImage2(const cv::Mat mat, cv::Mat image,
                              Point2f offset, cv::Rect_<float> image_box,
                              cv::Rect_<float> tile_box) {
@@ -234,8 +195,10 @@ void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
   for (int x = tL.x; x <= bR.x; x++) {
     for (int y = tL.y; y <= bR.y; y++) {
       //get tile
-      Mat tile = getTile(x, y);
-      *tiles(x, y) = Mat::zeros(tile_size, tile_size, CV_8UC4);
+
+      if (tiles(x,y)->data) {
+        tiles(x,y)->setTo(Scalar(0,0,0,0));
+      }
       Point_ loc = Point2i(x, y);
       Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size, tile_size);
       tileUpwards(loc, levelRegion, *tiles(x, y));
@@ -313,7 +276,13 @@ void TiledImage::insertMat(cv::Mat image_in, cv::Rect_<float> box) {
       Point2f offset = box.tl();
 
       if (image_in.type() == CV_8UC4) {
-        matToImage2(image_in, *tiles(i, j), offset * scale,
+#ifdef HAVE_OPENCV_CUDAARITHM
+        Mat temp(tile_size,tile_size,CV_8UC4);
+        tiles(i,j)->download(temp);
+#else
+        Mat temp = *tiles(i,j);
+#endif
+        matToImage2(image_in, temp, offset * scale,
                     rect_mult<float>(image_box, scale),
                     rect_mult<float>(tile_box, scale));
       } else {
@@ -335,11 +304,21 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
 
   for (int i = getIJ(top_left).x; i <= getIJ(bottom_right).x; i++) {
     for (int j = getIJ(top_left).y; j <= getIJ(bottom_right).y; j++) {
+
       int x = i * (int) logic_size - box.x;
       int y = j * (int) logic_size - box.y;
       cv::Rect_<float> rect = cv::Rect_<float>(x, y, logic_size, logic_size);
+      if (i==10 && j==10 && levelWithinPyramid == 0) {
+        int k = 0;
+      }
       if (tiles(i, j) == nullptr) { continue; };
-      box_tiles.push_back(TileQuery(*tiles(i, j), i, j, rect));
+#ifdef HAVE_OPENCV_CUDAARITHM
+      Mat temp(tile_size,tile_size,CV_8UC4);
+      tiles(i,j)->download(temp);
+#else
+      Mat temp = *tiles(i, j);
+#endif
+      box_tiles.push_back(TileQuery(temp, i, j, rect));
     }
   }
 
@@ -373,8 +352,12 @@ void TiledImage::saveBaseTilesToDisk() {
 
           int xloc = (x - minx) * (int) tile_size + xsubtile * 256;
           int yloc = (y - miny) * (int) tile_size + ysubtile * 256;
-
+#ifdef HAVE_OPENCV_CUDAARITHM
+          Mat temp(tile_size,tile_size,CV_8UC4);
+          (*tiles(x,y)).download(temp);
+#else
           Mat temp = *tiles(x, y);
+#endif
           Mat gry;
           cvtColor(temp(roi), gry, COLOR_BGR2GRAY);
           if (countNonZero(gry) > 0.95 * 256 * 256) {
@@ -388,13 +371,117 @@ void TiledImage::saveBaseTilesToDisk() {
   }
 }
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+
+
+void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cuda::GpuMat &myCV) {
+  try {
+    //find appropriate region of upper level
+    float xloc = myLevelRegion.x / 2.f;
+    float yloc = myLevelRegion.y / 2.f;
+    float width = myLevelRegion.width / 2.f;
+    float height = myLevelRegion.height / 2.f;
+    auto theirLevelRegion = cv::Rect_<float>(xloc, yloc, width, height);
+
+    //find appropriate tiles
+    Point2i theirTileIndex;
+    theirTileIndex.x = myTileIndex.x < 0 ? (myTileIndex.x - 1) / 2 : myTileIndex.x / 2;
+    theirTileIndex.y = myTileIndex.y < 0 ? (myTileIndex.y - 1) / 2 : myTileIndex.y / 2;
+
+    //make theirLevelRegion relative to tile
+    float theirTileRegionX = (long) theirLevelRegion.x % tile_size;
+    theirTileRegionX = theirTileRegionX < 0 ? theirTileRegionX + tile_size : theirTileRegionX;
+    float theirTileRegionY = (long) theirLevelRegion.y % tile_size;
+    theirTileRegionY = theirTileRegionY < 0 ? theirTileRegionY + tile_size : theirTileRegionY;
+
+    //calculate theirROI and grab tile
+    cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
+    auto theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
+
+    //resize self cv image into their cv image ROI
+    auto temp1 = theirCV(theirROI);
+    assert(theirCV(theirROI).rows == myCV.rows / 2 && theirCV(theirROI).cols == myCV.cols / 2);
+    auto testSize = Size(theirCV(theirROI).cols, theirCV(theirROI).rows);
+    resize(myCV, theirCV(theirROI), testSize);
+
+
+    //continue up pyramid
+    if (levelWithinPyramid + 1 < parent->level.size() - 1) {
+      parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirCV(theirROI));
+    }
+
+  }
+  catch (cv::Exception &e) {
+    int k = 0;
+  }
+}
+
+
+cuda::GpuMat TiledImage::getTile(int x, int y) {
+  makeTile(x, y);
+  return *tiles(x, y);
+}
+#else
+
+
+
+void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &myCV) {
+  try {
+    //find appropriate region of upper level
+    float xloc = myLevelRegion.x / 2.f;
+    float yloc = myLevelRegion.y / 2.f;
+    float width = myLevelRegion.width / 2.f;
+    float height = myLevelRegion.height / 2.f;
+    auto theirLevelRegion = cv::Rect_<float>(xloc, yloc, width, height);
+
+    //find appropriate tiles
+    Point2i theirTileIndex;
+    theirTileIndex.x = myTileIndex.x < 0 ? (myTileIndex.x - 1) / 2 : myTileIndex.x / 2;
+    theirTileIndex.y = myTileIndex.y < 0 ? (myTileIndex.y - 1) / 2 : myTileIndex.y / 2;
+
+    //make theirLevelRegion relative to tile
+    float theirTileRegionX = (long) theirLevelRegion.x % tile_size;
+    theirTileRegionX = theirTileRegionX < 0 ? theirTileRegionX + tile_size : theirTileRegionX;
+    float theirTileRegionY = (long) theirLevelRegion.y % tile_size;
+    theirTileRegionY = theirTileRegionY < 0 ? theirTileRegionY + tile_size : theirTileRegionY;
+
+    //calculate theirROI and grab tile
+    cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
+    auto theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
+
+    //resize self cv image into their cv image ROI
+    Mat temp1 = theirCV(theirROI);
+    assert(theirCV(theirROI).rows == myCV.rows / 2 && theirCV(theirROI).cols == myCV.cols / 2);
+    auto testSize = Size(theirCV(theirROI).cols, theirCV(theirROI).rows);
+    resize(myCV, theirCV(theirROI), testSize);
+
+
+    //continue up pyramid
+    if (levelWithinPyramid + 1 < parent->level.size() - 1) {
+      parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirCV(theirROI));
+    }
+
+  }
+  catch (cv::Exception &e) {
+    int k = 0;
+  }
+}
+
 Mat TiledImage::getTile(int x, int y) {
   makeTile(x, y);
   return *tiles(x, y);
 }
+#endif
 
 void TiledImage::makeTile(int x, int y) {
-  if (tiles(x, y) == NULL) {
+  if (x==10 && y==10 && levelWithinPyramid == 0) {
+    int k = 0;
+  }
+  if (tiles(x, y) == nullptr) {
+#ifdef HAVE_OPENCV_CUDAARITHM
+    tiles(x, y) = new cuda::GpuMat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
+#else
     tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
+#endif
   }
 }
