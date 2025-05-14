@@ -45,12 +45,8 @@ RUN apt-get update && \
     software-properties-common \
     unixodbc-dev \
     vim \
-    libusb-1.0-0 \
-    libusb-1.0-0-dev \
     gcc-11 \
     g++-11 \
-    debconf-utils \
-    sudo \
     && \
     update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100 && \
     update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100 && \
@@ -87,29 +83,6 @@ ENV CUDA_VERSION="12.6" \
 #    cuda-nvtx-$(echo ${CUDA_VERSION} | sed 's/\./-/') \
 #    && \
 #    true
-
-WORKDIR /opt
-
-COPY lib/spinnaker-4.2.0.46-amd64-22.04-pkg.tar.gz .
-
-RUN echo "libgentl libspinnaker/accepted-flir-eula select true" | sudo debconf-set-selections
-
-RUN tar zxfv spinnaker-4.2.0.46-amd64-22.04-pkg.tar.gz && \
-    cd spinnaker-* && \
-    dpkg -i ./libgentl_*.deb && \
-    dpkg -i libspinnaker_*.deb  && \
-    dpkg -i libspinnaker-dev_*.deb  && \
-    dpkg -i libspinnaker-c_*.deb  && \
-    dpkg -i libspinnaker-c-dev_*.deb  && \
-    dpkg -i libspinvideo_*.deb  && \
-    dpkg -i libspinvideo-dev_*.deb  && \
-    dpkg -i libspinvideo-c_*.deb  && \
-    dpkg -i libspinvideo-c-dev_*.deb  && \
-    dpkg -i spinupdate_*.deb  && \
-    dpkg -i spinupdate-dev_*.deb  && \
-    dpkg -i spinnaker_*.deb  && \
-    dpkg -i spinnaker-doc_*.deb
-
 
 ENV CUDA_PATH=/usr/local/cuda \
     CUDA_HOME=/usr/local/cuda-${CUDA_VERSION} \

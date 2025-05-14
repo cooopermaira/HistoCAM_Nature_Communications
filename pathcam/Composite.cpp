@@ -138,7 +138,6 @@ namespace pathCam {
         ffGPU.convertTo(ffGPU,CV_32F);
         double scale = 1/170.0;
         cuda::multiply(ffGPU, Scalar(scale,scale,scale), ffGPU);
-
 #else
     ff = Mat(Size(6464, 4852), CV_8U, bufferCuda, Mat::AUTO_STEP);
     cvtColor(ff,ff,COLOR_BayerBG2BGR);
@@ -427,11 +426,13 @@ namespace pathCam {
                 calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
             } else {
                 calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
+#ifndef HAVE_OPENCV_CUDAARITHM
                 imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
+#endif
             }
-
+#ifndef HAVE_OPENCV_CUDAARITHM
             imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-
+#endif
             if (parent->inferencing) {
                 std::vector<Point2i> tiles;
                 tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
@@ -887,7 +888,11 @@ namespace pathCam {
                         if (imagePyramid->level[0]->tiles(x, y) == NULL) {
                             tile = Mat(Size(tile_size, tile_size), CV_8UC4, Scalar(0, 0, 0, 0));
                         } else {
+#ifdef HAVE_OPENCV_CUDAARITHM
+                            level->getTile(x,y).download(tile);
+#else
                             tile = level->getTile(x, y).clone();
+#endif
                         }
                         auto searchForTile = Point2i(x, y);
                         if (std::find(effectedTiles.begin(), effectedTiles.end(), Point2i(x, y)) != effectedTiles.
@@ -895,7 +900,11 @@ namespace pathCam {
                             tile = 0.5 * tile + 0.5 * greyBlend;
                         }
                     } else {
+#ifdef HAVE_OPENCV_CUDAARITHM
+                        level->getTile(x,y).download(tile);
+#else
                         tile = level->getTile(x, y).clone();
+#endif
                     }
 
                     if (_withGrid) {
@@ -1364,6 +1373,8 @@ namespace pathCam {
 
 
     void ImageToTileCopyRunnable::run() {
+        std::cout<<"deprecated method ImageToTileCopyRunnable::run()"<<std::endl;
+        assert(false);
         auto composite = parent->composites[component_membership];
         try {
             auto mask = composite->polyMaskOutput;
@@ -1373,7 +1384,7 @@ namespace pathCam {
             auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width,
                                              image->height);
 
-            composite->imagePyramid->insertTilesAtBase(imageMat, mask, imageBox, {tile});
+            //composite->imagePyramid->insertTilesAtBase(imageMat, mask, imageBox, {tile});
         } catch (cv::Exception &e) {
             int k = 0;
         }

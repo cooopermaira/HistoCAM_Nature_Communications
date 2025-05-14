@@ -72,8 +72,11 @@ private:
   float logicRatio;
 
 public:
-  
+#ifdef HAVE_OPENCV_CUDAARITHM
+  Dense2DArray<cuda::GpuMat*> tiles;
+#else
   Dense2DArray<Mat*> tiles;
+#endif
   cv::Rect_<float> bounds;
 
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
@@ -95,13 +98,29 @@ public:
 
   void insertMatAtBase(cv::Mat image_in, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
 
+
+
+  void saveBaseTilesToDisk();
+
+#ifdef HAVE_OPENCV_CUDAARITHM
+  void matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask,int x, int y, Point2f rootOffset,
+               cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
+
+  void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+
+  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, const cuda::GpuMat &mat);
+
+  cuda::GpuMat getTile(int x, int y);
+#else
+  void matToTile(const cv::Mat &mat, const cv::Mat &mask,int x, int y, Point2f rootOffset,
+               cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
+
   void insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
 
   void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
 
-  void saveBaseTilesToDisk();
-
   Mat getTile(int x, int y);
+#endif
 
   inline Point2i getIJ(Point2f p) {
     Point2i ij = Point2i(p.x / (int) logic_size, p.y / (int) logic_size);
@@ -116,8 +135,6 @@ private:
   void matToImage(const cv::Mat &mat, cv::Mat *image, Point2f offset,
                   cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
-  void matToTile(const cv::Mat &mat, const cv::Mat &mask,int x, int y, Point2f rootOffset,
-                 cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
   void matToImage4Channel(const cv::Mat &mat, int x, int y, Point2f rootOffset,
                           cv::Rect_<float> image_box, cv::Rect_<float> tile_box);

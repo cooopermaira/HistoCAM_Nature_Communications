@@ -115,9 +115,10 @@ namespace pathCam {
             }
 
             //for some reason, removing this convert and doing from_blob right from tile makes it slower
-            cvtColor(pyramidLevel->getTile(std::get<0>(tileList[i]), std::get<1>(tileList[i])),
-                     threeChannelPreallocated,
-                     COLOR_BGRA2RGB);
+//cudarevisit
+            // cvtColor(pyramidLevel->getTile(std::get<0>(tileList[i]), std::get<1>(tileList[i])),
+            //          threeChannelPreallocated,
+            //          COLOR_BGRA2RGB);
 
 
             //clone would be necessary if not immediately moved to gpu. Tensor from_blob keeps ref to orig obj
