@@ -9,6 +9,9 @@ build/
 node_modules/
 dist/
 
+*.o
+*.d
+
 # Compiled Java class files
 *.class
 
