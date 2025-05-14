@@ -426,11 +426,13 @@ namespace pathCam {
                 calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
             } else {
                 calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
+#ifndef HAVE_OPENCV_CUDAARITHM
                 imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
+#endif
             }
-
+#ifndef HAVE_OPENCV_CUDAARITHM
             imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-
+#endif
             if (parent->inferencing) {
                 std::vector<Point2i> tiles;
                 tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
@@ -1371,6 +1373,8 @@ namespace pathCam {
 
 
     void ImageToTileCopyRunnable::run() {
+        std::cout<<"deprecated method ImageToTileCopyRunnable::run()"<<std::endl;
+        assert(false);
         auto composite = parent->composites[component_membership];
         try {
             auto mask = composite->polyMaskOutput;
@@ -1380,7 +1384,7 @@ namespace pathCam {
             auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width,
                                              image->height);
 
-            composite->imagePyramid->insertTilesAtBase(imageMat, mask, imageBox, {tile});
+            //composite->imagePyramid->insertTilesAtBase(imageMat, mask, imageBox, {tile});
         } catch (cv::Exception &e) {
             int k = 0;
         }

@@ -25,39 +25,6 @@ TiledImage::TiledImage(std::shared_ptr<MRTiledImage> parent, unsigned int _tile_
     }
 };
 
-void TiledImage::insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
-                                   std::vector<Point2i> retileIndices) {
-    unsigned int width = image_in.cols;
-    unsigned int height = image_in.rows;
-
-    assert(int(box.width*logicRatio) == width &&
-        int(box.height*logicRatio) == height);
-
-    bounds = bounds | box;
-
-    for (auto &tile: retileIndices) {
-        try {
-            int x = tile.x;
-            int y = tile.y;
-
-            cv::Rect_<float> tile_box = cv::Rect_<float>(x * float(logic_size),
-                                                         y * float(logic_size),
-                                                         logic_size,
-                                                         logic_size);
-
-            cv::Rect_<float> image_box = tile_box & box;
-
-            Point2f offset = box.tl(); //equivalent of root offset
-
-
-            matToTile(image_in, mask, x, y, offset * logicRatio,
-                      rect_mult<float>(image_box, logicRatio),
-                      rect_mult<float>(tile_box, logicRatio));
-        } catch (cv::Exception &e) {
-            int k = 0;
-        }
-    }
-}
 
 void TiledImage::insertMatAtBase(cv::Mat image_in, cv::Rect_<float> box, std::vector<Point2i> retileIndices) {
     unsigned int width = image_in.cols;
@@ -109,57 +76,6 @@ void TiledImage::matToImage4Channel(const cv::Mat &mat, int x, int y, Point2f ro
     }
 }
 
-void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y, cv::Point2f rootOffset,
-                           cv::Rect_<float> image_box, cv::Rect_<float> tile_box) {
-    cv::Rect ROIrect((int) (image_box.x - rootOffset.x),
-                     (int) (image_box.y - rootOffset.y),
-                     (int) image_box.width,
-                     (int) image_box.height);
-    if (ROIrect.width * ROIrect.height > 0) {
-        Mat matROI;
-        Mat temp;
-        Rect tileROI;
-
-        matROI = mat(ROIrect);
-
-#ifdef HAVE_OPENCV_CUDAARITHM
-        temp = Mat(tile_size, tile_size,CV_8UC4);
-        getTile(x, y).download(temp);
-#else
-    temp = getTile(x, y);
-#endif
-
-        tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
-                           matROI.rows);
-
-        if (mask.data) {
-            matROI.copyTo(temp(tileROI), mask(ROIrect));
-        } else {
-            matROI.copyTo(temp(tileROI));
-        }
-
-        (*tiles(x, y)).upload(temp);
-        //
-        //      //debug
-        //      auto white = Mat(matROI.rows, matROI.cols, CV_8U,Scalar(255));
-        //      white -= mask(ROIrect);
-        //      auto receive = Mat(matROI.rows, matROI.cols, CV_8UC4,Scalar(0,0,0,0));
-        //      matROI.copyTo(receive(tileROI),mask(ROIrect));
-        //
-        //      rectangle(white,Point(5,5),Point(white.cols - 5, white.rows - 5),Scalar(0),15);
-        //      rectangle(receive,Point(5,5),Point(white.cols - 5, white.rows - 5),Scalar(0,0,0,255),15);
-        //      rectangle(matROI,Point(5,5),Point(white.cols - 5, white.rows - 5),Scalar(0,0,0,255),15);
-        //
-        //      imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/"+std::to_string(x)+"_"+std::to_string(y)+"imageROI.png",matROI);
-        //      imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/"+std::to_string(x)+"_"+std::to_string(y)+"final.png",receive);
-        //      imwrite("/Users/coopermaira/Desktop/pathcam_data/figure_making/dump/"+std::to_string(x)+"_"+std::to_string(y)+"maskROI.png",white);
-
-        assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
-
-
-        tileUpwards(Point2i(x, y), tile_box, *tiles(x, y));
-    }
-}
 
 
 void TiledImage::matToImage2(const cv::Mat mat, cv::Mat image,
@@ -293,16 +209,13 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
         for (int j = getIJ(top_left).y; j <= getIJ(bottom_right).y; j++) {
             int x = i * (int) logic_size - box.x;
             int y = j * (int) logic_size - box.y;
-            cv::Rect_<float> rect = cv::Rect_<float>(x, y, logic_size, logic_size);
-            if (i == 10 && j == 10 && levelWithinPyramid == 0) {
-                int k = 0;
-            }
+            Rect_<float> rect = cv::Rect_<float>(x, y, logic_size, logic_size);
             if (tiles(i, j) == nullptr) { continue; };
 #ifdef HAVE_OPENCV_CUDAARITHM
             Mat temp(tile_size, tile_size,CV_8UC4);
             tiles(i, j)->download(temp);
 #else
-      Mat temp = *tiles(i, j);
+            Mat temp = *tiles(i, j);
 #endif
             box_tiles.push_back(TileQuery(temp, i, j, rect));
         }
@@ -357,6 +270,75 @@ void TiledImage::saveBaseTilesToDisk() {
 }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
+void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, int x, int y, cv::Point2f rootOffset,
+                           cv::Rect_<float> image_box, cv::Rect_<float> tile_box) {
+    cv::Rect ROIrect((int) (image_box.x - rootOffset.x),
+                     (int) (image_box.y - rootOffset.y),
+                     (int) image_box.width,
+                     (int) image_box.height);
+    if (ROIrect.width * ROIrect.height > 0) {
+        cuda::GpuMat matROI;
+        cuda::GpuMat temp;
+        Rect tileROI;
+
+        matROI = mat(ROIrect);
+
+        temp = getTile(x, y);
+
+        tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
+                           matROI.rows);
+
+        //copying to temp also copies to tiles(x,y) since they both point at the same data. We create temp
+        //because its clearer than (*tiles(x,y))(region of interest)
+        if (mask.data) {
+            matROI.copyTo(temp(tileROI), mask(ROIrect));
+        } else {
+            matROI.copyTo(temp(tileROI));
+        }
+
+        assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
+
+        tileUpwards(Point2i(x, y), tile_box, *tiles(x, y));
+    }
+}
+
+
+void TiledImage::insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box,
+                                   std::vector<Point2i> retileIndices) {
+    unsigned int width = image_in.cols;
+    unsigned int height = image_in.rows;
+
+    assert(int(box.width*logicRatio) == width &&
+        int(box.height*logicRatio) == height);
+
+    bounds = bounds | box;
+
+    for (auto &tile: retileIndices) {
+        try {
+            int x = tile.x;
+            int y = tile.y;
+
+            cv::Rect_<float> tile_box = cv::Rect_<float>(x * float(logic_size),
+                                                         y * float(logic_size),
+                                                         logic_size,
+                                                         logic_size);
+
+            cv::Rect_<float> image_box = tile_box & box;
+
+            Point2f offset = box.tl(); //equivalent of root offset
+
+
+            matToTile(image_in, mask, x, y, offset * logicRatio,
+                      rect_mult<float>(image_box, logicRatio),
+                      rect_mult<float>(tile_box, logicRatio));
+        } catch (cv::Exception &e) {
+            std::cout<<"cv error in insertTilesAtBase"<<std::endl;
+            std::cout << e.what() << std::endl;
+            int k = 0;
+        }
+    }
+}
+
 
 
 void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cuda::GpuMat &myCV) {
@@ -407,6 +389,71 @@ cuda::GpuMat TiledImage::getTile(int x, int y) {
     return *tiles(x, y);
 }
 #else
+void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y, cv::Point2f rootOffset,
+                           cv::Rect_<float> image_box, cv::Rect_<float> tile_box) {
+    cv::Rect ROIrect((int) (image_box.x - rootOffset.x),
+                     (int) (image_box.y - rootOffset.y),
+                     (int) image_box.width,
+                     (int) image_box.height);
+    if (ROIrect.width * ROIrect.height > 0) {
+        Mat matROI;
+        Mat temp;
+        Rect tileROI;
+
+        matROI = mat(ROIrect);
+
+        temp = getTile(x, y);
+
+        tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
+                           matROI.rows);
+
+        if (mask.data) {
+            matROI.copyTo(temp(tileROI), mask(ROIrect));
+        } else {
+            matROI.copyTo(temp(tileROI));
+        }
+
+        assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
+
+
+        tileUpwards(Point2i(x, y), tile_box, *tiles(x, y));
+    }
+}
+
+
+void TiledImage::insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box,
+                                   std::vector<Point2i> retileIndices) {
+    unsigned int width = image_in.cols;
+    unsigned int height = image_in.rows;
+
+    assert(int(box.width*logicRatio) == width &&
+        int(box.height*logicRatio) == height);
+
+    bounds = bounds | box;
+
+    for (auto &tile: retileIndices) {
+        try {
+            int x = tile.x;
+            int y = tile.y;
+
+            cv::Rect_<float> tile_box = cv::Rect_<float>(x * float(logic_size),
+                                                         y * float(logic_size),
+                                                         logic_size,
+                                                         logic_size);
+
+            cv::Rect_<float> image_box = tile_box & box;
+
+            Point2f offset = box.tl(); //equivalent of root offset
+
+
+            matToTile(image_in, mask, x, y, offset * logicRatio,
+                      rect_mult<float>(image_box, logicRatio),
+                      rect_mult<float>(tile_box, logicRatio));
+        } catch (cv::Exception &e) {
+            int k = 0;
+        }
+    }
+}
 
 
 
@@ -459,14 +506,11 @@ Mat TiledImage::getTile(int x, int y) {
 #endif
 
 void TiledImage::makeTile(int x, int y) {
-    if (x == 10 && y == 10 && levelWithinPyramid == 0) {
-        int k = 0;
-    }
     if (tiles(x, y) == nullptr) {
 #ifdef HAVE_OPENCV_CUDAARITHM
         tiles(x, y) = new cuda::GpuMat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
 #else
-    tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
+        tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
 #endif
     }
 }
