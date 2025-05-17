@@ -20,7 +20,8 @@ namespace pathCam {
                                                                                                           image_file(
                                                                                                               Poco::Path()),
                                                                                                           blurVariance(
-                                                                                                              0) {};
+                                                                                                              0),
+  cudaBufferReady(false) {};
 
   Image::~Image() {
     free_memory_RAW(true);
@@ -36,13 +37,20 @@ namespace pathCam {
     cudaMalloc(&raw_buffer_cuda,nBytes);
     cudaMemcpy(raw_buffer_cuda,raw_buffer,nBytes,cudaMemcpyHostToDevice);
     free_memory_RAW();
+
+    {
+      std::lock_guard<std::mutex> lock(cudaBufferMutex);
+      cudaBufferReady = true;
+      cudaBufferConVar.notify_one();
+    }
+
     return true;
   }
 #endif
 
   void Image::free_memory_RAW(bool force) {
     buffer_mutex.lock();
-    if (raw_buffer != 0) {
+    if (raw_buffer != nullptr) {
       reference_count--;
       if (force || reference_count == 0) {
         if (mempool) {
@@ -50,7 +58,7 @@ namespace pathCam {
         } else {
           delete[] raw_buffer;
         }
-        raw_buffer = 0;
+        raw_buffer = nullptr;
       }
     }
     buffer_mutex.unlock();

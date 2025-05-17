@@ -29,6 +29,9 @@ namespace pathCam {
     Vec2 absoluteCoords;
 
     Poco::FastMutex buffer_mutex;
+    std::mutex cudaBufferMutex;
+    std::condition_variable cudaBufferConVar;
+    bool cudaBufferReady;
 
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::KeyPoint> keypointsMultilevel;

@@ -37,6 +37,7 @@ namespace pathCam {
         channelsGPU.resize(4);
         threeChannelPrealGPU = cuda::GpuMat(image_size, CV_8UC3);
         fourChannelPreallocated = Mat::zeros(image_size, CV_8UC4);
+        //make_meshgrid();
 #endif
 
         channels.resize(2);
@@ -317,6 +318,7 @@ namespace pathCam {
             _face.push_back((Point2i) ii);
         }
 
+        clean_face(_face);
         //build polygon mask for new point
         cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
 
@@ -505,9 +507,10 @@ namespace pathCam {
         float yPixelBoundHigh = float(rowBoundFalseHigh) * float(imagePyramid->tile_size);
 
         //for each edge of the voronoi mask
-        for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
+        for (int ii = 0; ii < maskAsPolygon.size()-1; ii++) {
             //if we are at the last point, make the next point the first point (this makes the last edge)
-            int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
+            //int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
+            int ii2 = ii + 1;
 
             //create an Point2f from the cv::Point2i and shift voronoi mask to tile space
             auto p1 = Point2f(maskAsPolygon[ii].x + absCoord.x, maskAsPolygon[ii].y + absCoord.y);

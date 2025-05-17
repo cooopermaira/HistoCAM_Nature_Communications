@@ -8,32 +8,29 @@
 #include <stdio.h>
 #include <pathCam.h>
 
-namespace pathCam{
+namespace pathCam {
+  QManager::QManager(StreamCam *parent): parent(parent) {
+  };
 
-QManager::QManager(StreamCam *parent): parent(parent){};
-
-void QManager::run(){
-  auto jq = parent->JobQ;
-  Poco::Thread::sleep(200);
-  while(parent->compositing){
-    //jq->run_jobs(false);
-    if (jq->pool->available()){
-      if (!jq->is_empty())
-      {
-        jq->queue_mutex->lock();
-        auto j = jq->jobQueue.top();
-        jq->pool->start(*jq->jobQueue.top());
-        jq->jobQueue.pop();
-        jq->queue_mutex->unlock();
+  void QManager::run() {
+    auto jq = parent->JobQ;
+    Poco::Thread::sleep(200);
+    int loaderJobsThru = 0;
+    while (parent->compositing) {
+      //jq->run_jobs(false);
+      if (jq->pool->available()) {
+        if (!jq->is_empty()) {
+          jq->queue_mutex->lock();
+          auto j = jq->jobQueue.top();
+          jq->pool->start(*jq->jobQueue.top());
+          jq->jobQueue.pop();
+          jq->queue_mutex->unlock();
+        }
       }
+
+      //    else {
+      //      jq->pool->threadAvailableEvent->wait();
+      //    }
     }
-
-//    else {
-//      jq->pool->threadAvailableEvent->wait();
-//    }
-
   }
-}
-
-
 }

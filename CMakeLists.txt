@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.22)
 project(pathCam)
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -49,7 +49,12 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 
 add_subdirectory(poco)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Linux-specific commands
+    message(STATUS "Building on Linux")
+endif()
 
+message(STATUS "hell1o")
 IF (APPLE)
     SET(Torch_DIR "/Users/coopermaira/libtorch_2.4.0")
     add_compile_definitions(WITH_MPS)
@@ -73,20 +78,24 @@ ELSEIF (WIN32)
     set(Python3_INCLUDE_DIR "C:/Program Files/Python311/Include")
     set(Python3_LIBRARY_DIR "C:/Program Files/Python311/libs")
     set(Python3_LIB "python311")
-elseif (LINUX)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
-    SET(Torch_DIR "/home/max/libtorch-cxx11-abi-shared-with-deps-2.5.1+cu118/libtorch")
+    list(APPEND CMAKE_MODULE_PATH "/home/max/libtorch/share/cmake/Torch")
 
+    message(STATUS "Am I being used?!!! ${CMAKE_MODULE_PATH}")
+    #SET(Torch_DIR "/home/max/libtorch/share/cmake/Torch")
     SET(Python3_INCLUDE_DIR "/home/max/Python-3.11.0/shared_library_dynamic/include/python3.11")
     SET(Python3_LIBRARY_DIR "/home/max/Python-3.11.0/shared_library_dynamic/lib")
     SET(Python3_LIB "/home/max/Python-3.11.0/shared_library_dynamic/lib/libpython3.11.so")
 
-    set(CMAKE_CUDA_COMPILER "/usr/local/cuda-11.8/bin/nvcc")
-    SET(CUDAToolkit_ROOT_DIR "/usr/local/cuda-11.8" CACHE PATH "CUDA toolkit root")
-    set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-11.8/bin/nvcc")
-    set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
-    set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
+    set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
+    #SET(CUDAToolkit_ROOT_DIR "/usr/local/cuda-11.8" CACHE PATH "CUDA toolkit root")
+    #set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-11.8/bin/nvcc")
+    #set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
+    #set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
     set(CMAKE_CUDA_ARCHITECTURES "native")
+else()
+    message(STATUS "else here")
 ENDIF ()
 
 link_directories(${Python3_INCLUDE_DIR})
@@ -100,7 +109,10 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 
-list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
+#list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
+#list(APPEND CMAKE_MODULE_PATH "/home/max/libtorch/share/cmake/Torch/TorchConfig.cmake")
+set(Torch_DIR "/home/max/libtorch/share/cmake/Torch")
+message(STATUS "Am I being used?!!! ${CMAKE_MODULE_PATH}")
 find_package(Torch REQUIRED)
 #add_library(torch_python_shared SHARED IMPORTED)
 #set_target_properties(torch_python_shared PROPERTIES IMPORTED_LOCATION "/home/max/venv-2/lib/python3.10/site-packages/torch/lib/libtorch_python.so")

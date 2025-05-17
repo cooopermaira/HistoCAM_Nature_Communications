@@ -70,8 +70,8 @@ void CameraStream::run(){
         // Set integer value from entry node as new value of enumeration node
         ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
 
-        cout << "Acquisition mode set to continuous..." << endl;
       parent->pCam->BeginAcquisition();
+     // cout << "Acquiring images..." << endl;
       
       parent->camlogger.information("Acquiring images...");
       
@@ -89,7 +89,7 @@ void CameraStream::run(){
           if (pResultImage->IsIncomplete()){
             parent->camlogger.warning(Poco::format("Image incomplete: %s",
                                            Spinnaker::Image::GetImageStatusDescription(pResultImage->GetImageStatus())));
-            
+            cout<<"image no good"<<endl<<endl;
           }else{
             
             //const size_t width = pResultImage->GetWidth();
@@ -101,7 +101,7 @@ void CameraStream::run(){
             //image->increment_smart_pointer();
 
             std::string str = std::to_string(i) + ".Raw";
-            i++;
+
             //Poco::DateTime time = Poco::DateTime();
             //std::string str = Poco::DateTimeFormatter::format(Poco::DateTime(), "%Y%m%d%H%M%S%i") + ".Raw";
             
@@ -124,6 +124,7 @@ void CameraStream::run(){
             image_path.append(Poco::Path(str));
             image->set_disk_file(image_path);
             parent->sCam->pass_image(image, i, true);
+            i++;
             //image->free_memory_RAW();
             
           }
@@ -397,6 +398,7 @@ int SpinPath::spinUpCamera(){
     ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
     
     camlogger.information("Acquisition mode set to continuous...");
+    cout << "Acquisition mode set to continuous..." << endl;
     
   }
   catch (Spinnaker::Exception& e){
@@ -505,7 +507,7 @@ int SpinPath::run(){
   int result = spinUpCamera();
   
   if(result != -1){
-      Poco::Path root_path = Poco::Path("D:/front_end_test");
+      Poco::Path root_path = Poco::Path("/media/max/Data/test/");
 
       setRootPath(root_path);
       newCaptureSet();

@@ -6,6 +6,68 @@
 namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
 
+    void CompositeVoronoi::make_meshgrid() {
+        Mat x_row(1, image_size.width, CV_16U);
+        Mat y_col(image_size.height, 1, CV_16S);
+
+        for (int i = 0; i < image_size.width; i++) {
+            x_row.at<ushort>(i) = i;
+        }
+        for (int i = 0; i < image_size.height; i++) {
+            y_col.at<ushort>(i) = i;
+        }
+
+        Mat X,Y;
+        repeat(x_row,image_size.height,1,X);
+        repeat(y_col,1,image_size.width,Y);
+
+        meshGridX.upload(X);
+        meshGridY.upload(Y);
+
+        diffGPU = cuda::GpuMat(image_size, CV_16S);
+        xp1 = cuda::GpuMat(image_size, CV_32S);
+        xp2 = cuda::GpuMat(image_size, CV_32S);
+        binaryCompare = cuda::GpuMat(image_size, CV_8U);
+    }
+
+    void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
+        _face.push_back(_face[0]);
+        int i = 1;
+        while (i < _face.size()) {
+            if (_face[i].x == _face[i-1].x && _face[i].y == _face[i-1].y) {
+                _face.erase(_face.begin() + i);
+            }else {
+                i++;
+            }
+        }
+    }
+
+    
+    void CompositeVoronoi::coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i> &_face) {
+        polyMaskGPU.setTo(Scalar(0));
+        for (int i = 1;i<_face.size();i++) {
+            int x0 = _face[i-1].x;
+            int y0 = _face[i-1].y;
+            int x1 = _face[i].x;
+            int y1 = _face[i].y;
+
+            cuda::subtract(meshGridX,x0,diffGPU);
+            cuda::multiply(diffGPU,x1 - x0,xp2);
+
+            cuda::subtract(meshGridY,y0,diffGPU);
+            cuda::multiply(diffGPU,y1 - y0,xp1);
+
+            cuda::subtract(xp1,xp2,xp1);
+
+            //cuda::compare(xp1,0,binaryCompare,CMP_GE);
+            cuda::threshold(xp1,binaryCompare,-1,1,THRESH_BINARY);
+
+            cuda::add(polyMaskGPU,binaryCompare,polyMaskGPU);
+        }
+        cuda::threshold(polyMaskGPU,polyMaskGPU,_face.size() - 2,255, THRESH_BINARY);
+    }
+
+    
     void CompositeVoronoi::GPU_add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add) {
         // get a copy of references to all images at once so that only one mutex lock is needed
         std::vector<unsigned long> indexes;
@@ -28,6 +90,12 @@ namespace pathCam {
 
             //indicate that a new image has been added since last global alignment
             needsAlignment = true;
+
+            //wait for buffer to be on gpu
+            {
+                std::unique_lock<std::mutex> lock(images[i]->cudaBufferMutex);
+                images[i]->cudaBufferConVar.wait(lock, [&]{return images[i]->cudaBufferReady;});
+            }
 
             //debayer image on gpu
             cuda::GpuMat image_Mat(image_size, CV_8U, images[i]->get_raw_cuda());

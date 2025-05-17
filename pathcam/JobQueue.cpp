@@ -59,12 +59,36 @@ namespace pathCam {
     if (job->jobRefNumber >= 0) {
       if (jobRefs.size() <= job->jobRefNumber) {
         jobRefs.resize(job->jobRefNumber + 400);
+        jobsReadiness.resize(job->jobRefNumber + 400);
       }
       jobRefs[job->jobRefNumber] = job;
     }
-    jobQueue.push(job);
+    //jobQueue.push(job);
+    update_job_readiness(job->jobTypeFlag, job->image_index);
     queue_mutex->unlock();
+
   };
+
+  void JobQueue::update_job_readiness(int jobTypeFlag, unsigned long image_idx) {
+    if (jobTypeFlag == 2) {
+      int k = 0;
+      for (int i = 0; i < 10; i++) {
+        auto answer = getSortOrderAndJobRefs(jobTypeFlag, image_idx + i);
+        jobsReadiness[answer.first]++;
+        unsigned long readinessRequired = min(image_idx + i + 1,(unsigned long)6);
+        if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] != nullptr && jobRefs[answer.first]->unprocessed) {
+          jobQueue.push(jobRefs[answer.first]);
+          jobRefs[answer.first]->unprocessed = false;
+        }
+      }
+    }else {
+      auto answer = getSortOrderAndJobRefs(jobTypeFlag, image_idx);
+      if (jobRefs[answer.first]->unprocessed) {
+        jobQueue.push(jobRefs[answer.first]);
+        jobRefs[answer.first]->unprocessed = false;
+      }
+    }
+  }
 
   bool JobQueue::run_jobs(bool join_all) {
     queue_mutex->lock();

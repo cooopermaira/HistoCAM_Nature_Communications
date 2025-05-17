@@ -19,13 +19,17 @@ namespace pathCam {
   public:
     RunnableIntermediate(unsigned long image_index, int jobTypeFlag) : image_index(image_index),
                                                                        jobTypeFlag(jobTypeFlag), jobComplete(false),
-                                                                       someoneWaitingOnJobCompleteEvent(false) {}
+                                                                       someoneWaitingOnJobCompleteEvent(false),unprocessed(true),
+                                                                       precedingJobCount(0) {
+    }
 
     Poco::Event jobComplete;
     bool someoneWaitingOnJobCompleteEvent;
+    bool unprocessed;
     unsigned long sort_order = 0;
-    int jobTypeFlag = 0;
     unsigned long image_index;
+    std::atomic<int> precedingJobCount;
+    int jobTypeFlag = 0;
     int jobRefNumber = 0;
     std::atomic<bool> successful = false;
 
@@ -51,12 +55,13 @@ namespace pathCam {
   public:
     explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<double> *_blur,
                              std::vector<std::string> *_names, unsigned long _sort_order) : image(image),
-                                                                                            flatfield(flat_field),
-                                                                                            outfile(outfile),
-                                                                                            RunnableIntermediate(
-                                                                                                _sort_order, 0),
-                                                                                            blur(_blur),
-                                                                                            names(_names) {}
+      flatfield(flat_field),
+      outfile(outfile),
+      RunnableIntermediate(
+        _sort_order, 0),
+      blur(_blur),
+      names(_names) {
+    }
 
     Mat flatfield;
     std::vector<double> *blur;
@@ -93,18 +98,18 @@ namespace pathCam {
     void push_remaining_tiles_for_inference();
 
     void decrement_rebuild_jobs_outstanding();
-
   };
 
   class RegistrationRunnable : public RunnableIntermediate {
   private:
     StreamCam *parent;
     RegInfo *regInfo;
+
   public:
-    RegistrationRunnable(StreamCam *parent, RegInfo *regInfo) :
-        parent(parent),
-        regInfo(regInfo),
-        RunnableIntermediate(regInfo->index, 3) {};
+    RegistrationRunnable(StreamCam *parent, RegInfo *regInfo) : parent(parent),
+                                                                regInfo(regInfo),
+                                                                RunnableIntermediate(regInfo->index, 3) {
+    };
 
     virtual void run();
 
@@ -122,15 +127,15 @@ namespace pathCam {
     Image *image;
 
   public:
-
     LoaderLogicRunnable(StreamCam *parent, Image *image, unsigned long image_idx, bool additionalFullReg,
                         bool saveImg = false) : image(
-        image), parent(parent), additionalSiftReg(additionalFullReg), saveImg(saveImg),
-                                                RunnableIntermediate(image_idx, 1) {};
+                                                  image), parent(parent), additionalSiftReg(additionalFullReg),
+                                                saveImg(saveImg),
+                                                RunnableIntermediate(image_idx, 1) {
+    };
 
     virtual void run();
   };
-
 
 
   class InferenceManager : public Poco::Runnable {
@@ -138,9 +143,9 @@ namespace pathCam {
     StreamCam *parent;
     Mat threeChannelPreallocated;
 
-    std::vector<std::vector<float>>tileEmbedVec;
-    std::vector<std::vector<float>>coordsVec;
-    std::vector<std::vector<float>> resultsVec;
+    std::vector<std::vector<float> > tileEmbedVec;
+    std::vector<std::vector<float> > coordsVec;
+    std::vector<std::vector<float> > resultsVec;
 
     std::string embedFileOut;
     std::string coordsFileOut;
@@ -156,20 +161,18 @@ namespace pathCam {
     Poco::FastMutex tileEmbedMutex;
 
   public:
-
     explicit InferenceManager(StreamCam *parent);
-    
+
     virtual void run();
 
     void run_agg_classify();
 
     Poco::Thread thread;
-    std::vector<std::pair<int,int>> minShift;
+    std::vector<std::pair<int, int> > minShift;
 
     bool aggregatorReady = false;
 
-    std::map<std::tuple<int, int, unsigned>,unsigned> tileCoordToTensorIndex;
-
+    std::map<std::tuple<int, int, unsigned>, unsigned> tileCoordToTensorIndex;
   };
 
 
@@ -188,7 +191,6 @@ namespace pathCam {
     StreamCam *parent;
 
   public:
-
     DiskReader(StreamCam *parent);
 
     virtual void run();
@@ -202,14 +204,14 @@ namespace pathCam {
     unsigned int component_membership;
     Point2i tile;
 
-
   public:
     ImageToTileCopyRunnable(StreamCam *parent, Image *image, unsigned int component_membership,
                             Point2i tile, unsigned long sort_order) : RunnableIntermediate(sort_order, 0),
                                                                       parent(parent),
                                                                       image(image),
                                                                       tile(tile),
-                                                                      component_membership(component_membership) {};
+                                                                      component_membership(component_membership) {
+    };
 
     virtual void run();
   };
@@ -221,8 +223,8 @@ namespace pathCam {
     unsigned long image_idx1, image_idx2;
     unsigned int component_membership;
     int edgeNumber;
-  public:
 
+  public:
     SingleMatchRunnable(StreamCam *parent, unsigned long image_idx1, unsigned long image_idx2,
                         unsigned int component_membership, int edgeNumber, unsigned long sort_order);
 
@@ -234,12 +236,13 @@ namespace pathCam {
   public:
     XCompRunnable(StreamCam *parent, unsigned long image_idx, unsigned int componentMembershipSelf) : image_idx(
         image_idx),
-                                                                                                      componentMembership(
-                                                                                                          componentMembershipSelf),
-                                                                                                      parent(parent),
-                                                                                                      RunnableIntermediate(
-                                                                                                          image_idx,
-                                                                                                          0) {};
+      componentMembership(
+        componentMembershipSelf),
+      parent(parent),
+      RunnableIntermediate(
+        image_idx,
+        0) {
+    };
     StreamCam *parent;
     unsigned long image_idx;
     unsigned int componentMembership;
@@ -269,7 +272,6 @@ namespace pathCam {
     unsigned long image_idx;
 
   public:
-
     MatchRunnable(StreamCam *parent, unsigned long image_idx);
 
     virtual void run();

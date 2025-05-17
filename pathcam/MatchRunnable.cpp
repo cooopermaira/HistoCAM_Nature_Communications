@@ -328,6 +328,7 @@ namespace pathCam {
     }
 
     if (!successful) {
+      parent->JobQ->update_job_readiness(jobTypeFlag,image_idx);
       parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
     }
     //parent->RegistrationConsecQ.add_index(image_idx);

@@ -52,6 +52,7 @@ namespace pathCam {
     image->regInfo = this;
 
     bool proceed = queue_for_compositing && parent->sufficient_distance(absoluteCoords,component_membership);
+
     if (proceed) {
       parent->push_compositeQ(this);
     }

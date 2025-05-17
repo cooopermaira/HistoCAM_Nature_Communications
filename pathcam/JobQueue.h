@@ -19,6 +19,7 @@ namespace pathCam{
   public:
     static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
     std::vector<RunnableIntermediate*> jobRefs;
+    std::vector<int> jobsReadiness;
     Poco::Event *pathCamEvent;
 
 
@@ -38,6 +39,7 @@ namespace pathCam{
     bool run_jobs(std::vector < Poco::Runnable * > jobs);
     bool is_empty(){return jobQueue.empty();}
     std::pair<int,unsigned long> getSortOrderAndJobRefs(int jobTypeFlag, unsigned long image_idx);
+    void update_job_readiness(int jobTypeFlag, unsigned long image_idx);
   };
 
 }
