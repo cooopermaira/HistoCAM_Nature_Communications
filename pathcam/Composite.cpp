@@ -320,13 +320,25 @@ namespace pathCam {
 
         clean_face(_face);
         //build polygon mask for new point
-        cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
+#ifdef HAVE_OPENCV_CUDAARITHM
+        // coopers_GPU_vectorized_convex_mask_maker(_face);
+        //cuda::multiply(polyMaskGPU,circleMaskGPU,polyMaskGPU);
+        // Mat temp;
+        // polyMaskGPU.download(temp);
 
+        cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
+        // imwrite("/media/max/Data/fcp.png", polyMaskOutput);
+        // imwrite("/media/max/Data/ccmm.png",temp);
+
+#else
+        cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
+#endif
 
         //test for exclusion of frame via rollback
         int nonzeroMin;
         if (componentMagLabel == Image::_2X) {
             polyMaskOutput = polyMaskOutput.mul(circleMask);
+
         }
         //      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.00;
         //    } else {

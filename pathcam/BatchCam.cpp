@@ -243,6 +243,43 @@ namespace pathCam {
             flat_field_file_20x = Path();
           }
         }
+        if (pConf->has("io.flat_field_images.twoX_r")) {
+          std::string temp = pConf->getString("io.flat_field_images.twoX_r");
+          flat_field_file_2x_r = Path(temp);
+
+          if (flat_field_file_2x_r.getExtension() != "png" && flat_field_file_2x_r.getExtension() != "tif" &&
+              flat_field_file_2x_r.getExtension() != "tiff" && flat_field_file_2x_r.getExtension() != "Raw") {
+            logger->warning("Only PNG, TIF or Raw formats supported. No image output.");
+            flat_field_file_2x_r = Path();
+          }
+        }
+        if (pConf->has("io.flat_field_images.fourX_r")) {
+          std::string temp = pConf->getString("io.flat_field_images.fourX_r");
+          flat_field_file_4x_r = Path(temp);
+          if (flat_field_file_4x_r.getExtension() != "png" && flat_field_file_4x_r.getExtension() != "tiff" &&
+              flat_field_file_4x_r.getExtension() != "Raw") {
+            logger->warning("Only PNG, Raw, or TIF outputs supported. No image output.");
+            flat_field_file_4x_r = Path();
+          }
+        }
+        if (pConf->has("io.flat_field_images.tenX_r")) {
+          std::string temp = pConf->getString("io.flat_field_images.tenX_r");
+          flat_field_file_10x_r = Path(temp);
+          if (flat_field_file_10x_r.getExtension() != "png" && flat_field_file_10x_r.getExtension() != "tiff" &&
+              flat_field_file_10x_r.getExtension() != "Raw") {
+            logger->warning("Only PNG, Raw, or TIF outputs supported. No image output.");
+            flat_field_file_10x_r = Path();
+          }
+        }
+        if (pConf->has("io.flat_field_images.twentyX_r")) {
+          std::string temp = pConf->getString("io.flat_field_images.twentyX_r");
+          flat_field_file_20x_r = Path(temp);
+          if (flat_field_file_20x_r.getExtension() != "png" && flat_field_file_20x_r.getExtension() != "tiff" &&
+              flat_field_file_20x_r.getExtension() != "Raw") {
+            logger->warning("Only PNG, Raw, or TIF outputs supported. No image output.");
+            flat_field_file_20x_r = Path();
+          }
+        }
       }
     } else {
       logger->fatal("No IO info supplied.");

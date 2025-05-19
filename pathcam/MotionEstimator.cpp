@@ -86,20 +86,16 @@ namespace pathCam {
     }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    if (parent->opencvWithCuda) {
-      image->move_buffer_to_gpu(parent->compositorCudaDevice);
-    }
+    image->move_buffer_to_gpu(parent->compositorCudaDevice);
 #endif
 
-    if(parent->recordingMode){
-      std::fstream file;
-      file = std::fstream(image->image_file.toString(), std::ios::out | std::ios::binary);
-      if (file.fail()) {
-        throw new std::exception;
-      }
-      file.write(image->get_Raw(), image->width * image->height);
-    }
+    // if(parent->recordingMode){
+    //   image->write_to_path();
+    // }
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+    image->free_memory_RAW();
+#endif
   }
 
   void RegInfo::set_waiting_component(unsigned int componentIndex, Match *m) {

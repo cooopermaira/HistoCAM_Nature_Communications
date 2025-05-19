@@ -40,7 +40,7 @@ namespace pathCam {
       im = new InferenceManager(this);
     }
 
-    minPixelDistanceBetweenFrames = 200;
+    minPixelDistanceBetweenFrames = 400;
     minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames,2);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
@@ -165,15 +165,28 @@ namespace pathCam {
   }
 
   std::string StreamCam::get_flatfield(int label) {
-    switch (label) {
-      case Image::_2X:
-        return flat_field_file_2x.toString();
-      case Image::_4X:
-        return flat_field_file_4x.toString();
-      case Image::_10X:
-        return flat_field_file_10x.toString();
-      case Image::_20X:
-        return flat_field_file_20x.toString();
+    if (recordingMode) {
+      switch (label) {
+        case Image::_2X:
+          return flat_field_file_2x_r.toString();
+        case Image::_4X:
+          return flat_field_file_4x_r.toString();
+        case Image::_10X:
+          return flat_field_file_10x_r.toString();
+        case Image::_20X:
+          return flat_field_file_20x_r.toString();
+      }
+    }else {
+      switch (label) {
+        case Image::_2X:
+          return flat_field_file_2x.toString();
+        case Image::_4X:
+          return flat_field_file_4x.toString();
+        case Image::_10X:
+          return flat_field_file_10x.toString();
+        case Image::_20X:
+          return flat_field_file_20x.toString();
+      }
     }
   }
 

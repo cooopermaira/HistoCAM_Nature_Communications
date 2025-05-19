@@ -57,7 +57,7 @@ namespace pathCam {
     }
     queue_mutex->lock();
     if (job->jobRefNumber >= 0) {
-      if (jobRefs.size() <= job->jobRefNumber) {
+      if (jobRefs.size() <= job->jobRefNumber + 50) {
         jobRefs.resize(job->jobRefNumber + 400);
         jobsReadiness.resize(job->jobRefNumber + 400);
       }

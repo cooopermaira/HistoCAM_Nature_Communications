@@ -7,14 +7,14 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
 
     void CompositeVoronoi::make_meshgrid() {
-        Mat x_row(1, image_size.width, CV_16U);
+        Mat x_row(1, image_size.width, CV_16S);
         Mat y_col(image_size.height, 1, CV_16S);
 
         for (int i = 0; i < image_size.width; i++) {
-            x_row.at<ushort>(i) = i;
+            x_row.at<short>(i) = i;
         }
         for (int i = 0; i < image_size.height; i++) {
-            y_col.at<ushort>(i) = i;
+            y_col.at<short>(i) = i;
         }
 
         Mat X,Y;
@@ -24,10 +24,12 @@ namespace pathCam {
         meshGridX.upload(X);
         meshGridY.upload(Y);
 
-        diffGPU = cuda::GpuMat(image_size, CV_16S);
+        diffGPU = cuda::GpuMat(image_size, CV_32S);
         xp1 = cuda::GpuMat(image_size, CV_32S);
         xp2 = cuda::GpuMat(image_size, CV_32S);
         binaryCompare = cuda::GpuMat(image_size, CV_8U);
+
+        polyMaskGPU = cuda::GpuMat(image_size, CV_8U);
     }
 
     void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
@@ -44,7 +46,7 @@ namespace pathCam {
 
     
     void CompositeVoronoi::coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i> &_face) {
-        polyMaskGPU.setTo(Scalar(0));
+        polyMaskGPU.setTo(Scalar(255));
         for (int i = 1;i<_face.size();i++) {
             int x0 = _face[i-1].x;
             int y0 = _face[i-1].y;
@@ -52,19 +54,21 @@ namespace pathCam {
             int y1 = _face[i].y;
 
             cuda::subtract(meshGridX,x0,diffGPU);
-            cuda::multiply(diffGPU,x1 - x0,xp2);
+            cuda::multiply(diffGPU,y1 - y0,xp2);
 
             cuda::subtract(meshGridY,y0,diffGPU);
-            cuda::multiply(diffGPU,y1 - y0,xp1);
+            cuda::multiply(diffGPU,x1 - x0,xp1);
 
             cuda::subtract(xp1,xp2,xp1);
 
-            //cuda::compare(xp1,0,binaryCompare,CMP_GE);
-            cuda::threshold(xp1,binaryCompare,-1,1,THRESH_BINARY);
+            cuda::compare(xp1,0,binaryCompare,CMP_GE);
+            Mat temp;
+            binaryCompare.download(temp);
+            imwrite("/media/max/Data/binaryCompare.png",temp);
 
-            cuda::add(polyMaskGPU,binaryCompare,polyMaskGPU);
+            cuda::multiply(polyMaskGPU,binaryCompare,polyMaskGPU);
         }
-        cuda::threshold(polyMaskGPU,polyMaskGPU,_face.size() - 2,255, THRESH_BINARY);
+        //cuda::threshold(polyMaskGPU,polyMaskGPU,_face.size() - 2,255, THRESH_BINARY);
     }
 
     
@@ -100,16 +104,16 @@ namespace pathCam {
             //debayer image on gpu
             cuda::GpuMat image_Mat(image_size, CV_8U, images[i]->get_raw_cuda());
             cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
-            image_Mat.release();
+            images[i]->free_memory_CUDA();
 
-            if (componentMagLabel != 0) {
-                //flatfield correct
-                threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
-                cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
-                //brighten
-                cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
-                convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
-            }
+            // if (componentMagLabel != 0) {
+            //     //flatfield correct
+            //     threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
+            //     cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
+            //     //brighten
+            //     cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
+            //     convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
+            // }
 
             //channelsGPU[0] = threeChannelPrealGPU; //3 channel
             cuda::split(threeChannelPrealGPU, channelsGPU);

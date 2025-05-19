@@ -36,10 +36,9 @@ namespace pathCam {
     size_t nBytes = parent->image_height * parent->image_width;
     cudaMalloc(&raw_buffer_cuda,nBytes);
     cudaMemcpy(raw_buffer_cuda,raw_buffer,nBytes,cudaMemcpyHostToDevice);
-    free_memory_RAW();
 
     {
-      std::lock_guard<std::mutex> lock(cudaBufferMutex);
+      std::lock_guard lock(cudaBufferMutex);
       cudaBufferReady = true;
       cudaBufferConVar.notify_one();
     }
@@ -47,6 +46,14 @@ namespace pathCam {
     return true;
   }
 #endif
+
+  void Image::free_memory_CUDA() {
+    if (raw_buffer_cuda != nullptr) {
+      cudaFree(raw_buffer_cuda);
+    }
+    raw_buffer_cuda = nullptr;
+  }
+
 
   void Image::free_memory_RAW(bool force) {
     buffer_mutex.lock();
@@ -118,6 +125,16 @@ namespace pathCam {
 
     return blurVariance;
   }
+
+  void Image::write_to_path() {
+    std::fstream file;
+    file = std::fstream(image_file.toString(), std::ios::out | std::ios::binary);
+    if (file.fail()) {
+      throw new std::exception;
+    }
+    file.write(get_Raw(), width * height);
+  }
+
 
 
   void Image::correct_registration(std::vector<unsigned long> adjacentVerts) {

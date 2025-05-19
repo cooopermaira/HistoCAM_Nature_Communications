@@ -64,7 +64,9 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
   ImageViewComponent::drawSlide(g, scale);
 
-  if (view->isEmpty() || MRImage->empty()) { return; }
+  if (view->isEmpty() || MRImage->empty()) {
+    return;
+  }
 
   cv::Rect_<float> frameBox;
   bool showAsCircle;
@@ -128,6 +130,7 @@ void CaptureComponent::startRecording() {
   parent->annotate->setImage(parent->MRimage);
 
   compositeThread.start(new bcamPocoRunnable(this));
+  updateDrawThread.start(new drawThreadRunnable(parent, compositeThread));
 
   repaint();
 }

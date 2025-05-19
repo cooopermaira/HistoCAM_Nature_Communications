@@ -140,9 +140,15 @@ namespace pathCam {
 
     }
 
-    inline char *get_Raw() { return raw_buffer; }
+    inline char *get_Raw() {
+      assert(raw_buffer);
+      return raw_buffer;
+    }
 
-    inline char *get_raw_cuda(){ return raw_buffer_cuda; }
+    inline char *get_raw_cuda() {
+      assert(raw_buffer_cuda);
+      return raw_buffer_cuda;
+    }
 
     inline Poco::Path get_ImageFile() { return image_file; }
 
@@ -160,6 +166,9 @@ namespace pathCam {
 
     void free_memory_RAW(bool force = false);
 
+    void free_memory_CUDA();
+
+    void write_to_path();
     
     Poco::Path image_file;
   private:

@@ -41,6 +41,11 @@ namespace pathCam {
     Poco::Path flat_field_file_10x;
     Poco::Path flat_field_file_20x;
 
+    Poco::Path flat_field_file_2x_r;
+    Poco::Path flat_field_file_4x_r;
+    Poco::Path flat_field_file_10x_r;
+    Poco::Path flat_field_file_20x_r;
+
     Poco::Path tile_encoder_path;
     Poco::Path slide_encoder_path;
     Poco::Path python_venv_path;

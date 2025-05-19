@@ -381,15 +381,47 @@ int SpinPath::spinUpCamera(){
       return -1;
     }
 
-    // Set expsoure time to 1500 us
+    // Set exposure time to 1500 us
     CEnumerationPtr exposureAuto = nodeMap.GetNode("ExposureAuto");
     exposureAuto->SetIntValue(exposureAuto->GetEntryByName("Off")->GetValue());
 
     CEnumerationPtr exposureMode = nodeMap.GetNode("ExposureMode");
     exposureMode->SetIntValue(exposureMode->GetEntryByName("Timed")->GetValue());
+    cout<<exposureMode->GetEntryByName("Timed")->GetValue()<<endl;
+
 
     CFloatPtr exposureTime = nodeMap.GetNode("ExposureTime");
     exposureTime->SetValue(1500);
+    cout<<exposureTime->GetValue()<<endl;
+
+
+    //turn auto gain off, set value to 0
+    CEnumerationPtr gainAuto = nodeMap.GetNode("GainAuto");
+    gainAuto->SetIntValue(gainAuto->GetEntryByName("Off")->GetValue());
+    CFloatPtr gainValue = nodeMap.GetNode("Gain");
+    gainValue->SetValue(0);
+    cout<<gainValue->GetValue()<<endl;
+
+    // set gamma value to 0
+    CFloatPtr gamma = nodeMap.GetNode("Gamma");
+    gamma->SetValue(0);
+    cout<<gamma->GetValue()<<endl;
+
+    // set black level to 1
+    CEnumerationPtr blackLevelSelector = nodeMap.GetNode("BlackLevelSelector");
+    blackLevelSelector->SetIntValue(blackLevelSelector->GetEntryByName("All")->GetValue());
+    CFloatPtr blackLevel = nodeMap.GetNode("BlackLevel");
+    blackLevel->SetValue(1);
+
+    // set whitebalance to 1.5 Red
+    /*CEnumerationPtr balanceWhiteAuto = nodeMap.GetNode("BalanceWhiteAuto");
+    balanceWhiteAuto->SetIntValue(balanceWhiteAuto->GetEntryByName("Off")->GetValue());
+    CEnumerationPtr balanceRatioSelector = nodeMap.GetNode("BalanceRatioSelector");
+    balanceRatioSelector->SetIntValue(balanceRatioSelector->GetEntryByName("Blue")->GetValue());
+    CFloatPtr balanceRatio = nodeMap.GetNode("BalanceRatio");
+    balanceRatio->SetValue(1.5);
+    balanceRatioSelector->SetIntValue(balanceRatioSelector->GetEntryByName("Red")->GetValue());
+    balanceRatio->SetValue(1.5);*/
 
     // Retrieve integer value from entry node
     const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
@@ -513,14 +545,16 @@ int SpinPath::run(){
       newCaptureSet();
     cameraStream = new CameraStream(this);
     fileStream =  new FileStream(this);
-    processStream = new ProcessStream(this);
+    //processStream = new ProcessStream(this);
     
     thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
     thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
     thread_cam.start(*cameraStream);
     thread_file.start(*fileStream);
     sCam->microscopeInput = true;
-    thread_sCam.start(*processStream);
+    // thread_sCam.start(*processStream);
+    // thread_sCam.join();
+    sCam->spin_run();
     
   }
 
