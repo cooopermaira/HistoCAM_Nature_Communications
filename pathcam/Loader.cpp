@@ -101,12 +101,12 @@ namespace pathCam {
       }
 
       image->release_reg_image();
-      //image->free_memory_RAW();
 
       parent->add_image(image, image_index);
       auto matchjob = new MatchRunnable(parent, image_index);
       parent->matchableCount++;
       parent->JobQ->add_runnable(matchjob);
+
     } else {
       image->free_memory_RAW();
     }

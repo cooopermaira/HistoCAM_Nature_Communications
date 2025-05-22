@@ -17,26 +17,11 @@
 //#include <bits/fs_fwd.h>
 
 #include "pathCam.h"
-//#include "Poco/FileStream.h"
 
 namespace pathCam {
   InferenceManager::InferenceManager(StreamCam *parent) : parent(parent), device(torch::Device(torch::kCPU)),
                                                           tileEmbedMutex(Poco::FastMutex()) {
 
-
-    //load slide aggregator
-    //         if (parent->aggregating) {
-    // #ifdef WITH_MPS
-    //             //on its own thread doesnt work on apple
-    //             //https://github.com/python/cpython/issues/123022
-    //             initializeModel();
-    // #else
-    //             auto initRunnable = new InferenceInitRunner(this);
-    //             thread.start(initRunnable);
-    //
-    // #endif
-    //             //initialize_aggregator();
-    //         }
 
     embedFileOut = parent->slide_encoder_path.toString() + "/tileEmbeds.pt";
     coordsFileOut = parent->slide_encoder_path.toString() + "/coords.pt";
@@ -46,15 +31,47 @@ namespace pathCam {
     embedFileIn = parent->slide_encoder_path.toString() + "/response.pt";
     signalFileIn = parent->slide_encoder_path.toString() + "/cSignal.txt";
 
+
+
   }
 
+  //extern "C" void launch_drop_alpha_and_swap(char* dst, char* src,int count);
 
   void InferenceManager::run() {
+    bool multiGPU = false;
+    int inferenceDevice = -1;
+
     torch::NoGradGuard noGrad;
 
+    size_t dstPitch;
+    size_t elementSize;
+    size_t tileSizeInBytes;
+
     if (torch::cuda::is_available()) {
-      std::cout << "Using GPU (CUDA)" << std::endl;
-      device = torch::Device(torch::kCUDA);
+      inferenceDevice = parent->GPU_select_cuda_device(0);
+      device = torch::Device(torch::kCUDA, inferenceDevice);
+
+#ifdef HAVE_OPENCV_CUDAARITHM
+
+      if (inferenceDevice != parent->compositorCudaDevice) {
+        //create buffers for moving data from gpu1 to gpu2
+        multiGPU = true;
+        size_t bufferSize = parent->tileSize * parent->tileSize * parent->maxTilesPerBatch;
+        bufferMemory = (char*) malloc(bufferSize * 4);
+
+        //set cuda memory on inference gpu
+        cudaSetDevice(inferenceDevice);
+        cudaMalloc(&bufferGPU,bufferSize * 4);
+        cudaMalloc(&bufferGPU_rcv,bufferSize * 3);
+
+        elementSize = 4;
+        dstPitch = elementSize * parent->tileSize;
+        tileSizeInBytes = 4 * parent->tileSize * parent->tileSize;
+      }
+
+#endif
+
+      std::cout << "Torch using GPU (CUDA) with device: " << device << std::endl;
     }
 #ifdef WITH_MPS
     else if (torch::mps::is_available()) {
@@ -94,11 +111,13 @@ namespace pathCam {
 
           //get reference to pyramid tiles
           auto pyramidLevel = parent->composites[component]->imagePyramid->level[0];
-          int tileSize = parent->composites[component]->imagePyramid->tile_size;
-          auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), tileSize, tileSize, 3},
+
+          auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), parent->tileSize, parent->tileSize, 3},
                                            torch::kFloat32).to(device);
 
           tileEmbedMutex.lock();
+          cuda::setDevice(parent->compositorCudaDevice);
+
           for (int i = 0; i < numImages; i++) {
 
             //add to coord dict
@@ -114,17 +133,36 @@ namespace pathCam {
               minShift[component].second = std::get<1>(tileList[i]);
             }
 
-            //for some reason, removing this convert and doing from_blob right from tile makes it slower
-//cudarevisit
-            // cvtColor(pyramidLevel->getTile(std::get<0>(tileList[i]), std::get<1>(tileList[i])),
-            //          threeChannelPreallocated,
-            //          COLOR_BGRA2RGB);
+#ifdef HAVE_OPENCV_CUDAARITHM
 
+            int x = std::get<0>(tileList[i]);
+            int y = std::get<1>(tileList[i]);
+            threeChannelPrealGPU = pyramidLevel->getTile(x, y);
+            uchar* bufferPtr = reinterpret_cast<uchar*>(bufferMemory + i * tileSizeInBytes);
+            cudaMemcpy2D(bufferPtr,dstPitch,threeChannelPrealGPU.data,threeChannelPrealGPU.step,dstPitch,threeChannelPrealGPU.rows,cudaMemcpyDeviceToHost);
+
+#else
+            cvtColor(pyramidLevel->getTile(std::get<0>(tileList[i]), std::get<1>(tileList[i])),
+                     threeChannelPreallocated,
+                     COLOR_BGRA2RGB);
 
             //clone would be necessary if not immediately moved to gpu. Tensor from_blob keeps ref to orig obj
-            batch_tensor[i] = torch::from_blob(threeChannelPreallocated.data, {tileSize, tileSize, 3},
+            batch_tensor[i] = torch::from_blob(threeChannelPreallocated.data, {parent->tileSize, parent->tileSize, 3},
                                                torch::kUInt8).to(device);
+#endif
           }
+
+          //get data to inferencing GPU
+          cudaSetDevice(inferenceDevice);
+          cudaMemcpy(bufferGPU,bufferMemory,numImages * tileSizeInBytes,cudaMemcpyHostToDevice);
+
+          //equivalent of cvtColor(...,COLOR_BGRA2RGB) but done as a single kernel call
+          int numPixels = numImages * parent->tileSize * parent->tileSize;
+          launch_drop_alpha_and_swap(bufferGPU_rcv, bufferGPU, numPixels);
+          cudaDeviceSynchronize();
+
+          batch_tensor = torch::from_blob(bufferGPU_rcv, {(long) numImages, parent->tileSize, parent->tileSize, 3},
+            torch::TensorOptions().dtype(torch::kUInt8).device(torch::kCUDA, inferenceDevice));
 
           //permute to N,C,W,H, center crop, make memory block index-contiguous via type conversion,
           //normalize to [0,1], normalize to imageNet mean/stddv
@@ -187,6 +225,7 @@ namespace pathCam {
       } catch (const Poco::Exception &exc) {
         std::cerr << "Error reading file: " << exc.displayText() << std::endl;
       }
+
     }
 
   }

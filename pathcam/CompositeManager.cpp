@@ -17,19 +17,13 @@ namespace pathCam {
     unsigned long duration = 0;
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    if (parent->opencvWithCuda) {
       cuda::setDevice(parent->compositorCudaDevice);
-    }
 #endif
 
     rebuildJobsOutstanding = 0;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
 
-//      if(duration.count() < 100){
-//        Poco::Thread::sleep(100 - duration.count());
-//      }
-      //start = timeCheck;
 
       //pull new components that might need to be processed
       std::tuple<unsigned long, cv::Size, unsigned int> newComp;

@@ -92,6 +92,7 @@ namespace pathCam {
     cuda::GpuMat xp2;
     cuda::GpuMat binaryCompare;
 
+    long long bigx = 0,bigy = 0;
     cuda::GpuMat meshGridX;
     cuda::GpuMat meshGridY;
     cuda::GpuMat rectMaskGPU;
@@ -126,6 +127,8 @@ namespace pathCam {
     void add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
 
     static void clean_face(std::vector<Point2i> &_face);
+
+    static void ensure_clockwise(std::vector<Point2i> &_face);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     void make_meshgrid();

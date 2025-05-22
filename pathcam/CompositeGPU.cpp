@@ -6,6 +6,37 @@
 namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
 
+    
+    void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
+        _face.push_back(_face[0]);
+        int i = 1;
+        while (i < _face.size()) {
+            if (_face[i].x == _face[i-1].x && _face[i].y == _face[i-1].y) {
+                _face.erase(_face.begin() + i);
+            }else {
+                i++;
+            }
+        }
+        //ensure_clockwise(_face);
+    }
+
+
+    void CompositeVoronoi::ensure_clockwise(std::vector<Point2i> &_face) {
+        double area = 0.0;
+        for (int i = 1; i < _face.size(); ++i) {
+            const cv::Point2i& p0 = _face[i - 1];
+            const cv::Point2i& p1 = _face[i];
+            area += (p0.x * p1.y - p1.x * p0.y);
+        }
+        if(area < 0){
+            std::reverse(_face.begin(), _face.end());
+        }
+        else {
+            int k = 0;
+        }
+    }
+
+
     void CompositeVoronoi::make_meshgrid() {
         Mat x_row(1, image_size.width, CV_16S);
         Mat y_col(image_size.height, 1, CV_16S);
@@ -25,23 +56,11 @@ namespace pathCam {
         meshGridY.upload(Y);
 
         diffGPU = cuda::GpuMat(image_size, CV_32S);
-        xp1 = cuda::GpuMat(image_size, CV_32S);
-        xp2 = cuda::GpuMat(image_size, CV_32S);
+        xp1 = cuda::GpuMat(image_size, CV_32F);
+        xp2 = cuda::GpuMat(image_size, CV_32F);
         binaryCompare = cuda::GpuMat(image_size, CV_8U);
 
         polyMaskGPU = cuda::GpuMat(image_size, CV_8U);
-    }
-
-    void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
-        _face.push_back(_face[0]);
-        int i = 1;
-        while (i < _face.size()) {
-            if (_face[i].x == _face[i-1].x && _face[i].y == _face[i-1].y) {
-                _face.erase(_face.begin() + i);
-            }else {
-                i++;
-            }
-        }
     }
 
     
@@ -49,26 +68,46 @@ namespace pathCam {
         polyMaskGPU.setTo(Scalar(255));
         for (int i = 1;i<_face.size();i++) {
             int x0 = _face[i-1].x;
-            int y0 = _face[i-1].y;
             int x1 = _face[i].x;
+
+            int y0 = _face[i-1].y;
             int y1 = _face[i].y;
 
+
+            //largest values to appear as x1 or y1 are about 400,000
+            //meshGridX -> CV_16S
+            //meshGridY -> CV_16S
+            //diffGPU -> CV_32S
+            //xp1 and xp2 -> CV_32F
+            //polyMaskGPU and binaryCompare -> CV_8U
+
+            //get the x component of the vector formed between our line and vector formed between
+            //the base of our line and every point in the mat
             cuda::subtract(meshGridX,x0,diffGPU);
+
+            //multiply x component of every vector by y component of line
             cuda::multiply(diffGPU,y1 - y0,xp2);
 
+            //get the y component of the vector formed between our line and vector formed between
+            //the base of our line and every point in the mat
             cuda::subtract(meshGridY,y0,diffGPU);
+
+            //multiply y component of every vector by x component of line
             cuda::multiply(diffGPU,x1 - x0,xp1);
 
-            cuda::subtract(xp1,xp2,xp1);
+            //subtraction as defined by cross product forumula
+            cuda::subtract(xp2,xp1,xp1);
 
+            //set all values less than 0 to 0, all values greater than 0 to 255
             cuda::compare(xp1,0,binaryCompare,CMP_GE);
+
             Mat temp;
             binaryCompare.download(temp);
+            line(temp,_face[i-1],_face[i],Scalar(150),100);
             imwrite("/media/max/Data/binaryCompare.png",temp);
 
             cuda::multiply(polyMaskGPU,binaryCompare,polyMaskGPU);
         }
-        //cuda::threshold(polyMaskGPU,polyMaskGPU,_face.size() - 2,255, THRESH_BINARY);
     }
 
     
@@ -106,14 +145,14 @@ namespace pathCam {
             cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
             images[i]->free_memory_CUDA();
 
-            // if (componentMagLabel != 0) {
-            //     //flatfield correct
-            //     threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
-            //     cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
-            //     //brighten
-            //     cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
-            //     convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
-            // }
+             if (componentMagLabel != 0) {
+                 //flatfield correct
+                 threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
+                 cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
+                 //brighten
+                 cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
+                 convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
+             }
 
             //channelsGPU[0] = threeChannelPrealGPU; //3 channel
             cuda::split(threeChannelPrealGPU, channelsGPU);
@@ -128,7 +167,6 @@ namespace pathCam {
 
             //calculate effected tiles
             std::vector<Point2i> effectedTiles;
-            std::vector<Point2i> effectedTiles2;
             std::vector<Point2i> effectedTilesNoMask;
 
 

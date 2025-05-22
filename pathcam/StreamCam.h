@@ -110,6 +110,7 @@ namespace pathCam {
     bool opencvWithCuda = false;
     int compositorCudaDevice;
 
+    int maxTilesPerBatch = 512;
     int minPixelDistanceBetweenFrames;
     std::vector<Vec2> lastAcceptedCoords;
 
@@ -165,7 +166,7 @@ namespace pathCam {
     bool spin_run();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    int GPU_select_cuda_device();
+    int GPU_select_cuda_device(int _priority = 0);
 #endif
 
     bool has_flatfield(int label);

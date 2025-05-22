@@ -22,6 +22,8 @@
 #include "opencv2/cudaimgproc.hpp"
 #include "opencv2/cudaarithm.hpp"
 #include <cuda_runtime.h>
+#include <cstdio>
+
 #endif
 
 

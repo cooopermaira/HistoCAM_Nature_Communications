@@ -380,58 +380,48 @@ int SpinPath::spinUpCamera(){
       camlogger.error("Unable to get or set acquisition mode to continuous (entry retrieval). Aborting...");
       return -1;
     }
+    // Retrieve integer value from entry node
+    const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
+
+    // Set integer value from entry node as new value of enumeration node
+    ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
+
+    camlogger.information("Acquisition mode set to continuous...");
+    cout << "Acquisition mode set to continuous..." << endl;
 
     // Set exposure time to 1500 us
-    CEnumerationPtr exposureAuto = nodeMap.GetNode("ExposureAuto");
-    exposureAuto->SetIntValue(exposureAuto->GetEntryByName("Off")->GetValue());
+    // Turn off auto exposure
+    pCam->ExposureAuto.SetValue(Spinnaker::ExposureAutoEnums::ExposureAuto_Off);
+    //Set exposure mode to "Timed"
+    pCam->ExposureMode.SetValue(Spinnaker::ExposureModeEnums::ExposureMode_Timed);
+    //Set absolute value of shutter exposure time to 1500 microseconds
+    pCam->ExposureTime.SetValue(1500);
 
-    CEnumerationPtr exposureMode = nodeMap.GetNode("ExposureMode");
-    exposureMode->SetIntValue(exposureMode->GetEntryByName("Timed")->GetValue());
-    cout<<exposureMode->GetEntryByName("Timed")->GetValue()<<endl;
+    //Turn auto gain off
+    pCam->GainAuto.SetValue(Spinnaker::GainAutoEnums::GainAuto_Off);
+    pCam->Gain.SetValue(0);
+    cout << pCam->Gain.GetValue()<<endl;
 
-
-    CFloatPtr exposureTime = nodeMap.GetNode("ExposureTime");
-    exposureTime->SetValue(1500);
-    cout<<exposureTime->GetValue()<<endl;
-
-
-    //turn auto gain off, set value to 0
+    /*//turn auto gain off, set value to 0
     CEnumerationPtr gainAuto = nodeMap.GetNode("GainAuto");
     gainAuto->SetIntValue(gainAuto->GetEntryByName("Off")->GetValue());
     CFloatPtr gainValue = nodeMap.GetNode("Gain");
     gainValue->SetValue(0);
-    cout<<gainValue->GetValue()<<endl;
+    cout<<gainValue->GetValue()<<endl;*/
 
     // set gamma value to 0
-    CFloatPtr gamma = nodeMap.GetNode("Gamma");
-    gamma->SetValue(0);
-    cout<<gamma->GetValue()<<endl;
+    pCam->GammaEnable.SetValue(false);
 
-    // set black level to 1
-    CEnumerationPtr blackLevelSelector = nodeMap.GetNode("BlackLevelSelector");
-    blackLevelSelector->SetIntValue(blackLevelSelector->GetEntryByName("All")->GetValue());
-    CFloatPtr blackLevel = nodeMap.GetNode("BlackLevel");
-    blackLevel->SetValue(1);
+    pCam->BlackLevelSelector.SetValue(Spinnaker::BlackLevelSelectorEnums::BlackLevelSelector_All);
+    //Set the absolute value of brightness to 1.5%.
+    pCam->BlackLevel.SetValue(1.5);
 
-    // set whitebalance to 1.5 Red
-    /*CEnumerationPtr balanceWhiteAuto = nodeMap.GetNode("BalanceWhiteAuto");
-    balanceWhiteAuto->SetIntValue(balanceWhiteAuto->GetEntryByName("Off")->GetValue());
-    CEnumerationPtr balanceRatioSelector = nodeMap.GetNode("BalanceRatioSelector");
-    balanceRatioSelector->SetIntValue(balanceRatioSelector->GetEntryByName("Blue")->GetValue());
-    CFloatPtr balanceRatio = nodeMap.GetNode("BalanceRatio");
-    balanceRatio->SetValue(1.5);
-    balanceRatioSelector->SetIntValue(balanceRatioSelector->GetEntryByName("Red")->GetValue());
-    balanceRatio->SetValue(1.5);*/
+    //Set auto white balance to off
+    pCam->BalanceWhiteAuto.SetValue(Spinnaker::BalanceWhiteAutoEnums::BalanceWhiteAuto_Off);
+    //Select red channel balance ratio and set to 1.5
+    pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Red);
+    pCam->BalanceRatio.SetValue(1.5);
 
-    // Retrieve integer value from entry node
-    const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
-    
-    // Set integer value from entry node as new value of enumeration node
-    ptrAcquisitionMode->SetIntValue(acquisitionModeContinuous);
-    
-    camlogger.information("Acquisition mode set to continuous...");
-    cout << "Acquisition mode set to continuous..." << endl;
-    
   }
   catch (Spinnaker::Exception& e){
     camlogger.error(Poco::format("Error Spinning up camera: %s", e.what()));

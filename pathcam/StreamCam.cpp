@@ -44,14 +44,7 @@ namespace pathCam {
     minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames,2);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    int deviceCount = cv::cuda::getCudaEnabledDeviceCount();
-
-    //if inferencing, we need one device for that and one for compositing
-    //if not, we only need one device for compositing
-    if (deviceCount > inferencing) {//bool converted to int
-      opencvWithCuda = true;
-      compositorCudaDevice = GPU_select_cuda_device();
-    }
+      compositorCudaDevice = GPU_select_cuda_device(1);
 #endif
 
     MRimage.reset(new MRTiledImageSet());
@@ -115,7 +108,7 @@ namespace pathCam {
 
 #ifdef HAVE_OPENCV_CUDAARITHM
 
-  int StreamCam::GPU_select_cuda_device() {
+  int StreamCam::GPU_select_cuda_device(int _priority) {
     int device_count = cuda::getCudaEnabledDeviceCount();
     if (device_count == 0) {
       throw std::runtime_error("No CUDA devices found");
@@ -139,15 +132,8 @@ namespace pathCam {
         return a.capability() > b.capability();
     });
 
-    int selected = 0;
-    if (inferencing && devices.size() > 1) {
-      selected = devices[1].index;
-    } else {
-      selected = devices[0].index;
-    }
+    return devices[std::min(_priority,(int) devices.size() - 1)].index;
 
-    cuda::setDevice(selected);
-    return selected;
   }
 #endif
 
@@ -369,7 +355,7 @@ namespace pathCam {
     if (!tileEmbedQ.empty()) {
       unsigned int component_index = std::get<2>(tileEmbedQ.front());
 
-      while (!tileEmbedQ.empty() && std::get<2>(tileEmbedQ.front()) == component_index && temp.size() < 512) {
+      while (!tileEmbedQ.empty() && std::get<2>(tileEmbedQ.front()) == component_index && temp.size() < maxTilesPerBatch) {
         temp.push_back(tileEmbedQ.front());
         tileEmbedQ.pop();
       }

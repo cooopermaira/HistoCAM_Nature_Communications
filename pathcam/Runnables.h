@@ -12,6 +12,18 @@
 #include "pathCam.h"
 #include "Poco/Runnable.h"
 
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void launch_drop_alpha_and_swap(char* dst, const char* src, int count);
+
+#ifdef __cplusplus
+}
+#endif
+
 namespace pathCam {
   class JobQueue;
 
@@ -142,6 +154,12 @@ namespace pathCam {
   private:
     StreamCam *parent;
     Mat threeChannelPreallocated;
+#ifdef HAVE_OPENCV_CUDAARITHM
+    cuda::GpuMat threeChannelPrealGPU;
+    char* bufferGPU_rcv;
+    char* bufferGPU;
+    char* bufferMemory;
+#endif
 
     std::vector<std::vector<float> > tileEmbedVec;
     std::vector<std::vector<float> > coordsVec;
@@ -159,6 +177,7 @@ namespace pathCam {
     torch::Tensor tileEmbeds;
 
     Poco::FastMutex tileEmbedMutex;
+
 
   public:
     explicit InferenceManager(StreamCam *parent);
