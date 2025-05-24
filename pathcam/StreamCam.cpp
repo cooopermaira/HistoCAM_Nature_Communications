@@ -86,6 +86,30 @@ namespace pathCam {
     return true;
   }
 
+
+  bool StreamCam::spin_run() {
+
+    std::cout << "spin_run started " << std::endl;
+    recordingMode = true;
+
+    Q_thread.start(qm);
+    composite_thread.start(cm);
+    if (inferencing) {
+      inference_thread.start(im);
+    }
+
+    Q_thread.join();
+    composite_thread.join();
+    if (inferencing) {
+      //im->thread.join();
+      inference_thread.join();
+    }
+
+    std::cout << "spin_run done" << std::endl;
+
+    return true;
+  }
+
   void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index,
                                     std::string _label) {
     lastFrameMutex->lock();
@@ -175,23 +199,6 @@ namespace pathCam {
       }
     }
   }
-
-  bool StreamCam::spin_run() {
-
-    std::cout << "spin_run started " << std::endl;
-    recordingMode = true;
-
-    Q_thread.start(qm);
-    composite_thread.start(cm);
-
-    Q_thread.join();
-    composite_thread.join();
-
-    std::cout << "spin_run done" << std::endl;
-
-    return true;
-  }
-
 
 
   void StreamCam::add_image(Image *image, unsigned long index) {
