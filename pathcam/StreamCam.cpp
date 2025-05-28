@@ -34,11 +34,13 @@ namespace pathCam {
                                                            inferenceWait(true),
                                                            compositeWait(true),
                                                            microscopeInput(true) {
-    //inferencing = false;
+    inferencing = false;
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
     }
+
+    int threads = 10;
 
     minPixelDistanceBetweenFrames = 400;
     minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames,2);
@@ -48,7 +50,8 @@ namespace pathCam {
 #endif
 
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(10, 10);
+    JobQ = new JobQueue(threads, threads,windowWidth);
+    JobQ->parent = this;
 
 
     //lastFrame = Rect(0,0,image_width,image_height);
@@ -174,6 +177,20 @@ namespace pathCam {
     return false;
   }
 
+  void StreamCam::mark_neighbors_as_underexposed(unsigned long _index) {
+    std::vector<unsigned long> neighborhood;
+    for (unsigned long i = max(0ul,_index - windowWidth); i < _index + windowWidth; i++) {
+      neighborhood.push_back(i);
+      JobQ->cancel_job(2,_index);
+    }
+
+    auto answer = get_image_refs(neighborhood);
+
+    for (auto img : answer) {
+      img->mark_too_dark();
+    }
+  }
+
   std::string StreamCam::get_flatfield(int label) {
     if (recordingMode) {
       switch (label) {
@@ -220,6 +237,7 @@ namespace pathCam {
     reg_results_mutex->unlock();
 
     images[index] = image;
+    ++maxIndex;
     image_mutex->unlock();
   }
 
@@ -238,8 +256,9 @@ namespace pathCam {
 
     image_mutex->readLock();
     for (unsigned int i = 0; i < indexes.size(); i++) {
-      if (images[indexes[i]] == nullptr) { continue; }
-      temp.push_back(images[indexes[i]]);
+      if (images[indexes[i]]) {
+        temp.push_back(images[indexes[i]]);
+      }
     }
     image_mutex->unlock();
 
@@ -397,6 +416,7 @@ namespace pathCam {
   }
 
   void StreamCam::pass_image(Image *image, unsigned long _image_index, bool _saveImg) {
+    add_image(image,_image_index);
     LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true, _saveImg);
     loaderCount++;
     JobQ->add_runnable(llr);

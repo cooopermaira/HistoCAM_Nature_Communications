@@ -101,6 +101,9 @@ namespace pathCam {
         duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
       }
       check_render_info();
+      if (!parent->microscopeInput && parent->loaderCount == 0) {
+        submit_outstanding_jobs();
+      }
     }
 
 
@@ -123,6 +126,11 @@ namespace pathCam {
     parent->inferenceWait.set();
   }
 
+  void CompositeManager::submit_outstanding_jobs() {
+    for (int i = parent->maxIndex - parent->windowWidth; i <= parent->maxIndex ; i++) {
+      parent->JobQ->update_job_readiness(2,i);
+    }
+  }
 
   void CompositeManager::perform_global_alignment() {
     for (auto i: parent->composites) {
@@ -182,9 +190,7 @@ namespace pathCam {
     Mat3b threeChannelPreallocated;
     Mat4b fourChannelPreallocated;
 
-    if (image->readyImage.data) {
-      channels[0] = image->readyImage;
-    } else {
+
 
       Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
 
@@ -193,23 +199,23 @@ namespace pathCam {
 
 
       channels[0] = threeChannelPreallocated; //3 channel
-    }
+
 
     image->free_memory_RAW();
 
     if (image->label == Image::_2X) {//flat field correction if needed
-      if (!image->readyImage.data) {
+
         auto center = Point2i(composite->image_size.width / 2, composite->image_size.height / 2);
         auto bb = Rect(center.x - composite->parent->scope_radius - 10, center.y - composite->parent->scope_radius - 10,
                        2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
         cv::divide(threeChannelPreallocated(bb), composite->flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
-      }
+
       channels[1] = composite->circleMask * 255;           //alpha channel
 
     } else if (image->label == Image::_4X) {
-      if (!image->readyImage.data) {
+
         divide(threeChannelPreallocated, composite->parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
-      }
+
       channels[1] = Mat(image->height, image->width, CV_8U, Scalar(255));
 
     } else {
@@ -223,9 +229,6 @@ namespace pathCam {
     auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
     composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated, imageBox, rebuildTiles);
 
-    if (image->readyImage.data) {
-      image->readyImage.release();
-    }
 
     cm->decrement_rebuild_jobs_outstanding();
   }

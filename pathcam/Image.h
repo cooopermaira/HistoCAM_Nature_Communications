@@ -12,13 +12,16 @@ namespace pathCam {
   public:
     StreamCam* parent;
     RegInfo* regInfo;
-    double blurVariance;
+
+    unsigned long index;
+
     unsigned int width, height;
-    float reg_full_scale;
     unsigned int scope_radius;
     unsigned int component_membership;
     std::atomic<unsigned int> reference_count;
-    unsigned long index;
+
+    float reg_full_scale;
+    double blurVariance;
     double reg_scale_initial,reg_scale_full;
     double reg_crop_initial,reg_crop_full;
     enum {
@@ -39,7 +42,7 @@ namespace pathCam {
     cv::Mat descriptors;
     cv::Mat descriptorsMultilevel;
     cv::Mat descriptorsFull;
-    cv::Mat readyImage;
+
 
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 
@@ -54,8 +57,6 @@ namespace pathCam {
     }
 
     void correct_registration(std::vector<unsigned long> adjacentVerts);
-
-    void build_whitebalance_Mat(StreamCam* parent);
 
     void load_raw_from_disk();
 
@@ -138,6 +139,11 @@ namespace pathCam {
 
       return "No label";
 
+    }
+
+    void mark_too_dark() {
+      label = _UNDEREXP;
+      free_memory_RAW();
     }
 
     inline char *get_Raw() {

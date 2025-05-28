@@ -110,6 +110,8 @@ namespace pathCam {
     void push_remaining_tiles_for_inference();
 
     void decrement_rebuild_jobs_outstanding();
+
+    void submit_outstanding_jobs();
   };
 
   class RegistrationRunnable : public RunnableIntermediate {
@@ -286,11 +288,11 @@ namespace pathCam {
   };
 
   class MatchRunnable : public RunnableIntermediate {
-  private:
+  public:
     StreamCam *parent;
     unsigned long image_idx;
 
-  public:
+
     MatchRunnable(StreamCam *parent, unsigned long image_idx);
 
     virtual void run();

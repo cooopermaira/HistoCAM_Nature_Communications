@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/input10x.txt";
+    std::string outputfilepath = "/media/max/Data/frame_quality_testing/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
@@ -196,9 +196,9 @@ int main(int argc, char *argv[]) {
       }
       if (convertImages) {
         Mat ff;
-        if(i<=1753){
-          ff = flat_field4x;
-        }//else if(i>1753 && i <=2404){
+        // if(i<=1753){
+        //   ff = flat_field4x;
+        // }//else if(i>1753 && i <=2404){
 //          ff = flat_field4x;
 //        }else{
 //          ff = flat_field10x;
@@ -214,6 +214,7 @@ int main(int argc, char *argv[]) {
 //      ff = flat_field20x;
 //    }
         ff = flat_field20x;
+        string of = outFile.toString();
         auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
         jq.add_runnable(dr, i);
       }

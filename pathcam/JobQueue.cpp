@@ -8,12 +8,13 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  JobQueue::JobQueue(int min_threads, int max_threads) {
+  JobQueue::JobQueue(int min_threads, int max_threads, int _windowWidth) {
+    windowWidth = _windowWidth;
     queue_mutex = new Poco::FastMutex(),
         pathCamEvent = new Poco::Event(true);
     pool = new Poco::ThreadPool(min_threads, max_threads, 60, POCO_THREAD_STACK_SIZE);
   }
-  std::pair<int,unsigned long> JobQueue::getSortOrderAndJobRefs(int jobTypeFlag, unsigned long image_idx)
+  std::pair<int,unsigned long> JobQueue::get_sort_order_and_job_refs(int jobTypeFlag, unsigned long image_idx)
   {
     /*
      * Job Type Flags:
@@ -27,18 +28,18 @@ namespace pathCam {
     if (jobTypeFlag == 1)
     {
       sort_order = image_idx;
-      jobRefNumber = image_idx * 3 + jobTypeFlag;
+      jobRefNumber = image_idx * 3 + jobTypeFlag - 1;
     }
     else
     if (jobTypeFlag == 2)
     {
       sort_order = image_idx + 20;
-      jobRefNumber = image_idx * 3 + jobTypeFlag;
+      jobRefNumber = image_idx * 3 + jobTypeFlag - 1;
     }
     else if (jobTypeFlag == 3)
     {
       sort_order = image_idx + 1;
-      jobRefNumber = image_idx * 3 + jobTypeFlag;
+      jobRefNumber = image_idx * 3 + jobTypeFlag - 1;
     }
     else
     {
@@ -49,7 +50,7 @@ namespace pathCam {
   }
   void JobQueue::add_runnable(RunnableIntermediate *job, long _sortOrder) {
     if(_sortOrder == -1) {
-      std::pair<int, int> jr_so_pair = getSortOrderAndJobRefs(job->jobTypeFlag, job->image_index);
+      std::pair<int, int> jr_so_pair = get_sort_order_and_job_refs(job->jobTypeFlag, job->image_index);
       job->jobRefNumber = jr_so_pair.first;
       job->sort_order = jr_so_pair.second;
     }else{
@@ -59,35 +60,56 @@ namespace pathCam {
     if (job->jobRefNumber >= 0) {
       if (jobRefs.size() <= job->jobRefNumber + 50) {
         jobRefs.resize(job->jobRefNumber + 400);
-        jobsReadiness.resize(job->jobRefNumber + 400);
+        jobsReadiness.resize(job->jobRefNumber + 400,0);
+        cancelJob.resize(job->jobRefNumber + 400,false);
       }
       jobRefs[job->jobRefNumber] = job;
     }
-    //jobQueue.push(job);
-    update_job_readiness(job->jobTypeFlag, job->image_index);
+    if (job->jobTypeFlag == 0) {
+      jobQueue.push(job);
+    } else {
+      update_job_readiness(job->jobTypeFlag, job->image_index);
+    }
     queue_mutex->unlock();
 
   };
 
   void JobQueue::update_job_readiness(int jobTypeFlag, unsigned long image_idx) {
     if (jobTypeFlag == 2) {
+
       int k = 0;
-      for (int i = 0; i < 10; i++) {
-        auto answer = getSortOrderAndJobRefs(jobTypeFlag, image_idx + i);
+
+      for (int i = max(0,int(image_idx) - windowWidth);i <= image_idx + windowWidth;i++) {
+        auto answer = get_sort_order_and_job_refs(jobTypeFlag, i);
+        if (answer.first == 1) {
+          int k = 0;
+        }
         jobsReadiness[answer.first]++;
-        unsigned long readinessRequired = min(image_idx + i + 1,(unsigned long)6);
-        if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] != nullptr && jobRefs[answer.first]->unprocessed) {
-          jobQueue.push(jobRefs[answer.first]);
-          jobRefs[answer.first]->unprocessed = false;
+        unsigned long readinessRequired = 7 + min(i - windowWidth, 0);
+        if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] && jobRefs[answer.first]->unprocessed) {
+          if (cancelJob[answer.first]) {
+            --parent->matchableCount;
+            jobRefs[answer.first]->unprocessed = false;
+          }else {
+            jobQueue.push(jobRefs[answer.first]);
+            jobRefs[answer.first]->unprocessed = false;
+          }
         }
       }
     }else {
-      auto answer = getSortOrderAndJobRefs(jobTypeFlag, image_idx);
+      auto answer = get_sort_order_and_job_refs(jobTypeFlag, image_idx);
       if (jobRefs[answer.first]->unprocessed) {
         jobQueue.push(jobRefs[answer.first]);
         jobRefs[answer.first]->unprocessed = false;
       }
     }
+  }
+
+  void JobQueue::cancel_job(int jobTypeFlag, unsigned long image_idx) {
+    auto answer = get_sort_order_and_job_refs(jobTypeFlag, image_idx);
+    queue_mutex->lock();
+    cancelJob[answer.first] = true;
+    queue_mutex->unlock();
   }
 
   bool JobQueue::run_jobs(bool join_all) {

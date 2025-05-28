@@ -72,13 +72,14 @@ namespace pathCam {
   }
 
   bool Image::is_mostly_black() {
+
     float threshold_value = 20.f;
     int checkPoints = 40;
     float countBlack = 0;
-    float tooBlack = 0.2 * float(checkPoints);
+    float tooBlack = 0.4 * float(checkPoints);
     for (int i = 0; i < checkPoints; i++) {
-      int x = width / 2 + (scope_radius - 200.f) * cos(float(i) / float(checkPoints) * 2.f * 3.14f);
-      int y = height / 2 + (scope_radius - 200.f) * sin(float(i) / float(checkPoints) * 2.f * 3.14f);
+      int x = width / 2 + (scope_radius - 400.f) * cos(float(i) / float(checkPoints) * 2.f * 3.14f);
+      int y = height / 2 + (scope_radius - 400.f) * sin(float(i) / float(checkPoints) * 2.f * 3.14f);
       float val = debayer(x, y);
       if (val < threshold_value) { countBlack++; }
       if (countBlack > tooBlack) {
@@ -186,34 +187,7 @@ namespace pathCam {
     }
   }
 
-  void Image::build_whitebalance_Mat(StreamCam *parent) {
-    Mat flat_field;
 
-    Mat image_Mat = cv::Mat(height, width, CV_8U, get_Raw(), Mat::AUTO_STEP);
-    Mat gry;
-    Mat sbt;
-    Mat adj;
-
-    cvtColor(image_Mat, gry, COLOR_BayerBG2GRAY);
-    cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-
-    if (label == _2X) {
-      flat_field = parent->flat_field2X;
-      divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
-      adj = Mat3f(height, width, Vec3f(0.92, 1.0, 0.92));
-      Mat locations = gry > 230;
-      image_Mat.copyTo(sbt, locations);
-      image_Mat -= sbt;
-      cv::multiply(sbt, adj, sbt, 1, CV_8U);
-      image_Mat += sbt;
-      imwrite("test3.png", image_Mat);
-    } else if (label == _4X) {
-      flat_field = parent->flat_field4X;
-      divide(image_Mat, flat_field, image_Mat, 1, CV_8U);
-    } else { return; }
-
-    readyImage = image_Mat;
-  }
 
   bool Image::is_mostly_white(Mat ROI) {
     unsigned int threshold_value = 225;
@@ -296,6 +270,8 @@ namespace pathCam {
     return (center - outside2X) >= 150;
 
   }
+
+
 
   bool Image::is_good() {
     //return label == _2X;

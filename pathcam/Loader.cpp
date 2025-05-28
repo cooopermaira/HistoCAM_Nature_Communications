@@ -33,7 +33,7 @@ namespace pathCam {
     //   return;
     // }
     image->index = image_index;
-    image->find_label();
+    //image->find_label();
 
 //    if (image->label == Image::_2X || image->label == Image::_4X){
 //      if (image->blurVariance < 300){
@@ -46,7 +46,7 @@ namespace pathCam {
 
 
 
-    if (image->is_good()) {
+    if (!image->is_mostly_black()) {
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
@@ -102,12 +102,13 @@ namespace pathCam {
 
       image->release_reg_image();
 
-      parent->add_image(image, image_index);
+      //parent->add_image(image, image_index);
       auto matchjob = new MatchRunnable(parent, image_index);
-      parent->matchableCount++;
+      ++parent->matchableCount;
       parent->JobQ->add_runnable(matchjob);
-
+      successful = true;
     } else {
+      parent->mark_neighbors_as_underexposed(image_index);
       image->free_memory_RAW();
     }
 

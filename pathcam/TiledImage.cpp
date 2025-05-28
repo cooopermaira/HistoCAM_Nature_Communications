@@ -210,14 +210,17 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
             int x = i * (int) logic_size - box.x;
             int y = j * (int) logic_size - box.y;
             Rect_<float> rect = cv::Rect_<float>(x, y, logic_size, logic_size);
-            if (tiles(i, j) == nullptr) { continue; };
+            if (tiles(i, j)) {
 #ifdef HAVE_OPENCV_CUDAARITHM
-            Mat temp(tile_size, tile_size,CV_8UC4);
-            tiles(i, j)->download(temp);
+                Mat temp(tile_size, tile_size,CV_8UC4);
+                tiles(i, j)->download(temp);
+                box_tiles.emplace_back(temp, i, j, rect);
 #else
-            Mat temp = *tiles(i, j);
+                box_tiles.emplace_back(*tiles(i, j), i, j, rect);
 #endif
-            box_tiles.push_back(TileQuery(temp, i, j, rect));
+            };
+
+
         }
     }
 

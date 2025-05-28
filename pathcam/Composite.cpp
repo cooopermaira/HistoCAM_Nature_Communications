@@ -393,7 +393,6 @@ namespace pathCam {
 
       //res is {vertexId,maskId}
       if (res == -1) {
-        images[i]->readyImage.release();
         continue;
       }
       update = true;
@@ -403,10 +402,7 @@ namespace pathCam {
       needsAlignment = true;
 
       //build image with alpha channel
-      if (images[i]->readyImage.data) {
-        channels[0] = images[i]->readyImage;
-      } else {
-        //images[i]->load_raw_from_disk();
+        images[i]->load_raw_from_disk();
         Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
         cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
         images[i]->free_memory_RAW();
@@ -418,13 +414,11 @@ namespace pathCam {
           convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
         }
         channels[0] = threeChannelPreallocated; //3 channel
-      }
+
 
       //add alpha channel
       channels[1] = rectMask;
       merge(channels, fourChannelPreallocated);
-
-      images[i]->readyImage.release();
 
       //calculate effected tiles
       std::vector<Point2i> effectedTiles;

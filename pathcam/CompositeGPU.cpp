@@ -154,22 +154,17 @@ namespace pathCam {
                  convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
              }
 
-            //channelsGPU[0] = threeChannelPrealGPU; //3 channel
-            cuda::split(threeChannelPrealGPU, channelsGPU);
 
             //add alpha channel
+            cuda::split(threeChannelPrealGPU, channelsGPU);
             channelsGPU.push_back(rectMaskGPU);
             cuda::merge(channelsGPU, fourChannelPrealGPU);
-
-
-            //fourChannelPrealGPU.download(fourChannelPreallocated);
-
 
             //calculate effected tiles
             std::vector<Point2i> effectedTiles;
             std::vector<Point2i> effectedTilesNoMask;
 
-
+            //calculate region of pyramid for data placement
             auto imageBox = cv::Rect_<float>(images[i]->absoluteCoords.x, images[i]->absoluteCoords.y, images[i]->width,
                                              images[i]->height);
 
@@ -193,7 +188,7 @@ namespace pathCam {
             }
             //update pyramid bounds, reset mask
             imagePyramid->bounds = imagePyramid->level[0]->bounds;
-            polyMaskOutput = freshMask.clone();
+            polyMaskOutput.setTo(Scalar(0));
         }
 
         //highlight bounds of last frame
@@ -209,11 +204,6 @@ namespace pathCam {
 
             parent->notify_observers();
 
-            //      auto stop = std::chrono::high_resolution_clock::now();
-            //      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-            //      if (duration < 250) {
-            //        Poco::Thread::sleep(250 - duration);
-            //      }
         }
     }
 

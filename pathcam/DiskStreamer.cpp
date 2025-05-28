@@ -93,24 +93,32 @@ namespace pathCam {
         cv::Size image_size(image->width, image->height);
         Mat readMat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
         Mat image_Mat;
+
+        if (image->is_mostly_black()) {
+          outfile.pushDirectory("png_mostly_black");
+        }else {
+          outfile.pushDirectory("png_ok");
+        }
+
         cvtColor(readMat, readMat, COLOR_BayerBG2RGB);
+        resize(readMat,image_Mat,cv::Size(image->width/8, image->height/8));
 //
 //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
 //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
 
 
-        divide(readMat, flatfield, image_Mat, 1, CV_32F);
+        //divide(readMat, flatfield, image_Mat, 1, CV_32F);
 
-        cv::pow(image_Mat, 1.1, image_Mat);
+        //cv::pow(image_Mat, 1.1, image_Mat);
 
-        image_Mat.convertTo(image_Mat, CV_8UC3);
+        //image_Mat.convertTo(image_Mat, CV_8UC3);
 
         //add subdir for png
         auto r = o;
 
-        o.setFileName(image->get_ImageFile().getFileName());
-        o.setExtension("png");
-        imwrite(o.toString(), image_Mat);
+        outfile.setFileName(image->get_ImageFile().getFileName());
+        outfile.setExtension("png");
+        imwrite(outfile.toString(), image_Mat);
         //
         // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
 //        image_Mat = ConvertBGR2Bayer(image_Mat);

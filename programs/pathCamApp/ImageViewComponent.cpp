@@ -145,7 +145,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     std::vector<TileQuery> tiles = MRImage->images[i]->
         getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
     for (unsigned int t = 0; t < tiles.size(); t++) {
-      cv::Mat tile = tiles[t].image;
+      auto tile = tiles[t].image;
       auto bounds = RectCtoJ<float>(tiles[t].bounds);
       bounds *= view2screenScale(imageview) * scale;
       bounds.expand(0.5, 0.5);

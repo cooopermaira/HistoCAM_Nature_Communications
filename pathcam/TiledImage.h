@@ -53,15 +53,23 @@ public:
   }
 };
 
+
 struct TileQuery {
 public:
-  cv::Mat image;
+
   int i, j;
   cv::Rect_<float> bounds;
-
+// #ifdef HAVE_OPENCV_CUDAARITHM
+// cuda::GpuMat image;
+//   TileQuery(const cuda::GpuMat& image, int i, int j, cv::Rect_<float> bounds) :
+//       image(image), i(i), j(j), bounds(bounds) {};
+// #else
+  cv::Mat image;
   TileQuery(cv::Mat image, int i, int j, cv::Rect_<float> bounds) :
       image(image), i(i), j(j), bounds(bounds) {};
+//#endif
 };
+
 
 class MRTiledImage;
 class TiledImage {

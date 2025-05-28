@@ -146,12 +146,15 @@ namespace pathCam {
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;
 
+    int windowWidth = 3;
+    int maxIndex = -1;
+
     std::atomic<bool> compositing = true;
     std::atomic<bool> tileEmbeddingComplete = false;
     std::atomic<unsigned int> components = 0;
     std::atomic<unsigned int> diskCount = 0;
     std::atomic<unsigned int> loaderCount = 0;
-    std::atomic<unsigned int> matchableCount = 0;
+    std::atomic<int> matchableCount = 0;
     std::atomic<unsigned int> regCount = 0;
 
     std::vector<DataObserver *> observers;
@@ -170,6 +173,8 @@ namespace pathCam {
 #endif
 
     bool has_flatfield(int label);
+
+    void mark_neighbors_as_underexposed(unsigned long index);
 
     std::string get_flatfield(int label);
 
