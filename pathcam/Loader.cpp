@@ -94,11 +94,11 @@ namespace pathCam {
         return;
       }
 
-      if(additionalSiftReg){
-        //image->create_reg_image(1,1,parent->debayer,parent->interpolation,parent->real);
-        auto detector2 = new pathCam::FeatureDetector(7, parent->use_FREAK);
-        detector2->detect_and_compute(image,1);
-      }
+      // if(additionalSiftReg){
+      //   //image->create_reg_image(1,1,parent->debayer,parent->interpolation,parent->real);
+      //   auto detector2 = new pathCam::FeatureDetector(7, parent->use_FREAK);
+      //   detector2->detect_and_compute(image,1);
+      // }
 
       image->release_reg_image();
 

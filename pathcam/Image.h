@@ -43,6 +43,11 @@ namespace pathCam {
     cv::Mat descriptorsMultilevel;
     cv::Mat descriptorsFull;
 
+#ifdef HAVE_OPENCV_CUDAFEATURES2D
+    cv::cuda::GpuMat SIFTDescriptors;
+    cv::cuda::GpuMat SIFTKeypoints;
+#endif
+
 
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 

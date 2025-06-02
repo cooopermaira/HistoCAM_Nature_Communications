@@ -143,6 +143,9 @@ namespace pathCam {
             //debayer image on gpu
             cuda::GpuMat image_Mat(image_size, CV_8U, images[i]->get_raw_cuda());
             cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
+
+            GPU_extract_SIFT(image_Mat);
+
             images[i]->free_memory_CUDA();
 
              if (componentMagLabel != 0) {
@@ -207,5 +210,47 @@ namespace pathCam {
         }
     }
 
+    void CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
+        cuda::GpuMat gry;
+        cuda::cvtColor(_img,gry,COLOR_BayerBG2GRAY);
+
+        cuda::SURF_CUDA surf;
+    }
+
+
 #endif
+
+    void CompositeVoronoi::perform_bundle_adjustment(int _featureTypeAndLocation) {
+        /*grab references to images in delauney members. use this instead of memberImages since some filtering may occur
+        between these two*/
+        std::vector<unsigned long> indexes;
+        for (auto item : delaunayMembers){indexes.push_back(item.second);}
+        auto imgs = parent->get_image_refs(indexes);
+
+        //create necessary structs for bundleAdjusterAffine
+        std::vector<cv::detail::ImageFeatures> features(imgs.size());
+        std::vector<cv::detail::CameraParams> cameras(imgs.size());
+        double shrink = parent->crop_factor * parent->scale_factor;
+
+        for (int i = 0; i < memberImages.size(); i++) {
+            features[i].img_idx = i;
+            features[i].img_size = Size(parent->image_width * shrink, parent->image_height * shrink);
+            imgs[i]->descriptors.copyTo(features[i].descriptors);
+            features[i].keypoints = imgs[i]->keypoints;
+
+            //cameras[i].R = Mat::eye(3, 3, CV_64F); // unused by affine
+            //cameras[i].K = Mat::eye(3, 3, CV_64F); // unused by affine
+            cameras[i].t = Mat::zeros(3, 1, CV_64F);
+            cameras[i].t.at<double>(0, 0) = imgs[i]->absoluteCoords.x;
+            cameras[i].t.at<double>(1, 0) = imgs[i]->absoluteCoords.y;
+            cameras[i].t.at<double>(2, 0) = 1.0; // affine homogeneous translation
+        }
+
+        //do pairwise matches
+        cv::detail::AffineBestOf2NearestMatcher matcher();
+
+
+
+    }
+
 }

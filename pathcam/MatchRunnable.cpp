@@ -259,26 +259,12 @@ namespace pathCam {
 
 
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
-      pathCam::Image *previous = parent->get_image_ref(prev_idx);
+      Image *previous = parent->get_image_ref(prev_idx);
       
       if (previous == nullptr) {
           continue;
       }
-      /*
-        if (max(5, int(image_idx)) <= prev_idx + 5 && tryWaiting) {
-          auto res = parent->JobQ->getSortOrderAndJobRefs(1,prev_idx);
-          auto waitFor = parent->JobQ->jobRefs[res.first];
-          waitFor->waitOnThisGuy();
-          parent->debugMatchSuspendThread++;
-          tryWaiting = false;
-          previous = parent->get_image_ref(prev_idx);
-          if (previous == nullptr) { continue; }
 
-          //could remain null if !image->isGood()
-
-        } else { continue; }
-      }
-      */
       if (!previous->is_good()) { continue; }
 
       Match *m = new Match(previous, image);

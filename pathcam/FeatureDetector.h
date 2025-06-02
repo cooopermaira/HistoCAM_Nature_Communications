@@ -270,24 +270,13 @@ public:
   
   bool detect_and_compute(Image *image,int flag);
 
-//  inline bool detect_and_compute_multilevel(Image *image){
-//
-//    if(use_FREAK){
-//      detector->detect(image->get_reg_image(),image->keypointsMultilevel);
-//      extractor->compute( image->get_reg_image(), image->keypointsMultilevel, image->descriptorsMultilevel  );
-//    }else{
-//      detector->detectAndCompute(image->get_reg_image(),
-//                                 noArray(), image->keypointsMultilevel,
-//                                 image->descriptorsMultilevel );
-//    }
-//
-//    return (image->keypoints.size() > 0);
-//
-//  }
+
 
   
   
 };
+
+
 
 }
 

@@ -100,7 +100,9 @@ namespace pathCam {
         auto stop = std::chrono::high_resolution_clock::now();
         duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
       }
+
       check_render_info();
+
       if (!parent->microscopeInput && parent->loaderCount == 0) {
         submit_outstanding_jobs();
       }
@@ -134,7 +136,8 @@ namespace pathCam {
 
   void CompositeManager::perform_global_alignment() {
     for (auto i: parent->composites) {
-      i->perform_global_alignment(0, 0.2);
+      //i->perform_global_alignment(0, 0.2);
+      i->perform_bundle_adjustment(CompositeVoronoi::ORB_CPU);
     }
   }
 

@@ -135,6 +135,8 @@ namespace pathCam {
 
     void GPU_add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
 
+    void GPU_extract_SIFT(cuda::GpuMat &_img);
+
     void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i>& _face);
 #endif
 
@@ -179,6 +181,7 @@ namespace pathCam {
 
   public:
 
+    enum{SIFT_GPU = 0,ORB_CPU};
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
     unsigned int componentMagLabel;
@@ -210,6 +213,8 @@ namespace pathCam {
     void update_Bbox_no_composite(std::vector<RegInfo*> new_info);
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
+
+    void perform_bundle_adjustment(int _featureTypeAndLocation);
 
     void build_system_from_DT(std::map<long, long> &systemIndexToFrameIndex,
                               std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,
