@@ -111,6 +111,12 @@ namespace pathCam {
 
     void decrement_rebuild_jobs_outstanding();
 
+    void build_match_pairs(std::vector<std::pair<Image*, Image*> > &_imagePairsToMatch, std::vector<RegInfo*> &_regs);
+
+    cv::detail::MatchesInfo compute_matches_info(SiftData& _sift1, SiftData& _sift2, unsigned long _img1_idx, unsigned long _img2_idx);
+
+    void perform_SIFT_multires_bundle_adjustment();
+
     void submit_outstanding_jobs();
   };
 

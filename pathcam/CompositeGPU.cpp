@@ -117,7 +117,7 @@ namespace pathCam {
         for (int i = 0; i < new_info.size(); i++) {
             indexes.push_back(new_info[i]->index);
         }
-        std::vector<Image *> images = parent->get_image_refs(indexes);
+        std::vector<Image *> images = parent->get_image_ref(indexes);
         bool update = false;
 
         for (int i = 0; i < images.size(); i++) {
@@ -126,6 +126,20 @@ namespace pathCam {
             std::vector<Point2i> face;
             auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
             auto res = add_point_to_delaunay_triangulation(fShift, images[i], face, _force_add);
+
+            //res is {vertexId,maskId}
+            if (res == -1) {
+                continue;
+            }
+
+            delaunayRegInfos.push_back(new_info[i]);
+            delaunayImages.push_back(images[i]);
+            auto newOverlaps = calculate_new_overlaps();
+            std::cout<<newOverlaps.size()<<std::endl;
+
+            update = true;
+            images[i]->vertexId = res;
+
             polyMaskGPU.upload(polyMaskOutput);
 
             update = true;
@@ -144,8 +158,6 @@ namespace pathCam {
             cuda::GpuMat image_Mat(image_size, CV_8U, images[i]->get_raw_cuda());
             cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
 
-            GPU_extract_SIFT(image_Mat);
-
             images[i]->free_memory_CUDA();
 
              if (componentMagLabel != 0) {
@@ -157,6 +169,7 @@ namespace pathCam {
                  convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
              }
 
+            images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
 
             //add alpha channel
             cuda::split(threeChannelPrealGPU, channelsGPU);
@@ -210,11 +223,51 @@ namespace pathCam {
         }
     }
 
-    void CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
-        cuda::GpuMat gry;
-        cuda::cvtColor(_img,gry,COLOR_BayerBG2GRAY);
+    SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
+        if (_img.channels() == 1) {
+            cuda::cvtColor(_img,gry,COLOR_BayerBG2GRAY);
+        }else if (_img.channels() == 3) {
+            cuda::cvtColor(_img,gry,COLOR_BGR2GRAY);
+        }else {
+            throw std::runtime_error("Unsupported image format in GPU_extract_SIFT");
+        }
 
-        cuda::SURF_CUDA surf;
+        if (componentMagLabel == Image::_2X) {
+            cuda::multiply(circleMaskGPU, gry, gry);
+        }
+
+        gry.convertTo(gry2,CV_32FC1);
+
+        CudaImage cImgGry;
+        cImgGry.Allocate(image_size.width,image_size.height,gry2.step / sizeof(float),false,reinterpret_cast<float*>(gry2.data),nullptr);
+
+        SiftData siftData;
+        InitSiftData(siftData, 10000, true, true);
+
+        ExtractSift(siftData,cImgGry,5,1.f,3.5f,0.f,false);
+
+
+        return siftData;
+
+        //int k = 0;
+
+
+    }
+
+    std::vector<std::pair<Image *, Image *> > CompositeVoronoi::calculate_new_overlaps() {
+        std::vector<std::pair<Image *, Image *> > newOverlaps;
+        double radSq = pow(0.9 * parent->scope_radius,2);
+
+        for (int i = 0; i < delaunayRegInfos.size() - 1; ++i) {
+            if (componentMagLabel == Image::_2X) {
+                if (pow(delaunayRegInfos[i]->absoluteCoords.x - delaunayRegInfos.back()->absoluteCoords.x,2) +
+                pow(delaunayRegInfos[i]->absoluteCoords.y - delaunayRegInfos.back()->absoluteCoords.y,2) < radSq) {
+                    newOverlaps.push_back({delaunayImages[i],delaunayImages.back()});
+                }
+            }
+        }
+
+        return newOverlaps;
     }
 
 
@@ -225,7 +278,7 @@ namespace pathCam {
         between these two*/
         std::vector<unsigned long> indexes;
         for (auto item : delaunayMembers){indexes.push_back(item.second);}
-        auto imgs = parent->get_image_refs(indexes);
+        auto imgs = parent->get_image_ref(indexes);
 
         //create necessary structs for bundleAdjusterAffine
         std::vector<cv::detail::ImageFeatures> features(imgs.size());
@@ -247,7 +300,7 @@ namespace pathCam {
         }
 
         //do pairwise matches
-        cv::detail::AffineBestOf2NearestMatcher matcher();
+        cv::detail::AffineBestOf2NearestMatcher matcher;
 
 
 

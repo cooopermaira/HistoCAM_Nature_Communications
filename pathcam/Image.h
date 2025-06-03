@@ -46,6 +46,7 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAFEATURES2D
     cv::cuda::GpuMat SIFTDescriptors;
     cv::cuda::GpuMat SIFTKeypoints;
+    SiftData siftData;
 #endif
 
 

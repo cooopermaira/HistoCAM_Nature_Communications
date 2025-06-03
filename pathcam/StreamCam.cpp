@@ -34,7 +34,7 @@ namespace pathCam {
                                                            inferenceWait(true),
                                                            compositeWait(true),
                                                            microscopeInput(true) {
-    inferencing = false;
+    //inferencing = false;
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
@@ -42,7 +42,7 @@ namespace pathCam {
 
     int threads = 10;
 
-    minPixelDistanceBetweenFrames = 400;
+    minPixelDistanceBetweenFrames = 500;
     minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames,2);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
@@ -184,7 +184,7 @@ namespace pathCam {
       JobQ->cancel_job(2,_index);
     }
 
-    auto answer = get_image_refs(neighborhood);
+    auto answer = get_image_ref(neighborhood);
 
     for (auto img : answer) {
       img->mark_too_dark();
@@ -251,13 +251,13 @@ namespace pathCam {
   }
 
 
-  std::vector<Image *> StreamCam::get_image_refs(std::vector<unsigned long int> indexes) {
+  std::vector<Image *> StreamCam::get_image_ref(const std::vector<unsigned long int> &_indexes) const {
     std::vector<Image *> temp;
 
     image_mutex->readLock();
-    for (unsigned int i = 0; i < indexes.size(); i++) {
-      if (images[indexes[i]]) {
-        temp.push_back(images[indexes[i]]);
+    for (unsigned int i = 0; i < _indexes.size(); i++) {
+      if (images[_indexes[i]]) {
+        temp.push_back(images[_indexes[i]]);
       }
     }
     image_mutex->unlock();
@@ -265,7 +265,21 @@ namespace pathCam {
     return temp;
   }
 
-  RegInfo *StreamCam::get_registration(unsigned long image_idx) {
+  std::vector<RegInfo*> StreamCam::get_reg_ref(const std::vector<unsigned long> &_indexes) {
+    std::vector<RegInfo*> temp;
+
+    reg_results_mutex->writeLock();
+    for (unsigned int i = 0; i < _indexes.size(); i++) {
+      if (reg_results[_indexes[i]]) {
+        temp.push_back(reg_results[_indexes[i]]);
+      }
+    }
+    reg_results_mutex->unlock();
+
+    return temp;
+  };
+
+  RegInfo *StreamCam::get_reg_ref(unsigned long image_idx) {
     RegInfo *temp;
     reg_results_mutex->readLock();
     temp = reg_results[image_idx];
@@ -363,7 +377,7 @@ namespace pathCam {
       res[i] = dm[key];
       i++;
     }
-    return get_image_refs(res);
+    return get_image_ref(res);
   }
 
   std::vector<RegInfo *> StreamCam::get_Q_front() {

@@ -94,6 +94,7 @@ namespace pathCam {
       auto mean = torch::tensor({0.485, 0.456, 0.406}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
       auto stddv = torch::tensor({0.229, 0.224, 0.225}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
 
+      at::Tensor batch_tensor;
 
       while (parent->compositing || !parent->tileEmbedQ.empty()) {
         auto tileList = parent->get_tile_embed_Q_front();
@@ -112,8 +113,8 @@ namespace pathCam {
           //get reference to pyramid tiles
           auto pyramidLevel = parent->composites[component]->imagePyramid->level[0];
 
-          auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), parent->tileSize, parent->tileSize, 3},
-                                           torch::kFloat32).to(device);
+          // auto batch_tensor = torch::empty({static_cast<int64_t>(numImages), parent->tileSize, parent->tileSize, 3},
+          //                                  torch::kFloat32).to(device);
 
           tileEmbedMutex.lock();
           cuda::setDevice(parent->compositorCudaDevice);

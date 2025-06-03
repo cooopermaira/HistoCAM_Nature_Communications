@@ -11,7 +11,7 @@
 namespace pathCam {
 
   void RegInfo::attempt_absolute_reg(bool queue_for_compositing) {
-    auto them = parent->get_registration(matchedTo);
+    auto them = parent->get_reg_ref(matchedTo);
     Vec2 theirAbCs;
     unsigned int componentMembership;
 

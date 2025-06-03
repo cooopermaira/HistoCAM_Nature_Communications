@@ -214,13 +214,15 @@ namespace pathCam {
 
     void add_registration(RegInfo* regInfo);
 
-    RegInfo* get_registration(unsigned long image_idx);
-
     JobQueue *JobQ;
 
-    Image *get_image_ref(unsigned long int);
+    Image* get_image_ref(unsigned long int);
 
-    std::vector<Image *> get_image_refs(std::vector<unsigned long int>);
+    std::vector<Image *> get_image_ref(const std::vector<unsigned long>&) const;
+
+    std::vector<RegInfo*> get_reg_ref(const std::vector<unsigned long>&);
+
+    RegInfo* get_reg_ref(unsigned long image_idx);
 
     std::vector<Image *> get_component_image_refs(unsigned long component);
 

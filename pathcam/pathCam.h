@@ -20,10 +20,14 @@
 #include "opencv2/core/cuda.hpp"
 #include "opencv2/cudawarping.hpp"
 #include "opencv2/cudaimgproc.hpp"
+#include <opencv2/stitching/detail/matchers.hpp>
+#include <opencv2/stitching/detail/camera.hpp>
 #include "opencv2/cudaarithm.hpp"
 #include <cuda_runtime.h>
 #include <cstdio>
 
+#include "cudaImage.h"
+#include "cudaSift.h"
 #endif
 
 

@@ -27,7 +27,7 @@ namespace pathCam {
 
     circleMask = cv::Mat::zeros(image_size, CV_8U);
     cv::circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
-               cv::Scalar(255),
+               cv::Scalar(1),
                -1);
     rectMask = Mat(image_size, CV_8U, cv::Scalar(255));
 
@@ -338,19 +338,18 @@ namespace pathCam {
     int nonzeroMin;
     if (componentMagLabel == Image::_2X) {
       polyMaskOutput = polyMaskOutput.mul(circleMask);
+      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.00;
+    } else {
+      nonzeroMin = _image->width * _image->height * 0.1;
     }
-    //      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.00;
-    //    } else {
-    //      nonzeroMin = _image->width * _image->height * 0.1;
-    //    }
 
-    //    if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
-    //      //contributing less than x% of its pixels, revert and don't bother loading from disk
-    //      subdiv = tempSubdiv;
-    //      _image->free_memory_RAW();
-    //      memberImages.push_back({_image, false});
-    //      return -1;
-    //    }
+    if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
+      //contributing less than x% of its pixels, revert and don't bother loading from disk
+      subdiv = tempSubdiv;
+      _image->free_memory_RAW();
+      memberImages.push_back({_image, false});
+      return -1;
+    }
 
     _image->absoluteCoords = Vec2(_point.x, _point.y);
     memberImages.push_back({_image, true});
@@ -367,7 +366,7 @@ namespace pathCam {
     for (int i = 0; i < new_info.size(); i++) {
       indexes.push_back(new_info[i]->index);
     }
-    std::vector<Image *> images = parent->get_image_refs(indexes);
+    std::vector<Image *> images = parent->get_image_ref(indexes);
     bool update = false;
 
     for (int i = 0; i < images.size(); i++) {
@@ -980,58 +979,7 @@ namespace pathCam {
     }
   }
 
-  void CompositeVoronoi::create_and_submit_rebuild_jobs() {
-    std::vector<RebuildRunnable *> runnables;
-    for (auto el: delaunayMembers) {
-      auto dt = subdiv;
-      auto image = parent->get_image_ref(el.second);
-      Mat polyMaskOutput = Mat::zeros(image_size, CV_8U);
-      std::vector<Point2i> face;
-      std::vector<std::vector<Point2f> > facets;
-      std::vector<Point2f> centers;
-      dt.getVoronoiFacetList({el.first}, facets, centers);
 
-      //shift and recast
-      for (auto &ii: facets[0]) {
-        //we have pulled only one face so facets has only 1 element
-        ii.x -= centers[0].x;
-        ii.x += image_size.width / 2;
-        ii.y -= centers[0].y;
-        ii.y += image_size.height / 2;
-        face.push_back((Point2i) ii);
-      }
-      //build polygon mask for new point
-      if (image->label == Image::_2X) {
-        polyMaskOutput = polyMaskOutput.mul(circleMask);
-      }
-      fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
-      //imwrite("polymask.png", polyMaskOutput);
-      Mat polyMaskPadded;
-      int tileSize = imagePyramid->level[0]->getTileSize();
-      copyMakeBorder(polyMaskOutput, polyMaskPadded, tileSize, tileSize, tileSize, tileSize, BORDER_CONSTANT,
-                     Scalar(0));
-      std::vector<Point2i> effectedTiles;
-      calculate_effected_tiles(face, effectedTiles, image->absoluteCoords);
-      //Vector containing the tiles where their center
-      std::vector<Point2i> rebuildTiles;
-      for (auto tile: effectedTiles) {
-        auto tileBox = Rect(tileSize * tile.x - image->absoluteCoords.x + tileSize,
-                            tileSize * tile.y - image->absoluteCoords.y + tileSize, tileSize, tileSize);
-        int sum = countNonZero(polyMaskPadded(tileBox));
-        bool rebuild = rebuildTile(tile, sum);
-        if (rebuild) {
-          rebuildTiles.push_back(tile);
-        }
-      }
-
-      auto rr = new RebuildRunnable(this, el.first, el.second, rebuildTiles, polyMaskOutput);
-      runnables.push_back(rr);
-      parent->cm->rebuildJobsOutstanding++;
-    }
-    for (auto rr: runnables) {
-      parent->JobQ->add_runnable(rr);
-    }
-  }
 
   bool CompositeVoronoi::rebuildTile(Point2i tile, int sum) {
     std::string tileStr = std::to_string(tile.x) + "_" + std::to_string(tile.y);
@@ -1048,7 +996,7 @@ namespace pathCam {
     for (int i = 0; i < new_info.size(); i++) {
       indexes.push_back(new_info[i]->index);
     }
-    std::vector<Image *> images = parent->get_image_refs(indexes);
+    std::vector<Image *> images = parent->get_image_ref(indexes);
 
     std::vector<Point2i> effectedTiles;
     for (int i = 0; i < images.size(); i++) {
@@ -1244,7 +1192,7 @@ namespace pathCam {
     }
 
     // get a copy of references to all images at once so that only one mutex lock is needed
-    std::vector<Image *> images = parent->get_image_refs(indexes);
+    std::vector<Image *> images = parent->get_image_ref(indexes);
 
     //this may need to be placed inside the below for loop if frames ever vary in size. For now it is here so the mask only needs to be built once
     cv::Size image_size(images[0]->width, images[0]->height);
@@ -1412,7 +1360,7 @@ namespace pathCam {
       i++;
     }
 
-    auto images = parent->get_image_refs(image_indexes);
+    auto images = parent->get_image_ref(image_indexes);
     blurVals.clear();
     blurVals.resize(images.size());
     for (int i = 0; i < images.size(); i++) {
@@ -1491,8 +1439,8 @@ namespace pathCam {
             image_idx1 = delaunayMembers[vertId2];
           }
 
-          auto imageReg1 = parent->get_registration(image_idx1);
-          auto imageReg2 = parent->get_registration(image_idx2);
+          auto imageReg1 = parent->get_reg_ref(image_idx1);
+          auto imageReg2 = parent->get_reg_ref(image_idx2);
 
           if (m != nullptr) {
             auto val = imageReg1->absoluteCoords.x - imageReg2->absoluteCoords.x - m->t_x;
@@ -1643,12 +1591,12 @@ namespace pathCam {
       parent->update_observers();
       parent->reg_results_mutex->readLock();
       std::vector<RegInfo *> newinfo;
-      newinfo.push_back(parent->get_registration(memberImages[0].first->index));
+      newinfo.push_back(parent->get_reg_ref(memberImages[0].first->index));
       double xDiff, yDiff;
       double xDiffMax = 0;
       double yDiffMax = 0;
       for (auto [i, elm]: systemIndexToFrameIndex) {
-        auto ri = parent->get_registration(systemIndexToFrameIndex[i]);
+        auto ri = parent->get_reg_ref(systemIndexToFrameIndex[i]);
 
         xDiff = abs(ri->absoluteCoords.x - xac.at<double>(i));
         if (xDiff > xDiffMax) {
@@ -1937,11 +1885,11 @@ namespace pathCam {
         clean_data(A, b, bOther, x, systemIndexToFrameIndex);
 
         std::vector<RegInfo *> new_info(systemIndexToFrameIndex.size() + 1);
-        new_info[0] = parent->get_registration(memberImages[0].first->index);
+        new_info[0] = parent->get_reg_ref(memberImages[0].first->index);
         double diffmax = 0;
         int ii = 1;
         for (auto el: systemIndexToFrameIndex) {
-          auto ni = parent->get_registration(el.second);
+          auto ni = parent->get_reg_ref(el.second);
           auto val = x.at<double>(el.first);
           new_info[ii] = ni;
           double diff;
@@ -1982,11 +1930,11 @@ namespace pathCam {
 
       if (abs(n0 - n1) < epsilon || n1 < epsilon) {
         std::vector<RegInfo *> new_info(systemIndexToFrameIndex.size() + 1);
-        new_info[0] = parent->get_registration(memberImages[0].first->index);
+        new_info[0] = parent->get_reg_ref(memberImages[0].first->index);
         double diffmax = 0;
         int ii = 1;
         for (auto el: systemIndexToFrameIndex) {
-          auto ni = parent->get_registration(el.second);
+          auto ni = parent->get_reg_ref(el.second);
           auto val = x.at<double>(el.first);
           new_info[ii] = ni;
           double diff;

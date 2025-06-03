@@ -159,7 +159,7 @@ namespace pathCam {
       for (auto i: parent->composites[component_membership]->matchedEdges) {
         if (i.first > -1) {
           auto pwr = parent->matchM.match[i.first][i.second];
-          auto theirReg = parent->get_registration(i.second);
+          auto theirReg = parent->get_reg_ref(i.second);
           adjustedAbC.x += pwr->t_x + theirReg->absoluteCoords.x;
           adjustedAbC.y += pwr->t_y + theirReg->absoluteCoords.y;
 

@@ -103,6 +103,11 @@ namespace pathCam {
     cuda::GpuMat convertHoldingGPU;
     cuda::GpuMat threeChannelPrealGPU;
     cuda::GpuMat fourChannelPrealGPU;
+    cuda::GpuMat gry;
+    cuda::GpuMat gry2;
+
+    std::vector<RegInfo*> delaunayRegInfos;
+    std::vector<Image*> delaunayImages;
 #endif
 
     Subdiv2D subdiv;
@@ -135,7 +140,9 @@ namespace pathCam {
 
     void GPU_add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
 
-    void GPU_extract_SIFT(cuda::GpuMat &_img);
+    std::vector<std::pair<Image*,Image*>> calculate_new_overlaps();
+
+    SiftData GPU_extract_SIFT(cuda::GpuMat &_img);
 
     void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i>& _face);
 #endif

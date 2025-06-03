@@ -7,24 +7,24 @@
 // This class listens for registered frames, sorts them by component membership, then passes them to the component object for compositing.
 
 #include "pathCam.h"
+using namespace cv;
+using namespace cv::detail;
 
 namespace pathCam {
-
   CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),
-                                                          rebuildJobsOutstanding(true) {};
+                                                          rebuildJobsOutstanding(true) {
+  };
 
   void CompositeManager::run() {
     unsigned long duration = 0;
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-      cuda::setDevice(parent->compositorCudaDevice);
+    cuda::setDevice(parent->compositorCudaDevice);
 #endif
 
     rebuildJobsOutstanding = 0;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
-
-
       //pull new components that might need to be processed
       std::tuple<unsigned long, cv::Size, unsigned int> newComp;
       bool isNewComp = false;
@@ -36,12 +36,11 @@ namespace pathCam {
       //if nothing in the Q but termination condition not met, wait
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
-//          perform_global_alignment();
-//          if (rebuildJobsOutstanding > 0) {
-//            rebuildJobsComplete.wait();
-//          }
+          //          perform_global_alignment();
+          //          if (rebuildJobsOutstanding > 0) {
+          //            rebuildJobsComplete.wait();
+          //          }
           if (parent->inferencing) {
-
             push_remaining_tiles_for_inference();
 
             if (!parent->composites.empty()) {
@@ -51,15 +50,11 @@ namespace pathCam {
           }
           parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
           parent->newComponentQ.pop();
-
         } else {
-
           check_render_info();
           Poco::Thread::sleep(100);
         }
-
       } else {
-
         auto indexes = parent->get_Q_front();
         if (isNewComp) {
           if (indexes.front()->index > std::get<0>(newComp)) {
@@ -83,7 +78,6 @@ namespace pathCam {
 
         //sort the new frames by component and pass them to their respective components for compositing.
         for (int i = 0; i < indexes.size(); i++) {
-
           if (current_component == indexes[i]->component_membership) {
             new_info.push_back(indexes[i]);
           } else {
@@ -111,6 +105,7 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
+    //perform_SIFT_multires_bundle_adjustment();
     //perform_global_alignment();
     //rebuildJobsComplete.wait();
     //save_components_to_disk();
@@ -129,8 +124,8 @@ namespace pathCam {
   }
 
   void CompositeManager::submit_outstanding_jobs() {
-    for (int i = parent->maxIndex - parent->windowWidth; i <= parent->maxIndex ; i++) {
-      parent->JobQ->update_job_readiness(2,i);
+    for (int i = parent->maxIndex - parent->windowWidth; i <= parent->maxIndex; i++) {
+      parent->JobQ->update_job_readiness(2, i);
     }
   }
 
@@ -145,8 +140,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/Users/coopermaira/Desktop/image_dump/full4x_green.png",false,false,false,false);
-
+      i->save_pyramid_as_image("/Users/coopermaira/Desktop/image_dump/full4x_green.png", false, false, false, false);
     }
   }
 
@@ -172,68 +166,92 @@ namespace pathCam {
     }
   }
 
-  RebuildRunnable::RebuildRunnable(pathCam::CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex,
-                                   std::vector<Point2i> _rebuildTiles, Mat _polyMaskOutput) :
-      dtVertex(_dtVertex),
-      imageIndex(_imageIndex),
-      composite(_composite),
-      rebuildTiles(_rebuildTiles),
-      polyMaskOutput(_polyMaskOutput),
-      RunnableIntermediate(0, 0) {
-    cm = composite->parent->cm;
+  void CompositeManager::perform_SIFT_multires_bundle_adjustment() {
+    std::vector<std::pair<Image*,Image*> > imagePairsToMatch;
+    std::vector<RegInfo*> regs;
+    build_match_pairs(imagePairsToMatch,regs);
+
+    std::vector<MatchesInfo> matchesInfo(imagePairsToMatch.size());
+    for (int i = 0; i < matchesInfo.size(); ++i) {
+      //call params
+      auto sd1 = imagePairsToMatch[i].first->siftData;
+      auto sd2 = imagePairsToMatch[i].second->siftData;
+      auto idx1 = imagePairsToMatch[i].first->index;
+      auto idx2 = imagePairsToMatch[i].second->index;
+
+      matchesInfo[i] = compute_matches_info(sd1, sd2, idx1, idx2);
+    }
+    int k = 0;
   }
 
 
-  void RebuildRunnable::run() {
-    auto image = composite->parent->get_image_ref(imageIndex);
-    image->load_raw_from_disk();
-    //image->build_whitebalance_Mat(composite->parent);
+  MatchesInfo CompositeManager::compute_matches_info(SiftData &_sift1, SiftData &_sift2, unsigned long _img1_idx, unsigned long _img2_idx) {
+    MatchesInfo matches_info;
+    matches_info.src_img_idx = _img1_idx;
+    matches_info.dst_img_idx = _img2_idx;
 
-    std::vector<Mat> channels(2);
-    Mat3b threeChannelPreallocated;
-    Mat4b fourChannelPreallocated;
+    // Run matching in both directions
+    MatchSiftData(_sift1, _sift2);
+    MatchSiftData(_sift2, _sift1);
 
-
-
-      Mat image_Mat = cv::Mat(composite->image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-
-
-      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+    // Ensure host-side SiftPoints are synchronized from GPU. need xpos, ypos later for bundle adjustment
+    cudaMemcpy(_sift1.h_data, _sift1.d_data, sizeof(SiftPoint) * _sift1.numPts, cudaMemcpyDeviceToHost);
+    cudaMemcpy(_sift2.h_data, _sift2.d_data, sizeof(SiftPoint) * _sift2.numPts, cudaMemcpyDeviceToHost);
 
 
-      channels[0] = threeChannelPreallocated; //3 channel
+    // Track mutual matches
+    for (int i = 0; i < _sift1.numPts; ++i) {
+      int match_idx = _sift1.h_data[i].match;
+      if (match_idx < 0 || match_idx >= _sift2.numPts) continue;
 
-
-    image->free_memory_RAW();
-
-    if (image->label == Image::_2X) {//flat field correction if needed
-
-        auto center = Point2i(composite->image_size.width / 2, composite->image_size.height / 2);
-        auto bb = Rect(center.x - composite->parent->scope_radius - 10, center.y - composite->parent->scope_radius - 10,
-                       2 * composite->parent->scope_radius + 20, 2 * composite->parent->scope_radius + 20);
-        cv::divide(threeChannelPreallocated(bb), composite->flat_field(bb), threeChannelPreallocated(bb), 1.0, CV_8U);
-
-      channels[1] = composite->circleMask * 255;           //alpha channel
-
-    } else if (image->label == Image::_4X) {
-
-        divide(threeChannelPreallocated, composite->parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
-
-      channels[1] = Mat(image->height, image->width, CV_8U, Scalar(255));
-
-    } else {
-      //divide(threeChannelPreallocated, composite->parent->flat_field4X, threeChannelPreallocated, 1, CV_8U);
-      channels[1] = Mat(image->height, image->width, CV_8U, Scalar(255));
-
+      // Confirm mutual match
+      if (_sift2.h_data[match_idx].match == i) {
+        DMatch m;
+        m.queryIdx = i;
+        m.trainIdx = match_idx;
+        m.distance = _sift1.h_data[i].match_error;
+        matches_info.matches.push_back(m);
+      }
     }
 
-    merge(channels, fourChannelPreallocated);
-
-    auto imageBox = cv::Rect_<float>(image->absoluteCoords.x, image->absoluteCoords.y, image->width, image->height);
-    composite->imagePyramid->level[0]->insertMatAtBase(fourChannelPreallocated, imageBox, rebuildTiles);
+    return matches_info;
+  }
 
 
-    cm->decrement_rebuild_jobs_outstanding();
+  void CompositeManager::build_match_pairs(std::vector<std::pair<Image*, Image*> > &_imagePairsToMatch, std::vector<RegInfo*> &_regs) {
+
+    auto composites = parent->composites;
+    double radSq = pow(0.9 * parent->scope_radius,2);
+
+    for (auto cmp: composites) {
+
+      //get image refs for all delaunay members
+      std::vector<unsigned long> indexes;
+      for (auto item: cmp->delaunayMembers) {
+        indexes.push_back(item.second);
+      }
+      _regs = parent->get_reg_ref(indexes);
+      auto imgs = parent->get_image_ref(indexes);
+
+      //for each composite, loop thru delaunay members to make pairs within component.
+      //Choose pairs that have a chance of matching
+      for (int i = 0; i < _regs.size(); ++i) {
+        for (int j = i + 1; j < _regs.size(); ++j) {
+          if (cmp->componentMagLabel == Image::_2X) {
+            if (pow(_regs[i]->absoluteCoords.x - _regs[j]->absoluteCoords.x,2) +
+                pow(_regs[i]->absoluteCoords.y - _regs[j]->absoluteCoords.y,2) < radSq) {
+              _imagePairsToMatch.push_back({imgs[i], imgs[j]});
+            }
+          }else {
+            if (abs(_regs[i]->absoluteCoords.x - _regs[j]->absoluteCoords.x) < 0.9 * parent->image_width &&
+                abs(_regs[i]->absoluteCoords.y - _regs[j]->absoluteCoords.y) < 0.9 * parent->image_height) {
+              _imagePairsToMatch.push_back({imgs[i], imgs[j]});
+                }
+          }
+        }
+      }
+      //TODO: create matching pairs across components. this works for initial tests.
+    }
   }
 
 }

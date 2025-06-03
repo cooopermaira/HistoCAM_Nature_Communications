@@ -77,7 +77,7 @@ namespace pathCam {
       if(imgCompare->index == 1725 && selfImage->index == 1726){
         scale = 0.497557;
         matchedTo = imgCompare;
-        auto mtoRegInfo = parent->get_registration(140);
+        auto mtoRegInfo = parent->get_reg_ref(140);
         if(!mtoRegInfo->resolved){
           mtoRegInfo->waitOnResolve.wait();
         }
@@ -92,7 +92,7 @@ namespace pathCam {
       }else if(imgCompare->index == 314 && selfImage->index == 315){
         scale = 0.246104;
         matchedTo = imgCompare;
-        auto mtoRegInfo = parent->get_registration(314);
+        auto mtoRegInfo = parent->get_reg_ref(314);
         if(!mtoRegInfo->resolved){
           mtoRegInfo->waitOnResolve.wait();
         }
@@ -112,7 +112,7 @@ namespace pathCam {
       if (result == 1) {
 
         matchedTo = otherCompImages[ii];
-        auto mtoRegInfo = parent->get_registration(matchedTo->index);
+        auto mtoRegInfo = parent->get_reg_ref(matchedTo->index);
 
         mtoRegInfo->accessMutex->lock();
         if (!mtoRegInfo->resolved) {
@@ -150,13 +150,13 @@ namespace pathCam {
       indexes.push_back(i);
     }
 
-    auto otherImages = parent->get_image_refs(indexes);
+    auto otherImages = parent->get_image_ref(indexes);
     if(!match_to_images(image, otherImages)){
       indexes.clear();
       for (int i = 0; i < image->index; i++){
         indexes.push_back((unsigned long) i);
       }
-      auto secondTry = parent->get_image_refs(indexes);
+      auto secondTry = parent->get_image_ref(indexes);
       assert(match_to_images(image,secondTry));
     }
   }
@@ -202,7 +202,7 @@ namespace pathCam {
 
           parent->set_match(image_idx, prev_idx, m);
 
-          auto tempReg = parent->get_registration(image_idx);
+          auto tempReg = parent->get_reg_ref(image_idx);
           tempReg->accessMutex->lock();
           tempReg->index = image_idx;
           tempReg->root = false;
@@ -284,7 +284,7 @@ namespace pathCam {
           parent->set_match(image_idx, prev_idx, m);
 
           //this should all be in the damn constructor
-          auto tempReg = parent->get_registration(image_idx);
+          auto tempReg = parent->get_reg_ref(image_idx);
           tempReg->accessMutex->lock();
           tempReg->index = image_idx;
           tempReg->root = false;
