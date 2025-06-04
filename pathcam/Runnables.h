@@ -85,6 +85,16 @@ namespace pathCam {
   };
 
 
+  class PostProcessManager : public Poco::Runnable {
+    public:
+    PostProcessManager(StreamCam* _parent):parent(_parent){}
+    virtual void run();
+
+    StreamCam* parent;
+
+    std::vector<PostProcessorBase*> postProcesses;
+  };
+
   class CompositeManager : public Poco::Runnable {
   private:
     StreamCam *parent;

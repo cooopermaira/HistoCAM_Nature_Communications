@@ -28,9 +28,11 @@ namespace pathCam {
                                                            lastFrameMutex(new Poco::FastMutex()),
                                                            scaleRepoMutex(new Poco::FastMutex()),
                                                            pixelDistanceMutex(new Poco::FastMutex()),
+                                                           siftQMutex(new Poco::FastMutex()),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
+                                                           ppm(new PostProcessManager(this)),
                                                            inferenceWait(true),
                                                            compositeWait(true),
                                                            microscopeInput(true) {
@@ -43,14 +45,15 @@ namespace pathCam {
     int threads = 10;
 
     minPixelDistanceBetweenFrames = 500;
-    minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames,2);
+    minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames, 2);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-      compositorCudaDevice = GPU_select_cuda_device(1);
+    compositorCudaDevice = GPU_select_cuda_device(1);
+    siftCudaDevice = GPU_select_cuda_device();
 #endif
 
     MRimage.reset(new MRTiledImageSet());
-    JobQ = new JobQueue(threads, threads,windowWidth);
+    JobQ = new JobQueue(threads, threads, windowWidth);
     JobQ->parent = this;
 
 
@@ -62,6 +65,7 @@ namespace pathCam {
     cv::circle(regCircleMask, cv::Point(float(image_width / 2) * scale_factor, float(image_height / 2) * scale_factor),
                scope_radius, cv::Scalar(255),
                -1);
+
   }
 
   bool StreamCam::run() {
@@ -71,17 +75,19 @@ namespace pathCam {
     disk_thread.start(dr);
     Q_thread.start(qm);
     composite_thread.start(cm);
-    if (inferencing) {
-      inference_thread.start(im);
-    }
+    postprocessor_thread.start(ppm);
+    // if (inferencing) {
+    //   postprocessor_thread.start(im);
+    // }
 
     disk_thread.join();
     Q_thread.join();
     composite_thread.join();
-    if (inferencing) {
-      //im->thread.join();
-      inference_thread.join();
-    }
+    postprocessor_thread.join();
+    // if (inferencing) {
+    //   //im->thread.join();
+    //   postprocessor_thread.join();
+    // }
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -91,21 +97,20 @@ namespace pathCam {
 
 
   bool StreamCam::spin_run() {
-
     std::cout << "spin_run started " << std::endl;
     recordingMode = true;
 
     Q_thread.start(qm);
     composite_thread.start(cm);
     if (inferencing) {
-      inference_thread.start(im);
+      postprocessor_thread.start(im);
     }
 
     Q_thread.join();
     composite_thread.join();
     if (inferencing) {
       //im->thread.join();
-      inference_thread.join();
+      postprocessor_thread.join();
     }
 
     std::cout << "spin_run done" << std::endl;
@@ -155,12 +160,11 @@ namespace pathCam {
     }
 
     // Sort devices by compute capability descending
-    std::sort(devices.begin(), devices.end(), [](const auto& a, const auto& b) {
-        return a.capability() > b.capability();
+    std::sort(devices.begin(), devices.end(), [](const auto &a, const auto &b) {
+      return a.capability() > b.capability();
     });
 
-    return devices[std::min(_priority,(int) devices.size() - 1)].index;
-
+    return devices[std::min(_priority, (int) devices.size() - 1)].index;
   }
 #endif
 
@@ -179,14 +183,14 @@ namespace pathCam {
 
   void StreamCam::mark_neighbors_as_underexposed(unsigned long _index) {
     std::vector<unsigned long> neighborhood;
-    for (unsigned long i = max(0ul,_index - windowWidth); i < _index + windowWidth; i++) {
+    for (unsigned long i = max(0ul, _index - windowWidth); i < _index + windowWidth; i++) {
       neighborhood.push_back(i);
-      JobQ->cancel_job(2,_index);
+      JobQ->cancel_job(2, _index);
     }
 
     auto answer = get_image_ref(neighborhood);
 
-    for (auto img : answer) {
+    for (auto img: answer) {
       img->mark_too_dark();
     }
   }
@@ -203,7 +207,7 @@ namespace pathCam {
         case Image::_20X:
           return flat_field_file_20x_r.toString();
       }
-    }else {
+    } else {
       switch (label) {
         case Image::_2X:
           return flat_field_file_2x.toString();
@@ -230,7 +234,6 @@ namespace pathCam {
       resize_mmatch_mutex->writeLock();
       matchM.resize(index + 100);
       resize_mmatch_mutex->unlock();
-
     }
 
     reg_results[index] = new RegInfo(this, true, Vec2(0.0, 0.0), true, 0);
@@ -265,8 +268,8 @@ namespace pathCam {
     return temp;
   }
 
-  std::vector<RegInfo*> StreamCam::get_reg_ref(const std::vector<unsigned long> &_indexes) {
-    std::vector<RegInfo*> temp;
+  std::vector<RegInfo *> StreamCam::get_reg_ref(const std::vector<unsigned long> &_indexes) {
+    std::vector<RegInfo *> temp;
 
     reg_results_mutex->writeLock();
     for (unsigned int i = 0; i < _indexes.size(); i++) {
@@ -296,7 +299,6 @@ namespace pathCam {
   }
 
   void StreamCam::add_new_component_Q(unsigned long image_index, cv::Size image_size) {
-
     auto component_index = increment_and_get_components();
     if (component_index != 0) {
       //start job to find scale and offset
@@ -304,7 +306,6 @@ namespace pathCam {
       JobQ->add_runnable(xcm);
     }
     newComponentQ.push({image_index, image_size, component_index});
-
   }
 
 
@@ -318,12 +319,13 @@ namespace pathCam {
     component_mutex->lock();
     composites.push_back(temp);
 
-    if (composites.size() == 1) {//first component added
+    if (composites.size() == 1) {
+      //first component added
 
       //set component mag level
-      if(initialLabel == 0){
+      if (initialLabel == 0) {
         temp->componentMagLabel = get_image_ref(image_index)->label;
-      }else {
+      } else {
         temp->componentMagLabel = initialLabel;
         temp->get_flatfield();
       }
@@ -335,26 +337,23 @@ namespace pathCam {
       temp->imagePyramid->set_offset(Point2f(0, 0));
       ri->set_abc(Vec2(0, 0), component_index, true);
     } else {
-
       temp->store_new_info(ri);
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0, 0));
-
     }
     component_mutex->unlock();
-
   }
 
   //demo
   void StreamCam::run_agg_classify() {
-    if(inferencing && classifying){
+    if (inferencing && classifying) {
       im->run_agg_classify();
       std::this_thread::sleep_for(std::chrono::seconds(2));
       compositeWait.set();
     }
   }
 
-  void StreamCam::update_observers()  {
+  void StreamCam::update_observers() {
     for (unsigned int i = 0; i < observers.size(); i++) {
       MRimage->update_bounds();
       observers[i]->notify_new_data();
@@ -388,29 +387,61 @@ namespace pathCam {
     return temp;
   }
 
-  std::vector<std::tuple<int, int, unsigned int>> StreamCam::get_tile_embed_Q_front() {
-    std::vector<std::tuple<int, int, unsigned int>> temp;
+  std::vector<std::tuple<int, int, unsigned int> > StreamCam::get_tile_embed_Q_front() {
+    std::vector<std::tuple<int, int, unsigned int> > temp;
 
     inferenceQMutex->lock();
     if (!tileEmbedQ.empty()) {
       unsigned int component_index = std::get<2>(tileEmbedQ.front());
 
-      while (!tileEmbedQ.empty() && std::get<2>(tileEmbedQ.front()) == component_index && temp.size() < maxTilesPerBatch) {
+      while (!tileEmbedQ.empty() && std::get<2>(tileEmbedQ.front()) == component_index && temp.size() <
+             maxTilesPerBatch) {
         temp.push_back(tileEmbedQ.front());
         tileEmbedQ.pop();
       }
       inferenceQMutex->unlock();
       return temp;
-
     } else {
       inferenceQMutex->unlock();
       return {};
     }
-
   }
 
+
+  std::vector<std::pair<Image *, Image *> > StreamCam::get_sift_match_Q_front() {
+    std::vector<std::pair<Image *, Image *> > temp;
+
+    siftQMutex->lock();
+
+    //move all the buffers to my device (if necessary)
+    get_sift_data_Q_front();
+
+    //grab a bunch of matches from the Q to process
+    while (!siftMatchQueue.empty() && temp.size() < maxMatchesPerPull) {
+      temp.push_back(siftMatchQueue.front());
+      siftMatchQueue.pop();
+    }
+    siftQMutex->unlock();
+    return temp;
+  }
+
+
+  void StreamCam::get_sift_data_Q_front() {
+    std::vector<Image *> temp;
+
+    //no need to check if compositor device is different from sft device, Q will be empty if same -> no need to move data
+    while (!siftDataQueue.empty()) {
+      auto img = siftDataQueue.front();
+      cudaMalloc((void **) &img->siftData.d_data, sizeof(SiftPoint) * img->siftData.numPts);
+      cudaMemcpy(img->siftData.d_data, img->siftData.h_data, sizeof(SiftPoint) * img->siftData.numPts,
+                 cudaMemcpyHostToDevice);
+      siftDataQueue.pop();
+    }
+  }
+
+
   void StreamCam::push_tile_embed_Q(std::vector<Point2i> &_tiles, unsigned int _componentIndex) {
-    if(inferencing) {
+    if (inferencing) {
       inferenceQMutex->lock();
       for (auto tilePoint: _tiles) {
         auto tpl = std::tuple<int, int, unsigned>(tilePoint.x, tilePoint.y, _componentIndex);
@@ -430,7 +461,7 @@ namespace pathCam {
   }
 
   void StreamCam::pass_image(Image *image, unsigned long _image_index, bool _saveImg) {
-    add_image(image,_image_index);
+    add_image(image, _image_index);
     LoaderLogicRunnable *llr = new LoaderLogicRunnable(this, image, _image_index, true, _saveImg);
     loaderCount++;
     JobQ->add_runnable(llr);
@@ -441,13 +472,13 @@ namespace pathCam {
 
     pixelDistanceMutex->lock();
 
-    if(lastAcceptedCoords.size() < _componentIdx + 1){
+    if (lastAcceptedCoords.size() < _componentIdx + 1) {
       lastAcceptedCoords.resize(_componentIdx + 1);
       lastAcceptedCoords[_componentIdx] = _coordsInQuestion;
       answer = true;
-    }else{
+    } else {
       Vec2 v = lastAcceptedCoords[_componentIdx];
-      if(pow(v.x - _coordsInQuestion.x,2) + pow(v.y - _coordsInQuestion.y,2) >= minPixelDistanceBetweenFrames){
+      if (pow(v.x - _coordsInQuestion.x, 2) + pow(v.y - _coordsInQuestion.y, 2) >= minPixelDistanceBetweenFrames) {
         lastAcceptedCoords[_componentIdx] = _coordsInQuestion;
         answer = true;
       }
@@ -495,5 +526,4 @@ namespace pathCam {
     }
     someoneWaitingOnJobCompleteEvent = false;
   }
-
 }

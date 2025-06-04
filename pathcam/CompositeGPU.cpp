@@ -135,7 +135,7 @@ namespace pathCam {
             delaunayRegInfos.push_back(new_info[i]);
             delaunayImages.push_back(images[i]);
             auto newOverlaps = calculate_new_overlaps();
-            std::cout<<newOverlaps.size()<<std::endl;
+            //std::cout<<newOverlaps.size()<<std::endl;
 
             update = true;
             images[i]->vertexId = res;
@@ -169,7 +169,17 @@ namespace pathCam {
                  convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
              }
 
+            //get sift data and push it to sift ft extraction gpu
             images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
+
+            parent->siftQMutex->lock();
+            if (parent->compositorCudaDevice != parent->siftCudaDevice) {
+                parent->siftDataQueue.push(images[i]);
+            }
+            for (auto item: newOverlaps) {
+                parent->siftMatchQueue.push(item);
+            }
+            parent->siftQMutex->unlock();
 
             //add alpha channel
             cuda::split(threeChannelPrealGPU, channelsGPU);
@@ -242,10 +252,13 @@ namespace pathCam {
         cImgGry.Allocate(image_size.width,image_size.height,gry2.step / sizeof(float),false,reinterpret_cast<float*>(gry2.data),nullptr);
 
         SiftData siftData;
-        InitSiftData(siftData, 10000, true, true);
+        if (parent->compositorCudaDevice != parent->siftCudaDevice) {
+            InitSiftData(siftData, 10000, true, true);
+        }else {
+            InitSiftData(siftData, 10000, false, true);
+        }
 
         ExtractSift(siftData,cImgGry,5,1.f,3.5f,0.f,false);
-
 
         return siftData;
 

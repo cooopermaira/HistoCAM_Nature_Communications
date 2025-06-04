@@ -33,6 +33,10 @@ namespace pathCam {
 
   class InferenceManager;
 
+  class PostProcessManager;
+
+  class SiftFeatureMatcher;
+
 
   class StreamCam : public BatchCam {
 
@@ -97,6 +101,7 @@ namespace pathCam {
     Poco::FastMutex *lastFrameMutex;
     Poco::FastMutex *scaleRepoMutex;
     Poco::FastMutex *inferenceQMutex;
+    Poco::FastMutex *siftQMutex;
     Poco::FastMutex *pixelDistanceMutex;
 
     cv::Rect_<float> lastFrame;
@@ -109,8 +114,10 @@ namespace pathCam {
 
     bool opencvWithCuda = false;
     int compositorCudaDevice;
+    int siftCudaDevice = -1;
 
     int maxTilesPerBatch = 512;
+    int maxMatchesPerPull = 50;
     int minPixelDistanceBetweenFrames;
     std::vector<Vec2> lastAcceptedCoords;
 
@@ -134,6 +141,7 @@ namespace pathCam {
     QManager *qm;
     DiskReader *dr;
     InferenceManager *im;
+    pathCam::PostProcessManager* ppm;
 
     //std::vector < double > variancesForDebug;
     std::vector<CompositeVoronoi *> composites;
@@ -142,6 +150,8 @@ namespace pathCam {
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
     //UniqueQueue<std::pair<Point2i,unsigned int>,PairHash> tileEmbedQ;
     UniqueQueue<std::tuple<int,int,unsigned>,TupleHash>tileEmbedQ;
+    std::queue<std::pair<Image*,Image*>> siftMatchQueue;
+    std::queue<Image*> siftDataQueue;
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;
@@ -159,7 +169,7 @@ namespace pathCam {
 
     std::vector<DataObserver *> observers;
 
-    Poco::Thread disk_thread, Q_thread, composite_thread, inference_thread;
+    Poco::Thread disk_thread, Q_thread, composite_thread, postprocessor_thread;
 
     Poco::Event inferenceWait;
     Poco::Event compositeWait;
@@ -229,6 +239,10 @@ namespace pathCam {
     std::vector<RegInfo*> get_Q_front();
 
     std::vector<std::tuple<int,int,unsigned int>> get_tile_embed_Q_front();
+
+    void get_sift_data_Q_front();
+
+    std::vector<std::pair<Image*,Image*>> get_sift_match_Q_front();
 
     void push_tile_embed_Q(std::vector<Point2i>& _tiles, unsigned int _componentIndex);
 

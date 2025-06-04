@@ -82,7 +82,6 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     list(APPEND CMAKE_MODULE_PATH "/home/max/libtorch/share/cmake/Torch")
 
-    message(STATUS "Am I being used?!!! ${CMAKE_MODULE_PATH}")
     #SET(Torch_DIR "/home/max/libtorch/share/cmake/Torch")
     SET(Python3_INCLUDE_DIR "/home/max/Python-3.11.0/shared_library_dynamic/include/python3.11")
     SET(Python3_LIBRARY_DIR "/home/max/Python-3.11.0/shared_library_dynamic/lib")
@@ -118,6 +117,9 @@ find_package(Torch REQUIRED)
 #add_library(torch_python_shared SHARED IMPORTED)
 #set_target_properties(torch_python_shared PROPERTIES IMPORTED_LOCATION "/home/max/venv-2/lib/python3.10/site-packages/torch/lib/libtorch_python.so")
 #set(CMAKE_BUILD_RPATH "/home/max/venv-2/lib/python3.10/site-packages/torch/lib")
+
+add_subdirectory(CudaSift)
+include_directories(CudaSift)
 
 add_subdirectory(JUCE)
 
@@ -171,7 +173,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 include_directories(pathcam)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB})
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

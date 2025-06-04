@@ -142,6 +142,8 @@ namespace pathCam {
 
     std::vector<std::pair<Image*,Image*>> calculate_new_overlaps();
 
+    void move_sift_to_cpu(Image*);
+
     SiftData GPU_extract_SIFT(cuda::GpuMat &_img);
 
     void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i>& _face);

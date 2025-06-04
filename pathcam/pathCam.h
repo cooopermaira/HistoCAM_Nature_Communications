@@ -80,6 +80,7 @@
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
 #include "StreamCam.h"
+#include "PostProcessor.h"
 
 
 
