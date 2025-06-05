@@ -121,6 +121,9 @@ find_package(Torch REQUIRED)
 add_subdirectory(CudaSift)
 include_directories(CudaSift)
 
+add_subdirectory(cuda-bundle-adjustment)
+include_directories(cuda-bundle-adjustment)
+
 add_subdirectory(JUCE)
 
 
@@ -173,7 +176,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 include_directories(pathcam)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

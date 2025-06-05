@@ -408,13 +408,13 @@ namespace pathCam {
   }
 
 
-  std::vector<std::pair<Image *, Image *> > StreamCam::get_sift_match_Q_front() {
+  std::vector<std::pair<Image *, Image *> > StreamCam::get_sift_match_Q_front(std::vector<Image *> &_images) {
     std::vector<std::pair<Image *, Image *> > temp;
 
     siftQMutex->lock();
 
     //move all the buffers to my device (if necessary)
-    get_sift_data_Q_front();
+    get_sift_data_Q_front(_images);
 
     //grab a bunch of matches from the Q to process
     while (!siftMatchQueue.empty() && temp.size() < maxMatchesPerPull) {
@@ -426,12 +426,13 @@ namespace pathCam {
   }
 
 
-  void StreamCam::get_sift_data_Q_front() {
+  void StreamCam::get_sift_data_Q_front(std::vector<Image *> &_images) {
     std::vector<Image *> temp;
 
     //no need to check if compositor device is different from sft device, Q will be empty if same -> no need to move data
     while (!siftDataQueue.empty()) {
       auto img = siftDataQueue.front();
+      _images.push_back(img);
       cudaMalloc((void **) &img->siftData.d_data, sizeof(SiftPoint) * img->siftData.numPts);
       cudaMemcpy(img->siftData.d_data, img->siftData.h_data, sizeof(SiftPoint) * img->siftData.numPts,
                  cudaMemcpyHostToDevice);

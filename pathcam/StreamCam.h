@@ -240,9 +240,9 @@ namespace pathCam {
 
     std::vector<std::tuple<int,int,unsigned int>> get_tile_embed_Q_front();
 
-    void get_sift_data_Q_front();
+    void get_sift_data_Q_front(std::vector<Image *> &_images);
 
-    std::vector<std::pair<Image*,Image*>> get_sift_match_Q_front();
+    std::vector<std::pair<Image*,Image*>> get_sift_match_Q_front(std::vector<Image *> &_images);
 
     void push_tile_embed_Q(std::vector<Point2i>& _tiles, unsigned int _componentIndex);
 

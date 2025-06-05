@@ -6,6 +6,7 @@
 #define POSTPROCESSOR_H
 
 #include "pathCam.h"
+
 namespace pathCam {
 
   class PostProcessorBase {
@@ -21,18 +22,31 @@ namespace pathCam {
     StreamCam *parent;
   };
 
+struct pMatch;
 
 class SiftFeatureMatcher : public PostProcessorBase {
   public:
   SiftFeatureMatcher(StreamCam *_parent);
   ~SiftFeatureMatcher(){};
 
-  virtual void run();
+  void run() override;
 
-  virtual bool isTerminal();
+  bool isTerminal() override;
 
-  int device;
+  std::vector<Image*> imagesProcessed;
+
+  std::vector<pMatch> allMatches;
 };
+
+  // class Inferencer : public PostProcessorBase {
+  //   public:
+  //   Inferencer(StreamCam *_parent);
+  //   ~Inferencer(){};
+  //
+  //   void run() override;
+  //
+  //   bool isTerminal() override;
+  // };
 
 
 

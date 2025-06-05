@@ -29,10 +29,10 @@ namespace pathCam {
     //set device context
     cudaSetDevice(parent->siftCudaDevice);
 
-    auto matchPairs = parent->get_sift_match_Q_front();
+    auto matchPairs = parent->get_sift_match_Q_front(imagesProcessed);
     if (!matchPairs.empty()) {
       for (auto mp : matchPairs) {
-        cv::detail::MatchesInfo matches_info;
+        pMatch matches_info;
         matches_info.src_img_idx = mp.first->index;
         matches_info.dst_img_idx = mp.second->index;
 
@@ -59,11 +59,20 @@ namespace pathCam {
             matches_info.matches.push_back(m);
           }
         }
+        allMatches.push_back(matches_info);
       }
     }
   }
 
   bool SiftFeatureMatcher::isTerminal() {
+    if (!parent->compositing && parent->siftMatchQueue.empty()) {
+      FeatureTrackGenerator ftg;
+      auto start = std::chrono::high_resolution_clock::now();
+      auto tracks = ftg.generateTracks(imagesProcessed, allMatches);
+      auto stop = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+      std::cout << duration << "ms" << std::endl;
+    }
     return !parent->compositing && parent->siftMatchQueue.empty();
   }
 }

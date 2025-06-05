@@ -35,7 +35,21 @@ namespace pathCam {
 
   }
 
-  //extern "C" void launch_drop_alpha_and_swap(char* dst, char* src,int count);
+
+//   Inferencer::Inferencer(StreamCam *_parent) : PostProcessorBase(_parent) {
+//     /*
+//     embedFileOut = parent->slide_encoder_path.toString() + "/tileEmbeds.pt";
+//     coordsFileOut = parent->slide_encoder_path.toString() + "/coords.pt";
+//     signalFileOut = parent->slide_encoder_path.toString() + "/pSignal.txt";
+//
+//     reportFileIn = parent->slide_encoder_path.toString() + "/response.txt";
+//     embedFileIn = parent->slide_encoder_path.toString() + "/response.pt";
+//     signalFileIn = parent->slide_encoder_path.toString() + "/cSignal.txt";
+// */
+//
+//
+//   }
+
 
   void InferenceManager::run() {
     bool multiGPU = false;

@@ -276,6 +276,8 @@ namespace pathCam {
                 if (pow(delaunayRegInfos[i]->absoluteCoords.x - delaunayRegInfos.back()->absoluteCoords.x,2) +
                 pow(delaunayRegInfos[i]->absoluteCoords.y - delaunayRegInfos.back()->absoluteCoords.y,2) < radSq) {
                     newOverlaps.push_back({delaunayImages[i],delaunayImages.back()});
+                }else {
+                    //TODO finish for non2x images
                 }
             }
         }

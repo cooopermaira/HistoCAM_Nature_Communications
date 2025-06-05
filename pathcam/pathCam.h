@@ -28,6 +28,11 @@
 
 #include "cudaImage.h"
 #include "cudaSift.h"
+
+#include "cuda_bundle_adjustment_types.h"
+#include "cuda_bundle_adjustment.h"
+
+#include "eigen3/Eigen/src/Geometry/Quaternion.h"
 #endif
 
 
@@ -81,6 +86,7 @@
 #include "BatchCam.h"
 #include "StreamCam.h"
 #include "PostProcessor.h"
+#include "SIFTSearchUtils.h"
 
 
 
