@@ -33,6 +33,7 @@
 #include "cuda_bundle_adjustment.h"
 
 #include "eigen3/Eigen/src/Geometry/Quaternion.h"
+#include "samples/object_creator.h"
 #endif
 
 

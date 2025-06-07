@@ -6,20 +6,6 @@
 
 namespace pathCam {
 
-  void FeatureTrackGenerator::initializeTrackWorldPosition(FeatureTrack &track) {
-    // Simple initialization: average of first two observations
-    // For your planar case, you might want to use more sophisticated initialization
-    if (track.observations.size() >= 2) {
-      double avg_x = 0, avg_y = 0;
-      for (const auto &obs: track.observations) {
-        avg_x += obs.x;
-        avg_y += obs.y;
-      }
-      track.world_x = avg_x / track.observations.size();
-      track.world_y = avg_y / track.observations.size();
-      track.world_z = 0.0; // Planar assumption
-    }
-  }
 
   void FeatureTrackGenerator::buildConnectionGraph(const std::vector<pMatch> &all_matches,
                                                    UnionFind &uf) {
@@ -112,18 +98,95 @@ namespace pathCam {
         unordered_map<unsigned long, const Image *>::iterator img_it = image_lookup.find(pair.image_id);
         if (img_it != image_lookup.end() && pair.feature_id < img_it->second->siftData.numPts) {
           const auto &pos = img_it->second->siftData.h_data[pair.feature_id];
-          auto coords = img_it->second->absoluteCoords;
-          track.addObservation(FeatureObservation(pair.image_id, pair.feature_id, pos.xpos + coords.x, pos.ypos + coords.y));
+          track.addObservation(FeatureObservation(pair.image_id, pair.feature_id, pos.xpos, pos.ypos));
+          track.world_x += pos.xpos + img_it->second->absoluteCoords.x;
+          track.world_y += pos.ypos + img_it->second->absoluteCoords.y;
         }
       }
 
       if (valid_track && track.observations.size() >= 2) {
-        // Initialize world coordinates (you might want to triangulate here)
-        initializeTrackWorldPosition(track);
+        //average out world location;
+        track.world_x /= track.observations.size();
+        track.world_y /= track.observations.size();
+
         tracks.push_back(track);
       }
     }
 
     return tracks;
   }
+
+
+  void BundleAdjustmentIntegrator::setupBundleAdjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images) {
+
+    //camera poses represent absolute coordinates of images
+    for (const auto &img : _images) {
+      cuba::CameraParams camParams;
+
+      //6000 is for numerical stability. this will eventually represent scale of component
+      camParams.fx = 6000;
+      camParams.fy = 6000;
+
+      //this is essentially "where the camera sits relevant to the image it took" ie the middle
+      camParams.cx = parent->image_width / 2;
+      camParams.cy = parent->image_height / 2;
+
+      //bf only used for stereo photos - not relevant. this is actually set in the constructor as well.
+      camParams.bf = 0;
+
+      //images have no rotation
+      auto camRotation = Eigen::Quaterniond::Identity();
+
+      //translation should be our current absolute coordinates - essentially a first guess
+      cuba::Array<double,3> translation = {img->absoluteCoords.x, img->absoluteCoords.y, 0};
+
+      //only fix the root image of the first component, everything else is based on that
+      bool fixed = img->absoluteCoords.x == 0 && img->absoluteCoords.y == 0;
+
+      //not sure im convinced on the unique pointers but thats what chatgpt thinks so im going w it for now
+      auto poseVertex = new cuba::PoseVertex(img->index,camRotation, translation, camParams,fixed);
+
+      //add it to the optimizer
+      optimizer->addPoseVertex(poseVertex);
+
+      //keep possession of it
+      poseVertices[img->index] = std::move(poseVertex);
+    }
+
+    //landmark vertexes are feature points placed in world/composite pixel coordinates
+    for (const auto &track : _tracks) {
+      cuba::Array<double, 3> featurePositionInComposite = {track.world_x,track.world_y,0};
+
+      auto landmarkVertex = new cuba::LandmarkVertex(track.track_id,featurePositionInComposite,false);
+
+      optimizer->addLandmarkVertex(landmarkVertex);
+
+      auto test = optimizer->landmarkVertex(track.track_id);
+
+      landmarkVertices[track.track_id] = landmarkVertex;
+
+      //add edges (observations) for this track
+      for (const auto &obs : track.observations) {
+        //get the pose (image) associated with the obervation
+        auto poseVertex = optimizer->poseVertex(obs.image_id);
+
+        cuba::Array<double,2> landmarkPositionInFrame = {obs.x, obs.y};
+
+        auto edge = new cuba::MonoEdge(landmarkPositionInFrame,1,poseVertex,landmarkVertex);
+
+        optimizer->addMonocularEdge(edge);
+
+        monoEdges.push_back(edge);
+      }
+      optimizer->initialize();
+      optimizer->optimize(30);
+    }
+
+    //add edges. these connect landmarks (features) to the images they appear in
+
+  }
+
+
+
+
 }

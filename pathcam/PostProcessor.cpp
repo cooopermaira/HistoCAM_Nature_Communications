@@ -5,6 +5,7 @@
 #include "pathCam.h"
 namespace pathCam {
 
+
   void PostProcessManager::run() {
     postProcesses.push_back(new SiftFeatureMatcher(parent));
 
@@ -67,11 +68,23 @@ namespace pathCam {
   bool SiftFeatureMatcher::isTerminal() {
     if (!parent->compositing && parent->siftMatchQueue.empty()) {
       FeatureTrackGenerator ftg;
+      BundleAdjustmentIntegrator bai(parent);
       auto start = std::chrono::high_resolution_clock::now();
+
       auto tracks = ftg.generateTracks(imagesProcessed, allMatches);
+      bai.setupBundleAdjustment(tracks,imagesProcessed);
+
       auto stop = std::chrono::high_resolution_clock::now();
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
       std::cout << duration << "ms" << std::endl;
+      for (auto cam : bai.poseVertices) {
+        auto pv = bai.optimizer->poseVertex(cam.first);
+        auto img = parent->get_image_ref(cam.first);
+
+        //auto t = cam.second->
+        std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "<<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+      }
+      int k = 0;
     }
     return !parent->compositing && parent->siftMatchQueue.empty();
   }

@@ -138,75 +138,29 @@ namespace pathCam {
 
     void buildConnectionGraph(const std::vector<pMatch> &all_matches, UnionFind &uf);
 
-    std::vector<FeatureTrack> createTracksFromConnections(
-      const std::vector<Image *> &images,
-      const UnionFind &uf);
+    std::vector<FeatureTrack> createTracksFromConnections(const std::vector<Image *> &images, const UnionFind &uf);
 
-    void initializeTrackWorldPosition(FeatureTrack &track);
   };
 
-class BundleAdjustmentIntegrator {
-public:
-  void setupBundleAdjustment(
-      const std::vector<FeatureTrack>& tracks,
-      const std::vector<Image*>& images,
-      cuba::CudaBundleAdjustment::Ptr optimizer) {
-
-    // Camera parameters for different magnifications
-    std::map<int, cuba::CameraParams> magnification_cameras = {
-        {2,  {6000 * 2,  6000 * 2,  3232, 2426, 0}}, // 2x
-        {4,  {6000 * 4,  6000 * 4,  3232, 2426, 0}}, // 4x
-        {10, {6000 * 10, 6000 * 10, 3232, 2426, 0}}, // 10x
-        {20, {6000 * 20, 6000 * 20, 3232, 2426, 0}}, // 20x
-        {40, {6000 * 40, 6000 * 40, 3232, 2426, 0}}  // 40x
+  class BundleAdjustmentIntegrator {
+  public:
+    BundleAdjustmentIntegrator(StreamCam *_parent) : parent(_parent) {
+      optimizer = cuba::CudaBundleAdjustment::create();
     };
 
-    // Add pose vertices (one per image)
-    for (const auto& img : images) {
-      // You'll need to determine magnification for each image
-      int magnification = getMagnificationForImage(img.index); // Implement this
-      auto camera = magnification_cameras[magnification];
+    cuba::CudaBundleAdjustment::Ptr optimizer;
 
-      // Initial pose (identity rotation, zero translation)
-      Eigen::Quaterniond q = Eigen::Quaterniond::Identity();
-      cuba::Array<double, 3> t = {0.0, 0.0, 0.0};
+    StreamCam *parent;
 
-      auto pv = cuba::PoseVertex()
-      auto pose_vertex = obj.create<cuba::PoseVertex>(img->index, q, t, camera, false);
-      optimizer->addPoseVertex(pose_vertex);
-    }
+    void setupBundleAdjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images);
 
-    // Add landmark vertices (one per track)
-    for (const auto& track : tracks) {
-      cuba::Array<double, 3> world_pos = {track.world_x, track.world_y, track.world_z};
-      auto landmark_vertex = obj.create<cuba::LandmarkVertex>(track.track_id, world_pos, false);
-      optimizer->addLandmarkVertex(landmark_vertex);
-    }
 
-    // Add edges (observations)
-    for (const auto& track : tracks) {
-      auto landmark_vertex = optimizer->landmarkVertex(track.track_id);
-
-      for (const auto& obs : track.observations) {
-        auto pose_vertex = optimizer->poseVertex(obs.image_id);
-
-        cuba::Array<double, 2> measurement = {obs.x, obs.y};
-        double information = 1.0; // You might want to adjust this based on feature quality
-
-        auto edge = obj.create<cuba::MonoEdge>(measurement, information, pose_vertex, landmark_vertex);
-        optimizer->addMonocularEdge(edge);
-      }
-    }
-  }
-
-private:
-  int getMagnificationForImage(int image_id) {
-    // Implement based on your image naming or metadata
-    // This is just a placeholder
-    return 10; // Default to 10x
-  }
-};
-
+    // Store vertex pointers to maintain ownership
+    std::unordered_map<int, cuba::PoseVertex* > poseVertices;
+    std::unordered_map<int, cuba::LandmarkVertex* > landmarkVertices;
+    std::vector<cuba::MonoEdge* > monoEdges;
+    std::vector<cuba::StereoEdge* > stereoEdges;
+  };
 }
 
 #endif //SIFTSEARCHUTILS_H
