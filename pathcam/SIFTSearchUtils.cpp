@@ -76,7 +76,7 @@ namespace pathCam {
 
     for (const auto &[root, feature_indices]: root_to_features) {
       // Skip single-image tracks (not useful for bundle adjustment)
-      if (feature_indices.size() < 2) continue;
+      if (feature_indices.size() < 3) continue;
 
       FeatureTrack track(track_id++);
 
@@ -104,7 +104,7 @@ namespace pathCam {
         }
       }
 
-      if (valid_track && track.observations.size() >= 2) {
+      if (valid_track && track.observations.size() >= 3) {
         //average out world location;
         track.world_x /= track.observations.size();
         track.world_y /= track.observations.size();
@@ -123,9 +123,9 @@ namespace pathCam {
     for (const auto &img : _images) {
       cuba::CameraParams camParams;
 
-      //6000 is for numerical stability. this will eventually represent scale of component
-      camParams.fx = 6000;
-      camParams.fy = 6000;
+      //1000 is for numerical stability.
+      camParams.fx = 1000;
+      camParams.fy = 1000;
 
       //this is essentially "where the camera sits relevant to the image it took" ie the middle
       camParams.cx = parent->image_width / 2;
@@ -137,8 +137,8 @@ namespace pathCam {
       //images have no rotation
       auto camRotation = Eigen::Quaterniond::Identity();
 
-      //translation should be our current absolute coordinates - essentially a first guess
-      cuba::Array<double,3> translation = {img->absoluteCoords.x, img->absoluteCoords.y, 0};
+      //translation should be our current absolute coordinates -> essentially a first guess
+      cuba::Array<double,3> translation = {img->absoluteCoords.x, img->absoluteCoords.y, 1000};
 
       //only fix the root image of the first component, everything else is based on that
       bool fixed = img->absoluteCoords.x == 0 && img->absoluteCoords.y == 0;
@@ -161,8 +161,6 @@ namespace pathCam {
 
       optimizer->addLandmarkVertex(landmarkVertex);
 
-      auto test = optimizer->landmarkVertex(track.track_id);
-
       landmarkVertices[track.track_id] = landmarkVertex;
 
       //add edges (observations) for this track
@@ -178,11 +176,10 @@ namespace pathCam {
 
         monoEdges.push_back(edge);
       }
-      optimizer->initialize();
-      optimizer->optimize(30);
-    }
 
-    //add edges. these connect landmarks (features) to the images they appear in
+    }
+    optimizer->initialize();
+    optimizer->optimize(30);
 
   }
 

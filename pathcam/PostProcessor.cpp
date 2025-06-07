@@ -33,17 +33,16 @@ namespace pathCam {
     auto matchPairs = parent->get_sift_match_Q_front(imagesProcessed);
     if (!matchPairs.empty()) {
       for (auto mp : matchPairs) {
-        pMatch matches_info;
-        matches_info.src_img_idx = mp.first->index;
-        matches_info.dst_img_idx = mp.second->index;
+        pMatch matchesInfo;
+        matchesInfo.src_img_idx = mp.first->index;
+        matchesInfo.dst_img_idx = mp.second->index;
 
         // Run matching in both directions
         MatchSiftData(mp.first->siftData, mp.second->siftData);
         MatchSiftData(mp.second->siftData, mp.first->siftData);
 
-        // // Ensure host-side SiftPoints are synchronized from GPU. need xpos, ypos later for bundle adjustment
-        // cudaMemcpy(_sift1.h_data, _sift1.d_data, sizeof(SiftPoint) * _sift1.numPts, cudaMemcpyDeviceToHost);
-        // cudaMemcpy(_sift2.h_data, _sift2.d_data, sizeof(SiftPoint) * _sift2.numPts, cudaMemcpyDeviceToHost);
+        std::vector<DMatch> mutualMatches;
+        std::vector<Point2f> pts1, pts2;
 
 
         // Track mutual matches
@@ -53,14 +52,29 @@ namespace pathCam {
 
           // Confirm mutual match
           if (mp.second->siftData.h_data[match_idx].match == i) {
-            DMatch m;
-            m.queryIdx = i;
-            m.trainIdx = match_idx;
-            m.distance = mp.first->siftData.h_data[i].match_error;
-            matches_info.matches.push_back(m);
+            // DMatch m;
+            // m.queryIdx = i;
+            // m.trainIdx = match_idx;
+            // m.distance = mp.first->siftData.h_data[i].match_error;
+            // matches_info.matches.push_back(m);
+            mutualMatches.emplace_back(i,match_idx,mp.first->siftData.h_data[i].match_error);
+            pts1.emplace_back(mp.first->siftData.h_data[i].xpos,mp.first->siftData.h_data[i].ypos);
+            pts2.emplace_back(mp.second->siftData.h_data[match_idx].xpos,mp.second->siftData.h_data[match_idx].ypos);
           }
         }
-        allMatches.push_back(matches_info);
+
+        std::vector<uchar> inlierMask;
+        if (mutualMatches.size() > 8) {
+          findHomography(pts1,pts2,RANSAC,3.0,inlierMask);
+        }else {
+          inlierMask.resize(mutualMatches.size(),1);
+        }
+        for (size_t i = 0; i < mutualMatches.size();++i) {
+          if (inlierMask[i]) {
+            matchesInfo.matches.push_back(mutualMatches[i]);
+          }
+        }
+        allMatches.push_back(matchesInfo);
       }
     }
   }
@@ -83,6 +97,13 @@ namespace pathCam {
 
         //auto t = cam.second->
         std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "<<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+      }
+      for (const auto& stat : bai.optimizer->batchStatistics()){
+        std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+      }
+      for (const auto& [id, vertex] : bai.poseVertices) {
+        Eigen::Vector3d t = vertex->t;
+        std::cout << "Pose " << id << " translation: " << t.transpose() << std::endl;
       }
       int k = 0;
     }
