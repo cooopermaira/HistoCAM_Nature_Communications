@@ -52,6 +52,7 @@ namespace pathCam {
       cudaFree(raw_buffer_cuda);
     }
     raw_buffer_cuda = nullptr;
+    cudaBufferReady = false;
   }
 
 

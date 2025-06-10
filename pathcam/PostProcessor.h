@@ -24,6 +24,8 @@ namespace pathCam {
 
 struct pMatch;
 
+  class FeatureTrackGenerator;
+  class BundleAdjustmentIntegrator;
 class SiftFeatureMatcher : public PostProcessorBase {
   public:
   SiftFeatureMatcher(StreamCam *_parent);
@@ -36,6 +38,9 @@ class SiftFeatureMatcher : public PostProcessorBase {
   std::vector<Image*> imagesProcessed;
 
   std::vector<pMatch> allMatches;
+
+  FeatureTrackGenerator *ftg;
+  BundleAdjustmentIntegrator *bai;
 };
 
   // class Inferencer : public PostProcessorBase {

@@ -68,6 +68,19 @@ namespace pathCam {
       return parent[x];
     }
 
+    void expand(int new_size) {
+      if (new_size <= parent.size()) return;
+
+      int old_size = parent.size();
+      parent.resize(new_size);
+      rank.resize(new_size, 0);
+
+      // Initialize new elements
+      for (int i = old_size; i < new_size; i++) {
+        parent[i] = i;
+      }
+    }
+
     void unite(int x, int y) {
       int px = find(x);
       int py = find(y);
@@ -87,6 +100,8 @@ namespace pathCam {
     bool connected(int x, int y) {
       return find(x) == find(y);
     }
+
+    size_t size() const { return parent.size(); }
   };
 
   struct pMatch {
@@ -121,6 +136,7 @@ namespace pathCam {
     // Map from (image_id, feature_id) to unique global index
     std::unordered_map<ImageFeaturePair, int, PairHash> feature_to_index;
     std::vector<ImageFeaturePair> index_to_feature;
+    std::unique_ptr<UnionFind> uf_ptr;
 
     // Your SIFT data structure - adapt as needed
     struct ImageData {
@@ -133,13 +149,24 @@ namespace pathCam {
     std::vector<FeatureTrack> generateTracks(const std::vector<Image *> &images,
                                              const std::vector<pMatch> &all_matches);
 
+    void reset() {
+      feature_to_index.clear();
+      index_to_feature.clear();
+      uf_ptr.reset();
+    }
+
+    void process_match(unsigned long _srcImgIdx, unsigned long _dstImgIdx, const DMatch& _match);
+
+    std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image*>& images);
+
   private:
+    int getOrCreateFeatureIndex(const ImageFeaturePair &_pair);
+
     void createGlobalFeatureIndex(const std::vector<Image *> &images);
 
     void buildConnectionGraph(const std::vector<pMatch> &all_matches, UnionFind &uf);
 
     std::vector<FeatureTrack> createTracksFromConnections(const std::vector<Image *> &images, const UnionFind &uf);
-
   };
 
   class BundleAdjustmentIntegrator {
@@ -156,10 +183,10 @@ namespace pathCam {
 
 
     // Store vertex pointers to maintain ownership
-    std::unordered_map<int, cuba::PoseVertex* > poseVertices;
-    std::unordered_map<int, cuba::LandmarkVertex* > landmarkVertices;
-    std::vector<cuba::MonoEdge* > monoEdges;
-    std::vector<cuba::StereoEdge* > stereoEdges;
+    std::unordered_map<int, cuba::PoseVertex *> poseVertices;
+    std::unordered_map<int, cuba::LandmarkVertex *> landmarkVertices;
+    std::vector<cuba::MonoEdge *> monoEdges;
+    std::vector<cuba::StereoEdge *> stereoEdges;
   };
 }
 

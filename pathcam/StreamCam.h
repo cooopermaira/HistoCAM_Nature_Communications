@@ -180,7 +180,12 @@ namespace pathCam {
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     int GPU_select_cuda_device(int _priority = 0);
+
+    void align_and_rebuild();
+
+    void load_delaunay_images_to_GPU();
 #endif
+
 
     bool has_flatfield(int label);
 

@@ -111,11 +111,11 @@ namespace pathCam {
     }
 
     
-    void CompositeVoronoi::GPU_add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add) {
+    void CompositeVoronoi::GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add) {
         // get a copy of references to all images at once so that only one mutex lock is needed
         std::vector<unsigned long> indexes;
-        for (int i = 0; i < new_info.size(); i++) {
-            indexes.push_back(new_info[i]->index);
+        for (int i = 0; i < _newInfo.size(); i++) {
+            indexes.push_back(_newInfo[i]->index);
         }
         std::vector<Image *> images = parent->get_image_ref(indexes);
         bool update = false;
@@ -124,7 +124,7 @@ namespace pathCam {
 
             //add point to delaunay triangulation
             std::vector<Point2i> face;
-            auto fShift = Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y);
+            auto fShift = Point2f(_newInfo[i]->absoluteCoords.x, _newInfo[i]->absoluteCoords.y);
             auto res = add_point_to_delaunay_triangulation(fShift, images[i], face, _force_add);
 
             //res is {vertexId,maskId}
@@ -132,7 +132,7 @@ namespace pathCam {
                 continue;
             }
 
-            delaunayRegInfos.push_back(new_info[i]);
+            delaunayRegInfos.push_back(_newInfo[i]);
             delaunayImages.push_back(images[i]);
             auto newOverlaps = calculate_new_overlaps();
             //std::cout<<newOverlaps.size()<<std::endl;
@@ -215,6 +215,10 @@ namespace pathCam {
             //update pyramid bounds, reset mask
             imagePyramid->bounds = imagePyramid->level[0]->bounds;
             polyMaskOutput.setTo(Scalar(0));
+
+            if (_newInfo[0]->root) {
+                parent->align_and_rebuild();
+            }
         }
 
         //highlight bounds of last frame
@@ -231,6 +235,7 @@ namespace pathCam {
             parent->notify_observers();
 
         }
+
     }
 
     SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
@@ -269,18 +274,38 @@ namespace pathCam {
 
     std::vector<std::pair<Image *, Image *> > CompositeVoronoi::calculate_new_overlaps() {
         std::vector<std::pair<Image *, Image *> > newOverlaps;
-        double radSq = pow(0.9 * parent->scope_radius,2);
+        double radSq = pow(0.8 * parent->scope_radius,2);
 
+        //overlaps within component
         for (int i = 0; i < delaunayRegInfos.size() - 1; ++i) {
             if (componentMagLabel == Image::_2X) {
                 if (pow(delaunayRegInfos[i]->absoluteCoords.x - delaunayRegInfos.back()->absoluteCoords.x,2) +
                 pow(delaunayRegInfos[i]->absoluteCoords.y - delaunayRegInfos.back()->absoluteCoords.y,2) < radSq) {
                     newOverlaps.push_back({delaunayImages[i],delaunayImages.back()});
-                }else {
-                    //TODO finish for non2x images
+                }
+
+            }else {
+                if (abs(delaunayRegInfos[i]->absoluteCoords.x - delaunayRegInfos.back()->absoluteCoords.x) < 0.7 * image_size.width &&
+                    abs(delaunayRegInfos[i]->absoluteCoords.y - delaunayRegInfos.back()->absoluteCoords.y) < 0.7 * image_size.height) {
+                    newOverlaps.push_back({delaunayImages[i],delaunayImages.back()});
                 }
             }
         }
+
+        //overlaps between this and other components
+        for (auto comp: parent->composites) {
+            if (comp != this) {
+                for (auto di: comp->delaunayImages) {
+                    if (delaunayRegInfos.back()->root) {
+                        newOverlaps.push_back({di, delaunayImages.back()});
+                    }else {
+                        /*TODO intersect bounding box of this image with bounding box of images from other components
+                        usign knowns scale*/
+                    }
+                }
+            }
+        }
+
 
         return newOverlaps;
     }
@@ -288,35 +313,8 @@ namespace pathCam {
 
 #endif
 
-    void CompositeVoronoi::perform_bundle_adjustment(int _featureTypeAndLocation) {
-        /*grab references to images in delauney members. use this instead of memberImages since some filtering may occur
-        between these two*/
-        std::vector<unsigned long> indexes;
-        for (auto item : delaunayMembers){indexes.push_back(item.second);}
-        auto imgs = parent->get_image_ref(indexes);
-
-        //create necessary structs for bundleAdjusterAffine
-        std::vector<cv::detail::ImageFeatures> features(imgs.size());
-        std::vector<cv::detail::CameraParams> cameras(imgs.size());
-        double shrink = parent->crop_factor * parent->scale_factor;
-
-        for (int i = 0; i < memberImages.size(); i++) {
-            features[i].img_idx = i;
-            features[i].img_size = Size(parent->image_width * shrink, parent->image_height * shrink);
-            imgs[i]->descriptors.copyTo(features[i].descriptors);
-            features[i].keypoints = imgs[i]->keypoints;
-
-            //cameras[i].R = Mat::eye(3, 3, CV_64F); // unused by affine
-            //cameras[i].K = Mat::eye(3, 3, CV_64F); // unused by affine
-            cameras[i].t = Mat::zeros(3, 1, CV_64F);
-            cameras[i].t.at<double>(0, 0) = imgs[i]->absoluteCoords.x;
-            cameras[i].t.at<double>(1, 0) = imgs[i]->absoluteCoords.y;
-            cameras[i].t.at<double>(2, 0) = 1.0; // affine homogeneous translation
-        }
-
-        //do pairwise matches
-        cv::detail::AffineBestOf2NearestMatcher matcher;
-
+    void CompositeVoronoi::rebuild(int _featureTypeAndLocation) {
+        self_reset();
 
 
     }

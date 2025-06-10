@@ -166,6 +166,23 @@ namespace pathCam {
 
     return devices[std::min(_priority, (int) devices.size() - 1)].index;
   }
+
+  void StreamCam::align_and_rebuild() {
+
+  }
+
+
+  void StreamCam::load_delaunay_images_to_GPU() {
+    //this is honestly unhinged to do this without at all checking if the space is available in memory or on the gpu
+    //but for now were going with it TODO
+    for (auto &comp : composites) {
+      for (auto & img : comp->delaunayImages) {
+        img->load_raw_from_disk();
+        img->move_buffer_to_gpu(compositorCudaDevice);
+      }
+    }
+  }
+
 #endif
 
   void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx, Match *m) {
@@ -173,6 +190,7 @@ namespace pathCam {
     matchM.match[image_idx][prev_idx] = new Match(m);
     resize_mmatch_mutex->unlock();
   }
+
 
   bool StreamCam::has_flatfield(int label) {
     if (label == Image::_2X || label == Image::_4X || label == Image::_10X || Image::_20X) {
@@ -300,11 +318,11 @@ namespace pathCam {
 
   void StreamCam::add_new_component_Q(unsigned long image_index, cv::Size image_size) {
     auto component_index = increment_and_get_components();
-    if (component_index != 0) {
-      //start job to find scale and offset
-      auto xcm = new XCompRunnable(this, image_index, component_index);
-      JobQ->add_runnable(xcm);
-    }
+    // if (component_index != 0) {
+    //   //start job to find scale and offset
+    //   auto xcm = new XCompRunnable(this, image_index, component_index);
+    //   JobQ->add_runnable(xcm);
+    // }
     newComponentQ.push({image_index, image_size, component_index});
   }
 

@@ -6,6 +6,51 @@
 
 namespace pathCam {
 
+  int FeatureTrackGenerator::getOrCreateFeatureIndex(const ImageFeaturePair &_pair) {
+    auto it = feature_to_index.find(_pair);
+    if (it != feature_to_index.end()) {
+      return it->second;
+    }
+
+    // Create new index
+    int new_index = index_to_feature.size();
+    feature_to_index[_pair] = new_index;
+    index_to_feature.push_back(_pair);
+
+    // Expand Union-Find if necessary
+    if (!uf_ptr) {
+      uf_ptr = std::make_unique<UnionFind>(1);
+    } else if (new_index >= uf_ptr->size()) {
+      // Expand Union-Find structure
+      uf_ptr->expand(new_index + 1);
+    }
+
+    return new_index;
+  }
+
+
+  // Generate tracks from current state
+  std::vector<FeatureTrack> FeatureTrackGenerator::generateCurrentTracks(const std::vector<Image*>& images) {
+    if (!uf_ptr || index_to_feature.empty()) {
+      return {};
+    }
+
+    return createTracksFromConnections(images, *uf_ptr);
+  }
+
+  void FeatureTrackGenerator::process_match(unsigned long _srcImgIdx, unsigned long _dstImgIdx, const DMatch &_match) {
+    ImageFeaturePair feat1{_srcImgIdx, _match.queryIdx};
+    ImageFeaturePair feat2{_dstImgIdx, _match.trainIdx};
+
+    // Get or create indices for both features
+    int idx1 = getOrCreateFeatureIndex(feat1);
+    int idx2 = getOrCreateFeatureIndex(feat2);
+
+    // Unite them in the Union-Find structure
+    uf_ptr->unite(idx1, idx2);
+  }
+
+
 
   void FeatureTrackGenerator::buildConnectionGraph(const std::vector<pMatch> &all_matches,
                                                    UnionFind &uf) {

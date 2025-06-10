@@ -73,7 +73,7 @@ namespace pathCam {
     friend class ImageToTileCopyRunnable;
     friend class CompositeManager;
     friend class RebuildRunnable;
-  private:
+  public:
     unsigned long lastAcceptedImageIndex;
     unsigned int minPixelDistanceBetweenFrames;
     Vec2 lastAcceptedImageAbC;
@@ -138,7 +138,7 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
     void make_meshgrid();
 
-    void GPU_add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
+    void GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add = false);
 
     std::vector<std::pair<Image*,Image*>> calculate_new_overlaps();
 
@@ -223,7 +223,7 @@ namespace pathCam {
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
 
-    void perform_bundle_adjustment(int _featureTypeAndLocation);
+    void rebuild(int _featureTypeAndLocation);
 
     void build_system_from_DT(std::map<long, long> &systemIndexToFrameIndex,
                               std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,

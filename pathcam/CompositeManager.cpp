@@ -132,7 +132,7 @@ namespace pathCam {
   void CompositeManager::perform_global_alignment() {
     for (auto i: parent->composites) {
       //i->perform_global_alignment(0, 0.2);
-      i->perform_bundle_adjustment(CompositeVoronoi::ORB_CPU);
+      i->rebuild(CompositeVoronoi::ORB_CPU);
     }
   }
 

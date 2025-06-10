@@ -23,7 +23,7 @@ namespace pathCam {
     }
   }
 
-  SiftFeatureMatcher::SiftFeatureMatcher(StreamCam* parent) : PostProcessorBase(parent) {
+  SiftFeatureMatcher::SiftFeatureMatcher(StreamCam* parent) : PostProcessorBase(parent),bai(new BundleAdjustmentIntegrator(parent)),ftg(new FeatureTrackGenerator) {
   };
 
   void SiftFeatureMatcher::run() {
@@ -52,12 +52,9 @@ namespace pathCam {
 
           // Confirm mutual match
           if (mp.second->siftData.h_data[match_idx].match == i) {
-            // DMatch m;
-            // m.queryIdx = i;
-            // m.trainIdx = match_idx;
-            // m.distance = mp.first->siftData.h_data[i].match_error;
-            // matches_info.matches.push_back(m);
+
             mutualMatches.emplace_back(i,match_idx,mp.first->siftData.h_data[i].match_error);
+
             pts1.emplace_back(mp.first->siftData.h_data[i].xpos,mp.first->siftData.h_data[i].ypos);
             pts2.emplace_back(mp.second->siftData.h_data[match_idx].xpos,mp.second->siftData.h_data[match_idx].ypos);
           }
@@ -71,41 +68,42 @@ namespace pathCam {
         }
         for (size_t i = 0; i < mutualMatches.size();++i) {
           if (inlierMask[i]) {
-            matchesInfo.matches.push_back(mutualMatches[i]);
+            //matchesInfo.matches.push_back(mutualMatches[i]);
+            ftg->process_match(mp.first->index,mp.second->index,mutualMatches[i]);
           }
         }
-        allMatches.push_back(matchesInfo);
+
+        //allMatches.push_back(matchesInfo);
       }
     }
   }
 
   bool SiftFeatureMatcher::isTerminal() {
     if (!parent->compositing && parent->siftMatchQueue.empty()) {
-      FeatureTrackGenerator ftg;
-      BundleAdjustmentIntegrator bai(parent);
-      auto start = std::chrono::high_resolution_clock::now();
 
-      auto tracks = ftg.generateTracks(imagesProcessed, allMatches);
-      bai.setupBundleAdjustment(tracks,imagesProcessed);
-
-      auto stop = std::chrono::high_resolution_clock::now();
-      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-      std::cout << duration << "ms" << std::endl;
-      for (auto cam : bai.poseVertices) {
-        auto pv = bai.optimizer->poseVertex(cam.first);
-        auto img = parent->get_image_ref(cam.first);
-
-        //auto t = cam.second->
-        std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
-        <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
-      }
-      for (const auto& stat : bai.optimizer->batchStatistics()){
-        std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
-      }
-      for (const auto& [id, vertex] : bai.poseVertices) {
-        Eigen::Vector3d t = vertex->t;
-        std::cout << "Pose " << id << " translation: " << t.transpose() << std::endl;
-      }
+      // auto start = std::chrono::high_resolution_clock::now();
+      //
+      // auto tracks = ftg.generateTracks(imagesProcessed, allMatches);
+      // bai.setupBundleAdjustment(tracks,imagesProcessed);
+      //
+      // auto stop = std::chrono::high_resolution_clock::now();
+      // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+      // std::cout << duration << "ms" << std::endl;
+      // for (auto cam : bai.poseVertices) {
+      //   auto pv = bai.optimizer->poseVertex(cam.first);
+      //   auto img = parent->get_image_ref(cam.first);
+      //
+      //   //auto t = cam.second->
+      //   std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
+      //   <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+      // }
+      // for (const auto& stat : bai.optimizer->batchStatistics()){
+      //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+      // }
+      // for (const auto& [id, vertex] : bai.poseVertices) {
+      //   Eigen::Vector3d t = vertex->t;
+      //   std::cout << "Pose " << id << " translation: " << t.transpose() << std::endl;
+      // }
       int k = 0;
     }
     return !parent->compositing && parent->siftMatchQueue.empty();
