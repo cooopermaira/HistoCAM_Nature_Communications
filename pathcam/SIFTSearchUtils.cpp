@@ -123,13 +123,13 @@ namespace pathCam {
     for (const auto &img : _images) {
       cuba::CameraParams camParams;
 
-      //1000 is for numerical stability.
-      camParams.fx = 1000;
-      camParams.fy = 1000;
+      //10000 is for numerical stability.
+      camParams.fx = 10000;
+      camParams.fy = 10000;
 
       //this is essentially "where the camera sits relevant to the image it took" ie the middle
-      camParams.cx = parent->image_width / 2;
-      camParams.cy = parent->image_height / 2;
+      camParams.cx = 0;//parent->image_width / 2;
+      camParams.cy = 0;//parent->image_height / 2;
 
       //bf only used for stereo photos - not relevant. this is actually set in the constructor as well.
       camParams.bf = 0;
@@ -138,12 +138,11 @@ namespace pathCam {
       auto camRotation = Eigen::Quaterniond::Identity();
 
       //translation should be our current absolute coordinates -> essentially a first guess
-      cuba::Array<double,3> translation = {img->absoluteCoords.x, img->absoluteCoords.y, 1000};
+      cuba::Array<double,3> translation = {(img->absoluteCoords.x), (img->absoluteCoords.y), 10000};
 
       //only fix the root image of the first component, everything else is based on that
-      bool fixed = img->absoluteCoords.x == 0 && img->absoluteCoords.y == 0;
+      bool fixed = img->regInfo->root;
 
-      //not sure im convinced on the unique pointers but thats what chatgpt thinks so im going w it for now
       auto poseVertex = new cuba::PoseVertex(img->index,camRotation, translation, camParams,fixed);
 
       //add it to the optimizer
@@ -153,6 +152,7 @@ namespace pathCam {
       poseVertices[img->index] = std::move(poseVertex);
     }
 
+    double maxval = 0;
     //landmark vertexes are feature points placed in world/composite pixel coordinates
     for (const auto &track : _tracks) {
       cuba::Array<double, 3> featurePositionInComposite = {track.world_x,track.world_y,0};
@@ -170,16 +170,23 @@ namespace pathCam {
 
         cuba::Array<double,2> landmarkPositionInFrame = {obs.x, obs.y};
 
-        auto edge = new cuba::MonoEdge(landmarkPositionInFrame,1,poseVertex,landmarkVertex);
+        auto edge = new cuba::MonoEdge(landmarkPositionInFrame,1.0,poseVertex,landmarkVertex);
 
         optimizer->addMonocularEdge(edge);
 
         monoEdges.push_back(edge);
+
+
       }
 
     }
+    const cuba::RobustKernelType robustKernelType = cuba::RobustKernelType::HUBER;
+    const double deltaMono = sqrt(5.991);
+
+    optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
+
     optimizer->initialize();
-    optimizer->optimize(30);
+    optimizer->optimize(100);
 
   }
 

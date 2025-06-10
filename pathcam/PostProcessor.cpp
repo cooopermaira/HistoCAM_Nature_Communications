@@ -96,7 +96,8 @@ namespace pathCam {
         auto img = parent->get_image_ref(cam.first);
 
         //auto t = cam.second->
-        std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "<<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+        std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
+        <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
       }
       for (const auto& stat : bai.optimizer->batchStatistics()){
         std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
