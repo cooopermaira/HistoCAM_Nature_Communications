@@ -35,6 +35,12 @@ class SiftFeatureMatcher : public PostProcessorBase {
 
   bool isTerminal() override;
 
+  void postMatchProcessLoop();
+
+  Poco::FastMutex* queueMutex;
+
+  std::queue<std::pair<Image*,Image*>> postMatchQueue;
+
   std::vector<Image*> imagesProcessed;
 
   std::vector<pMatch> allMatches;
