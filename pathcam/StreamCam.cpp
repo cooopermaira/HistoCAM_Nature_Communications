@@ -188,17 +188,29 @@ namespace pathCam {
 
             shouldLoop = false;
 
-            // for (auto cam : sfm->bai->poseVertices) {
-            //   auto pv = sfm->bai->optimizer->poseVertex(cam.first);
-            //   auto img = get_image_ref(cam.first);
-            //
-            //   //auto t = cam.second->
-            //   std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
-            //   <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
-            // }
-            // for (const auto& stat : sfm->bai->optimizer->batchStatistics()){
-            //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
-            // }
+            double maxX = 0;
+            double maxY = 0;
+            for (auto cam : sfm->bai->poseVertices) {
+              auto pv = sfm->bai->optimizer->poseVertex(cam.first);
+              auto img = get_image_ref(cam.first);
+
+
+              std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
+              <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+              double diffx = abs(img->absoluteCoords.x + pv->t[0]);
+              double diffy = abs(img->absoluteCoords.y + pv->t[1]);
+              if (diffx > maxX) {
+                maxX = diffx;
+              }
+              if (diffy > maxY) {
+                maxY = diffy;
+              }
+            }
+
+            for (const auto& stat : sfm->bai->optimizer->batchStatistics()){
+              std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+            }
+            std::cout << maxX << " " << maxY <<std::endl;
             //
             // sfm->ftg->reset();
             // auto tracks2 = sfm->ftg->generateTracks(sfm->imagesProcessed,sfm->allMatches);
