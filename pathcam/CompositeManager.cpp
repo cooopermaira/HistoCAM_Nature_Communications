@@ -106,7 +106,7 @@ namespace pathCam {
     push_remaining_tiles_for_inference();
 
     //perform_SIFT_multires_bundle_adjustment();
-    perform_global_alignment();
+    //perform_global_alignment();
     //rebuildJobsComplete.wait();
     //save_components_to_disk();
 

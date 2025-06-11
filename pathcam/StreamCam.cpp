@@ -183,7 +183,7 @@ namespace pathCam {
 
           if (!sfm->loopInProcess) {
             //we're ready
-            auto tracks = sfm->ftg->generate_current_tracks(sfm->imagesProcessed);
+            auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
             sfm->bai->setupBundleAdjustment(tracks,sfm->imagesProcessed);
 
             shouldLoop = false;

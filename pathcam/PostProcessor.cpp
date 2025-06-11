@@ -34,7 +34,7 @@ namespace pathCam {
   };
 
   void SiftFeatureMatcher::init() {
-    std::thread([this]() { this->postMatchProcessLoop(); }).detach();
+    //std::thread([this]() { this->postMatchProcessLoop(); }).detach();
   }
 
 
@@ -53,9 +53,44 @@ namespace pathCam {
         MatchSiftData(mp.first->siftData, mp.second->siftData);
         MatchSiftData(mp.second->siftData, mp.first->siftData);
 
-        queueMutex->lock();
-        postMatchQueue.push(mp);
-        queueMutex->unlock();
+        // queueMutex->lock();
+        // postMatchQueue.push(mp);
+        // queueMutex->unlock();
+        pMatch matchesInfo;
+        matchesInfo.src_img_idx = mp.first->index;
+        matchesInfo.dst_img_idx = mp.second->index;
+        std::vector<DMatch> mutualMatches;
+        std::vector<Point2f> pts1, pts2;
+
+
+        // Track mutual matches
+        for (int i = 0; i < mp.first->siftData.numPts; ++i) {
+          int match_idx = mp.first->siftData.h_data[i].match;
+          if (match_idx < 0 || match_idx >= mp.second->siftData.numPts) { continue; }
+
+          // Confirm mutual match
+          if (mp.second->siftData.h_data[match_idx].match == i) {
+            mutualMatches.emplace_back(i, match_idx, mp.first->siftData.h_data[i].match_error);
+
+            pts1.emplace_back(mp.first->siftData.h_data[i].xpos, mp.first->siftData.h_data[i].ypos);
+            pts2.emplace_back(mp.second->siftData.h_data[match_idx].xpos, mp.second->siftData.h_data[match_idx].ypos);
+          }
+        }
+
+        std::vector<uchar> inlierMask;
+        if (mutualMatches.size() > 8) {
+          findHomography(pts1, pts2, RANSAC, 3.0, inlierMask);
+        } else {
+          inlierMask.resize(mutualMatches.size(), 1);
+        }
+        for (size_t i = 0; i < mutualMatches.size(); ++i) {
+          if (inlierMask[i]) {
+            matchesInfo.matches.push_back(mutualMatches[i]);
+            ftg->process_match(mp.first->index, mp.second->index, mutualMatches[i]);
+          }
+        }
+
+        allMatches.push_back(matchesInfo);
       }
     }
   }
@@ -73,8 +108,6 @@ namespace pathCam {
       auto mp = postMatchQueue.front();
       postMatchQueue.pop();
       queueMutex->unlock();
-
-      ftg->add_images({mp.first,mp.second});
 
       pMatch matchesInfo;
       matchesInfo.src_img_idx = mp.first->index;
@@ -117,6 +150,33 @@ namespace pathCam {
 
 
   bool SiftFeatureMatcher::isTerminal() {
+    if (!parent->compositing && parent->siftMatchQueue.empty() && !loopInProcess) {
+      auto tracks = ftg->generateCurrentTracks(imagesProcessed);
+      bai->setupBundleAdjustment(tracks,imagesProcessed);
+      double maxX = 0;
+      double maxY = 0;
+      for (auto cam : bai->poseVertices) {
+        auto pv = bai->optimizer->poseVertex(cam.first);
+        auto img = parent->get_image_ref(cam.first);
+
+
+        std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
+        <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+        double diffx = abs(img->absoluteCoords.x + pv->t[0]);
+        double diffy = abs(img->absoluteCoords.y + pv->t[1]);
+        if (diffx > maxX) {
+          maxX = diffx;
+        }
+        if (diffy > maxY) {
+          maxY = diffy;
+        }
+      }
+      for (const auto& stat : bai->optimizer->batchStatistics()){
+        std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+      }
+      std::cout << maxX << " " << maxY <<std::endl;
+      int k = 0;
+    }
     return !parent->compositing && parent->siftMatchQueue.empty();
   }
 }
