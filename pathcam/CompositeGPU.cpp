@@ -216,9 +216,7 @@ namespace pathCam {
             imagePyramid->bounds = imagePyramid->level[0]->bounds;
             polyMaskOutput.setTo(Scalar(0));
 
-            if (_newInfo[0]->root) {
-                parent->align_and_rebuild();
-            }
+
         }
 
         //highlight bounds of last frame

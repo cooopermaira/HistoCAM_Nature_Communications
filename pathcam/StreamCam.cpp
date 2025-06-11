@@ -33,6 +33,7 @@ namespace pathCam {
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
                                                            ppm(new PostProcessManager(this)),
+                                                           sfm(new SiftFeatureMatcher(this)),
                                                            inferenceWait(true),
                                                            compositeWait(true),
                                                            microscopeInput(true) {
@@ -65,7 +66,6 @@ namespace pathCam {
     cv::circle(regCircleMask, cv::Point(float(image_width / 2) * scale_factor, float(image_height / 2) * scale_factor),
                scope_radius, cv::Scalar(255),
                -1);
-
   }
 
   bool StreamCam::run() {
@@ -168,6 +168,61 @@ namespace pathCam {
   }
 
   void StreamCam::align_and_rebuild() {
+    //std::thread loader(load_delaunay_images_to_GPU);
+
+    bool shouldLoop = true;
+    do {
+
+      sfm->queueMutex->lock();
+      if (sfm->postMatchQueue.empty()) {
+        sfm->queueMutex->unlock();
+
+        siftQMutex->lock();
+        if (siftDataQueue.empty()) {
+          siftQMutex->unlock();
+
+          if (!sfm->loopInProcess) {
+            //we're ready
+            auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
+            sfm->bai->setupBundleAdjustment(tracks,sfm->imagesProcessed);
+
+            shouldLoop = false;
+
+            // for (auto cam : sfm->bai->poseVertices) {
+            //   auto pv = sfm->bai->optimizer->poseVertex(cam.first);
+            //   auto img = get_image_ref(cam.first);
+            //
+            //   //auto t = cam.second->
+            //   std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
+            //   <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+            // }
+            // for (const auto& stat : sfm->bai->optimizer->batchStatistics()){
+            //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+            // }
+            //
+            // sfm->ftg->reset();
+            // auto tracks2 = sfm->ftg->generateTracks(sfm->imagesProcessed,sfm->allMatches);
+            // sfm->bai->optimizer->clear();
+            // sfm->bai->setupBundleAdjustment(tracks2,sfm->imagesProcessed);
+            // for (auto cam : sfm->bai->poseVertices) {
+            //   auto pv = sfm->bai->optimizer->poseVertex(cam.first);
+            //   auto img = get_image_ref(cam.first);
+            //
+            //   //auto t = cam.second->
+            //   std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
+            //   <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
+            // }
+            // for (const auto& stat : sfm->bai->optimizer->batchStatistics()){
+            //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+            // }
+          }
+        }else {
+          siftQMutex->unlock();
+        }
+      }else {
+        sfm->queueMutex->unlock();
+      }
+    }while (shouldLoop);
 
   }
 
@@ -175,8 +230,8 @@ namespace pathCam {
   void StreamCam::load_delaunay_images_to_GPU() {
     //this is honestly unhinged to do this without at all checking if the space is available in memory or on the gpu
     //but for now were going with it TODO
-    for (auto &comp : composites) {
-      for (auto & img : comp->delaunayImages) {
+    for (auto &comp: composites) {
+      for (auto &img: comp->delaunayImages) {
         img->load_raw_from_disk();
         img->move_buffer_to_gpu(compositorCudaDevice);
       }

@@ -141,7 +141,8 @@ namespace pathCam {
     QManager *qm;
     DiskReader *dr;
     InferenceManager *im;
-    pathCam::PostProcessManager* ppm;
+    PostProcessManager* ppm;
+    SiftFeatureMatcher* sfm;
 
     //std::vector < double > variancesForDebug;
     std::vector<CompositeVoronoi *> composites;

@@ -19,6 +19,8 @@ namespace pathCam {
 
     virtual bool isTerminal() = 0;
 
+    virtual void init() = 0;
+
     StreamCam *parent;
   };
 
@@ -35,6 +37,8 @@ class SiftFeatureMatcher : public PostProcessorBase {
 
   bool isTerminal() override;
 
+  void init() override;
+
   void postMatchProcessLoop();
 
   Poco::FastMutex* queueMutex;
@@ -47,6 +51,8 @@ class SiftFeatureMatcher : public PostProcessorBase {
 
   FeatureTrackGenerator *ftg;
   BundleAdjustmentIntegrator *bai;
+
+  std::atomic<bool> loopInProcess = false;
 };
 
   // class Inferencer : public PostProcessorBase {

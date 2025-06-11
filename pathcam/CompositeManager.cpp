@@ -106,7 +106,7 @@ namespace pathCam {
     push_remaining_tiles_for_inference();
 
     //perform_SIFT_multires_bundle_adjustment();
-    //perform_global_alignment();
+    perform_global_alignment();
     //rebuildJobsComplete.wait();
     //save_components_to_disk();
 
@@ -130,10 +130,12 @@ namespace pathCam {
   }
 
   void CompositeManager::perform_global_alignment() {
-    for (auto i: parent->composites) {
-      //i->perform_global_alignment(0, 0.2);
-      i->rebuild(CompositeVoronoi::ORB_CPU);
-    }
+    // for (auto i: parent->composites) {
+    //   //i->perform_global_alignment(0, 0.2);
+    //   i->rebuild(CompositeVoronoi::ORB_CPU);
+    //
+    // }
+    parent->align_and_rebuild();
   }
 
   void CompositeManager::save_components_to_disk() {
