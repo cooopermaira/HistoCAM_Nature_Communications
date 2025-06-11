@@ -183,7 +183,7 @@ namespace pathCam {
 
           if (!sfm->loopInProcess) {
             //we're ready
-            auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
+            auto tracks = sfm->ftg->generate_current_tracks(sfm->imagesProcessed);
             sfm->bai->setupBundleAdjustment(tracks,sfm->imagesProcessed);
 
             shouldLoop = false;
@@ -211,6 +211,7 @@ namespace pathCam {
               std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
             }
             std::cout << maxX << " " << maxY <<std::endl;
+            int k = 0;
             //
             // sfm->ftg->reset();
             // auto tracks2 = sfm->ftg->generateTracks(sfm->imagesProcessed,sfm->allMatches);
@@ -235,7 +236,9 @@ namespace pathCam {
         sfm->queueMutex->unlock();
       }
     }while (shouldLoop);
-
+    for (auto &comp : composites) {
+      //comp->rebuild();
+    }
   }
 
 

@@ -146,6 +146,8 @@ namespace pathCam {
 
     SiftData GPU_extract_SIFT(cuda::GpuMat &_img);
 
+    void rebuild();
+
     void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i>& _face);
 #endif
 
@@ -174,7 +176,7 @@ namespace pathCam {
     void exclude_for_blur();
 
     int add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
-                                            std::vector<Point2i> &_face, bool _forceAdd);
+                                            std::vector<Point2i> &_face, bool _forceAdd, bool _drawMask = true);
 
     int add_point_to_delaunay_triangulation_with_adjustment(cv::Point2f _point, pathCam::Image *_image,
                                             std::vector<Point2i> &_face, bool _forceAdd);
@@ -222,8 +224,6 @@ namespace pathCam {
     void update_Bbox_no_composite(std::vector<RegInfo*> new_info);
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
-
-    void rebuild(int _featureTypeAndLocation);
 
     void build_system_from_DT(std::map<long, long> &systemIndexToFrameIndex,
                               std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,

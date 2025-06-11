@@ -45,7 +45,7 @@ namespace pathCam {
     imageBoundsAsPolygon.resize(4);
     reset_image_as_polygon();
 
-    polyMaskOutput = cv::Mat::zeros(image_size, CV_8U);
+    polyMaskOutput = Mat::zeros(image_size, CV_8U);
     freshMask = polyMaskOutput.clone();
 
 
@@ -293,8 +293,11 @@ namespace pathCam {
   }
 
   int CompositeVoronoi::add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
-                                                            std::vector<Point2i> &_face, bool _forceAdd) {
-    freshMask.copyTo(polyMaskOutput);
+                                                            std::vector<Point2i> &_face, bool _forceAdd,bool _drawMask) {
+    if (!_forceAdd) {
+      _drawMask = true;
+    }
+
     //make copy of subdiv incase we decide not to use new point
     Subdiv2D tempSubdiv(subdiv);
 
@@ -326,7 +329,10 @@ namespace pathCam {
     // Mat temp;
     // polyMaskGPU.download(temp);
 
-    cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
+    if (_drawMask) {
+      polyMaskOutput.setTo(Scalar(0));
+      fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
+    }
     // imwrite("/media/max/Data/fcp.png", polyMaskOutput);
     // imwrite("/media/max/Data/ccmm.png", temp);
 

@@ -236,6 +236,51 @@ namespace pathCam {
 
     }
 
+
+    void CompositeVoronoi::rebuild() {
+        self_reset();
+
+        //do this for all images first so we pull final voronoi face on reconstruct
+        for (int i = 0; i < delaunayImages.size(); ++i) {
+            auto img = delaunayImages[i];
+            Point2f absC(img->absoluteCoords.x,img->absoluteCoords.y);
+            std::vector<Point2i> face;
+            add_point_to_delaunay_triangulation(absC,img,face,true, false);
+        }
+
+        for (int i = 0; i < delaunayImages.size(); ++i) {
+            //get voronoi facets for only this face
+            std::vector<std::vector<Point2f> > facets;
+            std::vector<Point2f> centers;
+            std::vector<Point2i> face;
+
+            int vertexId = -1;
+            for (auto element : delaunayMembers) {
+                if (element.second == delaunayImages[i]->index) {
+                    vertexId = element.first;
+                    break;
+                }
+            }
+            assert (vertexId != -1);
+            subdiv.getVoronoiFacetList({vertexId}, facets, centers);
+
+
+            //shift and recast
+            for (auto &ii: facets[0]) {
+                //we have pulled only one face so facets has only 1 element
+                ii.x -= centers[0].x;
+                ii.x += image_size.width / 2;
+                ii.y -= centers[0].y;
+                ii.y += image_size.height / 2;
+                face.push_back((Point2i) ii);
+            }
+
+            fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
+            polyMaskGPU.upload(polyMaskOutput);
+        }
+
+    }
+
     SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
         if (_img.channels() == 1) {
             cuda::cvtColor(_img,gry,COLOR_BayerBG2GRAY);
@@ -311,10 +356,5 @@ namespace pathCam {
 
 #endif
 
-    void CompositeVoronoi::rebuild(int _featureTypeAndLocation) {
-        self_reset();
-
-
-    }
 
 }

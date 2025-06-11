@@ -43,7 +43,10 @@ namespace pathCam {
     cudaSetDevice(parent->siftCudaDevice);
 
     auto matchPairs = parent->get_sift_match_Q_front(imagesProcessed);
+
+
     if (!matchPairs.empty()) {
+
       for (auto mp: matchPairs) {
 
         // Run matching in both directions
@@ -70,6 +73,8 @@ namespace pathCam {
       auto mp = postMatchQueue.front();
       postMatchQueue.pop();
       queueMutex->unlock();
+
+      ftg->add_images({mp.first,mp.second});
 
       pMatch matchesInfo;
       matchesInfo.src_img_idx = mp.first->index;

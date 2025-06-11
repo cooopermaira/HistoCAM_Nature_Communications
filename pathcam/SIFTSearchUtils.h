@@ -134,37 +134,36 @@ namespace pathCam {
     };
 
     // Map from (image_id, feature_id) to unique global index
-    std::unordered_map<ImageFeaturePair, int, PairHash> feature_to_index;
-    std::vector<ImageFeaturePair> index_to_feature;
+    std::unordered_map<ImageFeaturePair, int, PairHash> featureToIndex;
+    std::vector<ImageFeaturePair> indexToFeature;
     std::unique_ptr<UnionFind> uf_ptr;
+    std::set<int> processedImages;
 
-    // Your SIFT data structure - adapt as needed
-    struct ImageData {
-      int index;
-      // Add your SiftData structure here
-      std::vector<cv::Point2f> feature_positions; // x,y coordinates of features
-    };
 
   public:
-    std::vector<FeatureTrack> generateTracks(const std::vector<Image *> &images,
+    std::vector<FeatureTrack> generate_tracks(const std::vector<Image *> &images,
                                              const std::vector<pMatch> &all_matches);
 
     void reset() {
-      feature_to_index.clear();
-      index_to_feature.clear();
+      featureToIndex.clear();
+      indexToFeature.clear();
       uf_ptr.reset();
+      processedImages.clear();
     }
 
     void process_match(unsigned long _srcImgIdx, unsigned long _dstImgIdx, const DMatch& _match);
 
-    std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image*>& images);
+    std::vector<FeatureTrack> generate_current_tracks(const std::vector<Image*>& _images);
 
+    void add_images(const std::vector<Image*>& _images);
   private:
-    int getOrCreateFeatureIndex(const ImageFeaturePair &_pair);
+    void addImageFeatures(const Image* _img);
 
-    void createGlobalFeatureIndex(const std::vector<Image *> &images);
+    int get_or_create_feature_index(const ImageFeaturePair &_pair);
 
-    void buildConnectionGraph(const std::vector<pMatch> &all_matches, UnionFind &uf);
+    void create_global_feature_index(const std::vector<Image *> &images);
+
+    void build_connection_graph(const std::vector<pMatch> &all_matches, UnionFind &uf);
 
     std::vector<FeatureTrack> createTracksFromConnections(const std::vector<Image *> &images, const UnionFind &uf);
   };
