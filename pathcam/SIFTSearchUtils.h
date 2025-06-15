@@ -179,7 +179,7 @@ namespace pathCam {
 
     StreamCam *parent;
 
-    void setupBundleAdjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images);
+    void run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images);
 
 
     // Store vertex pointers to maintain ownership

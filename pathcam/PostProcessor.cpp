@@ -12,7 +12,7 @@ namespace pathCam {
       //postProcesses.push_back()
     }
 
-    for (auto &pp : postProcesses) {
+    for (auto &pp: postProcesses) {
       pp->init();
     }
 
@@ -29,8 +29,10 @@ namespace pathCam {
   SiftFeatureMatcher::SiftFeatureMatcher(StreamCam *parent) : PostProcessorBase(parent),
                                                               bai(new BundleAdjustmentIntegrator(parent)),
                                                               ftg(new FeatureTrackGenerator),
-                                                              queueMutex(new Poco::FastMutex) {
-
+                                                              queueMutex(new Poco::FastMutex),
+                                                              loopMutex(new Poco::FastMutex),
+                                                              loopInProcess(false),
+                                                              matchWorkOutstanding(0) {
   };
 
   void SiftFeatureMatcher::init() {
@@ -44,11 +46,9 @@ namespace pathCam {
 
     auto matchPairs = parent->get_sift_match_Q_front(imagesProcessed);
 
-
     if (!matchPairs.empty()) {
-
+      loopInProcess = true;
       for (auto mp: matchPairs) {
-
         // Run matching in both directions
         MatchSiftData(mp.first->siftData, mp.second->siftData);
         MatchSiftData(mp.second->siftData, mp.first->siftData);
@@ -56,6 +56,8 @@ namespace pathCam {
         // queueMutex->lock();
         // postMatchQueue.push(mp);
         // queueMutex->unlock();
+        //
+        // continue;
         pMatch matchesInfo;
         matchesInfo.src_img_idx = mp.first->index;
         matchesInfo.dst_img_idx = mp.second->index;
@@ -78,32 +80,40 @@ namespace pathCam {
         }
 
         std::vector<uchar> inlierMask;
+        int numInliers;
         if (mutualMatches.size() > 8) {
-          findHomography(pts1, pts2, RANSAC, 3.0, inlierMask);
-        } else {
-          inlierMask.resize(mutualMatches.size(), 1);
+          Mat H = findHomography(pts1, pts2, RANSAC, 3.0, inlierMask);
+          numInliers = std::count(inlierMask.begin(), inlierMask.end(), 1);
+          if (mp.second->regInfo->root) {
+            int k = 0;
+          }
         }
-        for (size_t i = 0; i < mutualMatches.size(); ++i) {
-          if (inlierMask[i]) {
-            matchesInfo.matches.push_back(mutualMatches[i]);
-            ftg->process_match(mp.first->index, mp.second->index, mutualMatches[i]);
+        if (numInliers > 50) {
+          for (size_t i = 0; i < mutualMatches.size(); ++i) {
+            if (inlierMask[i]) {
+              matchesInfo.matches.push_back(mutualMatches[i]);
+              ftg->process_match(mp.first->index, mp.second->index, mutualMatches[i]);
+            }
           }
         }
 
         allMatches.push_back(matchesInfo);
+        --matchWorkOutstanding;
       }
     }
+    loopInProcess = false;
   }
 
   void SiftFeatureMatcher::postMatchProcessLoop() {
-    while (!isTerminal()) {
-
+    sleep(1);
+    //bool term = isTerminal();
+    while (parent->compositing || matchWorkOutstanding > 0) {
       queueMutex->lock();
       if (postMatchQueue.empty()) {
         queueMutex->unlock();
         continue;
       }
-      loopInProcess = true;
+      loopMutex->lock();
 
       auto mp = postMatchQueue.front();
       postMatchQueue.pop();
@@ -144,39 +154,24 @@ namespace pathCam {
       }
 
       allMatches.push_back(matchesInfo);
-      loopInProcess = false;
+      loopMutex->unlock();
     }
+    int k = 0;
   }
 
 
   bool SiftFeatureMatcher::isTerminal() {
-    if (!parent->compositing && parent->siftMatchQueue.empty() && !loopInProcess) {
-      auto tracks = ftg->generateCurrentTracks(imagesProcessed);
-      bai->setupBundleAdjustment(tracks,imagesProcessed);
-      double maxX = 0;
-      double maxY = 0;
-      for (auto cam : bai->poseVertices) {
-        auto pv = bai->optimizer->poseVertex(cam.first);
-        auto img = parent->get_image_ref(cam.first);
+    return !parent->compositing && parent->siftMatchQueue.empty() && parent->siftMatchQueue.empty();
+  }
 
-
-        std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
-        <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
-        double diffx = abs(img->absoluteCoords.x + pv->t[0]);
-        double diffy = abs(img->absoluteCoords.y + pv->t[1]);
-        if (diffx > maxX) {
-          maxX = diffx;
-        }
-        if (diffy > maxY) {
-          maxY = diffy;
-        }
-      }
-      for (const auto& stat : bai->optimizer->batchStatistics()){
-        std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
-      }
-      std::cout << maxX << " " << maxY <<std::endl;
+  bool SiftFeatureMatcher::tracksReady() {
+    // loopMutex->lock();
+    // bool answer = parent->siftMatchQueue.empty() && !loopInProcess && parent->siftDataQueue.empty();
+    // loopMutex->unlock();
+    bool answer = matchWorkOutstanding == 0;
+    if (answer) {
       int k = 0;
     }
-    return !parent->compositing && parent->siftMatchQueue.empty();
+    return answer;
   }
 }

@@ -106,7 +106,7 @@ namespace pathCam {
     push_remaining_tiles_for_inference();
 
     //perform_SIFT_multires_bundle_adjustment();
-    //perform_global_alignment();
+    perform_global_alignment();
     //rebuildJobsComplete.wait();
     //save_components_to_disk();
 
@@ -142,7 +142,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/Users/coopermaira/Desktop/image_dump/full4x_green.png", false, false, false, false);
+      i->save_pyramid_as_image("/media/max/Data/CORRECTED.png", false, false, false, false);
     }
   }
 
@@ -183,7 +183,6 @@ namespace pathCam {
 
       matchesInfo[i] = compute_matches_info(sd1, sd2, idx1, idx2);
     }
-    int k = 0;
   }
 
 

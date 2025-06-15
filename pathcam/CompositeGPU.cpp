@@ -117,11 +117,18 @@ namespace pathCam {
         for (int i = 0; i < _newInfo.size(); i++) {
             indexes.push_back(_newInfo[i]->index);
         }
+
         std::vector<Image *> images = parent->get_image_ref(indexes);
         bool update = false;
+        bool rootFound = false;
 
         for (int i = 0; i < images.size(); i++) {
+            images[i]->component_membership = this->componentIndex;
+            assert(images[i]->regInfo->component_membership == this->componentIndex);
 
+            if (images[i]->regInfo->root && !images[i]->regInfo->rootOfRoot) {
+                rootFound = true;
+            }
             //add point to delaunay triangulation
             std::vector<Point2i> face;
             auto fShift = Point2f(_newInfo[i]->absoluteCoords.x, _newInfo[i]->absoluteCoords.y);
@@ -135,22 +142,18 @@ namespace pathCam {
             delaunayRegInfos.push_back(_newInfo[i]);
             delaunayImages.push_back(images[i]);
             auto newOverlaps = calculate_new_overlaps();
-            //std::cout<<newOverlaps.size()<<std::endl;
 
             update = true;
             images[i]->vertexId = res;
 
             polyMaskGPU.upload(polyMaskOutput);
 
-            update = true;
-            images[i]->vertexId = res;
-
             //indicate that a new image has been added since last global alignment
             needsAlignment = true;
 
             //wait for buffer to be on gpu
             {
-                std::unique_lock<std::mutex> lock(images[i]->cudaBufferMutex);
+                std::unique_lock lock(images[i]->cudaBufferMutex);
                 images[i]->cudaBufferConVar.wait(lock, [&]{return images[i]->cudaBufferReady;});
             }
 
@@ -171,15 +174,7 @@ namespace pathCam {
 
             //get sift data and push it to sift ft extraction gpu
             images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
-
-            parent->siftQMutex->lock();
-            if (parent->compositorCudaDevice != parent->siftCudaDevice) {
-                parent->siftDataQueue.push(images[i]);
-            }
-            for (auto item: newOverlaps) {
-                parent->siftMatchQueue.push(item);
-            }
-            parent->siftQMutex->unlock();
+            parent->push_SIFT_matches(newOverlaps,images[i]);
 
             //add alpha channel
             cuda::split(threeChannelPrealGPU, channelsGPU);
@@ -218,6 +213,9 @@ namespace pathCam {
 
 
         }
+        if (rootFound) {
+            parent->align_and_rebuild();
+        }
 
         //highlight bounds of last frame
         if (imagePyramid->scale > 0 && update) {
@@ -249,6 +247,7 @@ namespace pathCam {
         }
 
         for (int i = 0; i < delaunayImages.size(); ++i) {
+            Image* img = delaunayImages[i];
             //get voronoi facets for only this face
             std::vector<std::vector<Point2f> > facets;
             std::vector<Point2f> centers;
@@ -256,7 +255,7 @@ namespace pathCam {
 
             int vertexId = -1;
             for (auto element : delaunayMembers) {
-                if (element.second == delaunayImages[i]->index) {
+                if (element.second == img->index) {
                     vertexId = element.first;
                     break;
                 }
@@ -277,7 +276,71 @@ namespace pathCam {
 
             fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
             polyMaskGPU.upload(polyMaskOutput);
+            cuda::multiply(polyMaskGPU, circleMaskGPU,polyMaskGPU);
+
+            //wait for buffer to be on gpu
+            {
+                std::unique_lock<std::mutex> lock(img->cudaBufferMutex);
+                img->cudaBufferConVar.wait(lock, [&]{return img->cudaBufferReady;});
+            }
+
+            //debayer image on gpu
+            cuda::GpuMat image_Mat(image_size, CV_8U, img->get_raw_cuda());
+            cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
+
+            img->free_memory_CUDA();
+
+            max_offset.x = max(max_offset.x,img->absoluteCoords.x + img->width);
+            max_offset.y = max(max_offset.y, img->absoluteCoords.y + img->height);
+            root_offset.x = min(root_offset.x,img->absoluteCoords.x);
+            root_offset.y = min(root_offset.y, img->absoluteCoords.y);
+
+            if (componentMagLabel != 0) {
+                //flatfield correct
+                threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
+                cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
+                //brighten
+                cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
+                convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
+            }
+
+            //add alpha channel
+            cuda::split(threeChannelPrealGPU, channelsGPU);
+            channelsGPU.push_back(rectMaskGPU);
+            cuda::merge(channelsGPU, fourChannelPrealGPU);
+
+            //calculate effected tiles
+            std::vector<Point2i> effectedTiles;
+            std::vector<Point2i> effectedTilesNoMask;
+
+            //calculate region of pyramid for data placement
+            auto imageBox = cv::Rect_<float>(img->absoluteCoords.x, img->absoluteCoords.y, img->width,
+                                             img->height);
+
+            if (componentMagLabel == Image::_2X) {
+                calculate_effected_tiles_round(face, effectedTiles, img->absoluteCoords);
+            } else {
+                calculate_effected_tiles(face, effectedTiles, img->absoluteCoords, &effectedTilesNoMask);
+                imagePyramid->insertTilesAtBase(fourChannelPrealGPU, cuda::GpuMat(), imageBox, effectedTilesNoMask);
+            }
+
+            imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);
+
+            if (parent->inferencing) {
+                std::vector<Point2i> tiles;
+                tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
+                tiles.insert(tiles.end(), effectedTiles.begin(), effectedTiles.end());
+                tiles.insert(tiles.end(), effectedTilesNoMask.begin(), effectedTilesNoMask.end());
+
+                auto pushForInferencing = push_for_inferencing(tiles);
+                parent->push_tile_embed_Q(pushForInferencing, componentIndex);
+            }
+            //update pyramid bounds, reset mask
+            imagePyramid->bounds = imagePyramid->level[0]->bounds;
+            polyMaskOutput.setTo(Scalar(0));
+            parent->notify_observers();
         }
+
 
     }
 
@@ -342,8 +405,7 @@ namespace pathCam {
                     if (delaunayRegInfos.back()->root) {
                         newOverlaps.push_back({di, delaunayImages.back()});
                     }else {
-                        /*TODO intersect bounding box of this image with bounding box of images from other components
-                        usign knowns scale*/
+                        /*TODO intersect bounding box of this image with bounding box of images from other components*/
                     }
                 }
             }

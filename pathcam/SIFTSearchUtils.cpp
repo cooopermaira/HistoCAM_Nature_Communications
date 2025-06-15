@@ -162,7 +162,7 @@ namespace pathCam {
   }
 
 
-  void BundleAdjustmentIntegrator::setupBundleAdjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images) {
+  void BundleAdjustmentIntegrator::run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images) {
 
     //camera poses represent absolute coordinates of images
     for (const auto &img : _images) {
@@ -181,12 +181,16 @@ namespace pathCam {
 
       //images have no rotation
       auto camRotation = Eigen::Quaterniond::Identity();
-
+      cuba::Array<double,3> translation;
       //translation should be our current absolute coordinates -> essentially a first guess
-      cuba::Array<double,3> translation = {(img->absoluteCoords.x), (img->absoluteCoords.y), 10000};
-
+      if (img->regInfo->root && !img->regInfo->rootOfRoot) {
+        auto lastCoords = parent->composites[img->component_membership - 1]->delaunayImages.back()->absoluteCoords;
+        translation = cuba::Array<double,3>(-(lastCoords.x), -(lastCoords.y), 10000);
+      }else {
+        translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
+      }
       //only fix the root image of the first component, everything else is based on that
-      bool fixed = img->regInfo->root;
+      bool fixed = img->regInfo->rootOfRoot;
 
       auto poseVertex = new cuba::PoseVertex(img->index,camRotation, translation, camParams,fixed);
 
@@ -231,7 +235,7 @@ namespace pathCam {
     optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 
     optimizer->initialize();
-    optimizer->optimize(100);
+    optimizer->optimize(50);
 
   }
 

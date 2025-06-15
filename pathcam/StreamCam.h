@@ -184,7 +184,9 @@ namespace pathCam {
 
     void align_and_rebuild();
 
-    void load_delaunay_images_to_GPU();
+    void load_delaunay_images_to_GPU(int _componentIndex);
+
+    void push_SIFT_matches(std::vector<std::pair<Image*,Image*>>& _newOverlaps, Image *_image);
 #endif
 
 

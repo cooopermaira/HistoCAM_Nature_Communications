@@ -10,10 +10,12 @@
 namespace pathCam {
   void LoaderLogicRunnable::run() {
 
+
     image->parent = parent;
     if (!image->in_memory()) {
       image->load_raw_from_disk();
     }
+
 
     if (!image->in_memory()) {
       successful = false;

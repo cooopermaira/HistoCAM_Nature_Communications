@@ -94,11 +94,7 @@ namespace pathCam {
         Mat readMat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
         Mat image_Mat;
 
-        if (image->is_mostly_black()) {
-          outfile.pushDirectory("png_mostly_black");
-        }else {
-          outfile.pushDirectory("png_ok");
-        }
+
 
         cvtColor(readMat, readMat, COLOR_BayerBG2RGB);
         resize(readMat,image_Mat,cv::Size(image->width/8, image->height/8));

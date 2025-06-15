@@ -41,7 +41,10 @@ class SiftFeatureMatcher : public PostProcessorBase {
 
   void postMatchProcessLoop();
 
+  bool tracksReady();
+
   Poco::FastMutex* queueMutex;
+  Poco::FastMutex* loopMutex;
 
   std::queue<std::pair<Image*,Image*>> postMatchQueue;
 
@@ -52,7 +55,9 @@ class SiftFeatureMatcher : public PostProcessorBase {
   FeatureTrackGenerator *ftg;
   BundleAdjustmentIntegrator *bai;
 
-  std::atomic<bool> loopInProcess = false;
+  std::atomic<bool> loopInProcess;
+  std::atomic<int> matchWorkOutstanding;
+
 };
 
   // class Inferencer : public PostProcessorBase {

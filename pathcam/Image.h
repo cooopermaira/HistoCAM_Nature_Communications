@@ -149,7 +149,6 @@ namespace pathCam {
 
     void mark_too_dark() {
       label = _UNDEREXP;
-      free_memory_RAW();
     }
 
     inline char *get_Raw() {

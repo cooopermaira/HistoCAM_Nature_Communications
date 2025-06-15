@@ -879,6 +879,7 @@ namespace pathCam {
 
     int tile_size = level->getTileSize();
 
+
     int width = (lr.x + 1 - ul.x) * tile_size;
     int height = (lr.y + 1 - ul.y) * tile_size;
 
@@ -937,26 +938,26 @@ namespace pathCam {
                     FONT_HERSHEY_PLAIN, 3, Scalar(0, 0, 0, 255), 5);
           }
 
-          Mat mask;
-          cv::extractChannel(tile, mask, 3);
-          double val;
-          int maglab = componentMagLabel;
-          maglab == 1
-            ? val = 1.0
-            : maglab == 2
-                ? val = 0.5
-                : maglab == 3
-                    ? val = 0.2
-                    : maglab == 4
-                        ? val = 0.1
-                        : val = 1;
-          double beta = (log2(1.0 / val) / 3.4) * 0.7 + 0.05;
-          auto greenShade = Mat(tile.rows, tile.cols, CV_8UC3,
-                                Scalar(200 * beta, 150 * (1 - beta), 100 * beta));
-          std::vector<Mat> v = {greenShade, mask};
-          merge(v, greenShade);
-
-          tile = beta * greenShade + (1 - beta) * tile;
+          // Mat mask;
+          // cv::extractChannel(tile, mask, 3);
+          // double val;
+          // int maglab = componentMagLabel;
+          // maglab == 1
+          //   ? val = 1.0
+          //   : maglab == 2
+          //       ? val = 0.5
+          //       : maglab == 3
+          //           ? val = 0.2
+          //           : maglab == 4
+          //               ? val = 0.1
+          //               : val = 1;
+          // double beta = (log2(1.0 / val) / 3.4) * 0.7 + 0.05;
+          // auto greenShade = Mat(tile.rows, tile.cols, CV_8UC3,
+          //                       Scalar(200 * beta, 150 * (1 - beta), 100 * beta));
+          // std::vector<Mat> v = {greenShade, mask};
+          // merge(v, greenShade);
+          //
+          // tile = beta * greenShade + (1 - beta) * tile;
 
           //imwrite(std::to_string(componentIndex) + "_" + std::to_string(x) + "_" + std::to_string(y) + ".png", tile);
           tile.copyTo(pyramidImage(Rect((x + x_offset) * tile.cols, (y + y_offset) * tile.rows, tile.cols,

@@ -32,7 +32,7 @@ class RegInfo{
 public:
   StreamCam* parent;
   unsigned long index,matchedTo;
-  bool successful,root,resolved;
+  bool successful,root,resolved,rootOfRoot;
   unsigned int component_membership;
   Vec2 absoluteCoords;
   Vec2 relativeCoords = Vec2(0.0, 0.0);
@@ -43,7 +43,7 @@ public:
   
   RegInfo(StreamCam* parent, bool successful=false, Vec2 absoluteCoords=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
   successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),accessMutex(new Poco::FastMutex), parent(parent),
-  waitOnResolve(true) {
+  waitOnResolve(true),rootOfRoot(false) {
   };
 
   void attempt_absolute_reg(bool queue_for_compositing);

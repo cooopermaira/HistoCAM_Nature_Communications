@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x, flat_field40x;
   std::ifstream stream;
+  /*
   {
 
     stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/cal/2x_cal.Raw", std::ios::binary);
@@ -106,7 +107,7 @@ int main(int argc, char *argv[]) {
   cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2BGR);
   flat_field20x.convertTo(flat_field20x, CV_32F);
   flat_field20x *= 1 / 170.0;
-
+*/
 //  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
 //  {
 //    char *raw_buffer = new char[6464 * 4852];
@@ -171,7 +172,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/media/max/Data/frame_quality_testing/input.txt";
+    std::string outputfilepath = "/media/max/Data/2_20_new/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {

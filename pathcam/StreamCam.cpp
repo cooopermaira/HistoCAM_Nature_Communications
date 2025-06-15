@@ -168,89 +168,88 @@ namespace pathCam {
   }
 
   void StreamCam::align_and_rebuild() {
-    //std::thread loader(load_delaunay_images_to_GPU);
+    if (composites.empty()){return;}
 
-    bool shouldLoop = true;
-    do {
+    std::thread([this]() { this->load_delaunay_images_to_GPU(0); }).detach();
 
-      sfm->queueMutex->lock();
-      if (sfm->postMatchQueue.empty()) {
-        sfm->queueMutex->unlock();
-
-        siftQMutex->lock();
-        if (siftDataQueue.empty()) {
-          siftQMutex->unlock();
-
-          if (!sfm->loopInProcess) {
-            //we're ready
-            auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
-            sfm->bai->setupBundleAdjustment(tracks,sfm->imagesProcessed);
-
-            shouldLoop = false;
-
-            double maxX = 0;
-            double maxY = 0;
-            for (auto cam : sfm->bai->poseVertices) {
-              auto pv = sfm->bai->optimizer->poseVertex(cam.first);
-              auto img = get_image_ref(cam.first);
+    while (true) {
+      if (sfm->tracksReady()) {
+        //we're ready
+        auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
+        sfm->bai->run_bundle_adjustment(tracks, sfm->imagesProcessed);
 
 
-              std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
-              <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
-              double diffx = abs(img->absoluteCoords.x + pv->t[0]);
-              double diffy = abs(img->absoluteCoords.y + pv->t[1]);
-              if (diffx > maxX) {
-                maxX = diffx;
-              }
-              if (diffy > maxY) {
-                maxY = diffy;
-              }
-            }
+        double maxX = 0;
+        double maxY = 0;
+        for (auto cam: sfm->bai->poseVertices) {
+          auto pv = sfm->bai->optimizer->poseVertex(cam.first);
+          auto img = get_image_ref(cam.first);
 
-            for (const auto& stat : sfm->bai->optimizer->batchStatistics()){
-              std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
-            }
-            std::cout << maxX << " " << maxY <<std::endl;
-            int k = 0;
-            //
-            // sfm->ftg->reset();
-            // auto tracks2 = sfm->ftg->generateTracks(sfm->imagesProcessed,sfm->allMatches);
-            // sfm->bai->optimizer->clear();
-            // sfm->bai->setupBundleAdjustment(tracks2,sfm->imagesProcessed);
-            // for (auto cam : sfm->bai->poseVertices) {
-            //   auto pv = sfm->bai->optimizer->poseVertex(cam.first);
-            //   auto img = get_image_ref(cam.first);
-            //
-            //   //auto t = cam.second->
-            //   std::cout << img->absoluteCoords.x<<" "<<pv->t[0]<<" "
-            //   <<img->absoluteCoords.y<<" "<<pv->t[1]<<std::endl;
-            // }
-            // for (const auto& stat : sfm->bai->optimizer->batchStatistics()){
-            //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
-            // }
+
+          std::cout << img->absoluteCoords.x << " " << pv->t[0] << " "
+              << img->absoluteCoords.y << " " << pv->t[1] << std::endl;
+          std::cout << pv->t[2] << std::endl;
+          double diffx = abs(img->absoluteCoords.x + pv->t[0]);
+          double diffy = abs(img->absoluteCoords.y + pv->t[1]);
+
+          img->absoluteCoords.x = -pv->t[0];
+          img->regInfo->absoluteCoords.x = -pv->t[0];
+          img->absoluteCoords.y = -pv->t[1];
+          img->regInfo->absoluteCoords.y = --pv->t[1];
+
+          if (diffx > maxX) {
+            maxX = diffx;
           }
-        }else {
-          siftQMutex->unlock();
+          if (diffy > maxY) {
+            maxY = diffy;
+          }
         }
-      }else {
-        sfm->queueMutex->unlock();
+
+        // for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
+        //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+        // }
+
+        std::cout << maxX << " " << maxY << std::endl;
+
+        break;
       }
-    }while (shouldLoop);
-    for (auto &comp : composites) {
-      //comp->rebuild();
+    }
+    cudaSetDevice(compositorCudaDevice);
+    for (int i = 0; i < composites.size(); ++i) {
+       if (i < composites.size() - 1) {
+         //load next component while we rebuild this one
+         int ii = i+1;
+         std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
+       }
+      composites[i]->rebuild();
     }
   }
 
 
-  void StreamCam::load_delaunay_images_to_GPU() {
+  void StreamCam::load_delaunay_images_to_GPU(int _componentIndex) {
     //this is honestly unhinged to do this without at all checking if the space is available in memory or on the gpu
     //but for now were going with it TODO
-    for (auto &comp: composites) {
-      for (auto &img: comp->delaunayImages) {
+
+    for (auto &img: composites[_componentIndex]->delaunayImages) {
+      if (!img->cudaBufferReady) {
         img->load_raw_from_disk();
         img->move_buffer_to_gpu(compositorCudaDevice);
       }
     }
+  }
+
+  void StreamCam::push_SIFT_matches(std::vector<std::pair<Image*,Image*>>& _newOverlaps, Image *_image) {
+
+    sfm->matchWorkOutstanding += (int)_newOverlaps.size();
+    siftQMutex->lock();
+    if (compositorCudaDevice != siftCudaDevice) {
+      siftDataQueue.push(_image);
+    }
+
+    for (auto item: _newOverlaps) {
+      siftMatchQueue.push(item);
+    }
+    siftQMutex->unlock();
   }
 
 #endif
@@ -270,11 +269,13 @@ namespace pathCam {
   }
 
   void StreamCam::mark_neighbors_as_underexposed(unsigned long _index) {
+
     std::vector<unsigned long> neighborhood;
     for (unsigned long i = max(0ul, _index - windowWidth); i < _index + windowWidth; i++) {
       neighborhood.push_back(i);
-      JobQ->cancel_job(2, _index);
+      JobQ->cancel_job(2, i);
     }
+    JobQ->update_job_readiness(2,_index);
 
     auto answer = get_image_ref(neighborhood);
 
@@ -409,7 +410,7 @@ namespace pathCam {
 
     if (composites.size() == 1) {
       //first component added
-
+      ri->rootOfRoot = true;
       //set component mag level
       if (initialLabel == 0) {
         temp->componentMagLabel = get_image_ref(image_index)->label;
@@ -418,17 +419,18 @@ namespace pathCam {
         temp->get_flatfield();
       }
 
+      //set scale and offset in repo
       set_scale_and_offset(0, 1, Point2f(0, 0));
 
       //set component scale and offset to be 1 and origin
       temp->imagePyramid->set_scale(1);
       temp->imagePyramid->set_offset(Point2f(0, 0));
-      ri->set_abc(Vec2(0, 0), component_index, true);
     } else {
       temp->store_new_info(ri);
       temp->imagePyramid->set_scale(0);
       temp->imagePyramid->set_offset(Point2f(0, 0));
     }
+    ri->set_abc(Vec2(0, 0), component_index, true);
     component_mutex->unlock();
   }
 

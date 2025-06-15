@@ -77,19 +77,18 @@ namespace pathCam {
   void JobQueue::update_job_readiness(int jobTypeFlag, unsigned long image_idx) {
     if (jobTypeFlag == 2) {
 
-      int k = 0;
-
       for (int i = max(0,int(image_idx) - windowWidth);i <= image_idx + windowWidth;i++) {
         auto answer = get_sort_order_and_job_refs(jobTypeFlag, i);
-        if (answer.first == 1) {
-          int k = 0;
-        }
+
         jobsReadiness[answer.first]++;
         unsigned long readinessRequired = 7 + min(i - windowWidth, 0);
         if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] && jobRefs[answer.first]->unprocessed) {
           if (cancelJob[answer.first]) {
             --parent->matchableCount;
             jobRefs[answer.first]->unprocessed = false;
+            auto img = parent->get_image_ref(image_idx);
+            img->free_memory_RAW();
+
           }else {
             jobQueue.push(jobRefs[answer.first]);
             jobRefs[answer.first]->unprocessed = false;
