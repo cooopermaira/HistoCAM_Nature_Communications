@@ -40,6 +40,7 @@ public:
   Poco::Event waitOnResolve;
   std::vector<RegInfo*> callersWaiting;
   std::vector<std::pair<unsigned int, Match*>> componentCallersWaiting;
+  std::vector<std::pair<Point2f,double>> rootHomographies;
   
   RegInfo(StreamCam* parent, bool successful=false, Vec2 absoluteCoords=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
   successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),accessMutex(new Poco::FastMutex), parent(parent),
@@ -53,6 +54,10 @@ public:
   void set_abc(Vec2 _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing);
 
   void set_waiting_component(unsigned int componentIndex, Match* m);
+
+  void set_AbC_local_from_relative(unsigned int _relativeComponentSpace,Point2f _AbCInRelativeSpace);
+
+  Point2f get_AbC_relative_from_local(unsigned int _relativeComponentSpace);
   
   // to allow for sorting of reginfo objects by component membership
   bool operator < (const RegInfo& other) const {

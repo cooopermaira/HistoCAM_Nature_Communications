@@ -102,6 +102,49 @@ namespace pathCam {
     componentCallersWaiting.push_back({componentIndex, m});
   }
 
+  Point2f RegInfo::get_AbC_relative_from_local(unsigned int _relativeComponentSpace) {
+    /*returns images coordinates in requested component space*/
+    accessMutex->lock();
+    auto imP = parent->composites[component_membership]->imagePyramid;
+    assert(imP->scale != 0);
+
+    assert(parent->composites.size() - 1 >= _relativeComponentSpace);
+    auto imP_R = parent->composites[_relativeComponentSpace]->imagePyramid;
+    assert(imP_R->scale != 0);
+
+    //convert absolute coordinates to base (first component) space
+    auto resInBaseSpace = imP->scale * ( Point2f(absoluteCoords.x, absoluteCoords.y) + imP->offset);
+
+    accessMutex->unlock();
+    //convert to requested component space
+    return  resInBaseSpace / imP_R->scale - imP_R->offset;
+  }
+
+  void RegInfo::set_AbC_local_from_relative(unsigned int _relativeComponentSpace, Point2f _AbCInRelativeSpace) {
+    /*sets absolute coordinates of image in its own component space given absolute coordinates in another component's
+     * space
+     */
+    accessMutex->lock();
+    auto imP = parent->composites[component_membership]->imagePyramid;
+    assert(imP->scale != 0);
+
+    assert(parent->composites.size() - 1 >= _relativeComponentSpace);
+    auto imP_R = parent->composites[_relativeComponentSpace]->imagePyramid;
+    assert(imP_R->scale != 0);
+
+    //convert given coordinates to base space
+    auto resInBaseSpace = imP_R->scale * (_AbCInRelativeSpace + imP_R->offset);
+
+    //convert to self space
+    auto resInMySpace = resInBaseSpace / imP->scale - imP->offset;
+
+    absoluteCoords.x = resInMySpace.x;
+    absoluteCoords.y = resInMySpace.y;
+    accessMutex->unlock();
+  }
+
+
+
   int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type, int requiredGoodMatches, int flag,
                                       double ransacReprojThreshold,
                                       int maxIters, double confidence) {
@@ -146,7 +189,7 @@ namespace pathCam {
       return -2;
     }
     if (flag == 1) {
-      int k = 0;
+
       for (int i = 0; i < m->H.rows; i++) {
         for (int j = 0; j < m->H.cols; j++) {
           std::cout << std::to_string(i) + " " + std::to_string(j) + " " + std::to_string(m->H.at<double>(i, j))

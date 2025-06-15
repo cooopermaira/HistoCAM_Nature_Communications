@@ -260,6 +260,26 @@ namespace pathCam {
     resize_mmatch_mutex->unlock();
   }
 
+  Point2f StreamCam::get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC, unsigned int _dstCompIdx) {
+    /*returns coordinates in dst component space given coordinates in src component space*/
+
+    assert(composites.size() - 1 > max(_dstCompIdx,_srcCompIdx));
+
+    auto srcImP = composites[_srcCompIdx]->imagePyramid;
+    assert(srcImP);
+    assert(srcImP->scale != 0);
+
+    auto dstImP = composites[_dstCompIdx]->imagePyramid;
+    assert(dstImP);
+    assert(dstImP->scale != 0);
+
+    //convert to base space
+    auto pointInBaseSpace = srcImP->scale * ( _srcAbC + srcImP->offset );
+
+    //convert to dst space
+    return pointInBaseSpace / dstImP->scale - dstImP->offset;
+  }
+
 
   bool StreamCam::has_flatfield(int label) {
     if (label == Image::_2X || label == Image::_4X || label == Image::_10X || Image::_20X) {
@@ -420,16 +440,14 @@ namespace pathCam {
       }
 
       //set scale and offset in repo
-      set_scale_and_offset(0, 1, Point2f(0, 0));
+      //set_scale_and_offset(0, 1, Point2f(0, 0));
 
       //set component scale and offset to be 1 and origin
       temp->imagePyramid->set_scale(1);
-      temp->imagePyramid->set_offset(Point2f(0, 0));
     } else {
-      temp->store_new_info(ri);
       temp->imagePyramid->set_scale(0);
-      temp->imagePyramid->set_offset(Point2f(0, 0));
     }
+    temp->imagePyramid->set_offset(Point2f(0, 0));
     ri->set_abc(Vec2(0, 0), component_index, true);
     component_mutex->unlock();
   }

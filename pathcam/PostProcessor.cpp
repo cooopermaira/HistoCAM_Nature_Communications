@@ -81,8 +81,9 @@ namespace pathCam {
 
         std::vector<uchar> inlierMask;
         int numInliers;
-        if (mutualMatches.size() > 8) {
-          Mat H = findHomography(pts1, pts2, RANSAC, 3.0, inlierMask);
+        Mat H;
+        if (mutualMatches.size() > 50) {
+          H = findHomography(pts1, pts2, RANSAC, 3.0, inlierMask);
           numInliers = std::count(inlierMask.begin(), inlierMask.end(), 1);
           if (mp.second->regInfo->root) {
             int k = 0;
@@ -93,6 +94,18 @@ namespace pathCam {
             if (inlierMask[i]) {
               matchesInfo.matches.push_back(mutualMatches[i]);
               ftg->process_match(mp.first->index, mp.second->index, mutualMatches[i]);
+              auto myRi = mp.second->regInfo;
+              if (myRi->root && !myRi->rootOfRoot) {//add && not already been thru BA TODO
+                double relativeScale = ( H.at<double>(0, 0) + H.at<double>(1, 1) ) / 2;
+
+                unsigned int queryComponentSpace = mp.first->regInfo->component_membership;
+                Point2f theirAbC(mp.first->regInfo->absoluteCoords.x,mp.first->regInfo->absoluteCoords.y);
+                Point2f queryAbC = relativeScale * Point2f(H.at<double>(0, 2),H.at<double>(1, 2)) + theirAbC;
+                auto resultantPoint = parent->get_AbC_relative_from_relative(queryComponentSpace,queryAbC,0);
+
+                double scale = relativeScale * parent->composites[mp.first->regInfo->component_membership]->imagePyramid->scale;
+                myRi->rootHomographies.emplace_back(resultantPoint,scale);
+              }
             }
           }
         }

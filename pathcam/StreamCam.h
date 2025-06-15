@@ -188,7 +188,7 @@ namespace pathCam {
 
     void push_SIFT_matches(std::vector<std::pair<Image*,Image*>>& _newOverlaps, Image *_image);
 #endif
-
+    Point2f get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC, unsigned int _requestedCompIdx);
 
     bool has_flatfield(int label);
 
