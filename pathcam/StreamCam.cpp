@@ -176,47 +176,88 @@ namespace pathCam {
       if (sfm->tracksReady()) {
         //we're ready
         auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
+        sfm->bai->optimizer->clear();
         sfm->bai->run_bundle_adjustment(tracks, sfm->imagesProcessed);
 
 
         double maxX = 0;
         double maxY = 0;
-        for (auto cam: sfm->bai->poseVertices) {
-          auto pv = sfm->bai->optimizer->poseVertex(cam.first);
-          auto img = get_image_ref(cam.first);
+        for (auto &comp : composites) {
+          if (comp->needsAlignment) {
+            for (auto &img : comp->delaunayImages) {
+              if (!img->regInfo->stayFixedDuringBundleAdjustment) {
+                auto pv = sfm->bai->optimizer->poseVertex(img->index);
+                if (img->regInfo->root && !img->regInfo->rootOfRoot) {
+                  auto imP = composites[img->component_membership]->imagePyramid;
+                  imP->set_scale(pv->t[2] / 10000);
+                  Point2f coords(-pv->t[0], -pv->t[1]);
+                  auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
+                  imP->set_offset(offset);
+                  composites[img->component_membership]->deduce_label();
+                } else {
+                  Point2f pointInBaseSpace(-pv->t[0],-pv->t[1]);
+                  img->regInfo->set_AbC_local_from_relative(0,pointInBaseSpace);
 
+                  //debug
+                  double diffx = abs(img->absoluteCoords.x - img->regInfo->absoluteCoords.x);
+                  double diffy = abs(img->absoluteCoords.y - img->regInfo->absoluteCoords.y);
+                  if (diffx > maxX) {
+                    maxX = diffx;
+                  }
+                  if (diffy > maxY) {
+                    maxY = diffy;
+                  }
 
-          std::cout << img->absoluteCoords.x << " " << pv->t[0] << " "
-              << img->absoluteCoords.y << " " << pv->t[1] << " " << pv->t[2] << std::endl;
+                  img->absoluteCoords.x = img->regInfo->absoluteCoords.x;
+                  img->absoluteCoords.y = img->regInfo->absoluteCoords.y;
 
-          double diffx = abs(img->absoluteCoords.x + pv->t[0]);
-          double diffy = abs(img->absoluteCoords.y + pv->t[1]);
-
-          if (img->regInfo->root && !img->regInfo->rootOfRoot) {
-            auto imP = composites[img->component_membership]->imagePyramid;
-            imP->set_scale(pv->t[2] / 10000);
-            Point2f coords(-pv->t[0], -pv->t[1]);
-            auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
-            imP->set_offset(offset);
-            composites[img->component_membership]->deduce_label();
-          } else {
-            img->absoluteCoords.x = -pv->t[0];
-            img->regInfo->absoluteCoords.x = -pv->t[0];
-            img->absoluteCoords.y = -pv->t[1];
-            img->regInfo->absoluteCoords.y = --pv->t[1];
-          }
-
-          if (diffx > maxX) {
-            maxX = diffx;
-          }
-          if (diffy > maxY) {
-            maxY = diffy;
+                }
+                if (comp->componentIndex == 0) {
+                  pv->t[2] = 10000;
+                }
+                pv->fixed = true;
+                img->regInfo->stayFixedDuringBundleAdjustment = true;
+              }
+            }
           }
         }
-
-        // for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
-        //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+        // for (auto cam: sfm->bai->poseVertices) {
+        //   auto pv = sfm->bai->optimizer->poseVertex(cam.first);
+        //   auto img = get_image_ref(cam.first);
+        //
+        //
+        //   std::cout << img->absoluteCoords.x << " " << pv->t[0] << " "
+        //       << img->absoluteCoords.y << " " << pv->t[1] << " " << pv->t[2] << std::endl;
+        //
+        //   double diffx = abs(img->absoluteCoords.x + pv->t[0]);
+        //   double diffy = abs(img->absoluteCoords.y + pv->t[1]);
+        //
+        //
+        //   if (img->regInfo->root && !img->regInfo->rootOfRoot) {
+        //     auto imP = composites[img->component_membership]->imagePyramid;
+        //     imP->set_scale(pv->t[2] / 10000);
+        //     Point2f coords(-pv->t[0], -pv->t[1]);
+        //     auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
+        //     imP->set_offset(offset);
+        //     composites[img->component_membership]->deduce_label();
+        //   } else {
+        //     img->absoluteCoords.x = -pv->t[0];
+        //     img->regInfo->absoluteCoords.x = -pv->t[0];
+        //     img->absoluteCoords.y = -pv->t[1];
+        //     img->regInfo->absoluteCoords.y = -pv->t[1];
+        //   }
+        //
+        //   if (diffx > maxX) {
+        //     maxX = diffx;
+        //   }
+        //   if (diffy > maxY) {
+        //     maxY = diffy;
+        //   }
         // }
+
+        for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
+          std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+        }
 
         std::cout << maxX << " " << maxY << std::endl;
 
@@ -225,12 +266,14 @@ namespace pathCam {
     }
     cudaSetDevice(compositorCudaDevice);
     for (int i = 0; i < composites.size(); ++i) {
-      if (i < composites.size() - 1) {
+      if (i < composites.size() - 1 && composites[i+1]->needsAlignment) {
         //load next component while we rebuild this one
         int ii = i + 1;
         std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
       }
-      composites[i]->rebuild();
+      if (composites[i]->needsAlignment) {
+        composites[i]->rebuild();
+      }
     }
   }
 

@@ -199,7 +199,7 @@ namespace pathCam {
         translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
       }
       //only fix the root image of the first component, everything else is based on that
-      bool fixed = img->regInfo->rootOfRoot;
+      bool fixed = img->regInfo->rootOfRoot || img->regInfo->stayFixedDuringBundleAdjustment;
 
       auto poseVertex = new cuba::PoseVertex(img->index,camRotation, translation, camParams,fixed);
 

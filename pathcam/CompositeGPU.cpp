@@ -298,7 +298,11 @@ namespace pathCam {
         threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
         cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
         //brighten
-        cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
+        if (componentMagLabel == 1) {
+          cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
+        }else if (componentMagLabel == 2) {
+          cuda::pow(convertHoldingGPU, 1.05, convertHoldingGPU);
+        }
         convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
       }
 
@@ -339,6 +343,7 @@ namespace pathCam {
       polyMaskOutput.setTo(Scalar(0));
       parent->notify_observers();
     }
+    needsAlignment = false;
   }
 
   SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
@@ -390,7 +395,7 @@ namespace pathCam {
             width &&
             abs(delaunayRegInfos[i]->absoluteCoords.y - delaunayRegInfos.back()->absoluteCoords.y) < 0.7 * image_size.
             height) {
-          newOverlaps.push_back({delaunayImages[i], delaunayImages.back()});
+          newOverlaps.emplace_back(delaunayImages[i], delaunayImages.back());
         }
       }
     }
@@ -400,9 +405,33 @@ namespace pathCam {
       if (comp != this) {
         for (auto di: comp->delaunayImages) {
           if (delaunayRegInfos.back()->root) {
-            newOverlaps.push_back({di, delaunayImages.back()});
+            newOverlaps.emplace_back(di, delaunayImages.back());
           } else {
+            assert(imagePyramid->scale != 0);
             /*TODO intersect bounding box of this image with bounding box of images from other components*/
+            //calculate my position in base space
+            auto myBaseAbC = delaunayRegInfos.back()->get_AbC_relative_from_local(0);
+            auto theirBaseAbC = di->regInfo->get_AbC_relative_from_local(0);
+
+            double myScale = imagePyramid->scale;
+            double theirScale = comp->imagePyramid->scale;
+
+            myBaseAbC.x += myScale * 0.5 * parent->image_width;
+            myBaseAbC.y += myScale * 0.5 * parent->image_height;
+
+            theirBaseAbC.x += theirScale * 0.5 * parent->image_width;
+            theirBaseAbC.y += theirScale * 0.5 * parent->image_height;
+
+            double allowableDiffX = theirScale + myScale * 0.5 * parent->image_width;
+            double allowableDiffY = theirScale + myScale * 0.5 * parent->image_height;
+
+            auto centerDiff = theirBaseAbC - myBaseAbC;
+            centerDiff.x = abs(centerDiff.x);
+            centerDiff.y = abs(centerDiff.y);
+
+            if (centerDiff.x <= 0.7 * allowableDiffX && centerDiff.y <= 0.7 * allowableDiffY) {
+              newOverlaps.emplace_back(di, delaunayImages.back());
+            }
           }
         }
       }
