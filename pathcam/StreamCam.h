@@ -234,7 +234,7 @@ namespace pathCam {
 
     JobQueue *JobQ;
 
-    Image* get_image_ref(unsigned long int);
+    Image* get_image_ref(unsigned long);
 
     std::vector<Image *> get_image_ref(const std::vector<unsigned long>&) const;
 

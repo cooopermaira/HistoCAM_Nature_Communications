@@ -77,19 +77,28 @@ namespace pathCam {
   void JobQueue::update_job_readiness(int jobTypeFlag, unsigned long image_idx) {
     if (jobTypeFlag == 2) {
 
-      for (int i = max(0,int(image_idx) - windowWidth);i <= image_idx + windowWidth;i++) {
+      int fv = max(0,int(image_idx) - windowWidth);
+      int lv = image_idx + windowWidth;
+      std::vector<int> iters(lv - fv + 1);
+      std::iota(iters.begin(),iters.end(),fv);
+
+      //for (int i = max(0,int(image_idx) - windowWidth);i <= image_idx + windowWidth;i++) {
+      for (auto i : iters){
+
         auto answer = get_sort_order_and_job_refs(jobTypeFlag, i);
 
         jobsReadiness[answer.first]++;
+
         unsigned long readinessRequired = 7 + min(i - windowWidth, 0);
+
         if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] && jobRefs[answer.first]->unprocessed) {
           if (cancelJob[answer.first]) {
             --parent->matchableCount;
             jobRefs[answer.first]->unprocessed = false;
-            auto img = parent->get_image_ref(image_idx);
+            auto img = parent->get_image_ref(i);
             img->free_memory_RAW();
-
           }else {
+
             jobQueue.push(jobRefs[answer.first]);
             jobRefs[answer.first]->unprocessed = false;
           }
@@ -105,6 +114,7 @@ namespace pathCam {
   }
 
   void JobQueue::cancel_job(int jobTypeFlag, unsigned long image_idx) {
+
     auto answer = get_sort_order_and_job_refs(jobTypeFlag, image_idx);
     queue_mutex->lock();
     cancelJob[answer.first] = true;

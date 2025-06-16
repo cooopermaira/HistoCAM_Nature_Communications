@@ -29,7 +29,14 @@ namespace pathCam {
 
 #ifdef HAVE_OPENCV_CUDAARITHM
   bool Image::move_buffer_to_gpu(int device) {
-    if (raw_buffer == 0) {
+    if (raw_buffer_cuda) {
+      std::lock_guard lock(cudaBufferMutex);
+      cudaBufferReady = true;
+      cudaBufferConVar.notify_one();
+      return false;
+    }
+
+    if (!raw_buffer) {
       return false;
     }
     cudaSetDevice(device);
@@ -57,6 +64,7 @@ namespace pathCam {
 
 
   void Image::free_memory_RAW(bool force) {
+
     buffer_mutex.lock();
     if (raw_buffer != nullptr) {
       reference_count--;

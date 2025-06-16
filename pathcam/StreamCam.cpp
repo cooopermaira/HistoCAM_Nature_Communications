@@ -291,17 +291,17 @@ namespace pathCam {
   void StreamCam::mark_neighbors_as_underexposed(unsigned long _index) {
 
     std::vector<unsigned long> neighborhood;
-    for (unsigned long i = max(0ul, _index - windowWidth); i < _index + windowWidth; i++) {
+    for (unsigned long i = max(0ul, _index - windowWidth); i <=_index + windowWidth; i++) {
       neighborhood.push_back(i);
       JobQ->cancel_job(2, i);
     }
-    JobQ->update_job_readiness(2,_index);
 
     auto answer = get_image_ref(neighborhood);
 
     for (auto img: answer) {
       img->mark_too_dark();
     }
+    JobQ->update_job_readiness(2,_index);
   }
 
   std::string StreamCam::get_flatfield(int label) {
@@ -399,7 +399,7 @@ namespace pathCam {
     return temp;
   }
 
-  Image *StreamCam::get_image_ref(unsigned long int index) {
+  Image *StreamCam::get_image_ref(unsigned long index) {
     Image *temp;
     image_mutex->readLock();
     temp = images[index];
