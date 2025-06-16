@@ -168,7 +168,7 @@ namespace pathCam {
   }
 
   void StreamCam::align_and_rebuild() {
-    if (composites.empty()){return;}
+    if (composites.empty()) { return; }
 
     std::thread([this]() { this->load_delaunay_images_to_GPU(0); }).detach();
 
@@ -187,15 +187,24 @@ namespace pathCam {
 
 
           std::cout << img->absoluteCoords.x << " " << pv->t[0] << " "
-              << img->absoluteCoords.y << " " << pv->t[1] << std::endl;
-          std::cout << pv->t[2] << std::endl;
+              << img->absoluteCoords.y << " " << pv->t[1] << " " << pv->t[2] << std::endl;
+
           double diffx = abs(img->absoluteCoords.x + pv->t[0]);
           double diffy = abs(img->absoluteCoords.y + pv->t[1]);
 
-          img->absoluteCoords.x = -pv->t[0];
-          img->regInfo->absoluteCoords.x = -pv->t[0];
-          img->absoluteCoords.y = -pv->t[1];
-          img->regInfo->absoluteCoords.y = --pv->t[1];
+          if (img->regInfo->root && !img->regInfo->rootOfRoot) {
+            auto imP = composites[img->component_membership]->imagePyramid;
+            imP->set_scale(pv->t[2] / 10000);
+            Point2f coords(-pv->t[0], -pv->t[1]);
+            auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
+            imP->set_offset(offset);
+            composites[img->component_membership]->deduce_label();
+          } else {
+            img->absoluteCoords.x = -pv->t[0];
+            img->regInfo->absoluteCoords.x = -pv->t[0];
+            img->absoluteCoords.y = -pv->t[1];
+            img->regInfo->absoluteCoords.y = --pv->t[1];
+          }
 
           if (diffx > maxX) {
             maxX = diffx;
@@ -216,11 +225,11 @@ namespace pathCam {
     }
     cudaSetDevice(compositorCudaDevice);
     for (int i = 0; i < composites.size(); ++i) {
-       if (i < composites.size() - 1) {
-         //load next component while we rebuild this one
-         int ii = i+1;
-         std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
-       }
+      if (i < composites.size() - 1) {
+        //load next component while we rebuild this one
+        int ii = i + 1;
+        std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
+      }
       composites[i]->rebuild();
     }
   }
@@ -233,14 +242,13 @@ namespace pathCam {
     for (auto &img: composites[_componentIndex]->delaunayImages) {
       if (!img->cudaBufferReady) {
         img->load_raw_from_disk();
-        img->move_buffer_to_gpu(compositorCudaDevice);
+        img->move_buffer_to_gpu(compositorCudaDevice, true);
       }
     }
   }
 
-  void StreamCam::push_SIFT_matches(std::vector<std::pair<Image*,Image*>>& _newOverlaps, Image *_image) {
-
-    sfm->matchWorkOutstanding += (int)_newOverlaps.size();
+  void StreamCam::push_SIFT_matches(std::vector<std::pair<Image *, Image *> > &_newOverlaps, Image *_image) {
+    sfm->matchWorkOutstanding += (int) _newOverlaps.size();
     siftQMutex->lock();
     if (compositorCudaDevice != siftCudaDevice) {
       siftDataQueue.push(_image);
@@ -260,10 +268,11 @@ namespace pathCam {
     resize_mmatch_mutex->unlock();
   }
 
-  Point2f StreamCam::get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC, unsigned int _dstCompIdx) {
+  Point2f StreamCam::get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC,
+                                                    unsigned int _dstCompIdx) {
     /*returns coordinates in dst component space given coordinates in src component space*/
 
-    assert(composites.size() - 1 > max(_dstCompIdx,_srcCompIdx));
+    assert(composites.size() > max(_dstCompIdx,_srcCompIdx));
 
     auto srcImP = composites[_srcCompIdx]->imagePyramid;
     assert(srcImP);
@@ -274,7 +283,7 @@ namespace pathCam {
     assert(dstImP->scale != 0);
 
     //convert to base space
-    auto pointInBaseSpace = srcImP->scale * ( _srcAbC + srcImP->offset );
+    auto pointInBaseSpace = srcImP->scale * (_srcAbC + srcImP->offset);
 
     //convert to dst space
     return pointInBaseSpace / dstImP->scale - dstImP->offset;
@@ -289,9 +298,8 @@ namespace pathCam {
   }
 
   void StreamCam::mark_neighbors_as_underexposed(unsigned long _index) {
-
     std::vector<unsigned long> neighborhood;
-    for (unsigned long i = max(0ul, _index - windowWidth); i <=_index + windowWidth; i++) {
+    for (unsigned long i = max(0ul, _index - windowWidth); i <= _index + windowWidth; i++) {
       neighborhood.push_back(i);
       JobQ->cancel_job(2, i);
     }
@@ -301,7 +309,7 @@ namespace pathCam {
     for (auto img: answer) {
       img->mark_too_dark();
     }
-    JobQ->update_job_readiness(2,_index);
+    JobQ->update_job_readiness(2, _index);
   }
 
   std::string StreamCam::get_flatfield(int label) {

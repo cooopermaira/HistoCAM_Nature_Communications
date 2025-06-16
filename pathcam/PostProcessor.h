@@ -11,7 +11,7 @@ namespace pathCam {
 
   class PostProcessorBase {
   public:
-    PostProcessorBase(pathCam::StreamCam* _parent):parent(_parent){};
+    PostProcessorBase(StreamCam* _parent):parent(_parent){};
 
      ~PostProcessorBase(){};
 

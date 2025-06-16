@@ -184,8 +184,17 @@ namespace pathCam {
       cuba::Array<double,3> translation;
       //translation should be our current absolute coordinates -> essentially a first guess
       if (img->regInfo->root && !img->regInfo->rootOfRoot) {
-        auto lastCoords = parent->composites[img->component_membership - 1]->delaunayImages.back()->absoluteCoords;
-        translation = cuba::Array<double,3>(-(lastCoords.x), -(lastCoords.y), 10000);
+        Point2f rootGuess(0,0);
+        double scale = 0;
+        for (auto &guessPoint :img->regInfo->rootHomographies) {
+          rootGuess += guessPoint.first;
+          scale += guessPoint.second;
+        }
+        auto div = static_cast<double>(img->regInfo->rootHomographies.size());
+        rootGuess /= div;
+        scale /= div;
+
+        translation = cuba::Array<double,3>(-rootGuess.x,-rootGuess.y, 10000 * scale);
       }else {
         translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
       }
@@ -201,7 +210,7 @@ namespace pathCam {
       poseVertices[img->index] = std::move(poseVertex);
     }
 
-    double maxval = 0;
+
     //landmark vertexes are feature points placed in world/composite pixel coordinates
     for (const auto &track : _tracks) {
       cuba::Array<double, 3> featurePositionInComposite = {track.world_x,track.world_y,0};

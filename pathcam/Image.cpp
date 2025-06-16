@@ -28,7 +28,7 @@ namespace pathCam {
   }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-  bool Image::move_buffer_to_gpu(int device) {
+  bool Image::move_buffer_to_gpu(int _device, bool _trueMove) {
     if (raw_buffer_cuda) {
       std::lock_guard lock(cudaBufferMutex);
       cudaBufferReady = true;
@@ -39,7 +39,7 @@ namespace pathCam {
     if (!raw_buffer) {
       return false;
     }
-    cudaSetDevice(device);
+    cudaSetDevice(_device);
     size_t nBytes = parent->image_height * parent->image_width;
     cudaMalloc(&raw_buffer_cuda,nBytes);
     cudaMemcpy(raw_buffer_cuda,raw_buffer,nBytes,cudaMemcpyHostToDevice);
@@ -48,6 +48,11 @@ namespace pathCam {
       std::lock_guard lock(cudaBufferMutex);
       cudaBufferReady = true;
       cudaBufferConVar.notify_one();
+    }
+
+    //release from system memory, keep on gpu only
+    if (_trueMove) {
+      free_memory_RAW();
     }
 
     return true;
