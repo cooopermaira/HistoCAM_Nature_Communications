@@ -191,17 +191,35 @@ namespace pathCam {
                   auto imP = composites[img->component_membership]->imagePyramid;
                   imP->set_scale(pv->t[2] / 10000);
                   Point2f coords(-pv->t[0], -pv->t[1]);
+                  imP->set_offset({0,0});
                   auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
                   imP->set_offset(offset);
                   composites[img->component_membership]->deduce_label();
                 } else {
+
                   Point2f pointInBaseSpace(-pv->t[0],-pv->t[1]);
+                  auto val = img->debugInitialGuess - pointInBaseSpace;
+                  val.x = abs(val.x);
+                  val.y = abs(val.y);
+                  if (val.x > 500 || val.y > 500) {
+                    int k = 0;
+                  }
+                  // auto val = img->regInfo->get_AbC_relative_from_local(0);
+                  //
+                  // if (img->component_membership == 1) {
+                  //   int k = 0;
+                  // }
                   img->regInfo->set_AbC_local_from_relative(0,pointInBaseSpace);
 
                   //debug
                   double diffx = abs(img->absoluteCoords.x - img->regInfo->absoluteCoords.x);
                   double diffy = abs(img->absoluteCoords.y - img->regInfo->absoluteCoords.y);
                   if (diffx > maxX) {
+                    if (diffx > maxX + 1000) {
+                      img->regInfo->set_AbC_local_from_relative(0,pointInBaseSpace);
+                      int k = 0;
+
+                    }
                     maxX = diffx;
                   }
                   if (diffy > maxY) {
@@ -215,45 +233,12 @@ namespace pathCam {
                 if (comp->componentIndex == 0) {
                   pv->t[2] = 10000;
                 }
-                pv->fixed = true;
-                img->regInfo->stayFixedDuringBundleAdjustment = true;
+                //pv->fixed = true;
+                //img->regInfo->stayFixedDuringBundleAdjustment = true;
               }
             }
           }
         }
-        // for (auto cam: sfm->bai->poseVertices) {
-        //   auto pv = sfm->bai->optimizer->poseVertex(cam.first);
-        //   auto img = get_image_ref(cam.first);
-        //
-        //
-        //   std::cout << img->absoluteCoords.x << " " << pv->t[0] << " "
-        //       << img->absoluteCoords.y << " " << pv->t[1] << " " << pv->t[2] << std::endl;
-        //
-        //   double diffx = abs(img->absoluteCoords.x + pv->t[0]);
-        //   double diffy = abs(img->absoluteCoords.y + pv->t[1]);
-        //
-        //
-        //   if (img->regInfo->root && !img->regInfo->rootOfRoot) {
-        //     auto imP = composites[img->component_membership]->imagePyramid;
-        //     imP->set_scale(pv->t[2] / 10000);
-        //     Point2f coords(-pv->t[0], -pv->t[1]);
-        //     auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
-        //     imP->set_offset(offset);
-        //     composites[img->component_membership]->deduce_label();
-        //   } else {
-        //     img->absoluteCoords.x = -pv->t[0];
-        //     img->regInfo->absoluteCoords.x = -pv->t[0];
-        //     img->absoluteCoords.y = -pv->t[1];
-        //     img->regInfo->absoluteCoords.y = -pv->t[1];
-        //   }
-        //
-        //   if (diffx > maxX) {
-        //     maxX = diffx;
-        //   }
-        //   if (diffy > maxY) {
-        //     maxY = diffy;
-        //   }
-        // }
 
         for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
           std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);

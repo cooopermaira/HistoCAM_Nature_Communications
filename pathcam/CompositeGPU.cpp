@@ -343,7 +343,7 @@ namespace pathCam {
       polyMaskOutput.setTo(Scalar(0));
       parent->notify_observers();
     }
-    needsAlignment = false;
+    //needsAlignment = false;
   }
 
   SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {

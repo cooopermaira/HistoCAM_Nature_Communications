@@ -196,7 +196,11 @@ namespace pathCam {
 
         translation = cuba::Array<double,3>(-rootGuess.x,-rootGuess.y, 10000 * scale);
       }else {
-        translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
+        auto AbC = img->regInfo->get_AbC_relative_from_local(0);
+        img->debugInitialGuess = AbC;
+        double scale = parent->composites[img->component_membership]->imagePyramid->scale;
+        //translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
+        translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), 10000 * scale);
       }
       //only fix the root image of the first component, everything else is based on that
       bool fixed = img->regInfo->rootOfRoot || img->regInfo->stayFixedDuringBundleAdjustment;

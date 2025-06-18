@@ -30,6 +30,7 @@ namespace pathCam {
     unsigned int label;
     int vertexId;
     Vec2 absoluteCoords;
+    cv::Point2f debugInitialGuess;
 
     Poco::FastMutex buffer_mutex;
     std::mutex cudaBufferMutex;
