@@ -188,12 +188,12 @@ namespace pathCam {
               if (!img->regInfo->stayFixedDuringBundleAdjustment) {
                 auto pv = sfm->bai->optimizer->poseVertex(img->index);
                 if (img->regInfo->root && !img->regInfo->rootOfRoot) {
-                  auto imP = composites[img->component_membership]->imagePyramid;
-                  imP->set_scale(pv->t[2] / 10000);
+
+                  comp->set_scale(pv->t[2] / 10000);
                   Point2f coords(-pv->t[0], -pv->t[1]);
-                  imP->set_offset({0,0});
+                  comp->set_offset({0,0});
                   auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
-                  imP->set_offset(offset);
+                  comp->set_offset(offset);
                   composites[img->component_membership]->deduce_label();
                 } else {
 
@@ -467,23 +467,13 @@ namespace pathCam {
     if (composites.size() == 1) {
       //first component added
       ri->rootOfRoot = true;
-      //set component mag level
-      if (initialLabel == 0) {
-        temp->componentMagLabel = get_image_ref(image_index)->label;
-      } else {
-        temp->componentMagLabel = initialLabel;
-        temp->get_flatfield();
-      }
-
-      //set scale and offset in repo
-      //set_scale_and_offset(0, 1, Point2f(0, 0));
-
-      //set component scale and offset to be 1 and origin
-      temp->imagePyramid->set_scale(1);
+      //this becomes the base scale
+      temp->set_scale(1);
     } else {
-      temp->imagePyramid->set_scale(0);
+      //this is saying "unknown scale" - will be determined in align_and_rebuild
+      temp->set_scale(0);
     }
-    temp->imagePyramid->set_offset(Point2f(0, 0));
+    temp->set_offset(Point2f(0, 0));
     ri->set_abc(Vec2(0, 0), component_index, true);
     component_mutex->unlock();
   }

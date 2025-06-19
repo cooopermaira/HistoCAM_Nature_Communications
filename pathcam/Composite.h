@@ -210,6 +210,9 @@ namespace pathCam {
     int minTiley = 1000;
     int maxTiley = 0;
 
+    void set_scale(double _scale);
+
+    void set_offset(const Point2f &_offset) const;
 
     void deduce_label();
 

@@ -95,8 +95,30 @@ namespace pathCam {
     }
   }
 
+  void CompositeVoronoi::set_offset(const Point2f &_offset) const {
+    imagePyramid->set_offset(_offset);
+  }
+
+
+  void CompositeVoronoi::set_scale(double _scale) {
+    imagePyramid->scale = _scale;
+    deduce_label();
+  }
+
+
   void CompositeVoronoi::deduce_label() {
-    assert(parent->composites[0]->componentMagLabel != 0);
+    if (componentIndex == 0) {
+      componentMagLabel = parent->initialLabel;
+    }
+
+    if (imagePyramid->scale == 0) {
+      componentMagLabel = 0;
+      return;
+    }
+
+    if (parent->composites[0]->componentMagLabel == 0) {
+      return;
+    }
 
     double initialComponentTrueScale = parent->labelScales[parent->composites[0]->componentMagLabel];
     double selfTrueScale = imagePyramid->scale * initialComponentTrueScale;
@@ -293,7 +315,8 @@ namespace pathCam {
   }
 
   int CompositeVoronoi::add_point_to_delaunay_triangulation(cv::Point2f _point, pathCam::Image *_image,
-                                                            std::vector<Point2i> &_face, bool _forceAdd,bool _drawMask) {
+                                                            std::vector<Point2i> &_face, bool _forceAdd,
+                                                            bool _drawMask) {
     if (!_forceAdd) {
       _drawMask = true;
     }
@@ -407,18 +430,18 @@ namespace pathCam {
       needsAlignment = true;
 
       //build image with alpha channel
-        images[i]->load_raw_from_disk();
-        Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
-        cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
-        images[i]->free_memory_RAW();
-        if (componentMagLabel != 0) {
-          //flatfield correct
-          divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
-          //brighten
-          cv::pow(convertHolding, 1.1, convertHolding);
-          convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
-        }
-        channels[0] = threeChannelPreallocated; //3 channel
+      images[i]->load_raw_from_disk();
+      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+      images[i]->free_memory_RAW();
+      if (componentMagLabel != 0) {
+        //flatfield correct
+        divide(threeChannelPreallocated, ff, convertHolding, 1, CV_32F);
+        //brighten
+        cv::pow(convertHolding, 1.1, convertHolding);
+        convertHolding.convertTo(threeChannelPreallocated, CV_8UC3);
+      }
+      channels[0] = threeChannelPreallocated; //3 channel
 
 
       //add alpha channel
@@ -987,7 +1010,6 @@ namespace pathCam {
   }
 
 
-
   bool CompositeVoronoi::rebuildTile(Point2i tile, int sum) {
     std::string tileStr = std::to_string(tile.x) + "_" + std::to_string(tile.y);
     if (tileToSumNonZero[tileStr] < sum) {
@@ -1095,7 +1117,7 @@ namespace pathCam {
       unsigned int tile_size = imagePyramid->tile_size;
       unsigned int topLogicSize = imagePyramid->level.back()->getLogicSize();
       bool addedLevel = false;
-      bool canResize = std::log2(tile_size) - imagePyramid->level.size() >= 1;
+      bool canResize = std::log2(tile_size) - imagePyramid->level.size() >= 2;
 
       while (canResize && (topLogicSize < max_offset.x - root_offset.x || topLogicSize < max_offset.y -
                            root_offset.y)) {
@@ -1106,7 +1128,7 @@ namespace pathCam {
         imagePyramid->level.push_back(
           std::make_shared<TiledImage>(imagePyramid, tile_size, logic_size, levelWithinPyramid));
         topLogicSize = logic_size;
-        canResize = std::log2(tile_size) - imagePyramid->level.size() >= 1;
+        canResize = std::log2(tile_size) - imagePyramid->level.size() >= 2;
       }
       if (addedLevel) {
         auto tl = topLevelBeforeAdding->getIJ(Point2f(root_offset.x, root_offset.y));
