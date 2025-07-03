@@ -115,6 +115,8 @@ namespace pathCam {
 
     void check_render_info();
 
+    void debug_termination_check();
+
     void save_components_to_disk();
 
     void push_remaining_tiles_for_inference();

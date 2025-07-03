@@ -92,15 +92,11 @@ namespace pathCam {
         parent->loaderCount--;
         jobComplete.set();
         image->release_reg_image();
+        std::cout<<"Low Ft: "+std::to_string(image_index)<<std::endl;
+        parent->mark_neighbors_as_underexposed(image_index);
         image->free_memory_RAW();
         return;
       }
-
-      // if(additionalSiftReg){
-      //   //image->create_reg_image(1,1,parent->debayer,parent->interpolation,parent->real);
-      //   auto detector2 = new pathCam::FeatureDetector(7, parent->use_FREAK);
-      //   detector2->detect_and_compute(image,1);
-      // }
 
       image->release_reg_image();
 
@@ -109,14 +105,19 @@ namespace pathCam {
       ++parent->matchableCount;
       parent->JobQ->add_runnable(matchjob);
       successful = true;
+
     } else {
+
+      std::cout<<"Too Black: "+std::to_string(image_index)<<std::endl;
       parent->mark_neighbors_as_underexposed(image_index);
       image->free_memory_RAW();
+
     }
 
     parent->loaderCount--;
     jobComplete.set();
     successful = true;
+
   }
 
   bool FeatureDetector::detect_and_compute(pathCam::Image *image, int flag) {

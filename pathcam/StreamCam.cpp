@@ -191,10 +191,21 @@ namespace pathCam {
 
                   comp->set_scale(pv->t[2] / 10000);
                   Point2f coords(-pv->t[0], -pv->t[1]);
+
+                  //this is where the offset is officially set for a component. This happens nowhere else.
                   comp->set_offset({0,0});
                   auto offset = get_AbC_relative_from_relative(0, coords, img->regInfo->component_membership);
                   comp->set_offset(offset);
                   composites[img->component_membership]->deduce_label();
+
+                  Point2f pointInBaseSpace(-pv->t[0],-pv->t[1]);
+                  auto val = img->debugInitialGuess - pointInBaseSpace;
+                  val.x = abs(val.x);
+                  val.y = abs(val.y);
+                  if (val.x > 500 || val.y > 500) {
+                    int k = 0;
+                  }
+                  
                 } else {
 
                   Point2f pointInBaseSpace(-pv->t[0],-pv->t[1]);
@@ -204,22 +215,13 @@ namespace pathCam {
                   if (val.x > 500 || val.y > 500) {
                     int k = 0;
                   }
-                  // auto val = img->regInfo->get_AbC_relative_from_local(0);
-                  //
-                  // if (img->component_membership == 1) {
-                  //   int k = 0;
-                  // }
+
                   img->regInfo->set_AbC_local_from_relative(0,pointInBaseSpace);
 
                   //debug
                   double diffx = abs(img->absoluteCoords.x - img->regInfo->absoluteCoords.x);
                   double diffy = abs(img->absoluteCoords.y - img->regInfo->absoluteCoords.y);
                   if (diffx > maxX) {
-                    if (diffx > maxX + 1000) {
-                      img->regInfo->set_AbC_local_from_relative(0,pointInBaseSpace);
-                      int k = 0;
-
-                    }
                     maxX = diffx;
                   }
                   if (diffy > maxY) {
@@ -234,7 +236,7 @@ namespace pathCam {
                   pv->t[2] = 10000;
                 }
                 //pv->fixed = true;
-                //img->regInfo->stayFixedDuringBundleAdjustment = true;
+                img->regInfo->stayFixedDuringBundleAdjustment = true;
               }
             }
           }
@@ -326,6 +328,7 @@ namespace pathCam {
   }
 
   void StreamCam::mark_neighbors_as_underexposed(unsigned long _index) {
+
     std::vector<unsigned long> neighborhood;
     for (unsigned long i = max(0ul, _index - windowWidth); i <= _index + windowWidth; i++) {
       neighborhood.push_back(i);
@@ -337,7 +340,9 @@ namespace pathCam {
     for (auto img: answer) {
       img->mark_too_dark();
     }
+    JobQ->queue_mutex->lock();
     JobQ->update_job_readiness(2, _index);
+    JobQ->queue_mutex->unlock();
   }
 
   std::string StreamCam::get_flatfield(int label) {
@@ -400,12 +405,21 @@ namespace pathCam {
 
 
   std::vector<Image *> StreamCam::get_image_ref(const std::vector<unsigned long int> &_indexes) const {
+    /*because images vector can be expanded, this gives access to the pointers within that vector under mutex lock.
+    an empty vector of unsigned longs returns entire list of images*/
     std::vector<Image *> temp;
 
     image_mutex->readLock();
-    for (unsigned int i = 0; i < _indexes.size(); i++) {
-      if (images[_indexes[i]]) {
-        temp.push_back(images[_indexes[i]]);
+    if (_indexes.empty()) {
+      unsigned long i = 0;
+      while (images[i]) {
+        temp.push_back(images[i++]);
+      }
+    }else {
+      for (unsigned int i = 0; i < _indexes.size(); i++) {
+        if (images[_indexes[i]]) {
+          temp.push_back(images[_indexes[i]]);
+        }
       }
     }
     image_mutex->unlock();

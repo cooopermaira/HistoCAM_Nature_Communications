@@ -43,7 +43,8 @@ namespace pathCam{
     void cancel_job(int jobTypeFlag, unsigned long image_idx);
     bool run_jobs(bool join_all);
     [[nodiscard]] bool is_empty() const {return jobQueue.empty();}
-    std::pair<int,unsigned long> get_sort_order_and_job_refs(int jobTypeFlag, unsigned long image_idx);
+
+    std::pair<long, unsigned long> get_job_ref_index_and_sort_order(int jobTypeFlag, unsigned long image_idx);
     void update_job_readiness(int jobTypeFlag, unsigned long image_idx);
   };
 

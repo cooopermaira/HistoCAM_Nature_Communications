@@ -14,7 +14,8 @@ namespace pathCam {
         pathCamEvent = new Poco::Event(true);
     pool = new Poco::ThreadPool(min_threads, max_threads, 60, POCO_THREAD_STACK_SIZE);
   }
-  std::pair<int,unsigned long> JobQueue::get_sort_order_and_job_refs(int jobTypeFlag, unsigned long image_idx)
+
+  std::pair<long, unsigned long> JobQueue::get_job_ref_index_and_sort_order(int jobTypeFlag, unsigned long image_idx)
   {
     /*
      * Job Type Flags:
@@ -50,7 +51,7 @@ namespace pathCam {
   }
   void JobQueue::add_runnable(RunnableIntermediate *job, long _sortOrder) {
     if(_sortOrder == -1) {
-      std::pair<int, int> jr_so_pair = get_sort_order_and_job_refs(job->jobTypeFlag, job->image_index);
+      std::pair<int, int> jr_so_pair = get_job_ref_index_and_sort_order(job->jobTypeFlag, job->image_index);
       job->jobRefNumber = jr_so_pair.first;
       job->sort_order = jr_so_pair.second;
     }else{
@@ -82,30 +83,43 @@ namespace pathCam {
       std::vector<int> iters(lv - fv + 1);
       std::iota(iters.begin(),iters.end(),fv);
 
+      if (image_idx >= 409 && image_idx <= 414) {
+        int k = 0;
+      }
+
       //for (int i = max(0,int(image_idx) - windowWidth);i <= image_idx + windowWidth;i++) {
       for (auto i : iters){
 
-        auto answer = get_sort_order_and_job_refs(jobTypeFlag, i);
+        auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, i);
 
         jobsReadiness[answer.first]++;
 
+        if (i== 803){// ||i==804||i==805) {
+          int k = 0;
+        }
+
         unsigned long readinessRequired = 7 + min(i - windowWidth, 0);
 
+
         if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] && jobRefs[answer.first]->unprocessed) {
+          //enough of this jobs neighbors have processed, this job has enough information to run.
           if (cancelJob[answer.first]) {
             --parent->matchableCount;
             jobRefs[answer.first]->unprocessed = false;
+
             auto img = parent->get_image_ref(i);
             img->free_memory_RAW();
+
           }else {
 
             jobQueue.push(jobRefs[answer.first]);
             jobRefs[answer.first]->unprocessed = false;
+
           }
         }
       }
     }else {
-      auto answer = get_sort_order_and_job_refs(jobTypeFlag, image_idx);
+      auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, image_idx);
       if (jobRefs[answer.first]->unprocessed) {
         jobQueue.push(jobRefs[answer.first]);
         jobRefs[answer.first]->unprocessed = false;
@@ -115,7 +129,7 @@ namespace pathCam {
 
   void JobQueue::cancel_job(int jobTypeFlag, unsigned long image_idx) {
 
-    auto answer = get_sort_order_and_job_refs(jobTypeFlag, image_idx);
+    auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, image_idx);
     queue_mutex->lock();
     cancelJob[answer.first] = true;
     queue_mutex->unlock();

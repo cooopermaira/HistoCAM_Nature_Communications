@@ -183,18 +183,22 @@ namespace pathCam {
       auto camRotation = Eigen::Quaterniond::Identity();
       cuba::Array<double,3> translation;
       //translation should be our current absolute coordinates -> essentially a first guess
-      if (img->regInfo->root && !img->regInfo->rootOfRoot) {
+      if (img->regInfo->root && !img->regInfo->rootOfRoot && !img->regInfo->stayFixedDuringBundleAdjustment) {
         Point2f rootGuess(0,0);
         double scale = 0;
         for (auto &guessPoint :img->regInfo->rootHomographies) {
           rootGuess += guessPoint.first;
           scale += guessPoint.second;
         }
+
         auto div = static_cast<double>(img->regInfo->rootHomographies.size());
         rootGuess /= div;
         scale /= div;
 
         translation = cuba::Array<double,3>(-rootGuess.x,-rootGuess.y, 10000 * scale);
+
+        img->debugInitialGuess = rootGuess;
+
       }else {
         auto AbC = img->regInfo->get_AbC_relative_from_local(0);
         img->debugInitialGuess = AbC;
