@@ -35,7 +35,47 @@ namespace pathCam {
       return {};
     }
 
-    return createTracksFromConnections(images, *uf_ptr);
+    auto ans = createTracksFromConnections(images, *uf_ptr);
+    //debug
+
+    int edge2_2=0,edge4_4=0,edge2_4=0,edge10_10=0,edge2_10=0,edge4_10=0,edge2_4_10=0;
+    for (auto &t : ans) {
+      bool two = false,four = false,ten = false;
+      for (auto &obs : t.observations) {
+        if (obs.imgRef->component_membership == 0) {
+          two = true;
+        }
+        if (obs.imgRef->component_membership==1) {
+          four = true;
+        }
+        if (obs.imgRef->component_membership == 2) {
+          ten = true;
+        }
+      }
+      if (two && !four && !ten) {
+          ++edge2_2;
+      }
+      if (two && four && !ten) {
+        ++edge2_4;
+      }
+      if (two && four && ten) {
+        ++edge2_4_10;
+      }
+      if (!two &&four && ten) {
+        ++edge4_10;
+      }
+      if (!two && !four && ten) {
+        ++edge10_10;
+      }
+      if (!two && four && !ten) {
+        ++edge4_4;
+      }
+      if (two && !four && ten) {
+        ++edge2_10;
+      }
+    }
+    int k = 0;
+    return ans;
   }
 
   void FeatureTrackGenerator::process_match(unsigned long _srcImgIdx, unsigned long _dstImgIdx, const DMatch &_match) {
@@ -143,7 +183,7 @@ namespace pathCam {
         unordered_map<unsigned long, const Image *>::iterator img_it = image_lookup.find(pair.image_id);
         if (img_it != image_lookup.end() && pair.feature_id < img_it->second->siftData.numPts) {
           const auto &pos = img_it->second->siftData.h_data[pair.feature_id];
-          track.addObservation(FeatureObservation(pair.image_id, pair.feature_id, pos.xpos, pos.ypos));
+          track.addObservation(FeatureObservation(pair.image_id, pair.feature_id, pos.xpos, pos.ypos,img_it->second));
           track.world_x += pos.xpos + img_it->second->absoluteCoords.x;
           track.world_y += pos.ypos + img_it->second->absoluteCoords.y;
         }
@@ -184,16 +224,9 @@ namespace pathCam {
       cuba::Array<double,3> translation;
       //translation should be our current absolute coordinates -> essentially a first guess
       if (img->regInfo->root && !img->regInfo->rootOfRoot && !img->regInfo->stayFixedDuringBundleAdjustment) {
-        Point2f rootGuess(0,0);
-        double scale = 0;
-        for (auto &guessPoint :img->regInfo->rootHomographies) {
-          rootGuess += guessPoint.first;
-          scale += guessPoint.second;
-        }
-
-        auto div = static_cast<double>(img->regInfo->rootHomographies.size());
-        rootGuess /= div;
-        scale /= div;
+        Point2f rootGuess;
+        double scale;
+        img->regInfo->average_from_homographies(rootGuess,scale);
 
         translation = cuba::Array<double,3>(-rootGuess.x,-rootGuess.y, 10000 * scale);
 
@@ -202,6 +235,18 @@ namespace pathCam {
       }else {
         auto AbC = img->regInfo->get_AbC_relative_from_local(0);
         img->debugInitialGuess = AbC;
+        if (img->regInfo->rootHomographies.size() > 2) {
+          if (img->component_membership  == 2) {
+            int k = 0;
+          }
+          Point2f rootGuess;
+          double scale;
+          img->regInfo->average_from_homographies(rootGuess,scale);
+          auto diffPoint = AbC - rootGuess;
+          if (abs(diffPoint.x) > 300 || abs(diffPoint.y) > 300) {
+            int k = 0;
+          }
+        }
         double scale = parent->composites[img->component_membership]->imagePyramid->scale;
         //translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
         translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), 10000 * scale);
@@ -225,6 +270,8 @@ namespace pathCam {
 
       auto landmarkVertex = new cuba::LandmarkVertex(track.track_id,featurePositionInComposite,false);
 
+      auto lmv = new BAM::LandmarkVert(track.world_x,track.world_y,track.track_id);
+
       optimizer->addLandmarkVertex(landmarkVertex);
 
       landmarkVertices[track.track_id] = landmarkVertex;
@@ -247,11 +294,12 @@ namespace pathCam {
 
     }
     const cuba::RobustKernelType robustKernelType = cuba::RobustKernelType::HUBER;
-    const double deltaMono = sqrt(5.991);
+    const double deltaMono = sqrt(/*5.991*/1.55);
 
     optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 
     optimizer->initialize();
+
     optimizer->optimize(50);
 
   }

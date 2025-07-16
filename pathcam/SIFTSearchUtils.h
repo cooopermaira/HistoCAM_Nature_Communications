@@ -12,9 +12,10 @@ namespace pathCam {
     int image_id;
     int feature_id; // feature index within that image
     double x, y; // pixel coordinates
+    const Image* imgRef;
 
-    FeatureObservation(int img_id, int feat_id, double x_coord, double y_coord)
-      : image_id(img_id), feature_id(feat_id), x(x_coord), y(y_coord) {
+    FeatureObservation(int img_id, int feat_id, double x_coord, double y_coord,const Image* _imgRef)
+      : image_id(img_id), feature_id(feat_id), x(x_coord), y(y_coord), imgRef(_imgRef) {
     }
   };
 

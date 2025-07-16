@@ -122,6 +122,7 @@ void CaptureComponent::startRecording() {
   bcam->add_observer(parent);
   scopeRadius = bcam->sCam->get_scope_radius();
   parent->MRimage = bcam->get_image_reference();
+  //aiOverlay->set_sCam(bcam->sCam);
 #endif
 
   //bcam->run();

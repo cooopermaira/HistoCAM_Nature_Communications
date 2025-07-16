@@ -170,7 +170,7 @@ namespace pathCam {
 
     std::vector<DataObserver *> observers;
 
-    Poco::Thread disk_thread, Q_thread, composite_thread, postprocessor_thread;
+    Poco::Thread disk_thread, Q_thread, composite_thread, postprocessor_thread,inference_thread;
 
     Poco::Event inferenceWait;
     Poco::Event compositeWait;

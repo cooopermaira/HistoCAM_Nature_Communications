@@ -265,7 +265,7 @@ SpinPath::~SpinPath(){
   pCam = nullptr;
   camList.Clear();
   system->ReleaseInstance();
-  delete sCam;
+  //delete sCam;
 }
 
 //int SpinPath::Aquisition(){

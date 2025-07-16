@@ -242,7 +242,8 @@ namespace pathCam {
       }
 
     }
-
+    //TODO remove this. this just prevents runnableEntry from calling the im destructor
+    //while (true){}
   }
 
   void InferenceManager::run_agg_classify() {
@@ -263,7 +264,7 @@ namespace pathCam {
       //file exchange
 
       //pack as disk savable tensors
-      tileEmbeds = tileEmbeds.to(torch::kCPU);
+      //tileEmbeds = tileEmbeds.to(torch::kCPU);
       auto pickledEmbed = torch::pickle_save(tileEmbeds);
       std::ofstream feout = std::ofstream(embedFileOut);
       feout.write(pickledEmbed.data(), pickledEmbed.size());
@@ -288,7 +289,7 @@ namespace pathCam {
       std::vector<char> buffer((std::istreambuf_iterator<char>(fin)), std::istreambuf_iterator<char>());
       torch::Tensor aggregatedEmbeds = torch::pickle_load(buffer).toTensor();
       //update tileEmbeds after attention
-      embedsToClassify = torch::cat({aggregatedEmbeds, coordsTensor}, 1).to(device).to(torch::kF32);
+      embedsToClassify = torch::cat({aggregatedEmbeds, coordsTensor}, 1).to(device).to(torch::kF16);
 
       //reset dir
       remove(signalFileIn.c_str());

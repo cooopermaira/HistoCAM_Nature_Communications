@@ -83,20 +83,12 @@ namespace pathCam {
       std::vector<int> iters(lv - fv + 1);
       std::iota(iters.begin(),iters.end(),fv);
 
-      if (image_idx >= 409 && image_idx <= 414) {
-        int k = 0;
-      }
-
       //for (int i = max(0,int(image_idx) - windowWidth);i <= image_idx + windowWidth;i++) {
       for (auto i : iters){
 
         auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, i);
 
         jobsReadiness[answer.first]++;
-
-        if (i== 803){// ||i==804||i==805) {
-          int k = 0;
-        }
 
         unsigned long readinessRequired = 7 + min(i - windowWidth, 0);
 

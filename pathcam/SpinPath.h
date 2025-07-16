@@ -98,7 +98,8 @@ private:
   }
   
 public:
-    StreamCam* sCam;
+  //std::shared_ptr<StreamCam> sCam;
+  StreamCam* sCam;
   SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();
   int run();

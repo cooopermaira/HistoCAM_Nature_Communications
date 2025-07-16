@@ -50,6 +50,10 @@ namespace pathCam {
 
     if (!image->is_mostly_black()) {
 
+      // if(parent->recordingMode){
+      //   image->write_to_path();
+      // }
+
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
 
@@ -92,7 +96,7 @@ namespace pathCam {
         parent->loaderCount--;
         jobComplete.set();
         image->release_reg_image();
-        std::cout<<"Low Ft: "+std::to_string(image_index)<<std::endl;
+        //std::cout<<"Low Ft: "+std::to_string(image_index)<<std::endl;
         parent->mark_neighbors_as_underexposed(image_index);
         image->free_memory_RAW();
         return;
@@ -108,7 +112,7 @@ namespace pathCam {
 
     } else {
 
-      std::cout<<"Too Black: "+std::to_string(image_index)<<std::endl;
+      //std::cout<<"Too Black: "+std::to_string(image_index)<<std::endl;
       parent->mark_neighbors_as_underexposed(image_index);
       image->free_memory_RAW();
 

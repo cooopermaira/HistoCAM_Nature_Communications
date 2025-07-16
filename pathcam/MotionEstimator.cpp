@@ -94,13 +94,30 @@ namespace pathCam {
     }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    image->free_memory_RAW();
+    //image->free_memory_RAW();
 #endif
   }
 
   void RegInfo::set_waiting_component(unsigned int componentIndex, Match *m) {
     componentCallersWaiting.push_back({componentIndex, m});
   }
+
+  void RegInfo::average_from_homographies(Point2f &_rootGuess, double &_scale) {
+    Point2f rootGuess(0,0);
+    double scale = 0;
+    for (auto &guessPoint :rootHomographies) {
+      rootGuess += guessPoint.first;
+      scale += guessPoint.second;
+    }
+
+    auto div = static_cast<double>(rootHomographies.size());
+    rootGuess /= div;
+    scale /= div;
+
+    _rootGuess = rootGuess;
+    _scale = scale;
+  }
+
 
   Point2f RegInfo::get_AbC_relative_from_local(unsigned int _relativeComponentSpace) {
     /*returns images coordinates in requested component space*/

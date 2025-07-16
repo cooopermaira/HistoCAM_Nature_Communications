@@ -28,7 +28,7 @@ namespace pathCam {
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
 
-      debug_termination_check();
+      //debug_termination_check();
 
       //pull new components that might need to be processed
       std::tuple<unsigned long, Size, unsigned int> newComp;
@@ -105,9 +105,8 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
-    //perform_SIFT_multires_bundle_adjustment();
-    perform_global_alignment();
-    //rebuildJobsComplete.wait();
+
+    //perform_global_alignment();
     //save_components_to_disk();
 
     std::cout << "CM duration: " + std::to_string(duration) << std::endl;

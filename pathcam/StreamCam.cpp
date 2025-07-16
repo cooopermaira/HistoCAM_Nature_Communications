@@ -76,18 +76,18 @@ namespace pathCam {
     Q_thread.start(qm);
     composite_thread.start(cm);
     postprocessor_thread.start(ppm);
-    // if (inferencing) {
-    //   postprocessor_thread.start(im);
-    // }
+    if (inferencing) {
+      inference_thread.start(*im);
+    }
 
     disk_thread.join();
     Q_thread.join();
     composite_thread.join();
     postprocessor_thread.join();
-    // if (inferencing) {
-    //   //im->thread.join();
-    //   postprocessor_thread.join();
-    // }
+    if (inferencing) {
+      //im->thread.join();
+      inference_thread.join();
+    }
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -176,6 +176,9 @@ namespace pathCam {
       if (sfm->tracksReady()) {
         //we're ready
         auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
+
+
+
         sfm->bai->optimizer->clear();
         sfm->bai->run_bundle_adjustment(tracks, sfm->imagesProcessed);
 
@@ -205,7 +208,7 @@ namespace pathCam {
                   if (val.x > 500 || val.y > 500) {
                     int k = 0;
                   }
-                  
+
                 } else {
 
                   Point2f pointInBaseSpace(-pv->t[0],-pv->t[1]);
@@ -242,15 +245,16 @@ namespace pathCam {
           }
         }
 
-        for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
-          std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
-        }
+        // for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
+        //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+        // }
 
         std::cout << maxX << " " << maxY << std::endl;
 
         break;
       }
     }
+
     cudaSetDevice(compositorCudaDevice);
     for (int i = 0; i < composites.size(); ++i) {
       if (i < composites.size() - 1 && composites[i+1]->needsAlignment) {
@@ -262,6 +266,7 @@ namespace pathCam {
         composites[i]->rebuild();
       }
     }
+
   }
 
 

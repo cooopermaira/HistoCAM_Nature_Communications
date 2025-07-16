@@ -59,6 +59,8 @@ public:
   void set_AbC_local_from_relative(unsigned int _relativeComponentSpace,Point2f _AbCInRelativeSpace);
 
   Point2f get_AbC_relative_from_local(unsigned int _relativeComponentSpace);
+
+  void average_from_homographies(Point2f &_rootGuess, double &_scale);
   
   // to allow for sorting of reginfo objects by component membership
   bool operator < (const RegInfo& other) const {
