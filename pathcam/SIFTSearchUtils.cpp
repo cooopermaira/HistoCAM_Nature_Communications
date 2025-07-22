@@ -270,8 +270,6 @@ namespace pathCam {
 
       auto landmarkVertex = new cuba::LandmarkVertex(track.track_id,featurePositionInComposite,false);
 
-      auto lmv = new BAM::LandmarkVert(track.world_x,track.world_y,track.track_id);
-
       optimizer->addLandmarkVertex(landmarkVertex);
 
       landmarkVertices[track.track_id] = landmarkVertex;

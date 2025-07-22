@@ -151,7 +151,7 @@ namespace pathCam {
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
     //UniqueQueue<std::pair<Point2i,unsigned int>,PairHash> tileEmbedQ;
     UniqueQueue<std::tuple<int,int,unsigned>,TupleHash>tileEmbedQ;
-    std::queue<std::pair<Image*,Image*>> siftMatchQueue;
+    std::deque<std::vector<std::pair<Image*,Image*>>> siftMatchQueue;
     std::queue<Image*> siftDataQueue;
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;

@@ -162,18 +162,15 @@ namespace pathCam {
 
       images[i]->free_memory_CUDA();
 
-      if (componentMagLabel != 0) {
-        //flatfield correct
-        threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
-        cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
-        //brighten
-        cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
-        convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
-      }
+      ff_correct_and_brighten();
 
       //get sift data and push it to sift ft extraction gpu
       images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
       parent->push_SIFT_matches(newOverlaps, images[i]);
+      if (_newInfo[i]->root && !newOverlaps.empty()) {
+        wakeEvent.wait();
+        ff_correct_and_brighten();
+      }
 
       //add alpha channel
       cuda::split(threeChannelPrealGPU, channelsGPU);
@@ -210,9 +207,9 @@ namespace pathCam {
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
       polyMaskOutput.setTo(Scalar(0));
     }
-    if (rootFound) {
-      parent->align_and_rebuild();
-    }
+    // if (rootFound) {
+    //   parent->align_and_rebuild();
+    // }
 
     //highlight bounds of last frame
     if (imagePyramid->scale > 0 && update) {
@@ -441,6 +438,16 @@ namespace pathCam {
     return newOverlaps;
   }
 
+void CompositeVoronoi::ff_correct_and_brighten() {
+    if (componentMagLabel != 0) {
+      //flatfield correct
+      threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
+      cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
+      //brighten
+      cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
+      convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
+    }
+}
 
 #endif
 }

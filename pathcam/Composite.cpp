@@ -109,6 +109,8 @@ namespace pathCam {
   void CompositeVoronoi::deduce_label() {
     if (componentIndex == 0) {
       componentMagLabel = parent->initialLabel;
+      get_flatfield();
+      return;
     }
 
     if (imagePyramid->scale == 0) {
@@ -161,6 +163,12 @@ namespace pathCam {
     ffGPU.convertTo(ffGPU,CV_32F);
     double scale = 1 / 170.0;
     cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
+    // if (componentMagLabel == 2) {
+    //   Mat temp;
+    //   ffGPU.download(temp);
+    //   imwrite("/media/max/Data/4xff.png", temp);
+    //   int k = 0;
+    // }
 #else
     ff = Mat(Size(6464, 4852), CV_8U, bufferCuda, Mat::AUTO_STEP);
     cvtColor(ff,ff,COLOR_BayerBG2BGR);

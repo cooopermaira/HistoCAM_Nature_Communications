@@ -29,12 +29,12 @@ namespace pathCam {
 
 #ifdef HAVE_OPENCV_CUDAARITHM
   bool Image::move_buffer_to_gpu(int _device, bool _trueMove) {
-    if (raw_buffer_cuda) {
-      std::lock_guard lock(cudaBufferMutex);
-      cudaBufferReady = true;
-      cudaBufferConVar.notify_one();
-      return false;
-    }
+    // if (raw_buffer_cuda) {
+    //   std::lock_guard lock(cudaBufferMutex);
+    //   cudaBufferReady = true;
+    //   cudaBufferConVar.notify_one();
+    //   return false;
+    // }
 
     if (!raw_buffer) {
       return false;

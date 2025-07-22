@@ -29,7 +29,7 @@
 #include "cudaImage.h"
 #include "cudaSift.h"
 
-#include "BAM/BAM.h"
+//#include "BAM/BAM.h"
 
 #include "cuda_bundle_adjustment_types.h"
 #include "cuda_bundle_adjustment.h"

@@ -102,15 +102,17 @@ namespace pathCam {
 
     Q_thread.start(qm);
     composite_thread.start(cm);
+    postprocessor_thread.start(ppm);
     if (inferencing) {
-      postprocessor_thread.start(im);
+      inference_thread.start(*im);
     }
 
     Q_thread.join();
     composite_thread.join();
+    postprocessor_thread.join();
     if (inferencing) {
       //im->thread.join();
-      postprocessor_thread.join();
+      inference_thread.join();
     }
 
     std::cout << "spin_run done" << std::endl;
@@ -289,8 +291,10 @@ namespace pathCam {
       siftDataQueue.push(_image);
     }
 
-    for (auto item: _newOverlaps) {
-      siftMatchQueue.push(item);
+    if (_image->regInfo->root) {
+      siftMatchQueue.push_front(_newOverlaps);
+    }else {
+      siftMatchQueue.push_back(_newOverlaps);
     }
     siftQMutex->unlock();
   }
@@ -570,9 +574,9 @@ namespace pathCam {
     get_sift_data_Q_front(_images);
 
     //grab a bunch of matches from the Q to process
-    while (!siftMatchQueue.empty() && temp.size() < maxMatchesPerPull) {
-      temp.push_back(siftMatchQueue.front());
-      siftMatchQueue.pop();
+    if (!siftMatchQueue.empty()) {
+      temp = siftMatchQueue.front();
+      siftMatchQueue.pop_front();
     }
     siftQMutex->unlock();
     return temp;

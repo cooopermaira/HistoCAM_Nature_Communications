@@ -43,11 +43,20 @@ namespace pathCam {
   void SiftFeatureMatcher::run() {
     //set device context
     cudaSetDevice(parent->siftCudaDevice);
+    bool rootFound = false;
+    RegInfo* rootRegRef;
 
     auto matchPairs = parent->get_sift_match_Q_front(imagesProcessed);
 
     if (!matchPairs.empty()) {
       loopInProcess = true;
+      rootFound = matchPairs.back().second->regInfo->root;
+      if (rootFound) {
+        rootRegRef = matchPairs.back().second->regInfo;
+      }
+
+
+      size_t mostMutualMatches = 0,mostInliers = 0;
       for (auto mp: matchPairs) {
         // Run matching in both directions
         MatchSiftData(mp.first->siftData, mp.second->siftData);
@@ -83,12 +92,18 @@ namespace pathCam {
         int numInliers;
         Mat H;
 
+        if (mutualMatches.size() > mostMutualMatches) {
+          mostMutualMatches = mutualMatches.size();
+        }
         if (mutualMatches.size() > 200) {
           H = findHomography(pts2, pts1, RANSAC, 3.0, inlierMask);
           numInliers = std::count(inlierMask.begin(), inlierMask.end(), 1);
 
+          if (numInliers > mostInliers) {
+            mostInliers = numInliers;
+          }
 
-          if (numInliers > 200) {
+          if (numInliers > 150) {
             for (size_t i = 0; i < mutualMatches.size(); ++i) {
               if (inlierMask[i]) {
                 matchesInfo.matches.push_back(mutualMatches[i]);
@@ -97,7 +112,7 @@ namespace pathCam {
             }
             //logic for handling root when called as part of adding new component
             auto myRi = mp.second->regInfo;
-            if (/*myRi->root &&*/ !myRi->rootOfRoot) {
+            if (myRi->root && !myRi->rootOfRoot) {
 
               double relativeScale = (H.at<double>(0, 0) + H.at<double>(1, 1)) / 2;
 
@@ -115,6 +130,17 @@ namespace pathCam {
 
         allMatches.push_back(matchesInfo);
         --matchWorkOutstanding;
+      }
+      if (rootFound) {
+        assert(rootRegRef->rootHomographies.size() > 0);
+        double scale;
+        Point2f rootGuess;
+        rootRegRef->average_from_homographies(rootGuess,scale);
+        auto comp = parent->composites[rootRegRef->component_membership];
+        cudaSetDevice(parent->compositorCudaDevice);
+        comp->set_scale(scale);
+        comp->set_offset(rootGuess/scale);
+        comp->wakeEvent.set();
       }
     }
     loopInProcess = false;

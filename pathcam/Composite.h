@@ -149,6 +149,8 @@ namespace pathCam {
     void rebuild();
 
     void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i>& _face);
+
+    void ff_correct_and_brighten();
 #endif
 
     void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
