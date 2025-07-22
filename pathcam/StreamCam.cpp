@@ -346,9 +346,9 @@ namespace pathCam {
 
     auto answer = get_image_ref(neighborhood);
 
-    for (auto img: answer) {
-      img->mark_too_dark();
-    }
+    // for (auto img: answer) {
+    //   img->mark_too_dark();
+    // }
     JobQ->queue_mutex->lock();
     JobQ->update_job_readiness(2, _index);
     JobQ->queue_mutex->unlock();
@@ -421,12 +421,12 @@ namespace pathCam {
     image_mutex->readLock();
     if (_indexes.empty()) {
       unsigned long i = 0;
-      while (images[i]) {
+      while (images[i] && i <= maxIndex) {
         temp.push_back(images[i++]);
       }
     }else {
       for (unsigned int i = 0; i < _indexes.size(); i++) {
-        if (images[_indexes[i]]) {
+        if (images[_indexes[i]] && _indexes[i] <= maxIndex) {
           temp.push_back(images[_indexes[i]]);
         }
       }

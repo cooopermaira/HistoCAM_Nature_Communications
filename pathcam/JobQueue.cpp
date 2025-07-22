@@ -94,12 +94,13 @@ namespace pathCam {
 
 
         if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] && jobRefs[answer.first]->unprocessed) {
-          //enough of this jobs neighbors have processed, this job has enough information to run.
+          //enough of this job's neighbors have processed, this job has enough information to run.
           if (cancelJob[answer.first]) {
             --parent->matchableCount;
             jobRefs[answer.first]->unprocessed = false;
 
             auto img = parent->get_image_ref(i);
+            img->mark_too_dark();
             img->free_memory_RAW();
 
           }else {
