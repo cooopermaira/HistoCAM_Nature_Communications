@@ -25,6 +25,9 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
+    if(parent->recordingMode){
+      image->write_to_path();
+    }
 
 
     // if(image->check_blur() < 100){
@@ -50,9 +53,7 @@ namespace pathCam {
 
     if (!image->is_mostly_black()) {
 
-      // if(parent->recordingMode){
-      //   image->write_to_path();
-      // }
+
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);

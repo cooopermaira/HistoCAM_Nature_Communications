@@ -124,6 +124,9 @@ namespace pathCam {
 
               double scale = relativeScale * parent->composites[mp.first->regInfo->component_membership]->imagePyramid->scale;
               myRi->rootHomographies.emplace_back(resultantPoint, scale);
+              if (myRi->rootHomographies.size() > 4) {
+                break;
+              }
             }
           }
         }

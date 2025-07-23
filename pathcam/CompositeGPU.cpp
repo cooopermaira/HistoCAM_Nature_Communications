@@ -434,7 +434,7 @@ namespace pathCam {
       }
     }
 
-
+    std::reverse(newOverlaps.begin(), newOverlaps.end());
     return newOverlaps;
   }
 

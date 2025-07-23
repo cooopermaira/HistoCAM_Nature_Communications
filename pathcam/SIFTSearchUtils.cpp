@@ -249,7 +249,7 @@ namespace pathCam {
         }
         double scale = parent->composites[img->component_membership]->imagePyramid->scale;
         //translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
-        translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), 10000 * scale);
+        translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), scale);
       }
       //only fix the root image of the first component, everything else is based on that
       bool fixed = img->regInfo->rootOfRoot || img->regInfo->stayFixedDuringBundleAdjustment;

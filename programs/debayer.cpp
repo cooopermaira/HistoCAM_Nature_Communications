@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/media/max/Data/2_20_new/input.txt";
+    std::string outputfilepath = "/media/max/Data/test/run2/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {
