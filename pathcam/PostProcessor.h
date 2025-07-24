@@ -58,6 +58,8 @@ class SiftFeatureMatcher : public PostProcessorBase {
   std::atomic<bool> loopInProcess;
   std::atomic<int> matchWorkOutstanding;
 
+  int numMatchesProcessed = 0;
+
 };
 
   // class Inferencer : public PostProcessorBase {

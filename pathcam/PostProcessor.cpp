@@ -58,6 +58,7 @@ namespace pathCam {
 
       size_t mostMutualMatches = 0,mostInliers = 0;
       for (auto mp: matchPairs) {
+        ++numMatchesProcessed;
         // Run matching in both directions
         MatchSiftData(mp.first->siftData, mp.second->siftData);
         MatchSiftData(mp.second->siftData, mp.first->siftData);
@@ -124,9 +125,9 @@ namespace pathCam {
 
               double scale = relativeScale * parent->composites[mp.first->regInfo->component_membership]->imagePyramid->scale;
               myRi->rootHomographies.emplace_back(resultantPoint, scale);
-              if (myRi->rootHomographies.size() > 4) {
-                break;
-              }
+              // if (myRi->rootHomographies.size() > 4) {
+              //   break;
+              // }
             }
           }
         }
@@ -206,7 +207,9 @@ namespace pathCam {
 
 
   bool SiftFeatureMatcher::isTerminal() {
-    return !parent->compositing && parent->siftMatchQueue.empty() && parent->siftMatchQueue.empty();
+    bool terminate = !parent->compositing && parent->siftMatchQueue.empty();
+    if (terminate){std::cout<<"matches processed: "+std::to_string(numMatchesProcessed)<<std::endl;}
+    return terminate;
   }
 
   bool SiftFeatureMatcher::tracksReady() {
