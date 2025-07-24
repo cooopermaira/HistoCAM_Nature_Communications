@@ -292,15 +292,7 @@ namespace pathCam {
 
       if (componentMagLabel != 0) {
         //flatfield correct
-        threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
-        cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
-        //brighten
-        if (componentMagLabel == 1) {
-          cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
-        }else if (componentMagLabel == 2) {
-          cuda::pow(convertHoldingGPU, 1.05, convertHoldingGPU);
-        }
-        convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
+        ff_correct_and_brighten();
       }
 
       //add alpha channel

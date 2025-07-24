@@ -249,7 +249,7 @@ namespace pathCam {
         }
         double scale = parent->composites[img->component_membership]->imagePyramid->scale;
         //translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
-        translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), scale);
+        translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), 10000 * scale);
       }
       //only fix the root image of the first component, everything else is based on that
       bool fixed = img->regInfo->rootOfRoot || img->regInfo->stayFixedDuringBundleAdjustment;
@@ -292,7 +292,7 @@ namespace pathCam {
 
     }
     const cuba::RobustKernelType robustKernelType = cuba::RobustKernelType::HUBER;
-    const double deltaMono = sqrt(/*5.991*/1.55);
+    const double deltaMono = sqrt(5);
 
     optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 

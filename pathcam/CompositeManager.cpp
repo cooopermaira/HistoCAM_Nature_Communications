@@ -106,7 +106,7 @@ namespace pathCam {
     push_remaining_tiles_for_inference();
 
 
-    //perform_global_alignment();
+    perform_global_alignment();
     //save_components_to_disk();
 
     std::cout << "CM duration: " + std::to_string(duration) << std::endl;
