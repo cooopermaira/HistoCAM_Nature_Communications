@@ -87,6 +87,8 @@ public:
 #endif
   cv::Rect_<float> bounds;
 
+  std::vector<Point2i>liveTiles;
+
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
              unsigned int logic_size = 256, int levelWithinPyramid = 0);
 

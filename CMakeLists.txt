@@ -81,6 +81,7 @@ ELSEIF (WIN32)
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     list(APPEND CMAKE_MODULE_PATH "/home/max/libtorch/share/cmake/Torch")
+    list(APPEND cmake_module_path "/home/max/Documents/onnxruntime-linux-x64-gpu-1.17.0")
 
     #SET(Torch_DIR "/home/max/libtorch/share/cmake/Torch")
     SET(Python3_INCLUDE_DIR "/home/max/Python-3.11.0/shared_library_dynamic/include/python3.11")
@@ -94,6 +95,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     #set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
     set(CMAKE_CUDA_ARCHITECTURES "native")
     enable_language(CUDA)
+
+    set(ONNXRUNTIME_DIR "/home/max/Documents/onnxruntime-linux-x64-gpu-1.22.0" CACHE PATH "Path to the extracted ONNX Runtime directory")
+
 else()
     message(STATUS "else here")
 ENDIF ()
@@ -175,8 +179,12 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
 
+link_directories(${ONNXRUNTIME_DIR}/lib)
+include_directories(${ONNXRUNTIME_DIR}/include)
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment)
+
+
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_cuda)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

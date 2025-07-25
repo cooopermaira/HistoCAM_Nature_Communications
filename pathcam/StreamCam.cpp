@@ -43,6 +43,16 @@ namespace pathCam {
       im = new InferenceManager(this);
     }
 
+    Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "sam");
+
+    // 2. Create session options and enable CUDA
+    Ort::SessionOptions session_options;
+    Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0)); // GPU 0
+
+    // 3. Load session
+    Ort::Session session(env, "sam.onnx", session_options);
+
+
     int threads = 10;
 
     minPixelDistanceBetweenFrames = 500;
