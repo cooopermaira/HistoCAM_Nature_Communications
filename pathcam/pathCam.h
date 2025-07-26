@@ -91,6 +91,7 @@
 #include "StreamCam.h"
 #include "PostProcessor.h"
 #include "SIFTSearchUtils.h"
+#include "AccessSAM.h"
 
 
 
