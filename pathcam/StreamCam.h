@@ -37,6 +37,8 @@ namespace pathCam {
 
   class SiftFeatureMatcher;
 
+  class AccessSAM;
+
 
   class StreamCam : public BatchCam {
 
@@ -143,6 +145,7 @@ namespace pathCam {
     InferenceManager *im;
     PostProcessManager* ppm;
     SiftFeatureMatcher* sfm;
+    AccessSAM *as;
 
     //std::vector < double > variancesForDebug;
     std::vector<CompositeVoronoi *> composites;

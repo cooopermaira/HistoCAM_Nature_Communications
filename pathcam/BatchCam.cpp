@@ -117,6 +117,18 @@ namespace pathCam {
         return false;
       }
 
+      if (pConf->has(("io.inferencing.SAM_encoder"))) {
+        segmentWithSAM = true;
+        SAM_encoder_path = Path(pConf->getString("io.inferencing.SAM_encoder"));
+        if (pConf->has("io.inferencing.SAM_tile_size")) {
+          SAMTileSize = pConf->getInt("io.inferencing.SAM_tile_size");
+        }else {
+          SAMTileSize = 1024;
+        }
+      }else {
+        segmentWithSAM = false;
+      }
+
       if (pConf->has("io.inferencing.tile_encoder")) {
         inferencing = true;
         tile_encoder_path = Path(pConf->getString("io.inferencing.tile_encoder"));

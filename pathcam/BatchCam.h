@@ -47,6 +47,7 @@ namespace pathCam {
     Poco::Path flat_field_file_20x_r;
 
     Poco::Path tile_encoder_path;
+    Poco::Path SAM_encoder_path;
     Poco::Path slide_encoder_path;
     Poco::Path python_venv_path;
     Poco::Path classifier_path;
@@ -66,12 +67,16 @@ namespace pathCam {
     bool reportText;
     bool classifyingComplete = false;
 
+    bool segmentWithSAM;
+
+
     std::string classes_title;
 
     int initialLabel;
     int interpolation;
     int feature_type;
     unsigned int tileSize;
+    unsigned int SAMTileSize;
     unsigned int image_width;
     unsigned int image_height;
     unsigned int scope_radius;

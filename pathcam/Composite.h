@@ -39,7 +39,7 @@ namespace pathCam {
     friend class CompositeManager;
     friend class RebuildRunnable;
 
-  protected:
+  public:
     StreamCam *parent;
     Mat local_quality_score, composite_z_buffer, flat_field;
     Mat3f flat_field_composite;
@@ -47,9 +47,6 @@ namespace pathCam {
     Vec2 root_offset, max_offset;
     Rect_<float> tiledImageBounds;
     Poco::FastMutex *update_mutex;
-
-
-  public:
 
     std::shared_ptr< MRTiledImage >  imagePyramid;
 

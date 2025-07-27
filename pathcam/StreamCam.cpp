@@ -42,6 +42,10 @@ namespace pathCam {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
     }
+
+    if (segmentWithSAM) {
+      as = new AccessSAM(this);
+    }
     //
     // Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "sam");
     //

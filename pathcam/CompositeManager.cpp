@@ -106,8 +106,15 @@ namespace pathCam {
     push_remaining_tiles_for_inference();
 
 
-    perform_global_alignment();
+    //perform_global_alignment();
     //save_components_to_disk();
+
+    if (parent->segmentWithSAM) {
+      auto start = std::chrono::high_resolution_clock::now();
+      parent->as->initialize();
+      auto stop = std::chrono::high_resolution_clock::now();
+      std::cout<<"SAM initialization runtime: "+std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count())<<std::endl;;
+    }
 
     std::cout << "CM duration: " + std::to_string(duration) << std::endl;
     parent->compositing = false;
