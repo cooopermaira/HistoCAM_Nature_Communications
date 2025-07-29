@@ -29,6 +29,7 @@
 #include "cudaImage.h"
 #include "cudaSift.h"
 #include "onnxruntime_cxx_api.h"
+#include "sam2_image_inference.hpp"
 
 //#include "BAM/BAM.h"
 

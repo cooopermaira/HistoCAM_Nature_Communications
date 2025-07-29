@@ -26,6 +26,7 @@ namespace pathCam {
     cuda::subtract(noncontiguousWrapper, Scalar(0.406, 0.456, 0.485, 0), noncontiguousWrapper);
     cuda::divide(noncontiguousWrapper, Scalar(0.225, 0.224, 0.229, 1), noncontiguousWrapper);
 
+
     std::vector<cuda::GpuMat> split_channels;
     cuda::split(noncontiguousWrapper, split_channels);
 
@@ -34,10 +35,10 @@ namespace pathCam {
 
     for (int i = 0; i < 3; ++i) {
       cudaMemcpy2D(_buffer + i * nBytesPerChannel,
-                   noncontiguousWrapper.cols * sizeof(float),
+                   noncontiguousWrapper.cols * 4,
                    split_channels[2 - i].data,
                    noncontiguousWrapper.step,
-                   noncontiguousWrapper.cols * sizeof(float),
+                   noncontiguousWrapper.cols * 4,
                    noncontiguousWrapper.rows,
                    cudaMemcpyDeviceToDevice);
     }
@@ -48,6 +49,7 @@ namespace pathCam {
 
 
   void AccessSAM::initialize() {
+    cudaSetDevice(parent->compositorCudaDevice);
     int interval = (parent->SAMTileSize / parent->tileSize);
     assert(interval % 2 == 0);
     auto comp = parent->composites[0];
@@ -57,7 +59,7 @@ namespace pathCam {
 
 
     int id = 0;
-    int numSAMTiles = ceil((lr.x - ul.x + 1) / 3) * ceil((lr.y - ul.y + 1) / 3);
+    int numSAMTiles = ceil((lr.x - ul.x + 1) / (interval - 1)) * ceil((lr.y - ul.y + 1) / (interval - 1));
     size_t nBytesPerImage = 4 * 3 * parent->SAMTileSize * parent->SAMTileSize;
     cudaMalloc(&batchImageEmbedBuffer,numSAMTiles * nBytesPerImage);
 
@@ -68,7 +70,7 @@ namespace pathCam {
 
         for (int x = ul.x; x <= lr.x; ++x) {
           if ((xTileCount - 1) % (interval - 1) == 0) {
-            auto st = new SAMTile(id++, {x, y}, parent->SAMTileSize);
+            auto st = new SAMTile(id, {x, y}, parent->SAMTileSize);
             tiles.push_back(st);
 
             //add subtiles
@@ -79,6 +81,7 @@ namespace pathCam {
               }
             }
             st->make_raw_buffer(batchImageEmbedBuffer + id * nBytesPerImage);
+            ++id;
 
             //add links to neighbors
             if (xTileCount > 0) {
@@ -111,18 +114,58 @@ namespace pathCam {
       }
       ++yTileCount;
     }
+    //
+    // int numImg = 5;
+    // void* imageData = malloc(numImg * nBytesPerImage);
+    // cudaMemcpy(imageData,batchImageEmbedBuffer + 50 * nBytesPerImage,numImg * nBytesPerImage,cudaMemcpyDeviceToHost);
+    // std::ofstream out("/media/max/Data/pathcam_SAM/imagearray", std::ios::binary);
+    // if (!out) {
+    //   throw std::runtime_error("Failed to open file for writing: ");
+    // }
+    // out.write(reinterpret_cast<const char*>(imageData), numImg*nBytesPerImage);
+    // out.close();
+    // int k = 0;
 
 
   }
 
   void AccessSAM::load_model() {
-    Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "sam2_embedder");
+    Ort::Env env(ORT_LOGGING_LEVEL_ERROR, "sam2_embedder");
     Ort::SessionOptions session_options;
-    OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, parent->compositorCudaDevice);
 
-    // Load the ONNX model
+    auto status = OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, parent->compositorCudaDevice);
+    if (status) {
+      const char* error_message = Ort::GetApi().GetErrorMessage(status);
+      std::cerr << "Failed to add CUDA execution provider: " << error_message << std::endl;
+      Ort::GetApi().ReleaseStatus(status);
+    }
+
     session = new Ort::Session(env, parent->SAM_encoder_path.toString().c_str(), session_options);
   }
+
+
+  void AccessSAM::embed_SAM_tiles() {
+    int batchSize = tiles.size();
+
+    cudaSetDevice(0);
+    //test
+    void* testBuffer;
+    size_t nElements = 4*3*parent->SAMTileSize*parent->SAMTileSize;
+    cudaMalloc(&testBuffer,nElements);
+
+    tensorrt_common::BatchConfig batch_config_encoder = {1, 1, 1};
+    tensorrt_common::BuildConfig build_config_encoder(
+    "Entropy", -1, false, false, false, 0.0, false, {});
+    const size_t max_workspace_size = 4ULL << 30;
+    auto sie = SAM2ImageEncoder("/home/max/Documents/sam2_trt_inference/sam2_pytorch2onnx/output/sam2.1_hiera_base_plus_encoder.engine","fp32",batch_config_encoder,max_workspace_size,build_config_encoder);
+
+    //sie.EncodeImage({testCPU});
+    sie.Infer(testBuffer);
+    int k = 0;
+
+    //cudaFree(batchImageEmbedBuffer);
+  }
+
 
 
   int AccessSAM::get_tile_id(Point2i _location, unsigned int _componentIndex) const {

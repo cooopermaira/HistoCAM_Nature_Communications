@@ -42,6 +42,7 @@ namespace pathCam {
 
     void load_model();
     void initialize();
+    void embed_SAM_tiles();
     int get_tile_id(Point2i _location, unsigned int _componentIndex) const;
 
 
