@@ -12,22 +12,30 @@ namespace pathCam {
   class SAMTile {
   public:
     int ID;
+    int priority = 10;
     Point2i location;
     unsigned int size;
     std::vector<std::pair<SAMTile*,std::vector<Point2i> > > neighbors;
     std::vector<std::pair<Point2i,Point2i>> componentTiles;
     cuda::GpuMat noncontiguousWrapper;
-    char* rawBuffer;
+    void *rawBuffer,*embed_data_d_,*feats_1_data_d_,*feats_0_data_d_;
 
     SAMTile(int ID,Point2i _location,unsigned int _size = 1024);
-    ~SAMTile(){};
+    ~SAMTile() {};
 
     void set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat);
 
-    void make_raw_buffer(char *_buffer);
+    void get_tile_data(CompositeVoronoi* _comp,unsigned int _interval);
+
+    void make_raw_buffer(void *_buffer);
+
 
   };
 
+
+  inline bool tile_compare(const SAMTile* a, const SAMTile* b) {
+    return a->priority < b->priority;
+  }
 
   class AccessSAM {
     public:
