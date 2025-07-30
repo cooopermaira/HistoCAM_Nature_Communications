@@ -29,7 +29,7 @@ namespace pathCam {
 
     void make_raw_buffer(void *_buffer);
 
-
+    void on_click();
   };
 
 

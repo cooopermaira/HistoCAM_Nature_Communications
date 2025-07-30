@@ -48,6 +48,7 @@ namespace pathCam {
 
     Poco::Path tile_encoder_path;
     Poco::Path SAM_encoder_path;
+    Poco::Path SAM_decoder_path;
     Poco::Path slide_encoder_path;
     Poco::Path python_venv_path;
     Poco::Path classifier_path;

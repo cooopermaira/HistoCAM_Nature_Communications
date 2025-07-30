@@ -3,8 +3,103 @@
 //
 
 #include "AccessSAM.h"
+#include "utils.hpp"
+
 
 namespace pathCam {
+
+  void ProcessImage(const std::string& encoder_path,
+                  const std::string& decoder_path,
+                  const std::string& img_path,
+                  const std::string& bbox_file_path,
+                  const std::string& output_jpg_path,
+                  const std::string& precision,
+                  const int decoder_batch_limit)
+{
+    // Get image and bbox filenames
+    std::vector<std::string> image_names;
+
+    for (const auto& entry : std::filesystem::directory_iterator(img_path))
+    {
+        image_names.push_back(entry.path().string());
+    }
+
+    // Create SAM2Image object
+    std::unique_ptr<SAM2Image> sam2;
+    cv::Size encoder_input_size(1024,
+                                1024);  // Current encoder input size, affects decoder normalization
+    sam2 = std::make_unique<SAM2Image>(
+        encoder_path, decoder_path, encoder_input_size, precision, decoder_batch_limit);
+
+    const size_t batch_size = 1;
+    for (size_t i = 0; i < image_names.size(); i += batch_size)
+    {
+        auto start = std::chrono::high_resolution_clock::now();
+
+        std::vector<cv::Mat> images_batch;
+        std::vector<std::vector<cv::Rect>> box_coords_batch;
+        // Calculate actual batch size for this iteration
+        size_t current_batch_size = std::min(batch_size, image_names.size() - i);
+
+        // Read images and bounding boxes
+        for (size_t j = 0; j < current_batch_size; j++)
+        {
+            std::filesystem::path image_path = image_names[i + j];
+            std::string image_file_name = image_path.filename().string();
+            std::string bb_file_name;
+            if (image_file_name.find(".jpg") != std::string::npos)
+            {
+                bb_file_name = ReplaceFileExtension(image_file_name, ".jpg", ".txt");
+            }
+            else if (image_file_name.find(".png") != std::string::npos)
+            {
+                bb_file_name = ReplaceFileExtension(image_file_name, ".png", ".txt");
+            }
+
+            // Read image and bounding box
+            std::filesystem::path bb_file_path =
+                std::filesystem::path(bbox_file_path) / bb_file_name;
+            images_batch.push_back(cv::imread(image_path.string()));
+            std::vector<cv::Rect> box_coords =
+                ReadAndTransformCoordinates(bb_file_path.string());
+            box_coords_batch.push_back(box_coords);
+        }
+
+        // Run encoder
+        auto start_encoder = std::chrono::high_resolution_clock::now();
+        sam2->RunEncoder(images_batch);
+        auto end_encoder = std::chrono::high_resolution_clock::now();
+
+        // Run decoder
+        auto start_decoder = std::chrono::high_resolution_clock::now();
+        sam2->RunDecoder(box_coords_batch);
+        auto end_decoder = std::chrono::high_resolution_clock::now();
+
+        std::vector<std::vector<cv::Mat>> masks = sam2->GetMasks();
+
+        auto start_draw = std::chrono::high_resolution_clock::now();
+        for (size_t j = 0; j < current_batch_size; j++)
+        {
+          for (auto &mask : masks[j]) {
+            imwrite(output_jpg_path + "_mask"+std::to_string(i+j)+".png",mask);
+          }
+            cv::Mat masked_img = DrawMasks(images_batch[j], masks[j]);
+            cv::imwrite(output_jpg_path + "_" + std::to_string(i + j) + ".jpg", masked_img);
+        }
+        auto end_draw = std::chrono::high_resolution_clock::now();
+
+        auto duration_encoder = std::chrono::duration<double>(end_encoder - start_encoder);
+        std::cout << "Encoder time: " << duration_encoder.count() << "s" << std::endl;
+        auto duration_decoder = std::chrono::duration<double>(end_decoder - start_decoder);
+        std::cout << "Decoder time: " << duration_decoder.count() << "s" << std::endl;
+        auto duration_draw = std::chrono::duration<double>(end_draw - start_draw);
+        std::cout << "Draw time: " << duration_draw.count() << "s" << std::endl;
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start);
+        std::cout << "Total time(one iteration): " << duration.count() << "s" << std::endl;
+    }
+}
   SAMTile::SAMTile(int _ID, Point2i _location, unsigned int _size) : ID(_ID), location(_location), size(_size) {
     noncontiguousWrapper = cuda::GpuMat(size, size,CV_8UC4, Scalar(0, 0, 0, 0));
   }
@@ -30,18 +125,18 @@ namespace pathCam {
     std::vector<cuda::GpuMat> split_channels;
     cuda::split(noncontiguousWrapper, split_channels);
 
-    size_t nBytesPerChannel = 4 * noncontiguousWrapper.cols * noncontiguousWrapper.rows;
+    size_t nBytesPerChannel = sizeof(float) * noncontiguousWrapper.cols * noncontiguousWrapper.rows;
     //cudaMalloc(&rawBuffer, nBytesPerChannel * 3);
 
     for (int i = 0; i < 3; ++i) {
-      void* dst = static_cast<char*>(_buffer) + i * nBytesPerChannel;
+      void *dst = static_cast<char *>(_buffer) + i * nBytesPerChannel;
       CHECK_CUDA_ERROR(cudaMemcpy2D(dst,
-                   noncontiguousWrapper.cols * 4,
-                   split_channels[2 - i].data,
-                   split_channels[2-i].step,
-                   noncontiguousWrapper.cols * 4,
-                   noncontiguousWrapper.rows,
-                   cudaMemcpyDeviceToDevice));
+        split_channels[2 - i].cols * sizeof(float),
+        split_channels[2 - i].data,
+        split_channels[2 - i].step,
+        split_channels[2 - i].cols * sizeof(float),
+        split_channels[2 - i].rows,
+        cudaMemcpyDeviceToDevice));
     }
     CHECK_CUDA_ERROR(cudaGetLastError());
     noncontiguousWrapper.release();
@@ -53,6 +148,14 @@ namespace pathCam {
         auto gMat = _comp->imagePyramid->level[0]->getTile(location.x + xx, location.y + yy);
         set_component_tile({location.x + xx - 1, location.y + yy - 1}, {xx, yy}, gMat);
       }
+    }
+  }
+
+
+  void SAMTile::on_click() {
+    priority = 0;
+    for (auto &p: neighbors) {
+      p.first->priority = 1;
     }
   }
 
@@ -90,8 +193,8 @@ namespace pathCam {
               for (int xx = 0; xx < interval; ++xx) {
                 temp.emplace_back(x + xx, y);
               }
-              tiles.back()->neighbors.push_back({brotherX, temp});
-              brotherX->neighbors.push_back({tiles.back(), temp});
+              tiles.back()->neighbors.emplace_back(brotherX, temp);
+              brotherX->neighbors.emplace_back(tiles.back(), temp);
             }
             if (yTileCount > 0) {
               auto brotherY = tiles[get_tile_id({x, y - interval + 1}, comp->componentIndex)];
@@ -99,14 +202,13 @@ namespace pathCam {
               for (int yy = 0; yy < interval; ++yy) {
                 temp.emplace_back(x, y + yy);
               }
-              tiles.back()->neighbors.push_back({brotherY, temp});
-              brotherY->neighbors.push_back({tiles.back(), temp});
+              tiles.back()->neighbors.emplace_back(brotherY, temp);
+              brotherY->neighbors.emplace_back(tiles.back(), temp);
             }
             if (yTileCount > 0 && xTileCount > 0) {
               auto brotherXY = tiles[get_tile_id({x - interval + 1, y - interval + 1}, comp->componentIndex)];
               tiles.back()->neighbors.push_back({brotherXY, {{x, y}}});
               brotherXY->neighbors.push_back({tiles.back(), {{x, y}}});
-              int k = 0;
             }
           }
           ++xTileCount;
@@ -143,6 +245,19 @@ namespace pathCam {
 
 
   void AccessSAM::embed_SAM_tiles() {
+/*
+    ProcessImage(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString(),
+  "/media/max/Data/pathcam_SAM/test_trt/images",
+  "/media/max/Data/pathcam_SAM/test_trt/labels",
+  "/media/max/Data/pathcam_SAM/test_trt/",
+  "fp32",64);
+*/
+    ProcessImage(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString(),
+  "/home/max/Documents/sam2_trt_inference/sample_data/images",
+  "/home/max/Documents/sam2_trt_inference/sample_data/bboxes",
+  "/home/max/Documents/sam2_trt_inference/sample_data/",
+  "fp32",64);
+
     tensorrt_common::BatchConfig batch_config_encoder = {1, 1, 1};
     tensorrt_common::BuildConfig build_config_encoder(
       "Entropy", -1, false, false, false, 0.0, false, {});
@@ -150,18 +265,39 @@ namespace pathCam {
     auto sie = SAM2ImageEncoder(parent->SAM_encoder_path.toString(), "fp32", batch_config_encoder, max_workspace_size,
                                 build_config_encoder);
 
-    //sie.EncodeImage({testCPU});
-    // sie.Infer(testBuffer);
-    // int k = 0;
+
 
     std::deque<SAMTile *> embedQueue;
     for (auto &st: tiles) {
       embedQueue.push_back(st);
     }
 
+    int decoder_batch_limit = 50;
+    Size encoder_input_size(parent->SAMTileSize, parent->SAMTileSize);
+    std::vector encoder_output_sizes = {
+      sie.embed_size_, sie.feats_0_size_, sie.feats_1_size_
+    };
+    tensorrt_common::BatchConfig batch_config_decoder = {1, decoder_batch_limit / 2, decoder_batch_limit};
+    tensorrt_common::BuildConfig build_config_decoder("Entropy",
+                                                      -1,
+                                                      false,
+                                                      false,
+                                                      false,
+                                                      0.0,
+                                                      false,
+                                                      {});
+    auto sid = SAM2ImageDecoder(parent->SAM_decoder_path.toString(),
+                                "fp32",
+                                batch_config_decoder,
+                                max_workspace_size,
+                                build_config_decoder,
+                                encoder_input_size,
+                                encoder_output_sizes);
+
     size_t nElementsPerChannel = parent->SAMTileSize * parent->SAMTileSize;
     auto comp = parent->composites[0];
 
+    SAMTile *tileToFree = nullptr;
     int i = 0;
     while (!embedQueue.empty()) {
       std::sort(embedQueue.begin(), embedQueue.end(), tile_compare);
@@ -176,11 +312,22 @@ namespace pathCam {
       cudaMalloc(&tile->feats_1_data_d_, nElementsPerChannel * sizeof(float));
       cudaMalloc(&tile->embed_data_d_, nElementsPerChannel * sizeof(float));
 
-      std::vector buffer{tile->rawBuffer, tile->feats_0_data_d_, tile->feats_1_data_d_, tile->embed_data_d_};
-      cudaDeviceSynchronize();
+      std::vector buffer{tile->rawBuffer, tile->embed_data_d_, tile->feats_1_data_d_, tile->feats_0_data_d_};
+
+      CHECK_CUDA_ERROR(cudaStreamSynchronize(*sie.stream_));
+      if (tileToFree) {
+        cudaFree(tileToFree->rawBuffer);
+      }
       sie.Infer(buffer);
 
-      cudaFree(tile->rawBuffer);
+      tileToFree = tile;
+
+      if (tile->ID == 83) {
+        std::vector<cv::Rect> box_coords = ReadAndTransformCoordinates("/media/max/Data/pathcam_SAM/SAM_bBox_ID83.txt");
+      }
+    }
+    if (tileToFree) {
+      cudaFree(tileToFree->rawBuffer);
     }
     int k = 0;
   }

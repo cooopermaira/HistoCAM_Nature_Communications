@@ -120,6 +120,12 @@ namespace pathCam {
       if (pConf->has(("io.inferencing.SAM_encoder"))) {
         segmentWithSAM = true;
         SAM_encoder_path = Path(pConf->getString("io.inferencing.SAM_encoder"));
+        if (pConf->has("io.inferencing.SAM_decoder")) {
+          SAM_decoder_path = Path(pConf->getString("io.inferencing.SAM_decoder"));
+        }
+        else {
+          throw std::runtime_error("Config file has SAM2 ENCODER but no DECODER");
+        }
         if (pConf->has("io.inferencing.SAM_tile_size")) {
           SAMTileSize = pConf->getInt("io.inferencing.SAM_tile_size");
         }else {
@@ -128,6 +134,7 @@ namespace pathCam {
       }else {
         segmentWithSAM = false;
       }
+
 
       if (pConf->has("io.inferencing.tile_encoder")) {
         inferencing = true;
