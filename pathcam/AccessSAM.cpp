@@ -2,104 +2,99 @@
 // Created by cooper maira on 7/25/25.
 //
 
-#include "AccessSAM.h"
-#include "utils.hpp"
+#include "pathCam.h"
+
+//#include "utils.hpp"
 
 
 namespace pathCam {
 
-  void ProcessImage(const std::string& encoder_path,
-                  const std::string& decoder_path,
-                  const std::string& img_path,
-                  const std::string& bbox_file_path,
-                  const std::string& output_jpg_path,
-                  const std::string& precision,
-                  const int decoder_batch_limit)
-{
+  /*
+  void ProcessImage(const std::string &encoder_path,
+                    const std::string &decoder_path,
+                    const std::string &img_path,
+                    const std::string &bbox_file_path,
+                    const std::string &output_jpg_path,
+                    const std::string &precision,
+                    const int decoder_batch_limit) {
     // Get image and bbox filenames
     std::vector<std::string> image_names;
 
-    for (const auto& entry : std::filesystem::directory_iterator(img_path))
-    {
-        image_names.push_back(entry.path().string());
+    for (const auto &entry: std::filesystem::directory_iterator(img_path)) {
+      image_names.push_back(entry.path().string());
     }
 
     // Create SAM2Image object
     std::unique_ptr<SAM2Image> sam2;
     cv::Size encoder_input_size(1024,
-                                1024);  // Current encoder input size, affects decoder normalization
+                                1024); // Current encoder input size, affects decoder normalization
     sam2 = std::make_unique<SAM2Image>(
-        encoder_path, decoder_path, encoder_input_size, precision, decoder_batch_limit);
+      encoder_path, decoder_path, encoder_input_size, precision, decoder_batch_limit);
 
     const size_t batch_size = 1;
-    for (size_t i = 0; i < image_names.size(); i += batch_size)
-    {
-        auto start = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < image_names.size(); i += batch_size) {
+      auto start = std::chrono::high_resolution_clock::now();
 
-        std::vector<cv::Mat> images_batch;
-        std::vector<std::vector<cv::Rect>> box_coords_batch;
-        // Calculate actual batch size for this iteration
-        size_t current_batch_size = std::min(batch_size, image_names.size() - i);
+      std::vector<cv::Mat> images_batch;
+      std::vector<std::vector<cv::Rect> > box_coords_batch;
+      // Calculate actual batch size for this iteration
+      size_t current_batch_size = std::min(batch_size, image_names.size() - i);
 
-        // Read images and bounding boxes
-        for (size_t j = 0; j < current_batch_size; j++)
-        {
-            std::filesystem::path image_path = image_names[i + j];
-            std::string image_file_name = image_path.filename().string();
-            std::string bb_file_name;
-            if (image_file_name.find(".jpg") != std::string::npos)
-            {
-                bb_file_name = ReplaceFileExtension(image_file_name, ".jpg", ".txt");
-            }
-            else if (image_file_name.find(".png") != std::string::npos)
-            {
-                bb_file_name = ReplaceFileExtension(image_file_name, ".png", ".txt");
-            }
-
-            // Read image and bounding box
-            std::filesystem::path bb_file_path =
-                std::filesystem::path(bbox_file_path) / bb_file_name;
-            images_batch.push_back(cv::imread(image_path.string()));
-            std::vector<cv::Rect> box_coords =
-                ReadAndTransformCoordinates(bb_file_path.string());
-            box_coords_batch.push_back(box_coords);
+      // Read images and bounding boxes
+      for (size_t j = 0; j < current_batch_size; j++) {
+        std::filesystem::path image_path = image_names[i + j];
+        std::string image_file_name = image_path.filename().string();
+        std::string bb_file_name;
+        if (image_file_name.find(".jpg") != std::string::npos) {
+          bb_file_name = ReplaceFileExtension(image_file_name, ".jpg", ".txt");
+        } else if (image_file_name.find(".png") != std::string::npos) {
+          bb_file_name = ReplaceFileExtension(image_file_name, ".png", ".txt");
         }
 
-        // Run encoder
-        auto start_encoder = std::chrono::high_resolution_clock::now();
-        sam2->RunEncoder(images_batch);
-        auto end_encoder = std::chrono::high_resolution_clock::now();
+        // Read image and bounding box
+        std::filesystem::path bb_file_path =
+            std::filesystem::path(bbox_file_path) / bb_file_name;
+        images_batch.push_back(cv::imread(image_path.string()));
+        std::vector<cv::Rect> box_coords =
+            ReadAndTransformCoordinates(bb_file_path.string());
+        box_coords_batch.push_back(box_coords);
+      }
 
-        // Run decoder
-        auto start_decoder = std::chrono::high_resolution_clock::now();
-        sam2->RunDecoder(box_coords_batch);
-        auto end_decoder = std::chrono::high_resolution_clock::now();
+      // Run encoder
+      auto start_encoder = std::chrono::high_resolution_clock::now();
+      sam2->RunEncoder(images_batch);
+      auto end_encoder = std::chrono::high_resolution_clock::now();
 
-        std::vector<std::vector<cv::Mat>> masks = sam2->GetMasks();
+      // Run decoder
+      auto start_decoder = std::chrono::high_resolution_clock::now();
+      sam2->RunDecoder(box_coords_batch);
+      auto end_decoder = std::chrono::high_resolution_clock::now();
 
-        auto start_draw = std::chrono::high_resolution_clock::now();
-        for (size_t j = 0; j < current_batch_size; j++)
-        {
-          for (auto &mask : masks[j]) {
-            imwrite(output_jpg_path + "_mask"+std::to_string(i+j)+".png",mask);
-          }
-            cv::Mat masked_img = DrawMasks(images_batch[j], masks[j]);
-            cv::imwrite(output_jpg_path + "_" + std::to_string(i + j) + ".jpg", masked_img);
+      std::vector<std::vector<cv::Mat> > masks = sam2->GetMasks();
+
+      auto start_draw = std::chrono::high_resolution_clock::now();
+      for (size_t j = 0; j < current_batch_size; j++) {
+        for (auto &mask: masks[j]) {
+          imwrite(output_jpg_path + "_mask" + std::to_string(i + j) + ".png", mask);
         }
-        auto end_draw = std::chrono::high_resolution_clock::now();
+        cv::Mat masked_img = DrawMasks(images_batch[j], masks[j]);
+        cv::imwrite(output_jpg_path + "_" + std::to_string(i + j) + ".jpg", masked_img);
+      }
+      auto end_draw = std::chrono::high_resolution_clock::now();
 
-        auto duration_encoder = std::chrono::duration<double>(end_encoder - start_encoder);
-        std::cout << "Encoder time: " << duration_encoder.count() << "s" << std::endl;
-        auto duration_decoder = std::chrono::duration<double>(end_decoder - start_decoder);
-        std::cout << "Decoder time: " << duration_decoder.count() << "s" << std::endl;
-        auto duration_draw = std::chrono::duration<double>(end_draw - start_draw);
-        std::cout << "Draw time: " << duration_draw.count() << "s" << std::endl;
+      auto duration_encoder = std::chrono::duration<double>(end_encoder - start_encoder);
+      std::cout << "Encoder time: " << duration_encoder.count() << "s" << std::endl;
+      auto duration_decoder = std::chrono::duration<double>(end_decoder - start_decoder);
+      std::cout << "Decoder time: " << duration_decoder.count() << "s" << std::endl;
+      auto duration_draw = std::chrono::duration<double>(end_draw - start_draw);
+      std::cout << "Draw time: " << duration_draw.count() << "s" << std::endl;
 
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration<double>(end - start);
-        std::cout << "Total time(one iteration): " << duration.count() << "s" << std::endl;
+      auto end = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration<double>(end - start);
+      std::cout << "Total time(one iteration): " << duration.count() << "s" << std::endl;
     }
-}
+  }*/
+
   SAMTile::SAMTile(int _ID, Point2i _location, unsigned int _size) : ID(_ID), location(_location), size(_size) {
     noncontiguousWrapper = cuda::GpuMat(size, size,CV_8UC4, Scalar(0, 0, 0, 0));
   }
@@ -230,75 +225,70 @@ namespace pathCam {
   }
 
   void AccessSAM::load_model() {
-    Ort::Env env(ORT_LOGGING_LEVEL_ERROR, "sam2_embedder");
-    Ort::SessionOptions session_options;
-
-    auto status = OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, parent->compositorCudaDevice);
-    if (status) {
-      const char *error_message = Ort::GetApi().GetErrorMessage(status);
-      std::cerr << "Failed to add CUDA execution provider: " << error_message << std::endl;
-      Ort::GetApi().ReleaseStatus(status);
-    }
-
-    session = new Ort::Session(env, parent->SAM_encoder_path.toString().c_str(), session_options);
+    speedSam = new SpeedSam(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString());
   }
 
 
   void AccessSAM::embed_SAM_tiles() {
-/*
-    ProcessImage(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString(),
-  "/media/max/Data/pathcam_SAM/test_trt/images",
-  "/media/max/Data/pathcam_SAM/test_trt/labels",
-  "/media/max/Data/pathcam_SAM/test_trt/",
-  "fp32",64);
-*/
-    ProcessImage(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString(),
-  "/home/max/Documents/sam2_trt_inference/sample_data/images",
-  "/home/max/Documents/sam2_trt_inference/sample_data/bboxes",
-  "/home/max/Documents/sam2_trt_inference/sample_data/",
-  "fp32",64);
+    /*
+        ProcessImage(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString(),
+      "/media/max/Data/pathcam_SAM/test_trt/images",
+      "/media/max/Data/pathcam_SAM/test_trt/labels",
+      "/media/max/Data/pathcam_SAM/test_trt/",
+      "fp32",64);
 
-    tensorrt_common::BatchConfig batch_config_encoder = {1, 1, 1};
-    tensorrt_common::BuildConfig build_config_encoder(
-      "Entropy", -1, false, false, false, 0.0, false, {});
-    const size_t max_workspace_size = 4ULL << 30;
-    auto sie = SAM2ImageEncoder(parent->SAM_encoder_path.toString(), "fp32", batch_config_encoder, max_workspace_size,
-                                build_config_encoder);
+        ProcessImage(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString(),
+      "/home/max/Documents/sam2_trt_inference/sample_data/images",
+      "/home/max/Documents/sam2_trt_inference/sample_data/bboxes",
+      "/home/max/Documents/sam2_trt_inference/sample_data/",
+      "fp32",64);
 
 
+        tensorrt_common::BatchConfig batch_config_encoder = {1, 1, 1};
+        tensorrt_common::BuildConfig build_config_encoder(
+          "Entropy", -1, false, false, false, 0.0, false, {});
+        const size_t max_workspace_size = 4ULL << 30;
+        auto sie = SAM2ImageEncoder(parent->SAM_encoder_path.toString(), "fp32", batch_config_encoder, max_workspace_size,
+                                    build_config_encoder);
+
+        int decoder_batch_limit = 50;
+        Size encoder_input_size(parent->SAMTileSize, parent->SAMTileSize);
+        std::vector encoder_output_sizes = {
+          sie.embed_size_, sie.feats_0_size_, sie.feats_1_size_
+        };
+        tensorrt_common::BatchConfig batch_config_decoder = {1, decoder_batch_limit / 2, decoder_batch_limit};
+        tensorrt_common::BuildConfig build_config_decoder("Entropy",
+                                                          -1,
+                                                          false,
+                                                          false,
+                                                          false,
+                                                          0.0,
+                                                          false,
+                                                          {});
+        auto sid = SAM2ImageDecoder(parent->SAM_decoder_path.toString(),
+                                    "fp32",
+                                    batch_config_decoder,
+                                    max_workspace_size,
+                                    build_config_decoder,
+                                    encoder_input_size,
+                                    encoder_output_sizes);
+    */
+
+    load_model();
 
     std::deque<SAMTile *> embedQueue;
     for (auto &st: tiles) {
       embedQueue.push_back(st);
     }
-
-    int decoder_batch_limit = 50;
-    Size encoder_input_size(parent->SAMTileSize, parent->SAMTileSize);
-    std::vector encoder_output_sizes = {
-      sie.embed_size_, sie.feats_0_size_, sie.feats_1_size_
-    };
-    tensorrt_common::BatchConfig batch_config_decoder = {1, decoder_batch_limit / 2, decoder_batch_limit};
-    tensorrt_common::BuildConfig build_config_decoder("Entropy",
-                                                      -1,
-                                                      false,
-                                                      false,
-                                                      false,
-                                                      0.0,
-                                                      false,
-                                                      {});
-    auto sid = SAM2ImageDecoder(parent->SAM_decoder_path.toString(),
-                                "fp32",
-                                batch_config_decoder,
-                                max_workspace_size,
-                                build_config_decoder,
-                                encoder_input_size,
-                                encoder_output_sizes);
-
     size_t nElementsPerChannel = parent->SAMTileSize * parent->SAMTileSize;
     auto comp = parent->composites[0];
 
     SAMTile *tileToFree = nullptr;
     int i = 0;
+
+    //SpeedSam speedSam(parent->SAM_encoder_path.toString(), parent->SAM_decoder_path.toString());
+
+
     while (!embedQueue.empty()) {
       std::sort(embedQueue.begin(), embedQueue.end(), tile_compare);
       auto tile = embedQueue.front();
@@ -308,22 +298,73 @@ namespace pathCam {
       cudaMalloc(&tile->rawBuffer, nElementsPerChannel * 3 * sizeof(float));
       tile->make_raw_buffer(tile->rawBuffer);
 
-      cudaMalloc(&tile->feats_0_data_d_, nElementsPerChannel * 2 * sizeof(float));
+      //cudaMalloc(&tile->feats_0_data_d_, nElementsPerChannel * 2 * sizeof(float));
       cudaMalloc(&tile->feats_1_data_d_, nElementsPerChannel * sizeof(float));
-      cudaMalloc(&tile->embed_data_d_, nElementsPerChannel * sizeof(float));
+      //cudaMalloc(&tile->embed_data_d_, nElementsPerChannel * sizeof(float));
 
-      std::vector buffer{tile->rawBuffer, tile->embed_data_d_, tile->feats_1_data_d_, tile->feats_0_data_d_};
 
-      CHECK_CUDA_ERROR(cudaStreamSynchronize(*sie.stream_));
+
+      CHECK_CUDA_ERROR(cudaStreamSynchronize(speedSam->mImageEncoder->mCudaStream));
       if (tileToFree) {
         cudaFree(tileToFree->rawBuffer);
       }
-      sie.Infer(buffer);
+      {
+        std::vector buffer{tile->rawBuffer,tile->feats_1_data_d_};
+        speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(),speedSam->mImageEncoder->mCudaStream,nullptr);
+      }
+
+      //sie.Infer(buffer);
 
       tileToFree = tile;
 
       if (tile->ID == 83) {
-        std::vector<cv::Rect> box_coords = ReadAndTransformCoordinates("/media/max/Data/pathcam_SAM/SAM_bBox_ID83.txt");
+        auto clicks = new float[2];
+        auto clickLabels = new float[1];
+        void *clicksGPU, *clickLabelsGPU,*inputMask,*hasMaskInput,*outputMask,*confidence;
+
+        clicks[0] = 425.f;
+        clicks[1] = 300.f;
+
+        clickLabels[0] = 1.f;
+
+        cudaMalloc(&clicksGPU,2*sizeof(float));
+        cudaMalloc(&clickLabelsGPU,sizeof(float));
+        cudaMalloc(&hasMaskInput,sizeof(float));
+        cudaMemset(hasMaskInput,0,sizeof(float));
+        cudaMalloc(&outputMask,sizeof(float) * 256 * 256 * 4);
+        cudaMalloc(&confidence,4 * sizeof(float));
+        cudaMalloc(&inputMask,sizeof(float) * 256 * 256);
+
+        cudaMemcpy(clicksGPU,clicks,2*sizeof(float),cudaMemcpyHostToDevice);
+        cudaMemcpy(clickLabelsGPU,clickLabels,sizeof(float),cudaMemcpyHostToDevice);
+
+        speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, speedSam->mMaskDecoder->mCudaStream); // Set the optimization profile
+        speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{ 1, 1, 2 }); // Set input dimensions for coordinates
+        speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{ 1, 1 });    // Set input dimensions for labels
+        {
+          std::vector buffer{tile->feats_1_data_d_,clicksGPU,clickLabelsGPU,inputMask,hasMaskInput,outputMask,confidence};
+          speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),speedSam->mMaskDecoder->mCudaStream,nullptr);
+        }
+
+        auto rawBuffer = new float[256 * 256 * 4];
+        auto confidenceCpu = new float[4];
+
+        cudaMemcpy(rawBuffer,outputMask,4 * 256 * 256 * sizeof(float),cudaMemcpyDeviceToHost);
+        cudaMemcpy(confidenceCpu,confidence,4,cudaMemcpyDeviceToHost);
+        for (int i = 0; i < 4; ++i) {
+          std::cout << confidenceCpu[i] << std::endl;
+          Mat test(256,256,CV_32FC1,rawBuffer + i * 256 * 256);
+          Mat binaryMask;
+          compare(test, 0, binaryMask, cv::CMP_GT);
+          binaryMask.convertTo(test,CV_8U);
+          imwrite("/media/max/Data/pathcam_SAM/maskoutput"+std::to_string(i)+".png",test);
+        }
+        //cuda::GpuMat gpuMat(256,256,CV_32FC1,outputMask);
+
+        int k = 0;
+
+
+
       }
     }
     if (tileToFree) {

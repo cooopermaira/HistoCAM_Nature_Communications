@@ -31,6 +31,7 @@
 #include "onnxruntime_cxx_api.h"
 #include "sam2_image_inference.hpp"
 
+
 //#include "BAM/BAM.h"
 
 #include "cuda_bundle_adjustment_types.h"
@@ -78,6 +79,8 @@
 #include <pybind11/stl.h>
 #include <pybind11/embed.h>
 #include <torch/csrc/autograd/python_variable.h>
+
+#include "speedSam.h"
 
 #include "util.h"
 #include "DataObserver.h"

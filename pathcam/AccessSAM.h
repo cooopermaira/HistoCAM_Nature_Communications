@@ -6,6 +6,7 @@
 #define ACCESSSAM_H
 
 #include "pathCam.h"
+//#include "speedSam.h"
 
 namespace pathCam {
 
@@ -36,14 +37,13 @@ namespace pathCam {
   inline bool tile_compare(const SAMTile* a, const SAMTile* b) {
     return a->priority < b->priority;
   }
-
+  //class SpeedSam;
   class AccessSAM {
     public:
     StreamCam* parent;
     std::vector<SAMTile*> tiles;
     char* batchImageEmbedBuffer;
-
-    Ort::Session* session;
+    SpeedSam* speedSam;
 
     AccessSAM(StreamCam* _parent):parent(_parent){};
     ~AccessSAM(){};

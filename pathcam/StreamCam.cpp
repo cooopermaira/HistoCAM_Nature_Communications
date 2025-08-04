@@ -6,6 +6,7 @@
 //
 
 #include "pathCam.h"
+#include "utils.h"
 
 namespace pathCam {
   using Poco::AutoPtr;
@@ -38,6 +39,7 @@ namespace pathCam {
                                                            compositeWait(true),
                                                            microscopeInput(true) {
     //inferencing = false;
+
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
@@ -46,16 +48,6 @@ namespace pathCam {
     if (segmentWithSAM) {
       as = new AccessSAM(this);
     }
-    //
-    // Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "sam");
-    //
-    // // 2. Create session options and enable CUDA
-    // Ort::SessionOptions session_options;
-    // Ort::ThrowOnError(OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, 0)); // GPU 0
-    //
-    // // 3. Load session
-    // Ort::Session session(env, "sam.onnx", session_options);
-    //
 
     int threads = 10;
 
@@ -65,6 +57,10 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
     siftCudaDevice = GPU_select_cuda_device();
+
+    // cudaSetDevice(compositorCudaDevice);
+    // SpeedSam ss2("/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/model/SAM_encoder.engine","/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/model/SAM_mask_decoder.engine");
+    //segmentWithPoint(ss2,"/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs.jpg","/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs_mask2.jpg");
 #endif
 
     MRimage.reset(new MRTiledImageSet());
