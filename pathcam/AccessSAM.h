@@ -9,6 +9,7 @@
 //#include "speedSam.h"
 
 namespace pathCam {
+  class AccessSAM;
 
   class SAMTile {
   public:
@@ -16,12 +17,20 @@ namespace pathCam {
     int priority = 10;
     Point2i location;
     unsigned int size;
+    AccessSAM* as;
     std::vector<std::pair<SAMTile*,std::vector<Point2i> > > neighbors;
     std::vector<std::pair<Point2i,Point2i>> componentTiles;
     cuda::GpuMat noncontiguousWrapper;
-    void *rawBuffer,*embed_data_d_,*feats_1_data_d_,*feats_0_data_d_;
 
-    SAMTile(int ID,Point2i _location,unsigned int _size = 1024);
+    void *rawBuffer,*embed_data_d_,*feats_1_data_d_,*feats_0_data_d_;
+    void *clicksGPU, *clickLabelsGPU,*inputMask,*hasMaskInputGPU,*outputMask,*confidence;
+    bool hasMaskInput = false;
+    std::vector<Point3f> clicksVec;
+
+    cuda::GpuMat inputMaskMat;
+    std::map<int,cuda::GpuMat> segmentations;
+
+    SAMTile(int ID, Point2i _location, AccessSAM* _as, unsigned int _size = 1024);
     ~SAMTile() {};
 
     void set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat);
@@ -31,6 +40,8 @@ namespace pathCam {
     void make_raw_buffer(void *_buffer);
 
     void on_click();
+
+    void run_segmentation(int _segmentationID);
   };
 
 
@@ -45,12 +56,15 @@ namespace pathCam {
     char* batchImageEmbedBuffer;
     SpeedSam* speedSam;
 
+    std::queue<SAMTile*> segmentProcessQ;
+
     AccessSAM(StreamCam* _parent):parent(_parent){};
     ~AccessSAM(){};
 
     void load_model();
     void initialize();
     void embed_SAM_tiles();
+    static void get_clicks_embedding(std::vector<Point3f> &_clicks, void *&_clicksGPU, void *&_clickLabelsGPU);
     int get_tile_id(Point2i _location, unsigned int _componentIndex) const;
 
 
