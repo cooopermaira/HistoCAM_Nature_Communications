@@ -65,8 +65,16 @@ public:
 //       image(image), i(i), j(j), bounds(bounds) {};
 // #else
   cv::Mat image;
+  void* preferredObj;
+  void* preferredObjBuffer;
+  bool usingPreferred;
+  
   TileQuery(cv::Mat image, int i, int j, cv::Rect_<float> bounds) :
-      image(image), i(i), j(j), bounds(bounds) {};
+      image(image), i(i), j(j), bounds(bounds) {
+    preferredObj= nullptr;
+    preferredObjBuffer = nullptr;
+    usingPreferred = false;
+  };
 //#endif
 };
 

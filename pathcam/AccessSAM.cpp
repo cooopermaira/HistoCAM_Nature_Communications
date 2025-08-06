@@ -73,9 +73,26 @@ void SAMTile::run_segmentation(int _segmentationID) {
       }
       if (neighbor.first->segmentations.find(_segmentationID) !=  neighbor.first->segmentations.end()
         && cuda::countNonZero(neighbor.first->inputMaskMat)) {
+        neighbor.first->hasMaskInput - true;
         as->segmentProcessQ.push(neighbor.first);
       }
     }
+
+    //send my own mask info for display
+    cuda::resize(output,output,{int(size),int(size)});
+    cuda::threshold(output,output,0.0,255.0,THRESH_BINARY);
+    output.convertTo(output,CV_8U);
+    Mat hostOutput;
+    output.download(hostOutput);
+
+    //part out the mask to tiles
+    int tileSize = as->parent->tileSize;
+    for (auto &tile : componentTiles) {
+      Rect maskRoi(tile.first.x * tileSize,tile.first.y * tileSize,tileSize,tileSize);
+      as->segmentationMasks[tile.second].emplace_back(_segmentationID,hostOutput(maskRoi));
+    }
+
+
 
 
     Mat test;
@@ -240,8 +257,6 @@ void SAMTile::run_segmentation(int _segmentationID) {
       cudaMalloc(&tile->feats_1_data_d_, nElementsPerChannel * sizeof(float));
       //cudaMalloc(&tile->embed_data_d_, nElementsPerChannel * sizeof(float));
 
-
-
       CHECK_CUDA_ERROR(cudaStreamSynchronize(speedSam->mImageEncoder->mCudaStream));
       if (tileToFree) {
         cudaFree(tileToFree->rawBuffer);
@@ -273,41 +288,7 @@ void SAMTile::run_segmentation(int _segmentationID) {
         tile->clicksVec = clicksVec;
         tile->run_segmentation(0);
 
-/*
-        // cudaMalloc(&clicksGPU,2*sizeof(float) * 11);
-        // cudaMalloc(&clickLabelsGPU,sizeof(float)*11);
-        cudaMalloc(&hasMaskInput,sizeof(float));
-        cudaMemset(hasMaskInput,0,sizeof(float));
-        cudaMalloc(&outputMask,sizeof(float) * 256 * 256 * 4);
-        cudaMalloc(&confidence,4 * sizeof(float));
-        cudaMalloc(&inputMask,sizeof(float) * 256 * 256);
 
-        //cudaMemcpy(clicksGPU,clicks,2*sizeof(float),cudaMemcpyHostToDevice);
-        //cudaMemcpy(clickLabelsGPU,clickLabels,sizeof(float),cudaMemcpyHostToDevice);
-
-        speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, speedSam->mMaskDecoder->mCudaStream); // Set the optimization profile
-        speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{ 1, 10, 2 }); // Set input dimensions for coordinates
-        speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{ 1, 10 });    // Set input dimensions for labels
-        {
-          std::vector buffer{tile->feats_1_data_d_,clicksGPU,clickLabelsGPU,inputMask,hasMaskInput,outputMask,confidence};
-          speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),speedSam->mMaskDecoder->mCudaStream,nullptr);
-        }
-
-        auto rawBuffer = new float[256 * 256 * 4];
-        auto confidenceCpu = new float[4];
-
-        cudaMemcpy(rawBuffer,outputMask,4 * 256 * 256 * sizeof(float),cudaMemcpyDeviceToHost);
-        cudaMemcpy(confidenceCpu,confidence,4,cudaMemcpyDeviceToHost);
-        for (int i = 0; i < 4; ++i) {
-          std::cout << confidenceCpu[i] << std::endl;
-          Mat test(256,256,CV_32FC1,rawBuffer + i * 256 * 256);
-          Mat binaryMask;
-          compare(test, 0, binaryMask, cv::CMP_GT);
-          binaryMask.convertTo(test,CV_8U);
-          imwrite("/media/max/Data/pathcam_SAM/maskoutput_"+std::to_string(i)+".png",test);
-        }
-        //cuda::GpuMat gpuMat(256,256,CV_32FC1,outputMask);
-*/
 
       }
     }

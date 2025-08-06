@@ -58,6 +58,8 @@ namespace pathCam {
 
     std::queue<SAMTile*> segmentProcessQ;
 
+    std::map<Point2i,std::vector<std::pair<int,Mat>>> segmentationMasks;
+
     AccessSAM(StreamCam* _parent):parent(_parent){};
     ~AccessSAM(){};
 
