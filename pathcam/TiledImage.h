@@ -56,12 +56,14 @@ struct TileObj {
   void* preferredObj;
   void* preferredBuffer;
   bool usingPreferred;
+  bool newData;
   cuda::GpuMat image;
   TileObj(int _tileSize) {
     image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, Scalar(0, 0, 0, 0));
     preferredBuffer = nullptr;
     preferredObj = nullptr;
     usingPreferred = false;
+    newData = false;
   }
 };
 
@@ -75,16 +77,12 @@ public:
 //   TileQuery(const cuda::GpuMat& image, int i, int j, cv::Rect_<float> bounds) :
 //       image(image), i(i), j(j), bounds(bounds) {};
 // #else
-  TileObj image;
-  void* preferredObj;
-  void* preferredObjBuffer;
-  bool usingPreferred;
+  TileObj* image;
+
   
-  TileQuery(TileObj image, int i, int j, cv::Rect_<float> bounds) :
+  TileQuery(TileObj* image, int i, int j, cv::Rect_<float> bounds) :
       image(image), i(i), j(j), bounds(bounds) {
-    preferredObj= nullptr;
-    preferredObjBuffer = nullptr;
-    usingPreferred = false;
+
   };
 //#endif
 };

@@ -5,10 +5,10 @@
 ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
                                        StringArray &iconNames,
                                        OwnedArray<Drawable> &iconsFromZipFile, MainComponent *parent) : parent(parent),
-                                                                                                        MRImage(NULL),
-                                                                                                        view(view),
-                                                                                                        shadeLevels(
-                                                                                                            false) {
+  MRImage(NULL),
+  view(view),
+  shadeLevels(
+    false) {
   setOpaque(true); //telling juce that there is nothingi to render underneath
 
   controlsOverlay.reset(new ImageViewOverlay(this, iconNames, iconsFromZipFile));
@@ -133,7 +133,6 @@ void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRa
 }
 
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
-
   bool canShadeClasses = false;
 
   for (unsigned int i = 0; i < MRImage->images.size(); i++) {
@@ -145,44 +144,76 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     std::vector<TileQuery> tiles = MRImage->images[i]->
         getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
     for (unsigned int t = 0; t < tiles.size(); t++) {
-      auto tile = tiles[t].image;
+      TileObj *tile = tiles[t].image;
       auto bounds = RectCtoJ<float>(tiles[t].bounds);
       bounds *= view2screenScale(imageview) * scale;
       bounds.expand(0.5, 0.5);
       tiles[t].bounds = RectJtoC<float>(bounds);
-      if (tile.image.data) {
-        if (!tile.preferredObj){
-          Mat temp;
-          tile.image.download(temp);
-        juce::Image im = juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
-        juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-        jassert(temp.step == bitmap_data.lineStride);
-
-        if (shadeLevels) {
-          if (!greenShade.data) {
-            greenShade = Mat(temp.rows, temp.cols, CV_8UC3, cv::Scalar(0, 255, 0));
-            channels.resize(2);
-            channels[0] = greenShade;
-          }
-          double val;
-          int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
-          maglab == 1 ? val = 1.0 : maglab==2? val = 0.5: maglab==3? val = 0.2  : maglab==4? val= 0.1:val = 1;
-          double beta = (log2(1.0 / val) / 3.4) * 0.7 + 0.05;
-
-
-          greenShade.setTo(cv::Scalar(0, 0, 0));
-          cv::extractChannel(temp, channels[1], 3);
-          greenShade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta), channels[1]);
-          cv::merge(channels, holding1);
-
-          holding2 = beta * holding1 + (1.0 - beta) * temp;
-          //holding2 = 0.5 * holding1 + 0.5 * tile;
-          memcpy(bitmap_data.data, holding2.data, temp.cols * temp.rows * 4);
-        } else {
-          memcpy(bitmap_data.data, temp.data, temp.cols * temp.rows * 4);
-        }
-        g.drawImage(im, bounds);
+      if (tiles[t].i == 0 &&tiles[t].j == 0) {
+        int k = 0;
       }
+      if (tile->image.data) {
+        //if (!tile->usingPreferred) {
+        if (true){
+          Mat temp;
+          tile->image.download(temp);
+          //juce::Image* ji;
+          //if (!tile->preferredObj) {
+          if (false){
+            // ji = new juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
+            // //tile->preferredBuffer = new juce::Image::BitmapData(*ji, juce::Image::BitmapData::ReadWriteMode::writeOnly);
+            // tile->preferredObj = ji;
+            // tile->usingPreferred = true;
+          }
+          juce::Image im = juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
+          juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
+          jassert(temp.step == bitmap_data.lineStride);
+
+          if (shadeLevels) {
+            if (!greenShade.data) {
+              greenShade = Mat(temp.rows, temp.cols, CV_8UC3, cv::Scalar(0, 255, 0));
+              channels.resize(2);
+              channels[0] = greenShade;
+            }
+            double val;
+            int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
+            //who the hell did this? did i do this? this is ridiculous
+            maglab == 1
+              ? val = 1.0
+              : maglab == 2
+                  ? val = 0.5
+                  : maglab == 3
+                      ? val = 0.2
+                      : maglab == 4
+                          ? val = 0.1
+                          : val = 1;
+            double beta = (log2(1.0 / val) / 3.4) * 0.7 + 0.05;
+
+
+            greenShade.setTo(cv::Scalar(0, 0, 0));
+            cv::extractChannel(temp, channels[1], 3);
+            greenShade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta), channels[1]);
+            cv::merge(channels, holding1);
+
+            holding2 = beta * holding1 + (1.0 - beta) * temp;
+            //holding2 = 0.5 * holding1 + 0.5 * tile;
+            memcpy(bitmap_data.data, holding2.data, temp.cols * temp.rows * 4);
+          } else {
+            memcpy(bitmap_data.data, temp.data, temp.cols * temp.rows * 4);
+          }
+          g.drawImage(im, bounds);
+        } else {
+          auto imm = static_cast<juce::Image *>(tile->preferredObj);
+          if (tile->newData) {
+            auto img = tile->image;
+            juce::Image::BitmapData bitmap_data(*imm, juce::Image::BitmapData::ReadWriteMode::writeOnly);
+            cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
+                         img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost);
+            tile->newData = false;
+          }
+
+          g.drawImage(*imm, bounds);
+        }
       }
     }
 
@@ -194,8 +225,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
           getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()), true);
 
       for (auto tile: baseTiles) {
-
-        if (!tile.image.image.data) { continue; }
+        if (!tile.image->image.data) { continue; }
         //get draw bounds of base level tile
         auto bounds = RectCtoJ<float>(tile.bounds);
         bounds *= view2screenScale(imageview) * scale;
@@ -219,22 +249,19 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         g.setColour(tileColor);
         g.fillRect(bounds);
       }
-
     }
 
 
-// //draws grid on image with indexes
-//   for (unsigned int t = 0; t < tiles.size(); t++) {
-//       auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
-//       g.setColour(juce::Colours::greenyellow);
-//       g.drawRect(bounds, 3);
-//       std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-//       g.setFont(20);
-//       g.drawText(ij, bounds.getCentreX() - 50,
-//                  bounds.getCentreY() - 15, 100, 30, Justification::centred);
-//    }
-
-
+    // //draws grid on image with indexes
+    //   for (unsigned int t = 0; t < tiles.size(); t++) {
+    //       auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
+    //       g.setColour(juce::Colours::greenyellow);
+    //       g.drawRect(bounds, 3);
+    //       std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+    //       g.setFont(20);
+    //       g.drawText(ij, bounds.getCentreX() - 50,
+    //                  bounds.getCentreY() - 15, 100, 30, Justification::centred);
+    //    }
   }
   //Define buffer space from the edges
   if (MRImage->images.size() > 0 && shadeClasses) {
@@ -308,8 +335,8 @@ void ImageViewComponent::paint(juce::Graphics &g) {
 
     std::vector<std::string> objectives = {"20x", "10x", "4x", "2x"};
     std::vector<juce::Colour> colors = {
-        Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
-        Colour(243, 249, 243)
+      Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
+      Colour(243, 249, 243)
     };
 
     for (unsigned int i = 0; i < 4; i++) {
@@ -364,37 +391,36 @@ void ImageViewComponent::resized() {
 void ImageViewComponent::zoomAndCenter() {
   if (!MRImage || MRImage->images.empty() || !isVisible()) { return; }
 
-//  Rect_<float> bounds;
-//  bool showAsCircle;
-//  int component;
-//  std::string magLabel;
-//  parent->capture->sCam->get_last_frame(bounds, showAsCircle, component, magLabel);
-//  auto lastComponentImg = MRImage->images[component];
+  //  Rect_<float> bounds;
+  //  bool showAsCircle;
+  //  int component;
+  //  std::string magLabel;
+  //  parent->capture->sCam->get_last_frame(bounds, showAsCircle, component, magLabel);
+  //  auto lastComponentImg = MRImage->images[component];
 
-//  horizontalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x, (*lastComponentImg).scale * (*lastComponentImg).bounds.width);
-//  verticalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.y + (*lastComponentImg).bounds.y, (*lastComponentImg).scale * (*lastComponentImg).bounds.height);
-//
-//  horizontalScrollBar.setVisible(true);
-//  verticalScrollBar.setVisible(true);
+  //  horizontalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x, (*lastComponentImg).scale * (*lastComponentImg).bounds.width);
+  //  verticalScrollBar.setRangeLimits((*lastComponentImg).scale * (*lastComponentImg).offset.y + (*lastComponentImg).bounds.y, (*lastComponentImg).scale * (*lastComponentImg).bounds.height);
+  //
+  //  horizontalScrollBar.setVisible(true);
+  //  verticalScrollBar.setVisible(true);
 
   juce::Rectangle<int> b = getLocalBounds();
   *view = fRectangle(b.getX(), b.getY(), b.getWidth(), b.getHeight());
 
 
-
-//  auto compBounds = Rect_<float>((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x,
-//                             (*lastComponentImg).scale * (*lastComponentImg).offset.y + (*lastComponentImg).bounds.y,
-//                             (*lastComponentImg).scale * (*lastComponentImg).bounds.width,
-//                             (*lastComponentImg).scale * (*lastComponentImg).bounds.height);
-//  //view->setCentre(RectCtoJ((*lastComponentImg).bounds).getCentre());
-//  view->setCentre(RectCtoJ(compBounds).getCentre());
-//
-//  float scale = max((float) (*lastComponentImg).scale * (*lastComponentImg).bounds.width /
-//                    (float) view->getHorizontalRange().getLength(),
-//                    (float) (*lastComponentImg).scale * (*lastComponentImg).bounds.height /
-//                    (float) view->getVerticalRange().getLength());
-//
-//  scaleCenter(fPoint(scale, scale));
+  //  auto compBounds = Rect_<float>((*lastComponentImg).scale * (*lastComponentImg).offset.x + (*lastComponentImg).bounds.x,
+  //                             (*lastComponentImg).scale * (*lastComponentImg).offset.y + (*lastComponentImg).bounds.y,
+  //                             (*lastComponentImg).scale * (*lastComponentImg).bounds.width,
+  //                             (*lastComponentImg).scale * (*lastComponentImg).bounds.height);
+  //  //view->setCentre(RectCtoJ((*lastComponentImg).bounds).getCentre());
+  //  view->setCentre(RectCtoJ(compBounds).getCentre());
+  //
+  //  float scale = max((float) (*lastComponentImg).scale * (*lastComponentImg).bounds.width /
+  //                    (float) view->getHorizontalRange().getLength(),
+  //                    (float) (*lastComponentImg).scale * (*lastComponentImg).bounds.height /
+  //                    (float) view->getVerticalRange().getLength());
+  //
+  //  scaleCenter(fPoint(scale, scale));
 
   view->setCentre(RectCtoJ(MRImage->bounds).getCentre());
 

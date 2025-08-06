@@ -215,7 +215,8 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
 #ifdef HAVE_OPENCV_CUDAARITHM
                 //Mat temp(tile_size, tile_size,CV_8UC4);
                 //tiles(i, j)->image.download(temp);
-                box_tiles.emplace_back(*tiles(x,y), i, j, rect);
+
+                box_tiles.emplace_back(&getTile(i,j), i, j, rect);
 #else
                 box_tiles.emplace_back(*tiles(i, j), i, j, rect);
 #endif
@@ -286,7 +287,7 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
 
         matROI = mat(ROIrect);
 
-        auto temp = getTile(x, y);
+        auto tileObject = getTile(x, y);
 
         tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                            matROI.rows);
@@ -294,11 +295,11 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
         //copying to temp also copies to tiles(x,y) since they both point at the same data. We create temp
         //because its clearer than (*tiles(x,y))(region of interest)
         if (mask.data) {
-            matROI.copyTo(temp.image(tileROI), mask(ROIrect));
+            matROI.copyTo(tileObject.image(tileROI), mask(ROIrect));
         } else {
-            matROI.copyTo(temp.image(tileROI));
+            matROI.copyTo(tileObject.image(tileROI));
         }
-
+        tileObject.newData = true;
         assert(tiles(x, y)->image.rows == tile_size && tiles(x, y)->image.cols == tile_size);
 
         tileUpwards(Point2i(x, y), tile_box, *tiles(x, y), Rect(0,0,tile_size,tile_size));
@@ -374,6 +375,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
         auto testSize = Size(theirCV.image(theirROI).cols, theirCV.image(theirROI).rows);
         cuda::resize(myCV.image(cvRoi), theirCV.image(theirROI), testSize);
 
+        theirCV.newData = true;
 
         //continue up pyramid
         if (levelWithinPyramid + 1 < parent->level.size() - 1) {
