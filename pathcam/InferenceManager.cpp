@@ -152,7 +152,7 @@ namespace pathCam {
 
             int x = std::get<0>(tileList[i]);
             int y = std::get<1>(tileList[i]);
-            threeChannelPrealGPU = pyramidLevel->getTile(x, y);
+            threeChannelPrealGPU = pyramidLevel->getTile(x, y).image;
             uchar* bufferPtr = reinterpret_cast<uchar*>(bufferMemory + i * tileSizeInBytes);
             cudaMemcpy2D(bufferPtr,dstPitch,threeChannelPrealGPU.data,threeChannelPrealGPU.step,dstPitch,threeChannelPrealGPU.rows,cudaMemcpyDeviceToHost);
 

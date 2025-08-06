@@ -150,14 +150,17 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
       bounds *= view2screenScale(imageview) * scale;
       bounds.expand(0.5, 0.5);
       tiles[t].bounds = RectJtoC<float>(bounds);
-      if (tile.data) {
-        juce::Image im = juce::Image(juce::Image::ARGB, tile.cols, tile.rows, true);
+      if (tile.image.data) {
+        if (!tile.preferredObj){
+          Mat temp;
+          tile.image.download(temp);
+        juce::Image im = juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
         juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-        jassert(tile.step == bitmap_data.lineStride);
+        jassert(temp.step == bitmap_data.lineStride);
 
         if (shadeLevels) {
           if (!greenShade.data) {
-            greenShade = Mat(tile.rows, tile.cols, CV_8UC3, cv::Scalar(0, 255, 0));
+            greenShade = Mat(temp.rows, temp.cols, CV_8UC3, cv::Scalar(0, 255, 0));
             channels.resize(2);
             channels[0] = greenShade;
           }
@@ -168,17 +171,18 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
 
           greenShade.setTo(cv::Scalar(0, 0, 0));
-          cv::extractChannel(tile, channels[1], 3);
+          cv::extractChannel(temp, channels[1], 3);
           greenShade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta), channels[1]);
           cv::merge(channels, holding1);
 
-          holding2 = beta * holding1 + (1.0 - beta) * tile;
+          holding2 = beta * holding1 + (1.0 - beta) * temp;
           //holding2 = 0.5 * holding1 + 0.5 * tile;
-          memcpy(bitmap_data.data, holding2.data, tile.cols * tile.rows * 4);
+          memcpy(bitmap_data.data, holding2.data, temp.cols * temp.rows * 4);
         } else {
-          memcpy(bitmap_data.data, tile.data, tile.cols * tile.rows * 4);
+          memcpy(bitmap_data.data, temp.data, temp.cols * temp.rows * 4);
         }
         g.drawImage(im, bounds);
+      }
       }
     }
 
@@ -191,7 +195,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
       for (auto tile: baseTiles) {
 
-        if (!tile.image.data) { continue; }
+        if (!tile.image.image.data) { continue; }
         //get draw bounds of base level tile
         auto bounds = RectCtoJ<float>(tile.bounds);
         bounds *= view2screenScale(imageview) * scale;

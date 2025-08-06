@@ -934,7 +934,7 @@ namespace pathCam {
               tile = Mat(Size(tile_size, tile_size), CV_8UC4, Scalar(0, 0, 0, 0));
             } else {
 #ifdef HAVE_OPENCV_CUDAARITHM
-              level->getTile(x, y).download(tile);
+              level->getTile(x, y).image.download(tile);
 #else
                             tile = level->getTile(x, y).clone();
 #endif
@@ -946,7 +946,7 @@ namespace pathCam {
             }
           } else {
 #ifdef HAVE_OPENCV_CUDAARITHM
-            level->getTile(x, y).download(tile);
+            level->getTile(x, y).image.download(tile);
 #else
                         tile = level->getTile(x, y).clone();
 #endif
@@ -1148,7 +1148,7 @@ namespace pathCam {
               auto myLevelRegion = cv::Rect_<float>(tile.x * tile_size, tile.y * tile_size, tile_size,
                                                     tile_size);
               topLevelBeforeAdding->tileUpwards(tile, myLevelRegion,
-                                                *topLevelBeforeAdding->tiles(tile.x, tile.y));
+                                                *topLevelBeforeAdding->tiles(tile.x, tile.y), Rect(0,0,tile_size,tile_size));
             }
           }
         }

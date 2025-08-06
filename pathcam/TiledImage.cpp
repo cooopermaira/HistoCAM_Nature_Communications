@@ -70,9 +70,9 @@ void TiledImage::matToImage4Channel(const cv::Mat &mat, int x, int y, Point2f ro
         //prepare to tile upward
         auto tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                                 matROI.rows);
-        matROI.copyTo(tile(tileROI));
+        matROI.copyTo(tile.image(tileROI));
 
-        tileUpwards(Point2i(x, y), tile_box, tile);
+        tileUpwards(Point2i(x, y), tile_box, tile, Rect(0,0,tile_size,tile_size));
     }
 }
 
@@ -104,12 +104,12 @@ void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
         for (int y = tL.y; y <= bR.y; y++) {
             //get tile
 
-            if (tiles(x,y) && tiles(x, y)->data) {
-                tiles(x, y)->setTo(Scalar(0, 0, 0, 0));
+            if (tiles(x,y) && tiles(x, y)->image.data) {
+                tiles(x, y)->image.setTo(Scalar(0, 0, 0, 0));
 
                 Point_ loc = Point2i(x, y);
                 Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size, tile_size);
-                tileUpwards(loc, levelRegion, *tiles(x, y));
+                tileUpwards(loc, levelRegion, *tiles(x, y), Rect(0,0,tile_size,tile_size));
             }
             /*
             //create vector of all 4 channes R, G, B and alpha
@@ -183,7 +183,7 @@ void TiledImage::insertMat(cv::Mat image_in, cv::Rect_<float> box) {
             if (image_in.type() == CV_8UC4) {
 #ifdef HAVE_OPENCV_CUDAARITHM
                 Mat temp(tile_size, tile_size,CV_8UC4);
-                tiles(i, j)->download(temp);
+                tiles(i, j)->image.download(temp);
 #else
         Mat temp = *tiles(i,j);
 #endif
@@ -213,9 +213,9 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
             Rect_<float> rect = cv::Rect_<float>(x, y, logic_size, logic_size);
             if (tiles(i, j)) {
 #ifdef HAVE_OPENCV_CUDAARITHM
-                Mat temp(tile_size, tile_size,CV_8UC4);
-                tiles(i, j)->download(temp);
-                box_tiles.emplace_back(temp, i, j, rect);
+                //Mat temp(tile_size, tile_size,CV_8UC4);
+                //tiles(i, j)->image.download(temp);
+                box_tiles.emplace_back(*tiles(x,y), i, j, rect);
 #else
                 box_tiles.emplace_back(*tiles(i, j), i, j, rect);
 #endif
@@ -257,7 +257,7 @@ void TiledImage::saveBaseTilesToDisk() {
                     int yloc = (y - miny) * (int) tile_size + ysubtile * 256;
 #ifdef HAVE_OPENCV_CUDAARITHM
                     Mat temp(tile_size, tile_size,CV_8UC4);
-                    (*tiles(x, y)).download(temp);
+                    (*tiles(x, y)).image.download(temp);
 #else
           Mat temp = *tiles(x, y);
 #endif
@@ -282,12 +282,11 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
                      (int) image_box.height);
     if (ROIrect.width * ROIrect.height > 0) {
         cuda::GpuMat matROI;
-        cuda::GpuMat temp;
         Rect tileROI;
 
         matROI = mat(ROIrect);
 
-        temp = getTile(x, y);
+        auto temp = getTile(x, y);
 
         tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                            matROI.rows);
@@ -295,14 +294,14 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
         //copying to temp also copies to tiles(x,y) since they both point at the same data. We create temp
         //because its clearer than (*tiles(x,y))(region of interest)
         if (mask.data) {
-            matROI.copyTo(temp(tileROI), mask(ROIrect));
+            matROI.copyTo(temp.image(tileROI), mask(ROIrect));
         } else {
-            matROI.copyTo(temp(tileROI));
+            matROI.copyTo(temp.image(tileROI));
         }
 
-        assert(tiles(x, y)->rows == tile_size && tiles(x, y)->cols == tile_size);
+        assert(tiles(x, y)->image.rows == tile_size && tiles(x, y)->image.cols == tile_size);
 
-        tileUpwards(Point2i(x, y), tile_box, *tiles(x, y));
+        tileUpwards(Point2i(x, y), tile_box, *tiles(x, y), Rect(0,0,tile_size,tile_size));
     }
 }
 
@@ -345,7 +344,7 @@ void TiledImage::insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, c
 
 
 
-void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cuda::GpuMat &myCV) {
+void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, TileObj &myCV, Rect cvRoi) {
     try {
 
         //find appropriate region of upper level
@@ -371,14 +370,14 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
         auto theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
 
         //resize self cv image into their cv image ROI
-        assert(theirCV(theirROI).rows == myCV.rows / 2 && theirCV(theirROI).cols == myCV.cols / 2);
-        auto testSize = Size(theirCV(theirROI).cols, theirCV(theirROI).rows);
-        cuda::resize(myCV, theirCV(theirROI), testSize);
+        assert(theirCV.image(theirROI).rows == myCV.image(cvRoi).rows / 2 && theirCV.image(theirROI).cols == myCV.image(cvRoi).cols / 2);
+        auto testSize = Size(theirCV.image(theirROI).cols, theirCV.image(theirROI).rows);
+        cuda::resize(myCV.image(cvRoi), theirCV.image(theirROI), testSize);
 
 
         //continue up pyramid
         if (levelWithinPyramid + 1 < parent->level.size() - 1) {
-            parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirCV(theirROI));
+            parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirCV, theirROI);
         }
     } catch (cv::Exception &e) {
         std::cout << "cv error in tileUpwards" << std::endl;
@@ -388,7 +387,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 }
 
 
-cuda::GpuMat TiledImage::getTile(int x, int y) {
+TileObj &TiledImage::getTile(int x, int y) {
     makeTile(x, y);
     return *tiles(x, y);
 }
@@ -512,7 +511,8 @@ Mat TiledImage::getTile(int x, int y) {
 void TiledImage::makeTile(int x, int y) {
     if (tiles(x, y) == nullptr) {
 #ifdef HAVE_OPENCV_CUDAARITHM
-        tiles(x, y) = new cuda::GpuMat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
+        //tiles(x, y) = new cuda::GpuMat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
+        tiles(x,y) = new TileObj(tile_size);
 #else
         tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
 #endif

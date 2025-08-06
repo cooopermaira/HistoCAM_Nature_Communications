@@ -151,7 +151,7 @@ void SAMTile::run_segmentation(int _segmentationID) {
     for (int xx = 0; xx < _interval; ++xx) {
       for (int yy = 0; yy < _interval; ++yy) {
         auto gMat = _comp->imagePyramid->level[0]->getTile(location.x + xx, location.y + yy);
-        set_component_tile({location.x + xx - 1, location.y + yy - 1}, {xx, yy}, gMat);
+        set_component_tile({location.x + xx - 1, location.y + yy - 1}, {xx, yy}, gMat.image);
       }
     }
   }

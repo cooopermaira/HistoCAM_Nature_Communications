@@ -9,6 +9,13 @@
 //#include "speedSam.h"
 
 namespace pathCam {
+  struct Point2iComparator {
+    bool operator()(const cv::Point2i& a, const cv::Point2i& b) const {
+      return std::tie(a.x, a.y) < std::tie(b.x, b.y);
+    }
+  };
+
+
   class AccessSAM;
 
   class SAMTile {
@@ -58,7 +65,7 @@ namespace pathCam {
 
     std::queue<SAMTile*> segmentProcessQ;
 
-    std::map<Point2i,std::vector<std::pair<int,Mat>>> segmentationMasks;
+    std::map<Point2i,std::vector<std::pair<int,Mat>>,Point2iComparator> segmentationMasks;
 
     AccessSAM(StreamCam* _parent):parent(_parent){};
     ~AccessSAM(){};

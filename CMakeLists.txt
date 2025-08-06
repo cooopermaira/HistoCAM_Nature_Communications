@@ -130,6 +130,8 @@ include_directories(cuda-bundle-adjustment)
 
 add_subdirectory(JUCE)
 
+add_subdirectory(sam2_trt_inference)
+
 
 IF (NOT OVERRRIDE_SPINNAKER)
 
@@ -178,13 +180,17 @@ ENDIF ()
 add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
+add_subdirectory(SPEED-SAM-C-TENSORRT)
+include_directories("/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/include")
 
 link_directories(${ONNXRUNTIME_DIR}/lib)
+link_directories(/home/max/Documents/TensorRT-8.6.1.6/lib)
 include_directories(${ONNXRUNTIME_DIR}/include)
 
+include_directories(${CMAKE_SOURCE_DIR}/sam2_trt_inference/include /home/max/Documents/TensorRT-8.6.1.6/include)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_cuda)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_cuda trt_sam2_infer SpeedSAM)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

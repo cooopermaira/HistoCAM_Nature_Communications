@@ -52,7 +52,18 @@ public:
     return (x - minX) + (y - minY) * width;
   }
 };
-
+struct TileObj {
+  void* preferredObj;
+  void* preferredBuffer;
+  bool usingPreferred;
+  cuda::GpuMat image;
+  TileObj(int _tileSize) {
+    image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, Scalar(0, 0, 0, 0));
+    preferredBuffer = nullptr;
+    preferredObj = nullptr;
+    usingPreferred = false;
+  }
+};
 
 struct TileQuery {
 public:
@@ -64,12 +75,12 @@ public:
 //   TileQuery(const cuda::GpuMat& image, int i, int j, cv::Rect_<float> bounds) :
 //       image(image), i(i), j(j), bounds(bounds) {};
 // #else
-  cv::Mat image;
+  TileObj image;
   void* preferredObj;
   void* preferredObjBuffer;
   bool usingPreferred;
   
-  TileQuery(cv::Mat image, int i, int j, cv::Rect_<float> bounds) :
+  TileQuery(TileObj image, int i, int j, cv::Rect_<float> bounds) :
       image(image), i(i), j(j), bounds(bounds) {
     preferredObj= nullptr;
     preferredObjBuffer = nullptr;
@@ -89,7 +100,7 @@ private:
 
 public:
 #ifdef HAVE_OPENCV_CUDAARITHM
-  Dense2DArray<cuda::GpuMat*> tiles;
+  Dense2DArray<TileObj*> tiles;
 #else
   Dense2DArray<Mat*> tiles;
 #endif
@@ -126,9 +137,9 @@ public:
 
   void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
 
-  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, const cuda::GpuMat &mat);
+  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &mat, Rect theirRoi);
 
-  cuda::GpuMat getTile(int x, int y);
+  TileObj &getTile(int x, int y);
 #else
   void matToTile(const cv::Mat &mat, const cv::Mat &mask,int x, int y, Point2f rootOffset,
                cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
