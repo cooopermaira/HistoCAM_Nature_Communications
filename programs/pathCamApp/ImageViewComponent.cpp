@@ -143,30 +143,28 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     imageview -= fPoint(MRImage->images[i]->offset.x, MRImage->images[i]->offset.y);
     std::vector<TileQuery> tiles = MRImage->images[i]->
         getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
+
+    //std::cout<<tiles.size()<<std::endl;
+
     for (unsigned int t = 0; t < tiles.size(); t++) {
       TileObj *tile = tiles[t].image;
       auto bounds = RectCtoJ<float>(tiles[t].bounds);
       bounds *= view2screenScale(imageview) * scale;
       bounds.expand(0.5, 0.5);
       tiles[t].bounds = RectJtoC<float>(bounds);
-      if (tiles[t].i == 0 &&tiles[t].j == 0) {
-        int k = 0;
-      }
+
       if (tile->image.data) {
-        //if (!tile->usingPreferred) {
-        if (true){
+        if (!tile->usingPreferred) {
+          //if (true){
           Mat temp;
           tile->image.download(temp);
-          //juce::Image* ji;
-          //if (!tile->preferredObj) {
-          if (false){
-            // ji = new juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
-            // //tile->preferredBuffer = new juce::Image::BitmapData(*ji, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-            // tile->preferredObj = ji;
-            // tile->usingPreferred = true;
-          }
-          juce::Image im = juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
-          juce::Image::BitmapData bitmap_data(im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
+
+          juce::Image *im = new juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
+
+          tile->preferredObj = im;
+          tile->usingPreferred = true;
+
+          juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
           jassert(temp.step == bitmap_data.lineStride);
 
           if (shadeLevels) {
@@ -201,9 +199,10 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
           } else {
             memcpy(bitmap_data.data, temp.data, temp.cols * temp.rows * 4);
           }
-          g.drawImage(im, bounds);
+          g.drawImage(*im, bounds);
         } else {
           auto imm = static_cast<juce::Image *>(tile->preferredObj);
+          tile->mutex->lock();
           if (tile->newData) {
             auto img = tile->image;
             juce::Image::BitmapData bitmap_data(*imm, juce::Image::BitmapData::ReadWriteMode::writeOnly);
@@ -211,6 +210,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
                          img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost);
             tile->newData = false;
           }
+          tile->mutex->unlock();
 
           g.drawImage(*imm, bounds);
         }

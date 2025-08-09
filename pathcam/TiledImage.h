@@ -21,7 +21,7 @@ class Dense2DArray {
 public:
   Dense2DArray(int minX = -2048, int maxX = 2048, int minY = -2048, int maxY = 2048)
       : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
-    data.resize(width * height);
+    data.resize(width * height,nullptr);
   }
 
   ~Dense2DArray() {
@@ -57,6 +57,7 @@ struct TileObj {
   void* preferredBuffer;
   bool usingPreferred;
   bool newData;
+  Poco::FastMutex* mutex;
   cuda::GpuMat image;
   TileObj(int _tileSize) {
     image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, Scalar(0, 0, 0, 0));
@@ -64,6 +65,7 @@ struct TileObj {
     preferredObj = nullptr;
     usingPreferred = false;
     newData = false;
+    mutex = new Poco::FastMutex;
   }
 };
 

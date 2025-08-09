@@ -294,12 +294,16 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
 
         //copying to temp also copies to tiles(x,y) since they both point at the same data. We create temp
         //because its clearer than (*tiles(x,y))(region of interest)
+
+        tileObject.mutex->lock();
         if (mask.data) {
             matROI.copyTo(tileObject.image(tileROI), mask(ROIrect));
         } else {
             matROI.copyTo(tileObject.image(tileROI));
         }
         tileObject.newData = true;
+        tileObject.mutex->unlock();
+
         assert(tiles(x, y)->image.rows == tile_size && tiles(x, y)->image.cols == tile_size);
 
         tileUpwards(Point2i(x, y), tile_box, *tiles(x, y), Rect(0,0,tile_size,tile_size));
@@ -368,14 +372,17 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 
         //calculate theirROI and grab tile
         cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
-        auto theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
+        TileObj &theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
 
         //resize self cv image into their cv image ROI
         assert(theirCV.image(theirROI).rows == myCV.image(cvRoi).rows / 2 && theirCV.image(theirROI).cols == myCV.image(cvRoi).cols / 2);
         auto testSize = Size(theirCV.image(theirROI).cols, theirCV.image(theirROI).rows);
+
+        theirCV.mutex->lock();
         cuda::resize(myCV.image(cvRoi), theirCV.image(theirROI), testSize);
 
         theirCV.newData = true;
+        theirCV.mutex->unlock();
 
         //continue up pyramid
         if (levelWithinPyramid + 1 < parent->level.size() - 1) {
