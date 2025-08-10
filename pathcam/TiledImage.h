@@ -55,10 +55,15 @@ public:
 struct TileObj {
   void* preferredObj;
   void* preferredBuffer;
+
   bool usingPreferred;
   bool newData;
+
   Poco::FastMutex* mutex;
   cuda::GpuMat image;
+
+  std::map<int,Mat> SAMMasks;
+
   TileObj(int _tileSize) {
     image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, Scalar(0, 0, 0, 0));
     preferredBuffer = nullptr;

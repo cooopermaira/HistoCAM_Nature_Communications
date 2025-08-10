@@ -36,7 +36,7 @@ public:
     
     resizerBar.reset(new juce::StretchableLayoutResizerBar(&layout, 1, true));
     addChildComponent(resizerBar.get());
-    /*
+
 #if DEBUG
     {
       std::shared_ptr< PolygonAnnotation > temp = std::make_shared < PolygonAnnotation >("Poly 1");
@@ -76,7 +76,7 @@ public:
     
     leftComponent->updatelist();
 #endif
-*/
+
   }
   
   void setImage(std::shared_ptr<MRTiledImageSet > image){  rightComponent->setImage(image); }

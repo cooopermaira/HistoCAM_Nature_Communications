@@ -101,16 +101,13 @@ namespace pathCam {
         submit_outstanding_jobs();
       }
     }
-
-
     push_remaining_tiles_for_inference();
-
 
 
     //save_components_to_disk();
 
-    //if (parent->segmentWithSAM) {
-    if (false){
+    if (parent->segmentWithSAM) {
+    //if (false){
       auto start = std::chrono::high_resolution_clock::now();
       //perform_global_alignment();
       parent->as->initialize();

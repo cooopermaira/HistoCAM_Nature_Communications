@@ -8,44 +8,50 @@
 
 
 namespace pathCam {
-
-  SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM* _as, unsigned int _size) : ID(_ID), location(_location), size(_size),as(_as) {
+  SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _componentIndex, unsigned _size) : ID(_ID),
+    location(_location),
+    componentIndex(_componentIndex),
+    size(_size),
+    as(_as) {
     noncontiguousWrapper = cuda::GpuMat(size, size,CV_8UC4, Scalar(0, 0, 0, 0));
     inputMask = nullptr;
     outputMask = nullptr;
     confidence = nullptr;
     hasMaskInputGPU = nullptr;
-    inputMaskMat = cuda::GpuMat(256,256,CV_32FC1,Scalar(0));
+    inputMaskMat = cuda::GpuMat(256, 256,CV_32FC1, Scalar(0));
   }
 
-void SAMTile::run_segmentation(int _segmentationID) {
-    if (clicksVec.empty() && !hasMaskInput){return;}
+  void SAMTile::run_segmentation(int _segmentationID) {
+    if (clicksVec.empty() && !hasMaskInput) { return; }
 
     //get embeddings
-    AccessSAM::get_clicks_embedding(clicksVec,clicksGPU,clickLabelsGPU);
+    AccessSAM::get_clicks_embedding(clicksVec, clicksGPU, clickLabelsGPU);
 
     if (!hasMaskInputGPU) {
-      cudaMalloc(&hasMaskInputGPU,sizeof(float));
+      cudaMalloc(&hasMaskInputGPU, sizeof(float));
     }
     auto maskInputVal = static_cast<float>(hasMaskInput); // 1.0f or 0.0f
     cudaMemcpy(hasMaskInputGPU, &maskInputVal, sizeof(float), cudaMemcpyHostToDevice);
 
     //allocate if not already allocated
     if (!outputMask) {
-      cudaMalloc(&outputMask,sizeof(float) * 256 * 256 * 4);
+      cudaMalloc(&outputMask, sizeof(float) * 256 * 256 * 4);
     }
     if (!confidence) {
-      cudaMalloc(&confidence,4 * sizeof(float));
+      cudaMalloc(&confidence, 4 * sizeof(float));
     }
     if (!inputMask) {
-      cudaMalloc(&inputMask,sizeof(float) * 256 * 256);
+      cudaMalloc(&inputMask, sizeof(float) * 256 * 256);
     }
 
     //consolidate into a single buffer and run
-    std::vector buffer{feats_1_data_d_,clicksGPU,clickLabelsGPU,inputMask,hasMaskInputGPU,outputMask,confidence};
-    as->speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, as->speedSam->mMaskDecoder->mCudaStream); // Set the optimization profile
-    as->speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{ 1, int(clicksVec.size()), 2 }); // Set input dimensions for coordinates
-    as->speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{ 1, int(clicksVec.size()) });    // Set input dimensions for labels
+    std::vector buffer{feats_1_data_d_, clicksGPU, clickLabelsGPU, inputMask, hasMaskInputGPU, outputMask, confidence};
+    as->speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, as->speedSam->mMaskDecoder->mCudaStream);
+    // Set the optimization profile
+    as->speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{1, int(clicksVec.size()), 2});
+    // Set input dimensions for coordinates
+    as->speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{1, int(clicksVec.size())});
+    // Set input dimensions for labels
     as->speedSam->mMaskDecoder->mContext->executeV2(buffer.data());
 
     cudaFree(clicksGPU);
@@ -53,14 +59,14 @@ void SAMTile::run_segmentation(int _segmentationID) {
     clicksVec.clear();
     hasMaskInput = false;
 
-    cuda::GpuMat output(256,256,CV_32FC1,outputMask);
+    cuda::GpuMat output(256, 256,CV_32FC1, outputMask);
     //cuda::threshold(output,output,0.0,1.0,THRESH_BINARY);
     int interval = 256 * 256 / size;
 
     //distribute mask information as input to neighbors
     int count = 0;
-    for (auto &neighbor : neighbors) {
-      for (auto &linkedSubTile : neighbor.second) {
+    for (auto &neighbor: neighbors) {
+      for (auto &linkedSubTile: neighbor.second) {
         //figure out region of my output to give each tile
         auto mySubTileIndex = linkedSubTile - location;
         Rect myRoi(interval * mySubTileIndex.x, interval * mySubTileIndex.y, interval, interval);
@@ -69,30 +75,29 @@ void SAMTile::run_segmentation(int _segmentationID) {
         Rect theirRoi(interval * theirSubTileIndex.x, interval * theirSubTileIndex.y, interval, interval);
 
         //take largest logit from mine and theirs as theirs
-        cuda::max(output(myRoi),neighbor.first->inputMaskMat(theirRoi),neighbor.first->inputMaskMat(theirRoi));
+        cuda::max(output(myRoi), neighbor.first->inputMaskMat(theirRoi), neighbor.first->inputMaskMat(theirRoi));
       }
-      if (neighbor.first->segmentations.find(_segmentationID) !=  neighbor.first->segmentations.end()
-        && cuda::countNonZero(neighbor.first->inputMaskMat)) {
+      if (neighbor.first->segmentations.find(_segmentationID) != neighbor.first->segmentations.end()
+          && cuda::countNonZero(neighbor.first->inputMaskMat)) {
         neighbor.first->hasMaskInput - true;
         as->segmentProcessQ.push(neighbor.first);
       }
     }
 
     //send my own mask info for display
-    cuda::resize(output,output,{int(size),int(size)});
-    cuda::threshold(output,output,0.0,255.0,THRESH_BINARY);
+    cuda::resize(output, output, {int(size), int(size)});
+    cuda::threshold(output, output, 0.0, 255.0, THRESH_BINARY);
     output.convertTo(output,CV_8U);
     Mat hostOutput;
     output.download(hostOutput);
 
     //part out the mask to tiles
     int tileSize = as->parent->tileSize;
-    for (auto &tile : componentTiles) {
-      Rect maskRoi(tile.first.x * tileSize,tile.first.y * tileSize,tileSize,tileSize);
-      as->segmentationMasks[tile.second].emplace_back(_segmentationID,hostOutput(maskRoi));
+    for (auto &tile: componentTiles) {
+      Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
+      as->push_mask_for_display(tile.first,componentIndex,hostOutput(maskRoi),_segmentationID);
+      //as->segmentationMasks[tile.second].emplace_back(_segmentationID, hostOutput(maskRoi));
     }
-
-
 
 
     Mat test;
@@ -100,7 +105,7 @@ void SAMTile::run_segmentation(int _segmentationID) {
     Mat binaryMask;
     compare(test, 0, binaryMask, cv::CMP_GT);
     binaryMask.convertTo(test,CV_8U);
-    imwrite("/media/max/Data/pathcam_SAM/maskoutput_runseg.png",test);
+    imwrite("/media/max/Data/pathcam_SAM/maskoutput_runseg.png", test);
     int k = 0;
 
 
@@ -187,7 +192,7 @@ void SAMTile::run_segmentation(int _segmentationID) {
 
         for (int x = ul.x; x <= lr.x; ++x) {
           if ((xTileCount - 1) % (interval - 1) == 0) {
-            auto st = new SAMTile(id, {x, y}, this, parent->SAMTileSize);
+            auto st = new SAMTile(id, {x, y}, this, 0,parent->SAMTileSize);
             tiles.push_back(st);
             ++id;
 
@@ -210,11 +215,6 @@ void SAMTile::run_segmentation(int _segmentationID) {
               tiles.back()->neighbors.emplace_back(brotherY, temp);
               brotherY->neighbors.emplace_back(tiles.back(), temp);
             }
-            // if (yTileCount > 0 && xTileCount > 0) {
-            //   auto brotherXY = tiles[get_tile_id({x - interval + 1, y - interval + 1}, comp->componentIndex)];
-            //   tiles.back()->neighbors.push_back({brotherXY, {{x, y}}});
-            //   brotherXY->neighbors.push_back({tiles.back(), {{x, y}}});
-            // }
           }
           ++xTileCount;
         }
@@ -224,7 +224,7 @@ void SAMTile::run_segmentation(int _segmentationID) {
   }
 
   void AccessSAM::load_model() {
-    speedSam = new SpeedSam(parent->SAM_encoder_path.toString(),parent->SAM_decoder_path.toString());
+    speedSam = new SpeedSam(parent->SAM_encoder_path.toString(), parent->SAM_decoder_path.toString());
   }
 
 
@@ -239,10 +239,6 @@ void SAMTile::run_segmentation(int _segmentationID) {
     auto comp = parent->composites[0];
 
     SAMTile *tileToFree = nullptr;
-    int i = 0;
-
-    //SpeedSam speedSam(parent->SAM_encoder_path.toString(), parent->SAM_decoder_path.toString());
-
 
     while (!embedQueue.empty()) {
       std::sort(embedQueue.begin(), embedQueue.end(), tile_compare);
@@ -260,10 +256,9 @@ void SAMTile::run_segmentation(int _segmentationID) {
       CHECK_CUDA_ERROR(cudaStreamSynchronize(speedSam->mImageEncoder->mCudaStream));
       if (tileToFree) {
         cudaFree(tileToFree->rawBuffer);
-      }
-      {
-        std::vector buffer{tile->rawBuffer,tile->feats_1_data_d_};
-        speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(),speedSam->mImageEncoder->mCudaStream,nullptr);
+      } {
+        std::vector buffer{tile->rawBuffer, tile->feats_1_data_d_};
+        speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(), speedSam->mImageEncoder->mCudaStream, nullptr);
       }
 
       //sie.Infer(buffer);
@@ -271,25 +266,19 @@ void SAMTile::run_segmentation(int _segmentationID) {
       tileToFree = tile;
 
       if (tile->ID == 83) {
-        auto clicks = new float[2 * 11];
-        auto clickLabels = new float[11];
-        void *clicksGPU, *clickLabelsGPU,*inputMask,*hasMaskInput,*outputMask,*confidence;
         std::vector<Point3f> clicksVec(10);
-        clicksVec[0] = {337,380,1};
-        clicksVec[1] = {410,373,1};
-        clicksVec[2] = {65,514,1};
-        clicksVec[3] = {66,734,1};
-        clicksVec[4] = {457,613,1};
-        clicksVec[5] = {314,822,1};
-        clicksVec[6] = {312,472,0};
-        clicksVec[7] = {193,650,0};
-        clicksVec[8] = {212,726,0};
-        clicksVec[9] = {500,395,0};
+        clicksVec[0] = {337, 380, 1};
+        clicksVec[1] = {410, 373, 1};
+        clicksVec[2] = {65, 514, 1};
+        clicksVec[3] = {66, 734, 1};
+        clicksVec[4] = {457, 613, 1};
+        clicksVec[5] = {314, 822, 1};
+        clicksVec[6] = {312, 472, 0};
+        clicksVec[7] = {193, 650, 0};
+        clicksVec[8] = {212, 726, 0};
+        clicksVec[9] = {500, 395, 0};
         tile->clicksVec = clicksVec;
         tile->run_segmentation(0);
-
-
-
       }
     }
 
@@ -298,6 +287,13 @@ void SAMTile::run_segmentation(int _segmentationID) {
       cudaFree(tileToFree->rawBuffer);
     }
   }
+
+  void AccessSAM::push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const Mat& _mask, int _segID) {
+    auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
+    TileObj &tileObj = pyrBase->getTile(_tile.x,_tile.y);
+    tileObj.SAMMasks[_segID] = _mask;
+  }
+
 
 
   int AccessSAM::get_tile_id(Point2i _location, unsigned int _componentIndex) const {
@@ -311,8 +307,8 @@ void SAMTile::run_segmentation(int _segmentationID) {
   }
 
   void AccessSAM::get_clicks_embedding(std::vector<Point3f> &_clicks, void *&_clicksGPU, void *&_clickLabelsGPU) {
-    cudaMalloc(&_clicksGPU,sizeof(float) * 2 * _clicks.size());
-    cudaMalloc(&_clickLabelsGPU,sizeof(float) * _clicks.size());
+    cudaMalloc(&_clicksGPU, sizeof(float) * 2 * _clicks.size());
+    cudaMalloc(&_clickLabelsGPU, sizeof(float) * _clicks.size());
 
     float clicks[2 * _clicks.size()];
     float clickLabels[_clicks.size()];
@@ -323,8 +319,7 @@ void SAMTile::run_segmentation(int _segmentationID) {
       clickLabels[i] = _clicks[i].z;
     }
 
-    cudaMemcpy(_clicksGPU,clicks,_clicks.size() * 2 * sizeof(float),cudaMemcpyHostToDevice);
-    cudaMemcpy(_clickLabelsGPU,clickLabels,_clicks.size() * sizeof(float),cudaMemcpyHostToDevice);
+    cudaMemcpy(_clicksGPU, clicks, _clicks.size() * 2 * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemcpy(_clickLabelsGPU, clickLabels, _clicks.size() * sizeof(float), cudaMemcpyHostToDevice);
   }
-
 }

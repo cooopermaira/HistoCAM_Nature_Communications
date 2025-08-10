@@ -24,6 +24,7 @@ namespace pathCam {
     int priority = 10;
     Point2i location;
     unsigned int size;
+    unsigned int componentIndex;
     AccessSAM* as;
     std::vector<std::pair<SAMTile*,std::vector<Point2i> > > neighbors;
     std::vector<std::pair<Point2i,Point2i>> componentTiles;
@@ -37,7 +38,7 @@ namespace pathCam {
     cuda::GpuMat inputMaskMat;
     std::map<int,cuda::GpuMat> segmentations;
 
-    SAMTile(int ID, Point2i _location, AccessSAM* _as, unsigned int _size = 1024);
+    SAMTile(int ID, Point2i _location, AccessSAM* _as, unsigned _componentIndex,unsigned _size = 1024);
     ~SAMTile() {};
 
     void set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat);
@@ -70,12 +71,24 @@ namespace pathCam {
     AccessSAM(StreamCam* _parent):parent(_parent){};
     ~AccessSAM(){};
 
+    //loads SAM encoder and decoder as speedSam object. Can take .engine or .onnx
     void load_model();
+
+    //creates SAM tile objects and links them to their neighbors. This function does not manipulate image data
     void initialize();
-    void embed_SAM_tiles();
+
+    //transforms click data into raw buffers (floats)
     static void get_clicks_embedding(std::vector<Point3f> &_clicks, void *&_clicksGPU, void *&_clickLabelsGPU);
+
+    //calculates the tile ID from the point location and component index
     int get_tile_id(Point2i _location, unsigned int _componentIndex) const;
 
+    //fills SAM tiles with image data and creates SAM embedding for each tile. Priority of each tile can be adjusted on the fly
+    void embed_SAM_tiles();
+
+    void push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const Mat& _mask, int _segID);
+
+    void create_segmentation(std::vector<Point3f> &_clicks, int _segID);
 
 
 

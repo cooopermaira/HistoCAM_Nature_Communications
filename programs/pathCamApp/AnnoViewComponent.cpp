@@ -41,6 +41,21 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent& event)
       cast->add(screen2view(fPoint(event.x, event.y), *view));
       return true;
     }
+
+    if(parent->getMode() == Annotation::_SEG){
+      std::shared_ptr < Annotation > new_annotation;
+      new_annotation.reset(new PolygonAnnotation("SAM"));
+      parent->setSelected(new_annotation);
+      annotations->push_back(new_annotation);
+      parent->annotationsUpdated();
+      parent->setMode( Annotation::_NONE );
+    }
+
+    if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_SEG){
+      PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
+      cast->add(screen2view(fPoint(event.x, event.y), *view));
+      return true;
+    }
   }
   
   
