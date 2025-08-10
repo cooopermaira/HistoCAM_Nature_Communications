@@ -63,7 +63,7 @@ void ImageViewComponent::mouseDown(const juce::MouseEvent &event) {
     lastMousePosition = event.getPosition();
   }
 }
-
+/*
 void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
   if (event.mods.isLeftButtonDown()) {
     juce::Point<int> idelta = event.getPosition() - lastMousePosition;
@@ -73,6 +73,25 @@ void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
     repaint();
   }
 }
+*/
+
+void ImageViewComponent::mouseDrag(const juce::MouseEvent& event) {
+    if (event.mods.isLeftButtonDown()) {
+        juce::Point<int> idelta = event.getPosition() - lastMousePosition;
+        fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
+        translate(-delta);
+        lastMousePosition = event.getPosition();
+        
+        // FRAME RATE LIMITING HERE
+        auto now = juce::Time::getCurrentTime();
+        if ((now - lastRepaintTime).inMilliseconds() >= MIN_REPAINT_INTERVAL_MS) {
+            repaint();
+            lastRepaintTime = now;
+        }
+        // Mouse position is still updated, just fewer repaints
+    }
+}
+
 
 void ImageViewComponent::mouseWheelMove(const MouseEvent &event, const MouseWheelDetails &wheel) {
   scaleCenter(fPoint(1.0 - wheel.deltaY, 1.0 - wheel.deltaY));

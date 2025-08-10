@@ -93,7 +93,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     #set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-11.8/bin/nvcc")
     #set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
     #set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
-    set(CMAKE_CUDA_ARCHITECTURES "native")
+    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES 86 89)   # adjust as needed
+    endif()
     enable_language(CUDA)
 
     set(ONNXRUNTIME_DIR "/home/max/Documents/onnxruntime-linux-x64-gpu-1.22.0" CACHE PATH "Path to the extracted ONNX Runtime directory")
