@@ -63,6 +63,7 @@ void ImageViewComponent::mouseDown(const juce::MouseEvent &event) {
     lastMousePosition = event.getPosition();
   }
 }
+
 /*
 void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
   if (event.mods.isLeftButtonDown()) {
@@ -75,21 +76,21 @@ void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
 }
 */
 
-void ImageViewComponent::mouseDrag(const juce::MouseEvent& event) {
-    if (event.mods.isLeftButtonDown()) {
-        juce::Point<int> idelta = event.getPosition() - lastMousePosition;
-        fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
-        translate(-delta);
-        lastMousePosition = event.getPosition();
-        
-        // FRAME RATE LIMITING HERE
-        auto now = juce::Time::getCurrentTime();
-        if ((now - lastRepaintTime).inMilliseconds() >= MIN_REPAINT_INTERVAL_MS) {
-            repaint();
-            lastRepaintTime = now;
-        }
-        // Mouse position is still updated, just fewer repaints
+void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
+  if (event.mods.isLeftButtonDown()) {
+    juce::Point<int> idelta = event.getPosition() - lastMousePosition;
+    fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
+    translate(-delta);
+    lastMousePosition = event.getPosition();
+
+    // FRAME RATE LIMITING HERE
+    auto now = juce::Time::getCurrentTime();
+    if ((now - lastRepaintTime).inMilliseconds() >= MIN_REPAINT_INTERVAL_MS) {
+      repaint();
+      lastRepaintTime = now;
     }
+    // Mouse position is still updated, just fewer repaints
+  }
 }
 
 
@@ -125,6 +126,11 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     shadeLevels = !shadeLevels;
     repaint();
     return true; // Key press handled
+  }
+  if (key==juce::KeyPress::createFromDescription("q")) {
+    if (!MRImage->images.empty()) {
+      //MRImage->images[0]->parent->as->create_segmentation()
+    }
   }
   if (key.getKeyCode() == KeyPress::escapeKey) {
     JUCEApplication::getInstance()->systemRequestedQuit();
@@ -174,64 +180,31 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
       if (tile->image.data) {
         if (!tile->usingPreferred) {
-          //if (true){
-          Mat temp;
-          tile->image.download(temp);
-
-          juce::Image *im = new juce::Image(juce::Image::ARGB, temp.cols, temp.rows, true);
-
+          juce::Image *im = new juce::Image(juce::Image::ARGB, tile->image.cols, tile->image.rows, true);
           tile->preferredObj = im;
           tile->usingPreferred = true;
+        }
 
+        auto im = static_cast<juce::Image *>(tile->preferredObj);
+        tile->mutex->lock();
+        if (tile->newData) {
+          auto img = tile->image;
           juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-          jassert(temp.step == bitmap_data.lineStride);
+          cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
+                       img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost);
+          tile->newData = false;
+        }
+        tile->mutex->unlock();
+        g.setOpacity(1.f);
+        g.drawImage(*im, bounds);
 
-          if (shadeLevels) {
-            if (!greenShade.data) {
-              greenShade = Mat(temp.rows, temp.cols, CV_8UC3, cv::Scalar(0, 255, 0));
-              channels.resize(2);
-              channels[0] = greenShade;
-            }
-            double val;
-            int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
-            //who the hell did this? did i do this? this is ridiculous
-            maglab == 1
-              ? val = 1.0
-              : maglab == 2
-                  ? val = 0.5
-                  : maglab == 3
-                      ? val = 0.2
-                      : maglab == 4
-                          ? val = 0.1
-                          : val = 1;
-            double beta = (log2(1.0 / val) / 3.4) * 0.7 + 0.05;
+        if (shadeLevels) {
+          int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
 
-
-            greenShade.setTo(cv::Scalar(0, 0, 0));
-            cv::extractChannel(temp, channels[1], 3);
-            greenShade.setTo(cv::Scalar(200 * beta, 150 * (1 - beta), 100 * beta), channels[1]);
-            cv::merge(channels, holding1);
-
-            holding2 = beta * holding1 + (1.0 - beta) * temp;
-            //holding2 = 0.5 * holding1 + 0.5 * tile;
-            memcpy(bitmap_data.data, holding2.data, temp.cols * temp.rows * 4);
-          } else {
-            memcpy(bitmap_data.data, temp.data, temp.cols * temp.rows * 4);
-          }
-          g.drawImage(*im, bounds);
-        } else {
-          auto imm = static_cast<juce::Image *>(tile->preferredObj);
-          tile->mutex->lock();
-          if (tile->newData) {
-            auto img = tile->image;
-            juce::Image::BitmapData bitmap_data(*imm, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-            cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
-                         img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost);
-            tile->newData = false;
-          }
-          tile->mutex->unlock();
-
-          g.drawImage(*imm, bounds);
+          auto color = levelColors[4 - maglab];
+          auto overlayColor = Colour(color.getRed(), color.getGreen(), color.getBlue(), (uint8) 100);
+          g.setColour(overlayColor);
+          g.fillRect(bounds);
         }
       }
     }
@@ -353,16 +326,13 @@ void ImageViewComponent::paint(juce::Graphics &g) {
     int linePadding = 10; // Space between lines
 
     std::vector<std::string> objectives = {"20x", "10x", "4x", "2x"};
-    std::vector<juce::Colour> colors = {
-      Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
-      Colour(243, 249, 243)
-    };
+
 
     for (unsigned int i = 0; i < 4; i++) {
       int xPosition = getWidth() - padding - squareSize - textPadding;
       int yPosition = getHeight() - padding - (i * squareSize) - (i * linePadding);
 
-      g.setColour(colors[i]);
+      g.setColour(levelColors[i]);
       g.fillRect(xPosition, yPosition, squareSize, squareSize);
 
       g.setColour(Colours::black);

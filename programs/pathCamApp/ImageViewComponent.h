@@ -15,6 +15,10 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
 public:
   bool shadeLevels;
   bool shadeClasses;
+  std::vector<juce::Colour> levelColors = {
+    Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
+    Colour(243, 249, 243)
+  };
   //==============================================================================
   ImageViewComponent(std::shared_ptr<fRectangle> view,
                      StringArray &iconNames,

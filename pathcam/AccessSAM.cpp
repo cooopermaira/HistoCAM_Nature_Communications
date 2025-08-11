@@ -100,13 +100,13 @@ namespace pathCam {
     }
 
 
-    Mat test;
-    output.download(test);
-    Mat binaryMask;
-    compare(test, 0, binaryMask, cv::CMP_GT);
-    binaryMask.convertTo(test,CV_8U);
-    imwrite("/media/max/Data/pathcam_SAM/maskoutput_runseg.png", test);
-    int k = 0;
+    // Mat test;
+    // output.download(test);
+    // Mat binaryMask;
+    // compare(test, 0, binaryMask, cv::CMP_GT);
+    // binaryMask.convertTo(test,CV_8U);
+    // imwrite("/media/max/Data/pathcam_SAM/maskoutput_runseg.png", test);
+    // int k = 0;
 
 
     //get mask back
@@ -288,23 +288,158 @@ namespace pathCam {
     }
   }
 
-  void AccessSAM::push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const Mat& _mask, int _segID) {
-    auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
-    TileObj &tileObj = pyrBase->getTile(_tile.x,_tile.y);
-    tileObj.SAMMasks[_segID] = _mask;
+
+  void AccessSAM::create_segmentation(std::vector<Point3f> &_clicks, int _segID) {
+    //a tile, its list of clicks, and if each click appears in other tiles as well
+    std::map<int,std::vector<std::pair<Point3f,bool>>> tilesAndTheirClicks;
+
+    for (auto &click : _clicks) {
+
+      //get list of tiles this click falls in
+      auto ans = get_tiles_covering_point(Point2f(click.x,click.y), parent->SAMTileSize - parent->tileSize);
+
+      //for each tile, add this click to its list
+      for (auto &tile : ans) {
+        tilesAndTheirClicks[tile].push_back({click,ans.size() > 1});
+      }
+    }
+
+    //choose which tiles should run with which clicks
+    auto ans = choose_clicks_for_each_tile(tilesAndTheirClicks);
+
+
+
+    //
   }
 
 
+  std::vector<int> AccessSAM::get_tiles_covering_point(const Point2f &_point, int _stride) {
+    std::vector<int> out;
 
-  int AccessSAM::get_tile_id(Point2i _location, unsigned int _componentIndex) const {
+    auto comp = parent->composites[0];
+    auto rootTile = comp->imagePyramid->level[0]->getIJ(Point2f(comp->root_offset.x, comp->root_offset.y));
+    auto myTile = comp->imagePyramid->level[0]->getIJ(_point);
+
+    auto primarySAMTile = get_tile_id(myTile,0);
+    out.push_back(primarySAMTile);
+
+    auto diff = myTile - rootTile;
+    Point2i locInTile(diff.x % 3,diff.y % 3);
+
+
+    if (locInTile.x == 0) {
+      //pushback SAM tile (-1,0) from primary tile
+      auto pointThatWillFallInTile = myTile - Point2i(_stride / parent->tileSize, 0);
+      auto id = get_tile_id(pointThatWillFallInTile, 0);
+      out.push_back(id);
+    }
+    if (locInTile.y == 0) {
+      //pushback SAM tile (0,-1) from primary tile
+      auto pointThatWillFallInTile = myTile - Point2i(0,_stride / parent->tileSize);
+      auto id = get_tile_id(pointThatWillFallInTile, 0);
+      out.push_back(id);
+    }
+    if (locInTile.x == 0 && locInTile.y == 0) {
+      //pushback SAM tile (-1,-1) from primary tile
+      auto pointThatWillFallInTile = myTile - Point2i(_stride / parent->tileSize, _stride / parent->tileSize);
+      auto id = get_tile_id(pointThatWillFallInTile, 0);
+      out.push_back(id);
+    }
+
+    return out;
+  }
+
+
+  std::map<int, std::vector<Point3f>> AccessSAM::choose_clicks_for_each_tile(const std::map<int, std::vector<std::pair<Point3f,bool>>>& clicksByTile, int cap)
+{
+    std::map<int, std::vector<Point3f>> result;
+
+    for (const auto& [tileId, clicks] : clicksByTile)
+    {
+        // Split by uniqueness (non-overlap vs overlap) and label (yes/no)
+        std::vector<cv::Point3f> Uyes, Uno, Oyes, Ono;
+        Uyes.reserve(clicks.size()); Uno.reserve(clicks.size());
+        Oyes.reserve(clicks.size()); Ono.reserve(clicks.size());
+
+        for (const auto& c : clicks)
+        {
+            const Point3f& p = c.first;
+            const bool isOverlap = c.second;
+            const bool isYes = (p.z >= 0.5f);
+
+            if (!isOverlap) (isYes ? Uyes : Uno).push_back(p);
+            else            (isYes ? Oyes : Ono).push_back(p);
+        }
+
+        auto pick = [](std::vector<cv::Point3f>& src, int k, std::vector<cv::Point3f>& out) -> int {
+            const int n = std::min<int>(k, static_cast<int>(src.size()));
+            out.insert(out.end(), src.begin(), src.begin() + n);
+            if (n > 0) src.erase(src.begin(), src.begin() + n);
+            return n;
+        };
+
+        std::vector<Point3f> sel;
+        sel.reserve(std::min<int>(cap, clicks.size()));
+
+        if ((int)clicks.size() <= cap) {
+            // If fewer than cap total, just take all (max possible per tile).
+            for (const auto& c : clicks) sel.push_back(c.first);
+            result.emplace(tileId, std::move(sel));
+            continue;
+        }
+
+        const int targetYes = cap / 2;      // 5
+        const int targetNo  = cap - targetYes; // 5
+        int Ayes = 0, Ano = 0;
+
+        // Step 1a: take uniques toward targets
+        Ayes += pick(Uyes, targetYes, sel);
+        Ano  += pick(Uno,  targetNo,  sel);
+        int rem = cap - (Ayes + Ano);
+
+        // Step 1b: still uniques left? fill while reducing imbalance
+        while (rem > 0 && (!Uyes.empty() || !Uno.empty())) {
+            const bool takeYes = (Ayes < targetYes && !Uyes.empty()) || Uno.empty();
+            if (takeYes) { Ayes += pick(Uyes, 1, sel); }
+            else         { Ano  += pick(Uno,  1, sel); }
+            rem = cap - (Ayes + Ano);
+        }
+
+        // Step 2a: pull from overlaps to hit targets
+        if (rem > 0) {
+            const int needYes = std::max(0, targetYes - Ayes);
+            const int needNo  = std::max(0, targetNo  - Ano);
+            Ayes += pick(Oyes, needYes, sel);
+            Ano  += pick(Ono,  needNo,  sel);
+            rem = cap - (Ayes + Ano);
+        }
+
+        // Step 2b: fill remaining from whatever is left (still bias toward balance)
+        while (rem > 0 && (!Oyes.empty() || !Ono.empty())) {
+            const bool takeYes = (Ayes < Ano && !Oyes.empty()) || Ono.empty();
+            if (takeYes) { Ayes += pick(Oyes, 1, sel); }
+            else         { Ano  += pick(Ono,  1, sel); }
+            rem = cap - (Ayes + Ano);
+        }
+
+        result.emplace(tileId, std::move(sel));
+    }
+
+    return result;
+}
+
+
+  int AccessSAM::get_tile_id(Point2i _tileIndexPoint, unsigned int _componentIndex) const {
     auto comp = parent->composites[_componentIndex];
     auto rootOffset = comp->imagePyramid->level[0]->getIJ(Point2f(comp->root_offset.x, comp->root_offset.y));
     auto maxOffset = comp->imagePyramid->level[0]->getIJ(Point2f(comp->max_offset.x, comp->max_offset.y));
-    auto pt1 = (_location.y - rootOffset.y) / 3;
-    auto pt2 = (maxOffset.x - rootOffset.x) / 3;
-    auto pt3 = (_location.x - rootOffset.x) / 3;
+    int interval = parent->SAMTileSize / parent->tileSize - 1;
+    auto pt1 = (_tileIndexPoint.y - rootOffset.y) / interval;
+    auto pt2 = (maxOffset.x - rootOffset.x) / interval;
+    auto pt3 = (_tileIndexPoint.x - rootOffset.x) / interval;
     return pt1 * pt2 + pt3;
   }
+
 
   void AccessSAM::get_clicks_embedding(std::vector<Point3f> &_clicks, void *&_clicksGPU, void *&_clickLabelsGPU) {
     cudaMalloc(&_clicksGPU, sizeof(float) * 2 * _clicks.size());
@@ -322,4 +457,13 @@ namespace pathCam {
     cudaMemcpy(_clicksGPU, clicks, _clicks.size() * 2 * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(_clickLabelsGPU, clickLabels, _clicks.size() * sizeof(float), cudaMemcpyHostToDevice);
   }
+
+
+
+  void AccessSAM::push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const Mat& _mask, int _segID) {
+    auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
+    TileObj &tileObj = pyrBase->getTile(_tile.x,_tile.y);
+    tileObj.SAMMasks[_segID] = _mask;
+  }
+
 }
