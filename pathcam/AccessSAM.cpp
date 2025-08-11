@@ -159,6 +159,8 @@ namespace pathCam {
         set_component_tile({location.x + xx - 1, location.y + yy - 1}, {xx, yy}, gMat.image);
       }
     }
+    //debug
+    noncontiguousWrapper.download(ncwStoreLocal);
   }
 
 
@@ -261,25 +263,8 @@ namespace pathCam {
         speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(), speedSam->mImageEncoder->mCudaStream, nullptr);
       }
 
-      //sie.Infer(buffer);
-
       tileToFree = tile;
 
-      if (tile->ID == 83) {
-        std::vector<Point3f> clicksVec(10);
-        clicksVec[0] = {337, 380, 1};
-        clicksVec[1] = {410, 373, 1};
-        clicksVec[2] = {65, 514, 1};
-        clicksVec[3] = {66, 734, 1};
-        clicksVec[4] = {457, 613, 1};
-        clicksVec[5] = {314, 822, 1};
-        clicksVec[6] = {312, 472, 0};
-        clicksVec[7] = {193, 650, 0};
-        clicksVec[8] = {212, 726, 0};
-        clicksVec[9] = {500, 395, 0};
-        tile->clicksVec = clicksVec;
-        tile->run_segmentation(0);
-      }
     }
 
     //free last tile
@@ -306,7 +291,21 @@ namespace pathCam {
 
     //choose which tiles should run with which clicks
     auto ans = choose_clicks_for_each_tile(tilesAndTheirClicks);
+    int i = 0;
+    for (auto & kv : ans) {
+      auto tile = tiles[kv.first];
 
+      for (auto &point : kv.second) {
+        Point3f pointInTileSpace = point - Point3f(parent->tileSize * tile->location.x,parent->tileSize * tile->location.y,0);
+        tile->clicksVec.push_back(pointInTileSpace);
+        cv::circle(tile->ncwStoreLocal,Point2f(pointInTileSpace.x,pointInTileSpace.y),50,Scalar(0,0,0,255));
+      }
+      imwrite("/media/max/Data/pathcam_SAM/SAMTILE_with_clicks"+std::to_string(i++)+".png",tile->ncwStoreLocal);
+
+      int k = 0;
+
+
+    }
 
 
     //

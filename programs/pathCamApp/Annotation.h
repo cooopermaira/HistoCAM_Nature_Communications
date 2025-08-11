@@ -51,7 +51,7 @@ protected:
 
 class PolygonAnnotation : public Annotation{
 public:
-  PolygonAnnotation(juce::String name): Annotation(name), area(0.0), selected(-1) {};
+  PolygonAnnotation(juce::String name): Annotation(name), area(0.0) {};
   
   
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
@@ -61,22 +61,13 @@ public:
     temp.applyTransform(juce::AffineTransform::scale(scale.getX(), scale.getY()));
     
     juce::Path::Iterator it(temp);
-    
-    g.setColour(color.withAlpha(0.5f));
-    g.fillPath(temp);
-    
-    if(selected){
-      g.setColour(juce::Colours::greenyellow);
-      
-      while (it.next())
-      {
-        if (it.elementType == juce::Path::Iterator::lineTo ||
-            it.elementType == juce::Path::Iterator::startNewSubPath)
-        {
-          g.fillEllipse(it.x1 - 10, it.y1 - 10, 2 * 10, 2 * 10);
-        }
-      }
+
+    if(selected) {
+      g.setColour(color.withAlpha(0.5f));
+    }else {
+      g.setColour(juce::Colours::greenyellow.withAlpha(0.5f));
     }
+      g.fillPath(temp);
     
     if(points.size() > 2){
       std::string area = Poco::format("%.0f mm^2", getArea()*pow(1.73*0.001,2));
@@ -107,33 +98,74 @@ public:
     path.swapWithPath(newPath);
     calculatePolygonArea();
   }
-  
-  bool test(fPoint clickInview, fPoint distance){
-    fPoint click_distance = fPoint(20.0, 20.0)*distance;
-    
-    for(unsigned int i=0; i < points.size(); i++){
-      fPoint p = points[i];
-      float d = p.getDistanceFrom(clickInview);
-      if(d < click_distance.getX() || d < click_distance.getY()){
-        selected = i;
-        return true;
+
+
+
+
+
+  double getArea(){ return area; }
+
+
+protected:
+
+  juce::Path path;
+  std::vector < fPoint > points;
+  double area;
+
+  void calculatePolygonArea() {
+    unsigned int n = (unsigned int)points.size();
+    area = 0.0;
+    if(n < 3){ return;}
+
+    // Calculate the area using the shoelace formula
+    for (unsigned int i = 0; i < n; i++) {
+      unsigned int j = (i + 1) % n; // Wrap around using modulo for the last point
+      area += points[i].x * points[j].y;
+      area -= points[j].x * points[i].y;
+    }
+
+    area = std::abs(area / 2.0);
+    int k = 0;
+  }
+
+};
+
+class PointClickPoly : public PolygonAnnotation{
+public:
+  PointClickPoly(juce::String name): PolygonAnnotation(name), selected(-1) {};
+
+
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
+    PolygonAnnotation::paint(g, offset, selected, scale);
+    juce::Path temp = path;
+
+    temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
+    temp.applyTransform(juce::AffineTransform::scale(scale.getX(), scale.getY()));
+
+    juce::Path::Iterator it(temp);
+
+    if(selected){
+      g.setColour(juce::Colours::greenyellow);
+
+      while (it.next())
+      {
+        if (it.elementType == juce::Path::Iterator::lineTo ||
+            it.elementType == juce::Path::Iterator::startNewSubPath)
+        {
+          g.fillEllipse(it.x1 - 10, it.y1 - 10, 2 * 10, 2 * 10);
+        }
       }
     }
-    unSelect();
-    return false;
+
   }
-  
-  
+
   void move(fPoint new_position) {
     if(selected != -1){
       points[selected] = new_position;
       rebuildPath();
     }
   }
-  
-  
-  double getArea(){ return area; }
-  
+
   void add(fPoint p){
     if(points.size() == 0){
       path.startNewSubPath(p.getX(), p.getY());
@@ -147,12 +179,12 @@ public:
     }
     calculatePolygonArea();
   }
-  
+
   void splitClosestEdge(fPoint p){
     float min_distance = std::numeric_limits< float >::infinity();
     int min_index = 0;
     fPoint minPoint;
-    
+
     for(unsigned int i=0; i < points.size(); i++){
       int n = (i+1)%points.size();
       Line<float> line (points[i].getX(), points[i].getY(), points[n].getX(), points[n].getY());
@@ -163,45 +195,59 @@ public:
         min_index = i;
       }
     }
-    
+
     std::vector < fPoint > new_points;
     for(unsigned int i=0; i < points.size(); i++){
       new_points.push_back(points[i]);
       if(i==min_index){ new_points.push_back(p); }
     }
-    
+
     points = new_points;
-    
+
   }
-  
+
+  bool test(fPoint clickInview, fPoint distance){
+    fPoint click_distance = fPoint(20.0, 20.0)*distance;
+
+    for(unsigned int i=0; i < points.size(); i++){
+      fPoint p = points[i];
+      float d = p.getDistanceFrom(clickInview);
+      if(d < click_distance.getX() || d < click_distance.getY()){
+        selected = i;
+        return true;
+      }
+    }
+    unSelect();
+    return false;
+  }
+
+
   bool isPointSelected(){ return (selected != -1); }
-  
+
   void unSelect(){ selected = -1; }
-  
+
 private:
-  
-  juce::Path path;
-  std::vector < fPoint > points;
-  double area;
+
   int selected;
-  
+
   void calculatePolygonArea() {
     unsigned int n = (unsigned int)points.size();
     area = 0.0;
     if(n < 3){ return;}
-    
+
     // Calculate the area using the shoelace formula
     for (unsigned int i = 0; i < n; i++) {
       unsigned int j = (i + 1) % n; // Wrap around using modulo for the last point
       area += points[i].x * points[j].y;
       area -= points[j].x * points[i].y;
     }
-    
+
     area = std::abs(area / 2.0);
     int k = 0;
   }
-  
+
 };
+
 
 class DictateAnnotation : public Annotation{
 public:
@@ -211,12 +257,35 @@ public:
   
 };
 
-class SegmentAnnotation : public Annotation{
+class SegmentAnnotation : public PolygonAnnotation{
 public:
-  SegmentAnnotation(juce::String name): Annotation(name) {};
+  SegmentAnnotation(juce::String name): PolygonAnnotation(name) {};
   
-  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {}
-  
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
+    //PolygonAnnotation::paint(g, offset, selected, scale);
+
+    for (auto points : input) {
+      juce::Point temp = juce::Point(points.x, points.y);
+      temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
+      temp.applyTransform(juce::AffineTransform::scale(scale.getX(), scale.getY()));
+      if (points.z == 0.0) {
+        g.setColour(juce::Colours::red);
+      }else {
+        g.setColour(juce::Colours::green);
+      }
+      g.fillEllipse(temp.x - 5, temp.y - 5, 10, 10);
+    }
+  }
+
+  void add(Point3f p) {
+    input.push_back(p);
+  }
+
+  void call_SAM() {
+
+  }
+
+  std::vector < Point3f > input;
   
 };
 

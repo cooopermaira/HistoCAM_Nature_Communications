@@ -11,7 +11,7 @@
 
 int Annotation::getType(){
   {
-    PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(this);
+    PolygonAnnotation *cast = dynamic_cast < PointClickPoly * >(this);
     if(cast != NULL){ return _POLY; }
   }
   {

@@ -9,6 +9,8 @@
 #define StreamCam_h
 
 #include <stdio.h>
+
+#include "AccessSAM.h"
 #include "pathCam.h"
 #include "MRTiledImage.h"
 
@@ -146,6 +148,7 @@ namespace pathCam {
     PostProcessManager* ppm;
     SiftFeatureMatcher* sfm;
     AccessSAM *as;
+    JobQueue *JobQ;
 
     //std::vector < double > variancesForDebug;
     std::vector<CompositeVoronoi *> composites;
@@ -229,13 +232,21 @@ namespace pathCam {
 
     void notify_observers();
 
+    bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID) {
+      if (segmentWithSAM) {
+        if (as) {
+          as->create_segmentation(_clicks,_segID);
+          return true;
+        }
+      }
+      return false;
+    }
+
     unsigned int increment_and_get_components() { return components++; }
 
     void add_image(Image *image, unsigned long index);
 
     void add_registration(RegInfo* regInfo);
-
-    JobQueue *JobQ;
 
     Image* get_image_ref(unsigned long);
 

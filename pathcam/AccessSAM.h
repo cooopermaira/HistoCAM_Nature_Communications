@@ -17,6 +17,7 @@ namespace pathCam {
 
 
   class AccessSAM;
+  class CompositeVoronoi;
 
   class SAMTile {
   public:
@@ -29,6 +30,7 @@ namespace pathCam {
     std::vector<std::pair<SAMTile *, std::vector<Point2i> > > neighbors;
     std::vector<std::pair<Point2i, Point2i> > componentTiles;
     cuda::GpuMat noncontiguousWrapper;
+    Mat ncwStoreLocal;
 
     void *rawBuffer, *embed_data_d_, *feats_1_data_d_, *feats_0_data_d_;
     void *clicksGPU, *clickLabelsGPU, *inputMask, *hasMaskInputGPU, *outputMask, *confidence;

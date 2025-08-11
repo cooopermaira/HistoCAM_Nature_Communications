@@ -13,6 +13,7 @@
 class AnnotateComponent  : public juce::Component {
     
 public:
+  int segID = 0;
   MainComponent* parent;
 
   AnnotateComponent(std::shared_ptr < fRectangle > view,
@@ -37,20 +38,20 @@ public:
     resizerBar.reset(new juce::StretchableLayoutResizerBar(&layout, 1, true));
     addChildComponent(resizerBar.get());
 
-#if DEBUG
+#if false
     {
-      std::shared_ptr< PolygonAnnotation > temp = std::make_shared < PolygonAnnotation >("Poly 1");
+      std::shared_ptr< SegmentAnnotation > temp = std::make_shared < SegmentAnnotation >("SAM");
       
-      temp->add(fPoint(50, 50));
-      temp->add(fPoint(1200, 150));          // Add second point
-      temp->add(fPoint(1150, 1150));         // Add third point
-      temp->add(fPoint(150, 1100));          // Add fourth point
-      temp->add(fPoint(-150, 500));          // Add fifth point
+      temp->add(Point3f(50, 50, 1.0));
+      temp->add(Point3f(1200, 150, 0.0));          // Add second point
+      temp->add(Point3f(1150, 1150, 0.0));         // Add third point
+      temp->add(Point3f(150, 1100, 1.0));          // Add fourth point
+      temp->add(Point3f(-150, 500, 1.0));          // Add fifth point
       
       annotations->push_back(temp);
     }
     {
-      std::shared_ptr< PolygonAnnotation > temp = std::make_shared < PolygonAnnotation >("Poly 2");
+      std::shared_ptr< PointClickPoly > temp = std::make_shared < PointClickPoly >("Poly 2");
       
       temp->add(fPoint(2050, 2050));
       temp->add(fPoint(2050, 3050));          // Add second point
