@@ -32,6 +32,7 @@ namespace pathCam {
     cuda::GpuMat noncontiguousWrapper;
     Mat ncwStoreLocal;
 
+    bool embeddingComplete = false;
     void *rawBuffer, *embed_data_d_, *feats_1_data_d_, *feats_0_data_d_;
     void *clicksGPU, *clickLabelsGPU, *inputMask, *hasMaskInputGPU, *outputMask, *confidence;
     bool hasMaskInput = false;
@@ -39,6 +40,8 @@ namespace pathCam {
 
     cuda::GpuMat inputMaskMat;
     std::map<int, cuda::GpuMat> segmentations;
+
+    cudaEvent_t embeddingCompleteCudaEvent;
 
     SAMTile(int ID, Point2i _location, AccessSAM *_as, unsigned _componentIndex, unsigned _size = 1024);
 
@@ -51,9 +54,12 @@ namespace pathCam {
 
     void make_raw_buffer(void *_buffer);
 
-    void on_click();
+    void increase_embed_priority();
 
     void run_segmentation(int _segmentationID);
+
+    Mat debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
+                                              const cv::Scalar &shadeColor, float alpha);
   };
 
 
@@ -103,6 +109,8 @@ namespace pathCam {
 
     static std::map<int, std::vector<Point3f>> choose_clicks_for_each_tile(const std::map<int, std::vector<std::pair<Point3f,bool>>>& clicksByTile,
                                                                            int cap = 10);
+
+    void process_segmentation_Q(int _segID);
 
     static int floorDiv(int a, int b) {
       int q = a / b;
