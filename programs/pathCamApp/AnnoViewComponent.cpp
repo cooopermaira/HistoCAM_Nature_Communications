@@ -28,7 +28,7 @@ bool AnnoViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* o
   ImageViewComponent::keyPressed(key, originatingComponent);
 
   if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_SEG) {
-    if (key == juce::KeyPress::createFromDescription("s")) {
+    if (key == juce::KeyPress::createFromDescription("q")) {
       std::cout << "Run SAM\n";
       SegmentAnnotation *cast = dynamic_cast < SegmentAnnotation * >(parent->getSelected().get());
       //cast->call_SAM();

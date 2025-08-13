@@ -115,22 +115,9 @@ namespace pathCam {
     for (auto &tile: componentTiles) {
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
       as->push_mask_for_display(tile.first, componentIndex, hostOutput(maskRoi), _segmentationID);
-      //as->segmentationMasks[tile.second].emplace_back(_segmentationID, hostOutput(maskRoi));
     }
 
 
-    // Mat test;
-    // output.download(test);
-    // Mat binaryMask;
-    // compare(test, 0, binaryMask, cv::CMP_GT);
-    // binaryMask.convertTo(test,CV_8U);
-    // imwrite("/media/max/Data/pathcam_SAM/maskoutput_runseg.png", test);
-    // int k = 0;
-
-
-    //get mask back
-    //distribute mask input to neighbors
-    //let neighbor know not to rerun this tile
   }
 
   void SAMTile::set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat) {
@@ -241,13 +228,9 @@ namespace pathCam {
     auto ul = comp->imagePyramid->level[0]->getIJ(Point2f(comp->root_offset.x, comp->root_offset.y));
     auto lr = comp->imagePyramid->level[0]->getIJ(Point2f(comp->max_offset.x, comp->max_offset.y));
 
-
     int id = 0;
-    int numSAMTiles = ceil((lr.x - ul.x + 1) / (interval - 1)) * ceil((lr.y - ul.y + 1) / (interval - 1));
-    //size_t nBytesPerImage = 4 * 3 * parent->SAMTileSize * parent->SAMTileSize;
-    //cudaMalloc(&batchImageEmbedBuffer,numSAMTiles * nBytesPerImage);
-
     int yTileCount = 0;
+
     for (int y = ul.y; y <= lr.y; ++y) {
       if ((yTileCount - 1) % (interval - 1) == 0) {
         int xTileCount = 0;
@@ -334,16 +317,23 @@ namespace pathCam {
 
 
       tileToFree = tile;
+
     }
 
     //free last tile
     if (tileToFree) {
       cudaFree(tileToFree->rawBuffer);
     }
+
   }
 
 
   void AccessSAM::create_segmentation(std::vector<Point3f> &_clicks, int _segID) {
+    cudaSetDevice(parent->compositorCudaDevice);
+    while (!segmentProcessQ.empty()) {
+      //clear the queue. the only thing that could be in here at this point is from debug
+      segmentProcessQ.pop();
+    }
     //a tile, its list of clicks, and if each click appears in other tiles as well
     std::map<int, std::vector<std::pair<Point3f, bool> > > tilesAndTheirClicks;
 
@@ -377,6 +367,7 @@ namespace pathCam {
 
         tile->clicksVec.push_back(pointInTileSpace);
       }
+
 
       //tile ready to be enqueued
       segmentProcessQ.push(tile);
@@ -423,15 +414,7 @@ namespace pathCam {
     auto locInTile12 = _point - Point2f((float) parent->tileSize * tiles[primarySAMTileID]->location.x,
                                         (float) parent->tileSize * tiles[primarySAMTileID]->location.y);
     if (locInTile12.x > 1024 || locInTile12.x < 0 || locInTile12.y > 1024 || locInTile12.y < 0) {
-      std::vector<std::pair<SAMTile *, Point2f> > k;
-      for (auto tatatatile: tiles) {
-        auto locInTile123 = _point - Point2f((float) parent->tileSize * tatatatile->location.x,
-                                             (float) parent->tileSize * tatatatile->location.y);
-        if (locInTile123.x >= 0 && locInTile123.x <= 1024 and locInTile123.y >= 0 and locInTile123.y <= 1024) {
-          k.push_back({tatatatile, locInTile123});
-        }
-      }
-      get_tile_id(myTile, 0);
+      throw std::exception();
     }
 
     out.push_back(primarySAMTileID);
