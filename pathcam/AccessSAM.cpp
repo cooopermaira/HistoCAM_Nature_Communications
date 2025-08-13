@@ -24,6 +24,16 @@ namespace pathCam {
 
   void SAMTile::run_segmentation(int _segmentationID) {
     if (clicksVec.empty() && !hasMaskInput) { return; }
+    if (clicksVec.empty()) {
+      //give dummy input to avoid input requirements, -1 means ignore
+      clicksVec.push_back({0,0,-1});
+    }
+
+    cuda::GpuMat temp;
+    cuda::compare(inputMaskMat,Scalar(0),temp,CMP_GT);
+    if (cuda::countNonZero(temp)) {
+      hasMaskInput = true;
+    }
 
     //get embeddings
     AccessSAM::get_clicks_embedding(clicksVec, clicksGPU, clickLabelsGPU);
@@ -45,17 +55,25 @@ namespace pathCam {
       cudaMalloc(&inputMask, sizeof(float) * 256 * 256);
     }
 
+    if (hasMaskInput) {
+      Mat inputMaskMatHost;
+      inputMaskMat.download(inputMaskMatHost);
+      threshold(inputMaskMatHost, inputMaskMatHost, 0.0, 255.0, THRESH_BINARY);
+      inputMaskMatHost.convertTo(inputMaskMatHost,CV_8U);
+      imwrite("/media/max/Data/pathcam_SAM/"+std::to_string(location.x)+"_"+std::to_string(location.y)+"input.png",inputMaskMatHost);
+
+      cudaMemcpy2D(inputMask,sizeof(float) * 256,inputMaskMat.data,inputMaskMat.step, sizeof(float) * 256,256,cudaMemcpyDeviceToDevice);
+    }
+
     //consolidate into a single buffer and run
     std::vector buffer{feats_1_data_d_, clicksGPU, clickLabelsGPU, inputMask, hasMaskInputGPU, outputMask, confidence};
-
-    // Set the optimization profile
-    as->speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, as->speedSam->mMaskDecoder->mCudaStream);
 
     // Set input dimensions for coordinates
     as->speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{1, int(clicksVec.size()), 2});
 
     // Set input dimensions for labels
     as->speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{1, int(clicksVec.size())});
+
 
     //run inference, sync the stream before trying to access output
     auto ok = as->speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),as->speedSam->mMaskDecoder->mCudaStream,nullptr);
@@ -330,10 +348,15 @@ namespace pathCam {
 
   void AccessSAM::create_segmentation(std::vector<Point3f> &_clicks, int _segID) {
     cudaSetDevice(parent->compositorCudaDevice);
+
+    // Set the optimization profile
+    speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, speedSam->mMaskDecoder->mCudaStream);
+
     while (!segmentProcessQ.empty()) {
       //clear the queue. the only thing that could be in here at this point is from debug
       segmentProcessQ.pop();
     }
+
     //a tile, its list of clicks, and if each click appears in other tiles as well
     std::map<int, std::vector<std::pair<Point3f, bool> > > tilesAndTheirClicks;
 
