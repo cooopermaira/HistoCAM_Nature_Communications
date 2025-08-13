@@ -58,9 +58,12 @@ namespace pathCam {
     as->speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{1, int(clicksVec.size())});
 
     //run inference, sync the stream before trying to access output
-    auto err = as->speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),as->speedSam->mMaskDecoder->mCudaStream,nullptr);
-    cudaStreamSynchronize(as->speedSam->mMaskDecoder->mCudaStream);
+    auto ok = as->speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),as->speedSam->mMaskDecoder->mCudaStream,nullptr);
+    auto err = cudaStreamSynchronize(as->speedSam->mMaskDecoder->mCudaStream);
 
+    if (!ok || err != cudaSuccess) {
+      throw std::runtime_error("TensorRT failed: " + std::string(cudaGetErrorString(err)));
+    }
 
     cudaFree(clicksGPU);
     cudaFree(clickLabelsGPU);
@@ -260,7 +263,7 @@ namespace pathCam {
               auto brotherX = tiles[get_tile_id({x - interval + 1, y}, comp->componentIndex)];
               std::vector<Point2i> temp;
               for (int yy = 0; yy < interval; ++yy) {
-                temp.emplace_back(x, y + yy);
+                temp.emplace_back(x - 1, y - 1 + yy);
               }
               tiles.back()->neighbors.emplace_back(brotherX, temp);
               brotherX->neighbors.emplace_back(tiles.back(), temp);
@@ -269,7 +272,7 @@ namespace pathCam {
               auto brotherY = tiles[get_tile_id({x, y - interval + 1}, comp->componentIndex)];
               std::vector<Point2i> temp;
               for (int xx = 0; xx < interval; ++xx) {
-                temp.emplace_back(x + xx, y);
+                temp.emplace_back(x - 1 + xx, y - 1);
               }
               tiles.back()->neighbors.emplace_back(brotherY, temp);
               brotherY->neighbors.emplace_back(tiles.back(), temp);
