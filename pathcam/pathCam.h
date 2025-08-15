@@ -29,7 +29,7 @@
 #include "cudaImage.h"
 #include "cudaSift.h"
 #include "onnxruntime_cxx_api.h"
-#include "sam2_image_inference.hpp"
+//#include "sam2_image_inference.hpp"
 
 
 //#include "BAM/BAM.h"
@@ -80,7 +80,8 @@
 #include <pybind11/embed.h>
 #include <torch/csrc/autograd/python_variable.h>
 
-#include "speedSam.h"
+//#include "speedSam.h"
+#include <NvInfer.h>
 
 #include "util.h"
 #include "DataObserver.h"

@@ -6,7 +6,7 @@
 //
 
 #include "pathCam.h"
-#include "utils.h"
+
 
 namespace pathCam {
   using Poco::AutoPtr;
@@ -59,8 +59,8 @@ namespace pathCam {
     siftCudaDevice = GPU_select_cuda_device();
 
     // cudaSetDevice(compositorCudaDevice);
-    // SpeedSam ss2("/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/model/SAM_encoder.engine","/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/model/SAM_mask_decoder.engine");
-    //segmentWithPoint(ss2,"/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs.jpg","/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs_mask2.jpg");
+    // SpeedSam ss2("/home/max/Downloads/sam2_hiera_large.encoder.onnx","/home/max/Downloads/sam2_hiera_large.decoder.onnx");
+    // segmentWithPoint(ss2,"/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs.jpg","/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs_mask2.jpg");
 #endif
 
     MRimage.reset(new MRTiledImageSet());

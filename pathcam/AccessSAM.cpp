@@ -4,10 +4,75 @@
 
 #include "pathCam.h"
 
+
 //#include "utils.hpp"
 
 
 namespace pathCam {
+  using namespace nvinfer1;
+
+  class Logger : public ILogger {
+    void log(Severity s, const char* msg) noexcept override {
+      if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
+    }
+  } gLogger;
+
+  static std::vector<char> readFile(const std::string& p){
+    std::ifstream f(p, std::ios::binary); if(!f){ std::cerr<<"Open failed: "<<p<<"\n"; std::exit(1);}
+    f.seekg(0,std::ios::end); size_t sz=f.tellg(); f.seekg(0,std::ios::beg);
+    std::vector<char> buf(sz); f.read(buf.data(), sz); return buf;
+  }
+
+  static const char* dataTypeName(nvinfer1::DataType t) {
+    switch (t) {
+      case nvinfer1::DataType::kFLOAT: return "FP32";
+      case nvinfer1::DataType::kHALF:  return "FP16";
+      case nvinfer1::DataType::kINT8:  return "INT8";
+      case nvinfer1::DataType::kINT32: return "INT32";
+#if NV_TENSORRT_MAJOR >= 8
+      case nvinfer1::DataType::kBOOL:  return "BOOL";
+#endif
+      default: return "?";
+    }
+  }
+
+  static void printDims(const nvinfer1::Dims& d) {
+    std::cout << "[";
+    for (int i = 0; i < d.nbDims; ++i) {
+      std::cout << d.d[i] << (i + 1 < d.nbDims ? ", " : "");
+    }
+    std::cout << "]";
+  }
+
+  // void dumpBindings(const nvinfer1::ICudaEngine& eng, int profile = 0) {
+  //   using Sel = nvinfer1::OptProfileSelector;
+  //   const int nb = eng.getNbBindings();
+  //   std::cout << "=== Bindings (profile " << profile << ") ===\n";
+  //   for (int b = 0; b < nb; ++b) {
+  //     const char* name = eng.getBindingName(b);
+  //     const bool isInput = eng.bindingIsInput(b);
+  //     const auto dt = eng.getBindingDataType(b);
+  //     const auto dMin = eng.getProfileDimensions(b, profile, Sel::kMIN);
+  //     const auto dOpt = eng.getProfileDimensions(b, profile, Sel::kOPT);
+  //     const auto dMax = eng.getProfileDimensions(b, profile, Sel::kMAX);
+  //
+  //     bool isStatic = (dMin.nbDims == dOpt.nbDims && dOpt.nbDims == dMax.nbDims);
+  //     if (isStatic) {
+  //       for (int i = 0; i < dMin.nbDims; ++i)
+  //         if (dMin.d[i] != dOpt.d[i] || dOpt.d[i] != dMax.d[i]) { isStatic = false; break; }
+  //     }
+  //
+  //     std::cout << (isInput ? "IN  " : "OUT ")
+  //               << b << "  \"" << (name ? name : "(null)") << "\"  "
+  //               << dataTypeName(dt) << "  min/opt/max=";
+  //     printDims(dMin); std::cout << " / "; printDims(dOpt); std::cout << " / "; printDims(dMax);
+  //     if (isStatic) std::cout << "  (static)";
+  //     std::cout << "\n";
+  //   }
+  //   std::cout << std::flush;
+  // }
+
+
   SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _componentIndex, unsigned _size) : ID(_ID),
     location(_location),
     componentIndex(_componentIndex),
@@ -62,26 +127,44 @@ namespace pathCam {
       inputMaskMatHost.convertTo(inputMaskMatHost,CV_8U);
       imwrite("/media/max/Data/pathcam_SAM/"+std::to_string(location.x)+"_"+std::to_string(location.y)+"input.png",inputMaskMatHost);
 
+      /*
+      cv::cuda::GpuMat neg, expRes, denom, oneMat, sigmoid;
+
+      // neg = -input
+      cv::cuda::multiply(inputMaskMat, -1.0f, neg);
+
+      // expRes = exp(-input)
+      cv::cuda::exp(neg, expRes);
+
+      // denom = 1.0 + expRes
+      cv::cuda::add(expRes, 1.0f, denom);
+
+      // sigmoid = 1.0 / denom
+      cv::cuda::divide(1.0f, denom, inputMaskMat);
+*/
       cudaMemcpy2D(inputMask,sizeof(float) * 256,inputMaskMat.data,inputMaskMat.step, sizeof(float) * 256,256,cudaMemcpyDeviceToDevice);
     }
+    //auto & eng = as->speedSam->mMaskDecoder->mContext->getEngine();
+    //dumpBindings(eng,as->speedSam->mMaskDecoder->mContext->getOptimizationProfile());
 
     //consolidate into a single buffer and run
     std::vector buffer{feats_1_data_d_, clicksGPU, clickLabelsGPU, inputMask, hasMaskInputGPU, outputMask, confidence};
 
     // Set input dimensions for coordinates
-    as->speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{1, int(clicksVec.size()), 2});
+    //as->speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{1, int(clicksVec.size()), 2});
 
     // Set input dimensions for labels
-    as->speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{1, int(clicksVec.size())});
+    //as->speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{1, int(clicksVec.size())});
 
 
     //run inference, sync the stream before trying to access output
-    auto ok = as->speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),as->speedSam->mMaskDecoder->mCudaStream,nullptr);
-    auto err = cudaStreamSynchronize(as->speedSam->mMaskDecoder->mCudaStream);
+    //auto ok = as->speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),as->speedSam->mMaskDecoder->mCudaStream,nullptr);
+    bool ok = true;
+    //auto err = cudaStreamSynchronize(as->speedSam->mMaskDecoder->mCudaStream);
 
-    if (!ok || err != cudaSuccess) {
-      throw std::runtime_error("TensorRT failed: " + std::string(cudaGetErrorString(err)));
-    }
+    // if (!ok || err != cudaSuccess) {
+    //   throw std::runtime_error("TensorRT failed: " + std::string(cudaGetErrorString(err)));
+    // }
 
     cudaFree(clicksGPU);
     cudaFree(clickLabelsGPU);
@@ -164,15 +247,15 @@ namespace pathCam {
 
     for (int i = 0; i < 3; ++i) {
       void *dst = static_cast<char *>(_buffer) + i * nBytesPerChannel;
-      CHECK_CUDA_ERROR(cudaMemcpy2D(dst,
+      cudaMemcpy2D(dst,
         split_channels[2 - i].cols * sizeof(float),
         split_channels[2 - i].data,
         split_channels[2 - i].step,
         split_channels[2 - i].cols * sizeof(float),
         split_channels[2 - i].rows,
-        cudaMemcpyDeviceToDevice));
+        cudaMemcpyDeviceToDevice);
     }
-    CHECK_CUDA_ERROR(cudaGetLastError());
+    cudaGetLastError();
     noncontiguousWrapper.release();
   }
 
@@ -287,7 +370,20 @@ namespace pathCam {
   }
 
   void AccessSAM::load_model() {
-    speedSam = new SpeedSam(parent->SAM_encoder_path.toString(), parent->SAM_decoder_path.toString());
+    //speedSam = new SpeedSam(parent->SAM_encoder_path.toString(), parent->SAM_decoder_path.toString());
+    //speedSam = new SpeedSam("/home/max/Downloads/sam2_hiera_large.encoder.engine","/home/max/Downloads/sam2_hiera_large.decoder.onnx");
+
+    auto blob =  readFile(parent->SAM_encoder_path.toString());
+
+    IRuntime *runtime_ = createInferRuntime(gLogger);
+    engine_ = runtime_->deserializeCudaEngine(blob.data(),blob.size());
+    delete runtime_;
+
+    assert(engine_);
+    encoderCtx_ = engine_->createExecutionContext();
+    assert(encoderCtx_);
+    
+    cudaStreamCreate(&stream_);
   }
 
 
@@ -323,15 +419,15 @@ namespace pathCam {
        * but if the priority of the tiles changes, theres still a chance between iterations for that to take effect. If we
        * enqueued them all at once, this wouldnt be the case. If we block for input consumed, we dont allow parallelism.
        */
-      CHECK_CUDA_ERROR(cudaStreamSynchronize(speedSam->mImageEncoder->mCudaStream));
+      //CHECK_CUDA_ERROR(cudaStreamSynchronize(speedSam->mImageEncoder->mCudaStream));
       if (tileToFree) {
         tile->embeddingComplete = true;
         cudaFree(tileToFree->rawBuffer);
       }
 
       std::vector buffer{tile->rawBuffer, tile->feats_1_data_d_};
-      speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(), speedSam->mImageEncoder->mCudaStream, nullptr);
-      cudaEventRecord(tile->embeddingCompleteCudaEvent,speedSam->mImageEncoder->mCudaStream);
+      //speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(), speedSam->mImageEncoder->mCudaStream, nullptr);
+      //cudaEventRecord(tile->embeddingCompleteCudaEvent,speedSam->mImageEncoder->mCudaStream);
 
 
       tileToFree = tile;
@@ -350,7 +446,7 @@ namespace pathCam {
     cudaSetDevice(parent->compositorCudaDevice);
 
     // Set the optimization profile
-    speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, speedSam->mMaskDecoder->mCudaStream);
+    //speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, speedSam->mMaskDecoder->mCudaStream);
 
     while (!segmentProcessQ.empty()) {
       //clear the queue. the only thing that could be in here at this point is from debug

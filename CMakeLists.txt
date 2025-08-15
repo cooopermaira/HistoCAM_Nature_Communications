@@ -89,10 +89,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     SET(Python3_LIB "/home/max/Python-3.11.0/shared_library_dynamic/lib/libpython3.11.so")
 
     set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
-    #SET(CUDAToolkit_ROOT_DIR "/usr/local/cuda-11.8" CACHE PATH "CUDA toolkit root")
-    #set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-11.8/bin/nvcc")
-    #set(CUDA_INCLUDE_DIRS "/usr/local/cuda-11.8/include")
-    #set(CUDA_CUDART_LIBRARY "/usr/local/cuda-11.8/lib64/libcudart.so")
+
     if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
         set(CMAKE_CUDA_ARCHITECTURES 86 89)   # adjust as needed
     endif()
@@ -107,22 +104,16 @@ ENDIF ()
 link_directories(${Python3_INCLUDE_DIR})
 include_directories(${Python3_INCLUDE_DIR})
 
-#find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 
-#list(APPEND CMAKE_PREFIX_PATH "${Torch_DIR}")
-#list(APPEND CMAKE_MODULE_PATH "/home/max/libtorch/share/cmake/Torch/TorchConfig.cmake")
 set(Torch_DIR "/home/max/libtorch/share/cmake/Torch")
-message(STATUS "Am I being used?!!! ${CMAKE_MODULE_PATH}")
+
 find_package(Torch REQUIRED)
-#add_library(torch_python_shared SHARED IMPORTED)
-#set_target_properties(torch_python_shared PROPERTIES IMPORTED_LOCATION "/home/max/venv-2/lib/python3.10/site-packages/torch/lib/libtorch_python.so")
-#set(CMAKE_BUILD_RPATH "/home/max/venv-2/lib/python3.10/site-packages/torch/lib")
+
 
 add_subdirectory(CudaSift)
 include_directories(CudaSift)
@@ -132,23 +123,10 @@ include_directories(cuda-bundle-adjustment)
 
 add_subdirectory(JUCE)
 
-add_subdirectory(sam2_trt_inference)
-
-
 IF (NOT OVERRRIDE_SPINNAKER)
 
     IF (APPLE)
         IF (EXISTS "/Applications/Spinnaker")
-            #MESSAGE(STATUS "Spinnaker directory found")
-            #SET(BUILD_SPINNAKER "" OFF)
-            #add_compile_definitions(WITH_SPINNAKER)
-            #include_directories( "/Applications/Spinnaker/include" )
-            #SET(SPINNAKER_LIBRARIES
-            #"/Applications/Spinnaker/lib/libSpinVideo.dylib"
-            #"/Applications/Spinnaker/lib/libSpinnaker_C.dylib"
-            #"/Applications/Spinnaker/lib/libSpinnaker.dylib"
-            #"/Applications/Spinnaker/lib/libSpinUpdate.dylib"
-            #"/Applications/Spinnaker/lib/libSpinVideo_C.dylib")
         ENDIF ()
     ELSEIF (WIN32)
         IF (EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
@@ -182,17 +160,17 @@ ENDIF ()
 add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
-add_subdirectory(SPEED-SAM-C-TENSORRT)
-include_directories("/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/include")
+#add_subdirectory(SPEED-SAM-C-TENSORRT)
+#include_directories("/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/include")
 
 link_directories(${ONNXRUNTIME_DIR}/lib)
-link_directories(/home/max/Documents/TensorRT-8.6.1.6/lib)
+link_directories(/home/max/Documents/TensorRT-10.13.2.6.Linux.x86_64-gnu.cuda-12.9/TensorRT-10.13.2.6/lib)
 include_directories(${ONNXRUNTIME_DIR}/include)
 
-include_directories(${CMAKE_SOURCE_DIR}/sam2_trt_inference/include /home/max/Documents/TensorRT-8.6.1.6/include)
+include_directories(/home/max/Documents/TensorRT-10.13.2.6.Linux.x86_64-gnu.cuda-12.9/TensorRT-10.13.2.6/include)
 
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_cuda trt_sam2_infer SpeedSAM)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_cuda nvinfer)# nvinfer_plugin)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

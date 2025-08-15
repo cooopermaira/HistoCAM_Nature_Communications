@@ -72,9 +72,13 @@ namespace pathCam {
   public:
     bool initialized = false;
 
+    nvinfer1::IExecutionContext *encoderCtx_ = nullptr;
+    nvinfer1::ICudaEngine *engine_ = nullptr;
+    cudaStream_t stream_{};
+
     StreamCam *parent;
     std::vector<SAMTile *> tiles;
-    SpeedSam *speedSam;
+    //SpeedSam *speedSam;
 
     std::queue<SAMTile *> segmentProcessQ;
 
