@@ -99,6 +99,13 @@ namespace pathCam {
 
   void SAMTile::run_segmentation(int _segmentationID) {
     if (clicksVec.empty() && !hasMaskInput) { return; }
+
+    if (!clicksFromMasks.empty()) {
+      int i = 0;
+      while (clicksVec.size() < 10) {
+        clicksVec.push_back(clicksFromMasks[i++]);
+      }
+    }
     if (clicksVec.empty()) {
       //give dummy input to avoid input requirements, -1 means ignore
       clicksVec.push_back({0, 0, -1});
@@ -116,8 +123,9 @@ namespace pathCam {
     if (!hasMaskInputGPU) {
       cudaMalloc(&hasMaskInputGPU, sizeof(float));
     }
-    auto maskInputVal = static_cast<float>(hasMaskInput); // 1.0f or 0.0f
-    cudaMemcpy(hasMaskInputGPU, &maskInputVal, sizeof(float), cudaMemcpyHostToDevice);
+    //auto maskInputVal = static_cast<float>(hasMaskInput); // 1.0f or 0.0f
+    //cudaMemcpy(hasMaskInputGPU, &maskInputVal, sizeof(float), cudaMemcpyHostToDevice);
+    cudaMemset(hasMaskInputGPU,0.f,sizeof(float));
 
     //allocate if not already allocated
     if (!outputMask) {
@@ -173,8 +181,72 @@ namespace pathCam {
     int interval = 256 * 256 / size;
 
     //distribute mask information as input to neighbors
-    int count = 0;
+    int scale = as->parent->SAMTileSize / as->parent->tileSize;
     for (auto &neighbor: neighbors) {
+
+      int roix,roiy, roixLen, roiyLen;
+      if ((neighbor.second[1].x - location.x) == 0) {
+        roix = 0;
+        roixLen = as->parent->tileSize / scale;
+        roiy = 0;
+        roiyLen = as->parent->SAMTileSize / scale;
+      } else if ((neighbor.second[1].x - location.x) == 3) {
+        roix = (as->parent->SAMTileSize - as->parent->tileSize) / scale;
+        roixLen = as->parent->tileSize / scale;
+        roiy = 0;
+        roiyLen = as->parent->SAMTileSize / scale;
+      } else if (neighbor.second[1].y - location.y == 0) {
+        roix = 0;
+        roixLen = as->parent->SAMTileSize / scale;
+        roiy = 0;
+        roiyLen = as->parent->tileSize / scale;
+      } else if (neighbor.second[1].y - location.y == 3){
+        roix = 0;
+        roixLen = as->parent->SAMTileSize / scale;
+        roiy = (as->parent->SAMTileSize - as->parent->tileSize) / scale;
+        roiyLen = as->parent->tileSize / scale;
+      }else {
+        throw std::exception();
+      }
+      Rect roi(roix,roiy,roixLen,roiyLen);
+
+      //take one high logit and one low logit as clicks from mask
+      Point highloc,lowloc;
+      double highVal, lowVal;
+      cuda::minMaxLoc(output(roi),&lowVal,&highVal,&lowloc,&highloc);
+
+      highloc.x *= scale;
+      lowloc.x *= scale;
+
+      highloc.y *= scale;
+      lowloc.y *= scale;
+
+      //map click to neighbor space
+      if (neighbor.first->location.x == location.x) {
+        //neighbor is brotherY
+        if (neighbor.first->location.y == location.y) {
+          //edge case
+          continue;
+
+        }else if (neighbor.first->location.y < location.y) {
+          highloc.y += as->parent->SAMTileSize - (int)as->parent->tileSize;
+          lowloc.y += as->parent->SAMTileSize - (int)as->parent->tileSize;
+        }
+      }else if (neighbor.first->location.x < location.x) {
+        //brotherX
+        highloc.y += as->parent->SAMTileSize - (int)as->parent->tileSize;
+        lowloc.y += as->parent->SAMTileSize - (int)as->parent->tileSize;
+      }
+
+      if (highVal > 0) {
+        neighbor.first->clicksFromMasks.push_back(Point3f(highloc.x,highloc.y,1.f));
+      }
+      if (lowVal < 0) {
+        neighbor.first->clicksFromMasks.push_back(Point3f(lowloc.x,lowloc.y,0.f));
+      }
+      int k = 0;
+
+
       for (auto &linkedSubTile: neighbor.second) {
         //figure out region of my output to give each tile
         auto mySubTileIndex = linkedSubTile - location;
@@ -541,6 +613,7 @@ namespace pathCam {
     auto locInTile4 = _point - Point2f((float) parent->tileSize * myTile.x, (float) parent->tileSize * myTile.y);
     if (locInTile4.x < 0 || locInTile4.y < 0 || locInTile4.y > 256 || locInTile4.x > 256) {
       int k = 0;
+      throw std::exception();
     }
 
     auto primarySAMTileID = get_tile_id(myTile, 0);
@@ -548,6 +621,13 @@ namespace pathCam {
     auto locInTile12 = _point - Point2f((float) parent->tileSize * tiles[primarySAMTileID]->location.x,
                                         (float) parent->tileSize * tiles[primarySAMTileID]->location.y);
     if (locInTile12.x > 1024 || locInTile12.x < 0 || locInTile12.y > 1024 || locInTile12.y < 0) {
+      std::vector<SAMTile*> correctTiles;
+      for (auto & tile : tiles) {
+        if (_point.x - tile->location.x >= 0 && _point.x - tile->location.x <= 1024 && _point.y - tile->location.y >= 0 && _point.y - tile->location.y <= 1024) {
+          correctTiles.push_back(tile);
+        }
+      }
+      get_tile_id(myTile,0);
       throw std::exception();
     }
 

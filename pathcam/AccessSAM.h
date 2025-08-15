@@ -37,6 +37,7 @@ namespace pathCam {
     void *clicksGPU, *clickLabelsGPU, *maskInput, *hasMaskInputGPU, *outputMask, *confidence;
     bool hasMaskInput = false;
     std::vector<Point3f> clicksVec;
+    std::vector<Point3f> clicksFromMasks;
 
     cuda::GpuMat inputMaskMat;
     std::map<int, cuda::GpuMat> segmentations;
