@@ -33,8 +33,8 @@ namespace pathCam {
     Mat ncwStoreLocal;
 
     bool embeddingComplete = false;
-    void *rawBuffer, *embed_data_d_, *feats_1_data_d_, *feats_0_data_d_;
-    void *clicksGPU, *clickLabelsGPU, *inputMask, *hasMaskInputGPU, *outputMask, *confidence;
+    void *rawBuffer, *image_embed, *high_res_feats_1, *high_res_feats_0;
+    void *clicksGPU, *clickLabelsGPU, *maskInput, *hasMaskInputGPU, *outputMask, *confidence;
     bool hasMaskInput = false;
     std::vector<Point3f> clicksVec;
 
@@ -72,13 +72,15 @@ namespace pathCam {
   public:
     bool initialized = false;
 
-    nvinfer1::IExecutionContext *encoderCtx_ = nullptr;
-    nvinfer1::ICudaEngine *engine_ = nullptr;
-    cudaStream_t stream_{};
+    nvinfer1::IExecutionContext *encoderCtx = nullptr;
+    nvinfer1::IExecutionContext *decoderCtx = nullptr;
+    nvinfer1::ICudaEngine *encoderEngine = nullptr;
+    nvinfer1::ICudaEngine *decoderEngine = nullptr;
+    cudaStream_t encoderStream{};
+    cudaStream_t decoderStream{};
 
     StreamCam *parent;
     std::vector<SAMTile *> tiles;
-    //SpeedSam *speedSam;
 
     std::queue<SAMTile *> segmentProcessQ;
 
@@ -89,6 +91,9 @@ namespace pathCam {
 
     ~AccessSAM() {
     };
+
+    //immediately when a click is made, figure out what the tile was and increase its embed priority
+    void on_click(Point3f _click);
 
     //loads SAM encoder and decoder as speedSam object. Can take .engine or .onnx
     void load_model();

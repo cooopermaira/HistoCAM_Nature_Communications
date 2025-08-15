@@ -279,6 +279,7 @@ public:
 
   void add(Point3f p) {
     input.push_back(p);
+
   }
 
   void call_SAM() {

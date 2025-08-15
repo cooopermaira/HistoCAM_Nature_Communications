@@ -7,36 +7,46 @@
 
 //#include "utils.hpp"
 
+#define CHECK_CUDA(x) do { cudaError_t e=(x); if(e!=cudaSuccess){ \
+std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<<"\n"; std::exit(1);} } while(0)
 
 namespace pathCam {
   using namespace nvinfer1;
 
   class Logger : public ILogger {
-    void log(Severity s, const char* msg) noexcept override {
+    void log(Severity s, const char *msg) noexcept override {
       if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
     }
   } gLogger;
 
-  static std::vector<char> readFile(const std::string& p){
-    std::ifstream f(p, std::ios::binary); if(!f){ std::cerr<<"Open failed: "<<p<<"\n"; std::exit(1);}
-    f.seekg(0,std::ios::end); size_t sz=f.tellg(); f.seekg(0,std::ios::beg);
-    std::vector<char> buf(sz); f.read(buf.data(), sz); return buf;
+  static std::vector<char> readFile(const std::string &p) {
+    std::ifstream f(p, std::ios::binary);
+    if (!f) {
+      std::cerr << "Open failed: " << p << "\n";
+      std::exit(1);
+    }
+    f.seekg(0, std::ios::end);
+    size_t sz = f.tellg();
+    f.seekg(0, std::ios::beg);
+    std::vector<char> buf(sz);
+    f.read(buf.data(), sz);
+    return buf;
   }
 
-  static const char* dataTypeName(nvinfer1::DataType t) {
+  static const char *dataTypeName(nvinfer1::DataType t) {
     switch (t) {
       case nvinfer1::DataType::kFLOAT: return "FP32";
-      case nvinfer1::DataType::kHALF:  return "FP16";
-      case nvinfer1::DataType::kINT8:  return "INT8";
+      case nvinfer1::DataType::kHALF: return "FP16";
+      case nvinfer1::DataType::kINT8: return "INT8";
       case nvinfer1::DataType::kINT32: return "INT32";
 #if NV_TENSORRT_MAJOR >= 8
-      case nvinfer1::DataType::kBOOL:  return "BOOL";
+      case nvinfer1::DataType::kBOOL: return "BOOL";
 #endif
       default: return "?";
     }
   }
 
-  static void printDims(const nvinfer1::Dims& d) {
+  static void printDims(const nvinfer1::Dims &d) {
     std::cout << "[";
     for (int i = 0; i < d.nbDims; ++i) {
       std::cout << d.d[i] << (i + 1 < d.nbDims ? ", " : "");
@@ -79,7 +89,7 @@ namespace pathCam {
     size(_size),
     as(_as) {
     noncontiguousWrapper = cuda::GpuMat(size, size,CV_8UC4, Scalar(0, 0, 0, 0));
-    inputMask = nullptr;
+    maskInput = nullptr;
     outputMask = nullptr;
     confidence = nullptr;
     hasMaskInputGPU = nullptr;
@@ -91,11 +101,11 @@ namespace pathCam {
     if (clicksVec.empty() && !hasMaskInput) { return; }
     if (clicksVec.empty()) {
       //give dummy input to avoid input requirements, -1 means ignore
-      clicksVec.push_back({0,0,-1});
+      clicksVec.push_back({0, 0, -1});
     }
 
     cuda::GpuMat temp;
-    cuda::compare(inputMaskMat,Scalar(0),temp,CMP_GT);
+    cuda::compare(inputMaskMat, Scalar(0), temp, CMP_GT);
     if (cuda::countNonZero(temp)) {
       hasMaskInput = true;
     }
@@ -111,13 +121,13 @@ namespace pathCam {
 
     //allocate if not already allocated
     if (!outputMask) {
-      cudaMalloc(&outputMask, sizeof(float) * 256 * 256 * 4);
+      cudaMalloc(&outputMask, sizeof(float) * 256 * 256 * 3);
     }
     if (!confidence) {
-      cudaMalloc(&confidence, 4 * sizeof(float));
+      cudaMalloc(&confidence, 3 * sizeof(float));
     }
-    if (!inputMask) {
-      cudaMalloc(&inputMask, sizeof(float) * 256 * 256);
+    if (!maskInput) {
+      cudaMalloc(&maskInput, sizeof(float) * 256 * 256);
     }
 
     if (hasMaskInput) {
@@ -125,46 +135,33 @@ namespace pathCam {
       inputMaskMat.download(inputMaskMatHost);
       threshold(inputMaskMatHost, inputMaskMatHost, 0.0, 255.0, THRESH_BINARY);
       inputMaskMatHost.convertTo(inputMaskMatHost,CV_8U);
-      imwrite("/media/max/Data/pathcam_SAM/"+std::to_string(location.x)+"_"+std::to_string(location.y)+"input.png",inputMaskMatHost);
+      imwrite(
+        "/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + "input.png",
+        inputMaskMatHost);
 
-      /*
-      cv::cuda::GpuMat neg, expRes, denom, oneMat, sigmoid;
-
-      // neg = -input
-      cv::cuda::multiply(inputMaskMat, -1.0f, neg);
-
-      // expRes = exp(-input)
-      cv::cuda::exp(neg, expRes);
-
-      // denom = 1.0 + expRes
-      cv::cuda::add(expRes, 1.0f, denom);
-
-      // sigmoid = 1.0 / denom
-      cv::cuda::divide(1.0f, denom, inputMaskMat);
-*/
-      cudaMemcpy2D(inputMask,sizeof(float) * 256,inputMaskMat.data,inputMaskMat.step, sizeof(float) * 256,256,cudaMemcpyDeviceToDevice);
+      cudaMemcpy2D(maskInput, sizeof(float) * 256, inputMaskMat.data, inputMaskMat.step, sizeof(float) * 256, 256,
+                   cudaMemcpyDeviceToDevice);
     }
-    //auto & eng = as->speedSam->mMaskDecoder->mContext->getEngine();
-    //dumpBindings(eng,as->speedSam->mMaskDecoder->mContext->getOptimizationProfile());
 
-    //consolidate into a single buffer and run
-    std::vector buffer{feats_1_data_d_, clicksGPU, clickLabelsGPU, inputMask, hasMaskInputGPU, outputMask, confidence};
+    //set binding dimension for dynamic input (clicks)
+    as->decoderCtx->setInputShape("point_coords", Dims3{1, static_cast<int>(clicksVec.size()), 2});
+    as->decoderCtx->setInputShape("point_labels", Dims2{1, static_cast<int>(clicksVec.size())});
 
-    // Set input dimensions for coordinates
-    //as->speedSam->mMaskDecoder->mContext->setBindingDimensions(1, Dims3{1, int(clicksVec.size()), 2});
+    //set input and output addresses
+    as->decoderCtx->setInputTensorAddress("image_embed",image_embed);
+    as->decoderCtx->setInputTensorAddress("high_res_feats_0",high_res_feats_0);
+    as->decoderCtx->setInputTensorAddress("high_res_feats_1",high_res_feats_1);
+    as->decoderCtx->setInputTensorAddress("point_coords",clicksGPU);
+    as->decoderCtx->setInputTensorAddress("point_labels",clickLabelsGPU);
+    as->decoderCtx->setInputTensorAddress("mask_input",maskInput);
+    as->decoderCtx->setInputTensorAddress("has_mask_input",hasMaskInputGPU);
 
-    // Set input dimensions for labels
-    //as->speedSam->mMaskDecoder->mContext->setBindingDimensions(2, Dims2{1, int(clicksVec.size())});
+    as->decoderCtx->setOutputTensorAddress("masks",outputMask);
+    as->decoderCtx->setOutputTensorAddress("iou_predictions",confidence);
 
+    as->decoderCtx->enqueueV3(as->decoderStream);
+    CHECK_CUDA(cudaStreamSynchronize(as->decoderStream));
 
-    //run inference, sync the stream before trying to access output
-    //auto ok = as->speedSam->mMaskDecoder->mContext->enqueueV2(buffer.data(),as->speedSam->mMaskDecoder->mCudaStream,nullptr);
-    bool ok = true;
-    //auto err = cudaStreamSynchronize(as->speedSam->mMaskDecoder->mCudaStream);
-
-    // if (!ok || err != cudaSuccess) {
-    //   throw std::runtime_error("TensorRT failed: " + std::string(cudaGetErrorString(err)));
-    // }
 
     cudaFree(clicksGPU);
     cudaFree(clickLabelsGPU);
@@ -206,8 +203,9 @@ namespace pathCam {
     Mat hostOutput;
     output.download(hostOutput);
 
-    auto ans = debug_draw_tile_with_clicks_and_mask(ncwStoreLocal,hostOutput,Scalar(0,180,150,255),0.5);
-    imwrite("/media/max/Data/pathcam_SAM/"+std::to_string(location.x)+"_"+std::to_string(location.y)+".png",ans);
+    auto ans = debug_draw_tile_with_clicks_and_mask(ncwStoreLocal, hostOutput, Scalar(0, 180, 150, 255), 0.5);
+    imwrite("/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + ".png",
+            ans);
     int k = 0;
 
 
@@ -217,8 +215,6 @@ namespace pathCam {
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
       as->push_mask_for_display(tile.first, componentIndex, hostOutput(maskRoi), _segmentationID);
     }
-
-
   }
 
   void SAMTile::set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat) {
@@ -248,12 +244,12 @@ namespace pathCam {
     for (int i = 0; i < 3; ++i) {
       void *dst = static_cast<char *>(_buffer) + i * nBytesPerChannel;
       cudaMemcpy2D(dst,
-        split_channels[2 - i].cols * sizeof(float),
-        split_channels[2 - i].data,
-        split_channels[2 - i].step,
-        split_channels[2 - i].cols * sizeof(float),
-        split_channels[2 - i].rows,
-        cudaMemcpyDeviceToDevice);
+                   split_channels[2 - i].cols * sizeof(float),
+                   split_channels[2 - i].data,
+                   split_channels[2 - i].step,
+                   split_channels[2 - i].cols * sizeof(float),
+                   split_channels[2 - i].rows,
+                   cudaMemcpyDeviceToDevice);
     }
     cudaGetLastError();
     noncontiguousWrapper.release();
@@ -279,8 +275,7 @@ namespace pathCam {
   }
 
   Mat SAMTile::debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
-                                                     const cv::Scalar &shadeColor, float alpha)
-  {
+                                                    const cv::Scalar &shadeColor, float alpha) {
     CV_Assert(bgraImage.type() == CV_8UC4);
     CV_Assert(binaryMask.type() == CV_8UC1);
     CV_Assert(bgraImage.size() == binaryMask.size());
@@ -311,13 +306,12 @@ namespace pathCam {
     // Merge back
     cv::merge(channels, result);
 
-    for (auto & point : clicksVec) {
-      circle(result,Point2f(point.x,point.y),20,Scalar(0,0,0,255),-1);
+    for (auto &point: clicksVec) {
+      circle(result, Point2f(point.x, point.y), 20, Scalar(0, 0, 0, 255), -1);
     }
 
     return result;
   }
-
 
 
   void AccessSAM::initialize() {
@@ -373,17 +367,29 @@ namespace pathCam {
     //speedSam = new SpeedSam(parent->SAM_encoder_path.toString(), parent->SAM_decoder_path.toString());
     //speedSam = new SpeedSam("/home/max/Downloads/sam2_hiera_large.encoder.engine","/home/max/Downloads/sam2_hiera_large.decoder.onnx");
 
-    auto blob =  readFile(parent->SAM_encoder_path.toString());
+    auto dBlob = readFile(parent->SAM_decoder_path.toString());
 
-    IRuntime *runtime_ = createInferRuntime(gLogger);
-    engine_ = runtime_->deserializeCudaEngine(blob.data(),blob.size());
-    delete runtime_;
+    IRuntime *dRuntime = createInferRuntime(gLogger);
+    decoderEngine = dRuntime->deserializeCudaEngine(dBlob.data(), dBlob.size());
+    delete dRuntime;
 
-    assert(engine_);
-    encoderCtx_ = engine_->createExecutionContext();
-    assert(encoderCtx_);
-    
-    cudaStreamCreate(&stream_);
+    assert(decoderEngine);
+    decoderCtx = decoderEngine->createExecutionContext();
+    assert(decoderCtx);
+
+    cudaStreamCreate(&decoderStream);
+
+    auto eBlob = readFile(parent->SAM_encoder_path.toString());
+
+    IRuntime *eRuntime = createInferRuntime(gLogger);
+    encoderEngine = eRuntime->deserializeCudaEngine(eBlob.data(), eBlob.size());
+    delete eRuntime;
+
+    assert(encoderEngine);
+    encoderCtx = encoderEngine->createExecutionContext();
+    assert(encoderCtx);
+
+    cudaStreamCreate(&encoderStream);
   }
 
 
@@ -408,9 +414,9 @@ namespace pathCam {
       cudaMalloc(&tile->rawBuffer, nElementsPerChannel * 3 * sizeof(float));
       tile->make_raw_buffer(tile->rawBuffer);
 
-      //cudaMalloc(&tile->feats_0_data_d_, nElementsPerChannel * 2 * sizeof(float));
-      cudaMalloc(&tile->feats_1_data_d_, nElementsPerChannel * sizeof(float));
-      //cudaMalloc(&tile->embed_data_d_, nElementsPerChannel * sizeof(float));
+      cudaMalloc(&tile->high_res_feats_0, 32 * 256 * 256 * sizeof(float));
+      cudaMalloc(&tile->high_res_feats_1, 64 * 128 * 128 * sizeof(float));
+      cudaMalloc(&tile->image_embed, 256 * 64 * 64 * sizeof(float));
 
       /*the more intuitive way to do this is to use an 'input consumed' event and then free the raw buffer as soon as that
        * turns true rather than wait for the next iteration, sync the whole stream and then free the input. The reason
@@ -419,19 +425,25 @@ namespace pathCam {
        * but if the priority of the tiles changes, theres still a chance between iterations for that to take effect. If we
        * enqueued them all at once, this wouldnt be the case. If we block for input consumed, we dont allow parallelism.
        */
-      //CHECK_CUDA_ERROR(cudaStreamSynchronize(speedSam->mImageEncoder->mCudaStream));
+      CHECK_CUDA(cudaStreamSynchronize(encoderStream));
       if (tileToFree) {
         tile->embeddingComplete = true;
         cudaFree(tileToFree->rawBuffer);
       }
 
-      std::vector buffer{tile->rawBuffer, tile->feats_1_data_d_};
+      encoderCtx->setInputTensorAddress("image", tile->rawBuffer);
+      encoderCtx->setOutputTensorAddress("high_res_feats_0", tile->high_res_feats_0);
+      encoderCtx->setOutputTensorAddress("high_res_feats_1", tile->high_res_feats_1);
+      encoderCtx->setOutputTensorAddress("image_embed", tile->image_embed);
+
+      encoderCtx->enqueueV3(encoderStream);
+
+      //std::vector buffer{tile->rawBuffer, tile->high_res_feats_1};
       //speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(), speedSam->mImageEncoder->mCudaStream, nullptr);
       //cudaEventRecord(tile->embeddingCompleteCudaEvent,speedSam->mImageEncoder->mCudaStream);
 
 
       tileToFree = tile;
-
     }
 
     //free last tile
@@ -439,6 +451,10 @@ namespace pathCam {
       cudaFree(tileToFree->rawBuffer);
     }
 
+    delete encoderCtx;
+    delete encoderEngine;
+
+    std::cout << "embedded tiles: " << tiles.size() << std::endl;
   }
 
 
@@ -446,7 +462,7 @@ namespace pathCam {
     cudaSetDevice(parent->compositorCudaDevice);
 
     // Set the optimization profile
-    //speedSam->mMaskDecoder->mContext->setOptimizationProfileAsync(0, speedSam->mMaskDecoder->mCudaStream);
+    decoderCtx->setOptimizationProfileAsync(0, decoderStream);
 
     while (!segmentProcessQ.empty()) {
       //clear the queue. the only thing that could be in here at this point is from debug
@@ -516,7 +532,6 @@ namespace pathCam {
   }
 
 
-
   std::vector<int> AccessSAM::get_tiles_covering_point(const Point2f &_point, int _stride) {
     std::vector<int> out;
 
@@ -581,6 +596,13 @@ namespace pathCam {
     }
 
     return out;
+  }
+
+  void AccessSAM::on_click(Point3f _click) {
+    auto effectedTiles = get_tiles_covering_point(Point2f(_click.x, _click.y), parent->SAMTileSize - parent->tileSize);
+    for (auto &ind: effectedTiles) {
+      tiles[ind]->increase_embed_priority();
+    }
   }
 
 

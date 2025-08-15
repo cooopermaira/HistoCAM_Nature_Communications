@@ -164,7 +164,9 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent& event)
     if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_SEG){
       SegmentAnnotation *cast = dynamic_cast < SegmentAnnotation * >(parent->getSelected().get());
       fPoint temp = screen2view(fPoint(event.x, event.y), *view);
-      cast->add(Point3f(temp.x, temp.y, 1.0));
+      Point3f point(temp.x, temp.y, 1.0);
+      cast->add(point);
+      parent->parent->sCam->as->on_click(point);
       return true;
     }
   }
@@ -173,7 +175,9 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent& event)
     if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_SEG){
       SegmentAnnotation *cast = dynamic_cast < SegmentAnnotation * >(parent->getSelected().get());
       fPoint temp = screen2view(fPoint(event.x, event.y), *view);
-      cast->add(Point3f(temp.x, temp.y, 0.0));
+      Point3f point(temp.x, temp.y, 0.0);
+      cast->add(point);
+      parent->parent->sCam->as->on_click(point);
       return true;
     }
   }
