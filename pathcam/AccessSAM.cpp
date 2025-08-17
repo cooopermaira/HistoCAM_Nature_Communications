@@ -13,6 +13,8 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 namespace pathCam {
   using namespace nvinfer1;
 
+
+
   class Logger : public ILogger {
     void log(Severity s, const char *msg) noexcept override {
       if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
@@ -102,7 +104,7 @@ namespace pathCam {
 
     if (!clicksFromMasks.empty()) {
       int i = 0;
-      while (clicksVec.size() < 10) {
+      while (clicksVec.size() < 10 && i < clicksFromMasks.size()) {
         clicksVec.push_back(clicksFromMasks[i++]);
       }
     }
@@ -140,12 +142,6 @@ namespace pathCam {
 
     if (hasMaskInput) {
       Mat inputMaskMatHost;
-      inputMaskMat.download(inputMaskMatHost);
-      threshold(inputMaskMatHost, inputMaskMatHost, 0.0, 255.0, THRESH_BINARY);
-      inputMaskMatHost.convertTo(inputMaskMatHost,CV_8U);
-      imwrite(
-        "/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + "input.png",
-        inputMaskMatHost);
 
       cudaMemcpy2D(maskInput, sizeof(float) * 256, inputMaskMat.data, inputMaskMat.step, sizeof(float) * 256, 256,
                    cudaMemcpyDeviceToDevice);
@@ -177,6 +173,11 @@ namespace pathCam {
     hasMaskInput = false;
 
     cuda::GpuMat output(256, 256,CV_32FC1, outputMask);
+    cuda::GpuMat outputBinary;
+    cuda::threshold(output,outputBinary,0,255,THRESH_BINARY);
+    outputBinary.convertTo(outputBinary,CV_8U);
+
+
 
     int interval = 256 * 256 / size;
 
@@ -213,7 +214,15 @@ namespace pathCam {
       //take one high logit and one low logit as clicks from mask
       Point highloc,lowloc;
       double highVal, lowVal;
-      cuda::minMaxLoc(output(roi),&lowVal,&highVal,&lowloc,&highloc);
+      //cuda::minMaxLoc(output(roi),&lowVal,&highVal,&lowloc,&highloc);
+
+      auto seeds = AccessSAM::pickSeedsFromLogits_v2(output(roi),outputBinary(roi),9);
+
+      highloc = seeds.inlier;
+      lowloc = seeds.outlier;
+
+      highVal = seeds.inlierScore;
+      lowVal = seeds.outlierScore;
 
       highloc.x *= scale;
       lowloc.x *= scale;
@@ -282,6 +291,7 @@ namespace pathCam {
       }
     }
 
+
     //send my own mask info for display
     cuda::resize(output, output, {int(size), int(size)});
     cuda::threshold(output, output, 0.0, 255.0, THRESH_BINARY);
@@ -301,9 +311,24 @@ namespace pathCam {
     int tileSize = as->parent->tileSize;
     for (auto &tile: componentTiles) {
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
-      as->push_mask_for_display(tile.first, componentIndex, output(maskRoi), _segmentationID);
+      if (cuda::countNonZero(output(maskRoi))) {
+        as->push_mask_for_display(tile.second, componentIndex, output(maskRoi), _segmentationID);
+      }
     }
   }
+
+
+  void SAMTile::get_tile_data(CompositeVoronoi *_comp, unsigned int _interval) {
+    for (int xx = 0; xx < _interval; ++xx) {
+      for (int yy = 0; yy < _interval; ++yy) {
+        auto gMat = _comp->imagePyramid->level[0]->getTile(location.x + xx, location.y + yy);
+        set_component_tile({location.x + xx, location.y + yy}, {xx, yy}, gMat.image);
+      }
+    }
+    //debug
+    noncontiguousWrapper.download(ncwStoreLocal);
+  }
+
 
   void SAMTile::set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat) {
     componentTiles.emplace_back(_subLocation, _tileID);
@@ -311,9 +336,10 @@ namespace pathCam {
     try {
       _tileMat.copyTo(noncontiguousWrapper(ROI));
     } catch (...) {
-      int k = 0;
+      throw std::exception();
     }
   }
+
 
   void SAMTile::make_raw_buffer(void *_buffer) {
     //convert to F32, normalize for imagenet. keep in mind the mat is currently in BGRA
@@ -341,17 +367,6 @@ namespace pathCam {
     }
     cudaGetLastError();
     noncontiguousWrapper.release();
-  }
-
-  void SAMTile::get_tile_data(CompositeVoronoi *_comp, unsigned int _interval) {
-    for (int xx = 0; xx < _interval; ++xx) {
-      for (int yy = 0; yy < _interval; ++yy) {
-        auto gMat = _comp->imagePyramid->level[0]->getTile(location.x + xx, location.y + yy);
-        set_component_tile({location.x + xx - 1, location.y + yy - 1}, {xx, yy}, gMat.image);
-      }
-    }
-    //debug
-    noncontiguousWrapper.download(ncwStoreLocal);
   }
 
 
@@ -596,10 +611,6 @@ namespace pathCam {
       segmentProcessQ.push(tile);
     }
 
-    process_segmentation_Q(_segID);
-  }
-
-  void AccessSAM::process_segmentation_Q(int _segID) {
     while (!segmentProcessQ.empty()) {
       //get front tile
       auto tile = segmentProcessQ.front();
@@ -616,6 +627,7 @@ namespace pathCam {
 
       //process the segmentation
       tile->run_segmentation(_segID);
+      //processQEvent.wait();
     }
   }
 
@@ -809,17 +821,85 @@ namespace pathCam {
   }
 
 
-  void AccessSAM::push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID) {
+  void AccessSAM::push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID) {
     auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
-    TileObj &tileObj = pyrBase->getTile(_tile.x, _tile.y);
+    TileObj &tileObj = pyrBase->getTile(_tileCoord.x, _tileCoord.y);
+
+    //if no display object exists, initialize one
     if (tileObj.SAMMasks.find(_segID) == tileObj.SAMMasks.end()) {
       tileObj.SAMMasks[_segID] = {cuda::GpuMat(parent->tileSize,parent->tileSize,CV_8U,Scalar(0)),nullptr};
     }
+
+    //combine with current mask by taking max at each pixel
     cuda::max(_mask,tileObj.SAMMasks[_segID].first,tileObj.SAMMasks[_segID].first);
+    tileObj.newAnnoData = true;
 
-    Rect levelRegion(_tile.x * parent->tileSize, _tile.y * parent->tileSize,parent->tileSize,parent->tileSize);
+    //pick level region as own bounds and roi as entire tile
+    Rect levelRegion(_tileCoord.x * parent->tileSize, _tileCoord.y * parent->tileSize,parent->tileSize,parent->tileSize);
+    Rect tileRegion(0,0,parent->tileSize,parent->tileSize);
+
     auto level = parent->composites[0]->imagePyramid->level[0];
+    level->tileUpwards(_tileCoord,levelRegion,tileObj,tileRegion,_segID);
 
-    level->tileUpwards(_tile,levelRegion,tileObj,Rect(0,0,parent->tileSize,parent->tileSize),_segID);
+    parent->notify_observers();
   }
+
+  Seeds AccessSAM::pickSeedsFromLogits_v2(const cv::cuda::GpuMat& logits,
+                             const cv::cuda::GpuMat& mask8u,
+                             int k,
+                             bool outsidePrefersHigh,
+                             cv::cuda::Stream stream)
+{
+    CV_Assert(logits.type() == CV_32F && logits.channels() == 1);
+    CV_Assert(mask8u.type() == CV_8U && mask8u.size() == logits.size());
+    CV_Assert(k > 0 && (k & 1) == 1);
+
+    // 1) Mean logits via normalized box filter (CUDA)
+    cuda::GpuMat meanLogits;
+    {
+        // Normalized box = local average. CV_32F -> CV_32F.
+        // Some builds have createBoxFilter(srcType, dstType, ksize)
+        // (normalized by default). If yours requires an anchor, pass Point(-1,-1).
+        auto box = cuda::createBoxFilter(CV_32F, CV_32F, Size(k, k));
+        box->apply(logits, meanLogits, stream);
+    }
+
+    // 2) Build interior (eroded) and outer ring (dilate - original) on GPU
+    cuda::GpuMat interior, dilated, outerRing;
+    {
+        auto se3 = getStructuringElement(MORPH_RECT, Size(3, 3));
+        auto erodeF  = cuda::createMorphologyFilter(MORPH_ERODE,  CV_8U, se3);
+        auto dilateF = cuda::createMorphologyFilter(MORPH_DILATE, CV_8U, se3);
+        erodeF->apply(mask8u, interior, stream);
+        dilateF->apply(mask8u, dilated,  stream);
+        cuda::subtract(dilated, mask8u, outerRing, noArray(), CV_8U, stream);
+    }
+
+    // Ensure the above GPU ops are done before minMaxLoc (which syncs anyway)
+    stream.waitForCompletion();
+
+    // 3) Inlier: argmax of meanLogits inside the interior
+    double inMin = 0.0, inMax = 0.0;
+    cv::Point inMinLoc, inMaxLoc;
+    // Note: cuda::minMaxLoc has signature without Stream; pass a mask for ROI
+    cv::cuda::minMaxLoc(meanLogits, &inMin, &inMax, &inMinLoc, &inMaxLoc, interior);
+
+    // 4) Outlier: argmax or argmin in the outer ring (choose based on your logit convention)
+    double outMin = 0.0, outMax = 0.0;
+    cv::Point outMinLoc, outMaxLoc;
+    cv::cuda::minMaxLoc(meanLogits, &outMin, &outMax, &outMinLoc, &outMaxLoc, outerRing);
+
+    Seeds s;
+    s.inlier = inMaxLoc;
+    s.inlierScore = static_cast<float>(inMax);
+
+    if (outsidePrefersHigh) {
+        s.outlier = outMaxLoc;
+        s.outlierScore = static_cast<float>(outMax);
+    } else {
+        s.outlier = outMinLoc;
+        s.outlierScore = static_cast<float>(outMin);
+    }
+    return s;
+}
 }

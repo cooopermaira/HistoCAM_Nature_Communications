@@ -101,6 +101,8 @@ namespace pathCam {
         submit_outstanding_jobs();
       }
     }
+    std::cout << "CM duration: " + std::to_string(duration) << std::endl;
+
     push_remaining_tiles_for_inference();
 
 
@@ -118,7 +120,6 @@ namespace pathCam {
       std::cout<<"SAM initialization runtime: "+std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count())<<std::endl;;
     }
 
-    std::cout << "CM duration: " + std::to_string(duration) << std::endl;
     parent->compositing = false;
     parent->inferenceWait.set();
   }

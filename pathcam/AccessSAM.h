@@ -9,6 +9,9 @@
 //#include "speedSam.h"
 
 namespace pathCam {
+
+  struct Seeds { Point inlier, outlier; float inlierScore, outlierScore; };
+
   struct Point2iComparator {
     bool operator()(const cv::Point2i &a, const cv::Point2i &b) const {
       return std::tie(a.x, a.y) < std::tie(b.x, b.y);
@@ -60,7 +63,9 @@ namespace pathCam {
     void run_segmentation(int _segmentationID);
 
     Mat debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
-                                              const cv::Scalar &shadeColor, float alpha);
+                                             const cv::Scalar &shadeColor, float alpha);
+
+    Rect get_shared_ROI(SAMTile* neighbor);
   };
 
 
@@ -81,13 +86,14 @@ namespace pathCam {
     cudaStream_t decoderStream{};
 
     StreamCam *parent;
+
+    Poco::Event processQEvent;
+
     std::vector<SAMTile *> tiles;
-
     std::queue<SAMTile *> segmentProcessQ;
-
     std::map<Point2i, std::vector<std::pair<int, Mat> >, Point2iComparator> segmentationMasks;
 
-    AccessSAM(StreamCam *_parent): parent(_parent) {
+    AccessSAM(StreamCam *_parent): parent(_parent), processQEvent(true) {
     };
 
     ~AccessSAM() {
@@ -105,20 +111,27 @@ namespace pathCam {
     //transforms click data into raw buffers (floats)
     static void get_clicks_embedding(std::vector<Point3f> &_clicks, void *&_clicksGPU, void *&_clickLabelsGPU);
 
+    static Seeds pickSeedsFromLogits_v2(const cv::cuda::GpuMat& logits,
+                             const cv::cuda::GpuMat& mask8u,
+                             int k,
+                             bool outsidePrefersHigh = true,
+                             cuda::Stream stream = cuda::Stream::Null());
+
     //calculates the tile ID from the point location and component index
     int get_tile_id(Point2i _tileIndexPoint, unsigned int _componentIndex) const;
 
     //fills SAM tiles with image data and creates SAM embedding for each tile. Priority of each tile can be adjusted on the fly
     void embed_SAM_tiles();
 
-    void push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID);
+    void push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID);
 
     void create_segmentation(std::vector<Point3f> &_clicks, int _segID);
 
     std::vector<int> get_tiles_covering_point(const Point2f &_p, int _stride = 768);
 
-    static std::map<int, std::vector<Point3f>> choose_clicks_for_each_tile(const std::map<int, std::vector<std::pair<Point3f,bool>>>& clicksByTile,
-                                                                           int cap = 10);
+    static std::map<int, std::vector<Point3f> > choose_clicks_for_each_tile(
+      const std::map<int, std::vector<std::pair<Point3f, bool> > > &clicksByTile,
+      int cap = 10);
 
     void process_segmentation_Q(int _segID);
 
