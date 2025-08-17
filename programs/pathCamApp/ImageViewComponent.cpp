@@ -194,9 +194,37 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
                        img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost);
           tile->newData = false;
         }
-        tile->mutex->unlock();
+        if (tile->newAnnoData) {
+          for (auto &kv : tile->SAMMasks) {
+            if (!kv.second.second) {
+              kv.second.second = new juce::Image(juce::Image::SingleChannel, tile->image.cols, tile->image.rows, true);
+            }
+            auto annoMask = static_cast<juce::Image *>(kv.second.second);
+            juce::Image::BitmapData bitmap_data(*annoMask,juce::Image::BitmapData::ReadWriteMode::writeOnly);
+            auto img = kv.second.first;
+            cudaMemcpy2D(bitmap_data.data,img.cols,img.data,img.step,img.cols,img.rows,cudaMemcpyDeviceToHost);
+          }
+        }
+
         g.setOpacity(1.f);
         g.drawImage(*im, bounds);
+        for (auto & mask : tile->SAMMasks) {
+          auto jImg = static_cast<juce::Image*>(mask.second.second);
+          g.saveState();
+          g.setOpacity(0.5f);
+
+          const float sx = bounds.getWidth()  / (float) jImg->getWidth();
+          const float sy = bounds.getHeight() / (float) jImg->getHeight();
+
+          AffineTransform maskToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
+
+          g.reduceClipRegion(*jImg,maskToCanvas);
+          g.setColour(juce::Colours::green);
+          g.fillAll();
+          g.restoreState();
+        }
+
+        tile->mutex->unlock();
 
         if (shadeLevels) {
           int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;

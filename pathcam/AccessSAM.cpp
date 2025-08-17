@@ -244,7 +244,6 @@ namespace pathCam {
       if (lowVal < 0) {
         neighbor.first->clicksFromMasks.push_back(Point3f(lowloc.x,lowloc.y,0.f));
       }
-      int k = 0;
 
 
       for (auto &linkedSubTile: neighbor.second) {
@@ -259,7 +258,23 @@ namespace pathCam {
         auto src1 = output(myRoi);
         auto src2 = neighbor.first->inputMaskMat(theirRoi);
         cuda::max(src1, src2, src2);
+
       }
+      /*
+      //proof of seed clicks falling where they should in mask
+      cuda::GpuMat tempD;
+      Mat tempH;
+
+      cuda::threshold(neighbor.first->inputMaskMat,tempD,0,255,THRESH_BINARY);
+      tempD.convertTo(tempD,CV_8U);
+      cuda::resize(tempD,tempD,{int(size), int(size)});
+      tempD.download(tempH);
+      for (auto p : neighbor.first->clicksFromMasks) {
+        circle(tempH,Point(p.x,p.y),50,p.z>.5?Scalar(50):Scalar(200),-1);
+      }
+      imwrite("/media/max/Data/pathcam_SAM/m1.png",tempH);
+      int k = 0;
+      */
       if (neighbor.first->segmentations.find(_segmentationID) == neighbor.first->segmentations.end()
           && cuda::countNonZero(neighbor.first->inputMaskMat)) {
         neighbor.first->hasMaskInput = true;
@@ -272,6 +287,7 @@ namespace pathCam {
     cuda::threshold(output, output, 0.0, 255.0, THRESH_BINARY);
     output.convertTo(output,CV_8U);
     segmentations[_segmentationID] = output;
+    /*
     Mat hostOutput;
     output.download(hostOutput);
 
@@ -279,13 +295,13 @@ namespace pathCam {
     imwrite("/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + ".png",
             ans);
     int k = 0;
-
+*/
 
     //part out the mask to tiles
     int tileSize = as->parent->tileSize;
     for (auto &tile: componentTiles) {
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
-      as->push_mask_for_display(tile.first, componentIndex, hostOutput(maskRoi), _segmentationID);
+      as->push_mask_for_display(tile.first, componentIndex, output(maskRoi), _segmentationID);
     }
   }
 
@@ -793,9 +809,17 @@ namespace pathCam {
   }
 
 
-  void AccessSAM::push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const Mat &_mask, int _segID) {
+  void AccessSAM::push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID) {
     auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
     TileObj &tileObj = pyrBase->getTile(_tile.x, _tile.y);
-    tileObj.SAMMasks[_segID] = _mask;
+    if (tileObj.SAMMasks.find(_segID) == tileObj.SAMMasks.end()) {
+      tileObj.SAMMasks[_segID] = {cuda::GpuMat(parent->tileSize,parent->tileSize,CV_8U,Scalar(0)),nullptr};
+    }
+    cuda::max(_mask,tileObj.SAMMasks[_segID].first,tileObj.SAMMasks[_segID].first);
+
+    Rect levelRegion(_tile.x * parent->tileSize, _tile.y * parent->tileSize,parent->tileSize,parent->tileSize);
+    auto level = parent->composites[0]->imagePyramid->level[0];
+
+    level->tileUpwards(_tile,levelRegion,tileObj,Rect(0,0,parent->tileSize,parent->tileSize),_segID);
   }
 }

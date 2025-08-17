@@ -58,11 +58,12 @@ struct TileObj {
 
   bool usingPreferred;
   bool newData;
+  bool newAnnoData;
 
   Poco::FastMutex* mutex;
   cuda::GpuMat image;
 
-  std::map<int,Mat> SAMMasks;
+  std::map<int,std::pair<cuda::GpuMat,void*>> SAMMasks;
 
   TileObj(int _tileSize) {
     image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, Scalar(0, 0, 0, 0));
@@ -142,7 +143,7 @@ public:
 
   void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
 
-  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &mat, Rect theirRoi);
+  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &mat, Rect theirRoi, int _segID = -1);
 
   TileObj &getTile(int x, int y);
 #else

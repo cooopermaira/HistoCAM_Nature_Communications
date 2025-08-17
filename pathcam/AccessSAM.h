@@ -111,7 +111,7 @@ namespace pathCam {
     //fills SAM tiles with image data and creates SAM embedding for each tile. Priority of each tile can be adjusted on the fly
     void embed_SAM_tiles();
 
-    void push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const Mat &_mask, int _segID);
+    void push_mask_for_display(Point2i _tile, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID);
 
     void create_segmentation(std::vector<Point3f> &_clicks, int _segID);
 

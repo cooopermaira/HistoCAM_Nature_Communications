@@ -349,7 +349,8 @@ void TiledImage::insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, c
 
 
 
-void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, TileObj &myCV, Rect cvRoi) {
+void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, TileObj &myTileObj, Rect cvRoi, int _segID) {
+    //this function takes a tiles data at a lower level of the pyramid and resizes it into the tile directly above it in the pyramid
     try {
 
         //find appropriate region of upper level
@@ -372,26 +373,39 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 
         //calculate theirROI and grab tile
         cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
-        TileObj &theirCV = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
+        TileObj &theirTileObj = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
 
         //resize self cv image into their cv image ROI
-        assert(theirCV.image(theirROI).rows == myCV.image(cvRoi).rows / 2 && theirCV.image(theirROI).cols == myCV.image(cvRoi).cols / 2);
-        auto testSize = Size(theirCV.image(theirROI).cols, theirCV.image(theirROI).rows);
+        auto newSize = Size(theirTileObj.image(theirROI).cols, theirTileObj.image(theirROI).rows);
+        theirTileObj.mutex->lock();
 
-        theirCV.mutex->lock();
-        cuda::resize(myCV.image(cvRoi), theirCV.image(theirROI), testSize);
+        if (_segID < 0) {
+            assert(theirTileObj.image(theirROI).rows == myTileObj.image(cvRoi).rows / 2 && theirTileObj.image(theirROI).cols == myTileObj.image(cvRoi).cols / 2);
+            cuda::resize(myTileObj.image(cvRoi), theirTileObj.image(theirROI), newSize);
+            theirTileObj.newData = true;
 
-        theirCV.newData = true;
-        theirCV.mutex->unlock();
+        }else {
+            if (theirTileObj.SAMMasks.find(_segID) == theirTileObj.SAMMasks.end()) {
+                theirTileObj.SAMMasks[_segID] = {cuda::GpuMat(parent->tile_size,parent->tile_size,CV_8U),nullptr};
+            }
+
+            assert(theirTileObj.SAMMasks[_segID].first(theirROI).rows == myTileObj.SAMMasks[_segID].first(cvRoi).rows / 2
+                && theirTileObj.SAMMasks[_segID].first(theirROI).cols == myTileObj.SAMMasks[_segID].first(cvRoi).cols / 2);
+
+            cuda::resize(myTileObj.SAMMasks[_segID].first(cvRoi), theirTileObj.SAMMasks[_segID].first(theirROI), newSize);
+            theirTileObj.newAnnoData = true;
+        }
+
+        theirTileObj.mutex->unlock();
 
         //continue up pyramid
         if (levelWithinPyramid + 1 < parent->level.size() - 1) {
-            parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirCV, theirROI);
+            parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirTileObj, theirROI, _segID);
         }
     } catch (cv::Exception &e) {
         std::cout << "cv error in tileUpwards" << std::endl;
         std::cout << e.what() << std::endl;
-        int k = 0;
+        throw std::exception();
     }
 }
 
