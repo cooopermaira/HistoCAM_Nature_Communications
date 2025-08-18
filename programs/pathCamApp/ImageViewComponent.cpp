@@ -219,7 +219,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
           AffineTransform maskToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
 
           g.reduceClipRegion(*jImg,maskToCanvas);
-          g.setColour(juce::Colours::green);
+          g.setColour(juce::Colours::blue.withAlpha(0.5f));
           g.fillAll();
           g.restoreState();
         }

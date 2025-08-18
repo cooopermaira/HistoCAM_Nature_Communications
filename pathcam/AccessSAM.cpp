@@ -100,7 +100,7 @@ namespace pathCam {
   }
 
   void SAMTile::run_segmentation(int _segmentationID) {
-    if (clicksVec.empty() && !hasMaskInput) { return; }
+    if (clicksVec.empty() && !clicksFromMasks.empty()/*!hasMaskInput*/) { return; }
 
     if (!clicksFromMasks.empty()) {
       int i = 0;
@@ -247,13 +247,13 @@ namespace pathCam {
         lowloc.y += as->parent->SAMTileSize - (int)as->parent->tileSize;
       }
 
-      if (highVal > 0) {
+      if (highVal > 5) {
         neighbor.first->clicksFromMasks.push_back(Point3f(highloc.x,highloc.y,1.f));
-      }
-      if (lowVal < 0) {
-        neighbor.first->clicksFromMasks.push_back(Point3f(lowloc.x,lowloc.y,0.f));
-      }
 
+        if (lowVal < -5) {
+          neighbor.first->clicksFromMasks.push_back(Point3f(lowloc.x,lowloc.y,0.f));
+        }
+      }
 
       for (auto &linkedSubTile: neighbor.second) {
         //figure out region of my output to give each tile
@@ -269,7 +269,7 @@ namespace pathCam {
         cuda::max(src1, src2, src2);
 
       }
-      /*
+
       //proof of seed clicks falling where they should in mask
       cuda::GpuMat tempD;
       Mat tempH;
@@ -283,10 +283,10 @@ namespace pathCam {
       }
       imwrite("/media/max/Data/pathcam_SAM/m1.png",tempH);
       int k = 0;
-      */
+
       if (neighbor.first->segmentations.find(_segmentationID) == neighbor.first->segmentations.end()
-          && cuda::countNonZero(neighbor.first->inputMaskMat)) {
-        neighbor.first->hasMaskInput = true;
+          && !clicksFromMasks.empty()/*cuda::countNonZero(neighbor.first->inputMaskMat*/) {
+        //neighbor.first->hasMaskInput = true;
         as->segmentProcessQ.push(neighbor.first);
       }
     }

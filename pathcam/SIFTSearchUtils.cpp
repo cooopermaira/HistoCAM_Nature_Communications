@@ -38,43 +38,43 @@ namespace pathCam {
     auto ans = createTracksFromConnections(images, *uf_ptr);
     //debug
 
-    int edge2_2=0,edge4_4=0,edge2_4=0,edge10_10=0,edge2_10=0,edge4_10=0,edge2_4_10=0;
-    for (auto &t : ans) {
-      bool two = false,four = false,ten = false;
-      for (auto &obs : t.observations) {
-        if (obs.imgRef->component_membership == 0) {
-          two = true;
-        }
-        if (obs.imgRef->component_membership==1) {
-          four = true;
-        }
-        if (obs.imgRef->component_membership == 2) {
-          ten = true;
-        }
-      }
-      if (two && !four && !ten) {
-          ++edge2_2;
-      }
-      if (two && four && !ten) {
-        ++edge2_4;
-      }
-      if (two && four && ten) {
-        ++edge2_4_10;
-      }
-      if (!two &&four && ten) {
-        ++edge4_10;
-      }
-      if (!two && !four && ten) {
-        ++edge10_10;
-      }
-      if (!two && four && !ten) {
-        ++edge4_4;
-      }
-      if (two && !four && ten) {
-        ++edge2_10;
-      }
-    }
-    int k = 0;
+    // int edge2_2=0,edge4_4=0,edge2_4=0,edge10_10=0,edge2_10=0,edge4_10=0,edge2_4_10=0;
+    // for (auto &t : ans) {
+    //   bool two = false,four = false,ten = false;
+    //   for (auto &obs : t.observations) {
+    //     if (obs.imgRef->component_membership == 0) {
+    //       two = true;
+    //     }
+    //     if (obs.imgRef->component_membership==1) {
+    //       four = true;
+    //     }
+    //     if (obs.imgRef->component_membership == 2) {
+    //       ten = true;
+    //     }
+    //   }
+    //   if (two && !four && !ten) {
+    //       ++edge2_2;
+    //   }
+    //   if (two && four && !ten) {
+    //     ++edge2_4;
+    //   }
+    //   if (two && four && ten) {
+    //     ++edge2_4_10;
+    //   }
+    //   if (!two &&four && ten) {
+    //     ++edge4_10;
+    //   }
+    //   if (!two && !four && ten) {
+    //     ++edge10_10;
+    //   }
+    //   if (!two && four && !ten) {
+    //     ++edge4_4;
+    //   }
+    //   if (two && !four && ten) {
+    //     ++edge2_10;
+    //   }
+    // }
+    // int k = 0;
     return ans;
   }
 
@@ -292,7 +292,7 @@ namespace pathCam {
 
     }
     const cuba::RobustKernelType robustKernelType = cuba::RobustKernelType::HUBER;
-    const double deltaMono = sqrt(5);
+    const double deltaMono = sqrt(5.99);
 
     optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 
