@@ -76,11 +76,11 @@ namespace pathCam {
     int initialLabel;
     int interpolation;
     int feature_type;
-    unsigned int tileSize;
-    unsigned int SAMTileSize;
-    unsigned int image_width;
-    unsigned int image_height;
-    unsigned int scope_radius;
+    int tileSize;
+    int SAMTileSize;
+    int image_width;
+    int image_height;
+    int scope_radius;
     bool use_FREAK;
     cv::DescriptorMatcher::MatcherType matcher_type;
     int estimator_type;

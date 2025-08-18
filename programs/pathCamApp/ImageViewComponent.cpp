@@ -272,16 +272,16 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     }
 
 
-    // //draws grid on image with indexes
-    //   for (unsigned int t = 0; t < tiles.size(); t++) {
-    //       auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
-    //       g.setColour(juce::Colours::greenyellow);
-    //       g.drawRect(bounds, 3);
-    //       std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-    //       g.setFont(20);
-    //       g.drawText(ij, bounds.getCentreX() - 50,
-    //                  bounds.getCentreY() - 15, 100, 30, Justification::centred);
-    //    }
+    //draws grid on image with indexes
+      for (unsigned int t = 0; t < tiles.size(); t++) {
+          auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
+          g.setColour(juce::Colours::greenyellow);
+          g.drawRect(bounds, 3);
+          std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+          g.setFont(20);
+          g.drawText(ij, bounds.getCentreX() - 50,
+                     bounds.getCentreY() - 15, 100, 30, Justification::centred);
+       }
   }
   //Define buffer space from the edges
   if (MRImage->images.size() > 0 && shadeClasses) {

@@ -386,7 +386,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 
         }else {
             if (theirTileObj.SAMMasks.find(_segID) == theirTileObj.SAMMasks.end()) {
-                theirTileObj.SAMMasks[_segID] = {cuda::GpuMat(parent->tile_size,parent->tile_size,CV_8U),nullptr};
+                theirTileObj.SAMMasks[_segID] = {cuda::GpuMat(parent->tile_size,parent->tile_size,CV_8U,Scalar(0)),nullptr};
             }
 
             assert(theirTileObj.SAMMasks[_segID].first(theirROI).rows == myTileObj.SAMMasks[_segID].first(cvRoi).rows / 2

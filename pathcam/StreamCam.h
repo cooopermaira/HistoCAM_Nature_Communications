@@ -127,8 +127,8 @@ namespace pathCam {
 
     std::vector<double> labelScales = { -10.0, 1.0, 0.5, 0.2, 0.1, 0.05 };
 
-    std::map<unsigned int, std::pair<double, Point2f>> scaleRepo;
-    std::map<std::tuple<int,int,unsigned>,int> tileCoordToClass;
+    std::map<int, std::pair<double, Point2f>> scaleRepo;
+    std::map<std::tuple<int,int,int>,int> tileCoordToClass;
 
     Mat flat_field2X;
     Mat flat_field4X;
