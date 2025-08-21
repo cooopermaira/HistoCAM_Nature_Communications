@@ -275,8 +275,8 @@ namespace pathCam {
         std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
       }
       if (composites[i]->needsAlignment) {
-        //composites[i]->rebuild();
-        composites[i]->rebuild_and_initialize_SAM();
+        composites[i]->rebuild();
+        //composites[i]->rebuild_and_initialize_SAM();
       }
     }
 

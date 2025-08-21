@@ -151,7 +151,7 @@ bool AnnoViewComponent::measureMouseMove(const juce::MouseEvent& event){
 
 bool AnnoViewComponent::segMouseDown(const juce::MouseEvent& event)
 {
-  if(event.mods.isLeftButtonDown()){
+  if(event.mods.isLeftButtonDown() && event.mods.isShiftDown()){
     if(parent->getMode() == Annotation::_SEG){
       std::shared_ptr < Annotation > new_annotation;
       new_annotation.reset(new SegmentAnnotation("SAM"));
@@ -171,7 +171,7 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent& event)
     }
   }
 
-  if(event.mods.isRightButtonDown()){
+  if(event.mods.isRightButtonDown() && event.mods.isShiftDown()){
     if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_SEG){
       SegmentAnnotation *cast = dynamic_cast < SegmentAnnotation * >(parent->getSelected().get());
       fPoint temp = screen2view(fPoint(event.x, event.y), *view);
@@ -186,13 +186,13 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent& event)
 }
 
 bool AnnoViewComponent::segMouseUp(const juce::MouseEvent& event) {
-    if (parent->getMode() == Annotation::_SEG || parent->getSelected()->getType() == Annotation::_SEG) {
+    if ((parent->getMode() == Annotation::_SEG || parent->getSelected()->getType() == Annotation::_SEG) && event.mods.isShiftDown()) {
       return true;
     }
 }
 
 bool AnnoViewComponent::segMouseDrag(const juce::MouseEvent& event) {
-  if (parent->getMode() == Annotation::_SEG || parent->getSelected()->getType() == Annotation::_SEG) {
+  if ((parent->getMode() == Annotation::_SEG || parent->getSelected()->getType() == Annotation::_SEG) && event.mods.isShiftDown()) {
     return true;
   }
 }

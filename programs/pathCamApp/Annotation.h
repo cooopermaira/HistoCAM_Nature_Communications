@@ -263,17 +263,18 @@ public:
   
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
     //PolygonAnnotation::paint(g, offset, selected, scale);
-
-    for (auto points : input) {
-      juce::Point temp = juce::Point(points.x, points.y);
-      temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
-      temp.applyTransform(juce::AffineTransform::scale(scale.getX(), scale.getY()));
-      if (points.z == 0.0) {
-        g.setColour(juce::Colours::red);
-      }else {
-        g.setColour(juce::Colours::green);
+    if (selected) {
+      for (auto points : input) {
+        juce::Point temp = juce::Point(points.x, points.y);
+        temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
+        temp.applyTransform(juce::AffineTransform::scale(scale.getX(), scale.getY()));
+        if (points.z == 0.0) {
+          g.setColour(juce::Colours::red);
+        }else {
+          g.setColour(juce::Colours::green);
+        }
+        g.fillEllipse(temp.x - 5, temp.y - 5, 10, 10);
       }
-      g.fillEllipse(temp.x - 5, temp.y - 5, 10, 10);
     }
   }
 
