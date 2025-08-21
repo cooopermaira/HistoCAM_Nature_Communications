@@ -212,7 +212,7 @@ namespace pathCam {
 
     bool sufficient_distance(pathCam::Vec2 _coordsInQuestion, int _componentIdx);
 
-    void set_match(unsigned long image_idx, unsigned long prev_idx, Match *m);
+    void set_match(unsigned long _image_idx, unsigned long _prev_idx, Match *_m, bool _invert = true);
 
     void set_scale_and_offset(unsigned int component_index, double scale, Point2f offset) {
       scaleRepoMutex->lock();

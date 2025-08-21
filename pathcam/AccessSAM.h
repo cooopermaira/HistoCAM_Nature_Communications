@@ -26,6 +26,10 @@ namespace pathCam {
   public:
     int ID;
     int priority = 10;
+
+    Image* img = nullptr;
+    int imgIndex = -1;
+
     Point2i location;
     unsigned int size;
     unsigned int componentIndex;
@@ -34,6 +38,7 @@ namespace pathCam {
     std::vector<std::pair<Point2i, Point2i> > componentTiles;
     cuda::GpuMat noncontiguousWrapper;
     Mat ncwStoreLocal;
+
 
     bool embeddingComplete = false;
     void *rawBuffer, *image_embed, *high_res_feats_1, *high_res_feats_0;

@@ -160,7 +160,7 @@ namespace pathCam {
       cuda::GpuMat image_Mat(image_size, CV_8U, images[i]->get_raw_cuda());
       cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
 
-      images[i]->free_memory_CUDA();
+      images[i]->free_memory_cuda();
 
       ff_correct_and_brighten();
 
@@ -227,6 +227,148 @@ namespace pathCam {
   }
 
 
+  void CompositeVoronoi::rebuild_and_initialize_SAM() {
+    //currently SAM only works for one component at a time. Ensure this is a single resolution composite
+    assert(componentIndex == 0);
+
+    self_reset();
+    cudaSetDevice(parent->compositorCudaDevice);
+
+    //do this first so we have root and max offset determined ahead of time
+    for (int i = 0; i < delaunayImages.size(); ++i) {
+      auto img = delaunayImages[i];
+      Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
+      std::vector<Point2i> face;
+      if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
+        max_offset.x = max(max_offset.x, img->absoluteCoords.x + img->width);
+        max_offset.y = max(max_offset.y, img->absoluteCoords.y + img->height);
+        root_offset.x = min(root_offset.x, img->absoluteCoords.x);
+        root_offset.y = min(root_offset.y, img->absoluteCoords.y);
+      }
+    }
+
+    int interval = (parent->SAMTileSize / parent->tileSize);
+
+    auto ul = imagePyramid->level[0]->getIJ(Point2f(root_offset.x, root_offset.y));
+    auto lr = imagePyramid->level[0]->getIJ(Point2f(max_offset.x, max_offset.y));
+
+    int id = 0;
+    int yTileCount = 0;
+    auto accessSAM = parent->as;
+
+    for (int y = ul.y; y <= lr.y; ++y) {
+      if ((yTileCount - 1) % (interval - 1) == 0) {
+        int xTileCount = 0;
+
+        for (int x = ul.x; x <= lr.x; ++x) {
+          if ((xTileCount - 1) % (interval - 1) == 0) {
+            auto st = new SAMTile(id, {x - 1, y - 1}, accessSAM, 0, parent->SAMTileSize);
+            accessSAM->tiles.push_back(st);
+            ++id;
+
+            //add links to neighbors
+            if (xTileCount > 0) {
+              auto brotherX = accessSAM->tiles[accessSAM->get_tile_id({x - interval + 1, y}, componentIndex)];
+              std::vector<Point2i> temp;
+              for (int yy = 0; yy < interval; ++yy) {
+                temp.emplace_back(x - 1, y - 1 + yy);
+              }
+              accessSAM->tiles.back()->neighbors.emplace_back(brotherX, temp);
+              brotherX->neighbors.emplace_back(accessSAM->tiles.back(), temp);
+            }
+            if (yTileCount > 0) {
+              auto brotherY = accessSAM->tiles[accessSAM->get_tile_id({x, y - interval + 1}, componentIndex)];
+              std::vector<Point2i> temp;
+              for (int xx = 0; xx < interval; ++xx) {
+                temp.emplace_back(x - 1 + xx, y - 1);
+              }
+              accessSAM->tiles.back()->neighbors.emplace_back(brotherY, temp);
+              brotherY->neighbors.emplace_back(accessSAM->tiles.back(), temp);
+            }
+
+            //choose image
+            Rect tileRect(st->location.x * parent->tileSize, st->location.y * parent->tileSize, parent->SAMTileSize,
+                              parent->SAMTileSize);
+            for (auto &brother: st->neighbors) {
+              if (brother.first->img) {
+
+                int coverage = pixels_overlapping_between(brother.first->img, tileRect);
+                if (coverage == parent->SAMTileSize * parent->SAMTileSize) {
+                  //take this image as st's image
+                  st->img = brother.first->img;
+                  st->imgIndex = st->img->index;
+                  // auto val = sqrt(pow(st->img->absoluteCoords.x + 3232 - st->location.x * parent->tileSize + 512,2) + pow(st->img->absoluteCoords.y + 2426 - st->location.y * parent->tileSize + 512,2));
+                  // if (val > parent->scope_radius) {
+                  //   int k = 0;
+                  // }
+                }
+              }
+            }
+
+            if (!st->img) {
+              int bestCoverage = 0;
+              for (auto &img: delaunayImages) {
+                int val = pixels_overlapping_between(img, tileRect);
+                if (val > bestCoverage) {
+                  bestCoverage = val;
+                  st->img = img;
+                  st->imgIndex = img->index;
+                  // auto val = sqrt(pow(st->img->absoluteCoords.x + 3232 - (st->location.x * parent->tileSize + 512),2) + pow(st->img->absoluteCoords.y + 2426 - (st->location.y * parent->tileSize + 512),2));
+                  // if (val > parent->scope_radius+725) {
+                  //   int k = 0;
+                  //   pixels_overlapping_between(img, tileRect);
+                  // }
+                }
+                if (bestCoverage == parent->SAMTileSize * parent->SAMTileSize){break;}
+              }
+            }
+          }
+          ++xTileCount;
+        }
+      }
+      ++yTileCount;
+    }
+
+    std::sort(accessSAM->tiles.begin(), accessSAM->tiles.end(),
+              [](const SAMTile* a, const SAMTile* b) {
+                  return a->imgIndex < b->imgIndex;});
+
+    auto currentInd = accessSAM->tiles[0]->imgIndex;
+    for (auto &samTile : accessSAM->tiles) {
+      if (!samTile->img){continue;}
+
+      auto img = samTile->img;
+
+      //check if we need to load a new image for the next group of SAM tiles
+      if (samTile->imgIndex != currentInd) {
+        //wait for buffer to be on GPU
+        {
+          std::unique_lock<std::mutex> lock(img->cudaBufferMutex);
+          img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
+        }
+
+        //prepare 3 channel image
+        cuda::GpuMat image_Mat(image_size, CV_8U, img->get_raw_cuda());
+        cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
+
+        img->free_memory_cuda();
+
+        if (componentMagLabel != 0) {
+          //flatfield correct
+          ff_correct_and_brighten();
+        }
+
+        //populate SAM gpu mat with data from 3channel preal
+        Rect tileRect(samTile->location.x * parent->tileSize, samTile->location.y * parent->tileSize,
+          parent->SAMTileSize,parent->SAMTileSize);
+        Rect imageRect(img->absoluteCoords.x,img->absoluteCoords.y,img->width,img->height);
+        Rect roi = tileRect & imageRect;
+      }
+    }
+    int k = 0;
+  }
+
+
   void CompositeVoronoi::rebuild() {
     if (delaunayImages.size() == 1) {
       //return;
@@ -238,7 +380,12 @@ namespace pathCam {
       auto img = delaunayImages[i];
       Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
       std::vector<Point2i> face;
-      add_point_to_delaunay_triangulation(absC, img, face, true, false);
+      if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
+        max_offset.x = max(max_offset.x, img->absoluteCoords.x + img->width);
+        max_offset.y = max(max_offset.y, img->absoluteCoords.y + img->height);
+        root_offset.x = min(root_offset.x, img->absoluteCoords.x);
+        root_offset.y = min(root_offset.y, img->absoluteCoords.y);
+      }
     }
 
     for (int i = 0; i < delaunayImages.size(); ++i) {
@@ -283,12 +430,7 @@ namespace pathCam {
       cuda::GpuMat image_Mat(image_size, CV_8U, img->get_raw_cuda());
       cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
 
-      img->free_memory_CUDA();
-
-      max_offset.x = max(max_offset.x, img->absoluteCoords.x + img->width);
-      max_offset.y = max(max_offset.y, img->absoluteCoords.y + img->height);
-      root_offset.x = min(root_offset.x, img->absoluteCoords.x);
-      root_offset.y = min(root_offset.y, img->absoluteCoords.y);
+      img->free_memory_cuda();
 
       if (componentMagLabel != 0) {
         //flatfield correct
@@ -334,6 +476,20 @@ namespace pathCam {
     }
     //needsAlignment = false;
   }
+
+  int CompositeVoronoi::pixels_overlapping_between(Image *_img, Rect _rect) {
+    Rect imageRect(_img->absoluteCoords.x, _img->absoluteCoords.y, _img->width, _img->height);
+    auto overlapRect = imageRect & _rect;
+
+    if (overlapRect.area() == 0 || componentMagLabel != Image::_2X) {
+      return overlapRect.area();
+    }
+
+    overlapRect.x -= _img->absoluteCoords.x;
+    overlapRect.y -= _img->absoluteCoords.y;
+    return cuda::countNonZero(circleMaskGPU(overlapRect));
+  }
+
 
   SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
     if (_img.channels() == 1) {
@@ -430,7 +586,7 @@ namespace pathCam {
     return newOverlaps;
   }
 
-void CompositeVoronoi::ff_correct_and_brighten() {
+  void CompositeVoronoi::ff_correct_and_brighten() {
     if (componentMagLabel != 0) {
       //flatfield correct
       threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
@@ -439,7 +595,7 @@ void CompositeVoronoi::ff_correct_and_brighten() {
       cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
       convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
     }
-}
+  }
 
 #endif
 }

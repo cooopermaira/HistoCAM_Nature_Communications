@@ -275,7 +275,8 @@ namespace pathCam {
         std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
       }
       if (composites[i]->needsAlignment) {
-        composites[i]->rebuild();
+        //composites[i]->rebuild();
+        composites[i]->rebuild_and_initialize_SAM();
       }
     }
 
@@ -311,9 +312,13 @@ namespace pathCam {
 
 #endif
 
-  void StreamCam::set_match(unsigned long image_idx, unsigned long prev_idx, Match *m) {
+  void StreamCam::set_match(unsigned long _image_idx, unsigned long _prev_idx, Match *_m, bool _invert) {
     resize_mmatch_mutex->writeLock();
-    matchM.match[image_idx][prev_idx] = new Match(m);
+    if (_invert) {
+      matchM.match[_image_idx][_prev_idx] = new Match(_m);
+    }else {
+      matchM.match[_prev_idx][_image_idx] = _m;
+    }
     resize_mmatch_mutex->unlock();
   }
 

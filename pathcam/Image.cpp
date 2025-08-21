@@ -59,7 +59,7 @@ namespace pathCam {
   }
 #endif
 
-  void Image::free_memory_CUDA() {
+  void Image::free_memory_cuda() {
     if (raw_buffer_cuda != nullptr) {
       cudaFree(raw_buffer_cuda);
     }

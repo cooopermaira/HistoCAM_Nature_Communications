@@ -13,11 +13,11 @@ namespace pathCam {
     StreamCam* parent;
     RegInfo* regInfo;
 
-    unsigned long index;
+    long index;
 
-    unsigned int width, height;
-    unsigned int scope_radius;
-    unsigned int component_membership;
+    int width, height;
+    int scope_radius;
+    int component_membership;
     std::atomic<unsigned int> reference_count;
 
     float reg_full_scale;
@@ -178,7 +178,7 @@ namespace pathCam {
 
     void free_memory_RAW(bool force = false);
 
-    void free_memory_CUDA();
+    void free_memory_cuda();
 
     void write_to_path();
     

@@ -34,55 +34,6 @@ namespace pathCam {
     return buf;
   }
 
-  static const char *dataTypeName(nvinfer1::DataType t) {
-    switch (t) {
-      case nvinfer1::DataType::kFLOAT: return "FP32";
-      case nvinfer1::DataType::kHALF: return "FP16";
-      case nvinfer1::DataType::kINT8: return "INT8";
-      case nvinfer1::DataType::kINT32: return "INT32";
-#if NV_TENSORRT_MAJOR >= 8
-      case nvinfer1::DataType::kBOOL: return "BOOL";
-#endif
-      default: return "?";
-    }
-  }
-
-  static void printDims(const nvinfer1::Dims &d) {
-    std::cout << "[";
-    for (int i = 0; i < d.nbDims; ++i) {
-      std::cout << d.d[i] << (i + 1 < d.nbDims ? ", " : "");
-    }
-    std::cout << "]";
-  }
-
-  // void dumpBindings(const nvinfer1::ICudaEngine& eng, int profile = 0) {
-  //   using Sel = nvinfer1::OptProfileSelector;
-  //   const int nb = eng.getNbBindings();
-  //   std::cout << "=== Bindings (profile " << profile << ") ===\n";
-  //   for (int b = 0; b < nb; ++b) {
-  //     const char* name = eng.getBindingName(b);
-  //     const bool isInput = eng.bindingIsInput(b);
-  //     const auto dt = eng.getBindingDataType(b);
-  //     const auto dMin = eng.getProfileDimensions(b, profile, Sel::kMIN);
-  //     const auto dOpt = eng.getProfileDimensions(b, profile, Sel::kOPT);
-  //     const auto dMax = eng.getProfileDimensions(b, profile, Sel::kMAX);
-  //
-  //     bool isStatic = (dMin.nbDims == dOpt.nbDims && dOpt.nbDims == dMax.nbDims);
-  //     if (isStatic) {
-  //       for (int i = 0; i < dMin.nbDims; ++i)
-  //         if (dMin.d[i] != dOpt.d[i] || dOpt.d[i] != dMax.d[i]) { isStatic = false; break; }
-  //     }
-  //
-  //     std::cout << (isInput ? "IN  " : "OUT ")
-  //               << b << "  \"" << (name ? name : "(null)") << "\"  "
-  //               << dataTypeName(dt) << "  min/opt/max=";
-  //     printDims(dMin); std::cout << " / "; printDims(dOpt); std::cout << " / "; printDims(dMax);
-  //     if (isStatic) std::cout << "  (static)";
-  //     std::cout << "\n";
-  //   }
-  //   std::cout << std::flush;
-  // }
-
 
   SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _componentIndex, unsigned _size) : ID(_ID),
     location(_location),

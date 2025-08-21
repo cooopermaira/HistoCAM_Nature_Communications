@@ -109,6 +109,15 @@ namespace pathCam {
               if (inlierMask[i]) {
                 matchesInfo.matches.push_back(mutualMatches[i]);
                 ftg->process_match(mp.first->index, mp.second->index, mutualMatches[i]);
+
+                if (mp.first->component_membership == mp.second->component_membership) {
+                  auto m = new Match(mp.first,mp.second);
+                  parent->set_match(mp.first->index,mp.second->index,m,false);
+
+                  m->H = H;
+                  m->t_x = H.at<double>(0, 2);
+                  m->t_y = H.at<double>(1, 2);
+                }
               }
             }
             //logic for handling root when called as part of adding new component
