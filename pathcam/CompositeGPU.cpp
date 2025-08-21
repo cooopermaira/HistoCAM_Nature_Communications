@@ -288,10 +288,9 @@ namespace pathCam {
 
             //choose image
             Rect tileRect(st->location.x * parent->tileSize, st->location.y * parent->tileSize, parent->SAMTileSize,
-                              parent->SAMTileSize);
+                          parent->SAMTileSize);
             for (auto &brother: st->neighbors) {
               if (brother.first->img) {
-
                 int coverage = pixels_overlapping_between(brother.first->img, tileRect);
                 if (coverage == parent->SAMTileSize * parent->SAMTileSize) {
                   //take this image as st's image
@@ -319,7 +318,7 @@ namespace pathCam {
                   //   pixels_overlapping_between(img, tileRect);
                   // }
                 }
-                if (bestCoverage == parent->SAMTileSize * parent->SAMTileSize){break;}
+                if (bestCoverage == parent->SAMTileSize * parent->SAMTileSize) { break; }
               }
             }
           }
@@ -330,12 +329,13 @@ namespace pathCam {
     }
 
     std::sort(accessSAM->tiles.begin(), accessSAM->tiles.end(),
-              [](const SAMTile* a, const SAMTile* b) {
-                  return a->imgIndex < b->imgIndex;});
+              [](const SAMTile *a, const SAMTile *b) {
+                return a->imgIndex < b->imgIndex;
+              });
 
     auto currentInd = accessSAM->tiles[0]->imgIndex;
-    for (auto &samTile : accessSAM->tiles) {
-      if (!samTile->img){continue;}
+    for (auto &samTile: accessSAM->tiles) {
+      if (!samTile->img) { continue; }
 
       auto img = samTile->img;
 
@@ -358,12 +358,31 @@ namespace pathCam {
           ff_correct_and_brighten();
         }
 
-        //populate SAM gpu mat with data from 3channel preal
-        Rect tileRect(samTile->location.x * parent->tileSize, samTile->location.y * parent->tileSize,
-          parent->SAMTileSize,parent->SAMTileSize);
-        Rect imageRect(img->absoluteCoords.x,img->absoluteCoords.y,img->width,img->height);
-        Rect roi = tileRect & imageRect;
+        //add alpha channel
+        cuda::split(threeChannelPrealGPU, channelsGPU);
+        channelsGPU.push_back(rectMaskGPU);
+        cuda::merge(channelsGPU, fourChannelPrealGPU);
+
+        currentInd = samTile->imgIndex;
       }
+
+
+      //populate SAM gpu mat with data from 3channel preal
+      Rect tileRect(samTile->location.x * parent->tileSize, samTile->location.y * parent->tileSize,
+                    parent->SAMTileSize, parent->SAMTileSize);
+      Rect imageRect(img->absoluteCoords.x, img->absoluteCoords.y, img->width, img->height);
+      Rect roi = tileRect & imageRect;
+
+      Rect imageRoi = roi;
+      imageRoi.x -= imageRect.x;
+      imageRoi.y -= imageRect.y;
+
+      Rect tileRoi = roi;
+      tileRoi.x -= tileRect.x;
+      tileRoi.y -= tileRect.y;
+
+      fourChannelPrealGPU(imageRoi).copyTo(samTile->noncontiguousWrapper(tileRoi));
+      cudaMalloc(&samTile->rawBuffer, nElementsPerChannel * 3 * sizeof(float));
     }
     int k = 0;
   }

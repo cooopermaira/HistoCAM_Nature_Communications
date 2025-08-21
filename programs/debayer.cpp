@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/media/max/Data/test/run2/input.txt";
+    std::string outputfilepath = "/media/max/Data/scale_neg_NaN/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {

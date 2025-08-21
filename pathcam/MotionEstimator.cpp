@@ -94,7 +94,7 @@ namespace pathCam {
     // }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    //image->free_memory_RAW();
+    image->free_memory_RAW();
 #endif
   }
 

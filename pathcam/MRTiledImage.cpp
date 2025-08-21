@@ -22,7 +22,7 @@ std::vector < TileQuery > MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect
   return level[i_scale]->getTiles(view);
 }
 
-MRTiledImage::MRTiledImage(pathCam::StreamCam *parent, unsigned int _tile_size) : parent(parent),tile_size(_tile_size){
+MRTiledImage::MRTiledImage(pathCam::StreamCam *parent, unsigned int _tile_size) : parent(parent),tile_size(_tile_size),scale(0){
   if(tile_size == 0){
     tile_size = parent->tileSize;
   }

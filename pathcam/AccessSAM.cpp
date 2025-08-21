@@ -274,7 +274,7 @@ namespace pathCam {
       }
     }
     //debug
-    noncontiguousWrapper.download(ncwStoreLocal);
+    //noncontiguousWrapper.download(ncwStoreLocal);
   }
 
 
