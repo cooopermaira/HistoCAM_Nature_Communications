@@ -189,7 +189,7 @@ namespace pathCam {
         calculate_effected_tiles_round(face, effectedTiles, images[i]->absoluteCoords);
       } else {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
-        imagePyramid->insertTilesAtBase(fourChannelPrealGPU, cuda::GpuMat(), imageBox, effectedTilesNoMask);
+        imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageBox, effectedTilesNoMask);
       }
 
       imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);
@@ -263,6 +263,7 @@ namespace pathCam {
         for (int x = ul.x; x <= lr.x; ++x) {
           if ((xTileCount - 1) % (interval - 1) == 0) {
             auto st = new SAMTile(id, {x - 1, y - 1}, accessSAM, 0, parent->SAMTileSize);
+
             accessSAM->tiles.push_back(st);
             ++id;
 
@@ -296,10 +297,6 @@ namespace pathCam {
                   //take this image as st's image
                   st->img = brother.first->img;
                   st->imgIndex = st->img->index;
-                  // auto val = sqrt(pow(st->img->absoluteCoords.x + 3232 - st->location.x * parent->tileSize + 512,2) + pow(st->img->absoluteCoords.y + 2426 - st->location.y * parent->tileSize + 512,2));
-                  // if (val > parent->scope_radius) {
-                  //   int k = 0;
-                  // }
                 }
               }
             }
@@ -312,11 +309,6 @@ namespace pathCam {
                   bestCoverage = val;
                   st->img = img;
                   st->imgIndex = img->index;
-                  // auto val = sqrt(pow(st->img->absoluteCoords.x + 3232 - (st->location.x * parent->tileSize + 512),2) + pow(st->img->absoluteCoords.y + 2426 - (st->location.y * parent->tileSize + 512),2));
-                  // if (val > parent->scope_radius+725) {
-                  //   int k = 0;
-                  //   pixels_overlapping_between(img, tileRect);
-                  // }
                 }
                 if (bestCoverage == parent->SAMTileSize * parent->SAMTileSize) { break; }
               }
@@ -328,15 +320,17 @@ namespace pathCam {
       ++yTileCount;
     }
 
-    std::sort(accessSAM->tiles.begin(), accessSAM->tiles.end(),
+    auto tempTiles = accessSAM->tiles;
+    std::sort(tempTiles.begin(), tempTiles.end(),
               [](const SAMTile *a, const SAMTile *b) {
                 return a->imgIndex < b->imgIndex;
               });
 
-    auto currentInd = accessSAM->tiles[0]->imgIndex;
-    for (auto &samTile: accessSAM->tiles) {
+    auto currentInd = tempTiles[0]->imgIndex;
+    for (auto &samTile: tempTiles) {
       if (!samTile->img) { continue; }
 
+      samTile->valid = true;
       auto img = samTile->img;
 
       //check if we need to load a new image for the next group of SAM tiles
@@ -360,7 +354,14 @@ namespace pathCam {
 
         //add alpha channel
         cuda::split(threeChannelPrealGPU, channelsGPU);
-        channelsGPU.push_back(rectMaskGPU);
+        if (componentMagLabel == Image::_2X) {
+          for (auto & channel : channelsGPU) {
+            cuda::multiply(channel,circleMaskGPU,channel);
+          }
+          channelsGPU.push_back(circleMaskGPU255);
+        }else {
+          channelsGPU.push_back(rectMaskGPU);
+        }
         cuda::merge(channelsGPU, fourChannelPrealGPU);
 
         currentInd = samTile->imgIndex;
@@ -382,9 +383,19 @@ namespace pathCam {
       tileRoi.y -= tileRect.y;
 
       fourChannelPrealGPU(imageRoi).copyTo(samTile->noncontiguousWrapper(tileRoi));
-      cudaMalloc(&samTile->rawBuffer, nElementsPerChannel * 3 * sizeof(float));
+      samTile->make_raw_buffer();
+
+      std::vector<Point2i> retileIndices(9);
+      for (int xx = 0; xx < 3; ++xx) {
+        for (int yy = 0; yy < 3; ++yy) {
+          Point2i sublocation(xx,yy);
+          Point2i tileID(samTile->location.x + xx, samTile->location.y + yy);
+          samTile->componentTiles.emplace_back(sublocation,tileID);
+          retileIndices[3 * xx + yy] = tileID;
+        }
+      }
+      imagePyramid->insertTilesAtBase(fourChannelPrealGPU,rectMaskGPU,imageRect,retileIndices);
     }
-    int k = 0;
   }
 
 
@@ -458,7 +469,14 @@ namespace pathCam {
 
       //add alpha channel
       cuda::split(threeChannelPrealGPU, channelsGPU);
-      channelsGPU.push_back(rectMaskGPU);
+      if (componentMagLabel == Image::_2X) {
+        for (auto & channel : channelsGPU) {
+          cuda::multiply(channel,circleMaskGPU,channel);
+        }
+        channelsGPU.push_back(circleMaskGPU255);
+      }else {
+        channelsGPU.push_back(rectMaskGPU);
+      }
       cuda::merge(channelsGPU, fourChannelPrealGPU);
 
       //calculate effected tiles
@@ -474,7 +492,7 @@ namespace pathCam {
         cuda::multiply(polyMaskGPU, circleMaskGPU, polyMaskGPU);
       } else {
         calculate_effected_tiles(face, effectedTiles, img->absoluteCoords, &effectedTilesNoMask);
-        imagePyramid->insertTilesAtBase(fourChannelPrealGPU, cuda::GpuMat(), imageBox, effectedTilesNoMask);
+        imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageBox, effectedTilesNoMask);
       }
 
       imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);

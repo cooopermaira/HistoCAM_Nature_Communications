@@ -33,6 +33,8 @@ namespace pathCam {
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     circleMaskGPU.upload(circleMask);
+    circleMaskGPU255 = cuda::GpuMat(image_size,CV_8U);
+    cuda::multiply(circleMaskGPU,Scalar(255),circleMaskGPU255);
     rectMaskGPU.upload(rectMask);
     channelsGPU.resize(4);
     threeChannelPrealGPU = cuda::GpuMat(image_size, CV_8UC3);

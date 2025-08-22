@@ -218,19 +218,19 @@ namespace pathCam {
           cuda::max(src1, src2, src2);
         }
 
-        //proof of seed clicks falling where they should in mask
-        cuda::GpuMat tempD;
-        Mat tempH;
-
-        cuda::threshold(neighbor.first->inputMaskMat, tempD, 0, 255, THRESH_BINARY);
-        tempD.convertTo(tempD,CV_8U);
-        cuda::resize(tempD, tempD, {int(size), int(size)});
-        tempD.download(tempH);
-        for (auto p: neighbor.first->clicksFromMasks) {
-          circle(tempH, Point(p.x, p.y), 50, p.z > .5 ? Scalar(50) : Scalar(200), -1);
-        }
-        imwrite("/media/max/Data/pathcam_SAM/m1.png", tempH);
-        int k = 0;
+        // //proof of seed clicks falling where they should in mask
+        // cuda::GpuMat tempD;
+        // Mat tempH;
+        //
+        // cuda::threshold(neighbor.first->inputMaskMat, tempD, 0, 255, THRESH_BINARY);
+        // tempD.convertTo(tempD,CV_8U);
+        // cuda::resize(tempD, tempD, {int(size), int(size)});
+        // tempD.download(tempH);
+        // for (auto p: neighbor.first->clicksFromMasks) {
+        //   circle(tempH, Point(p.x, p.y), 50, p.z > .5 ? Scalar(50) : Scalar(200), -1);
+        // }
+        // imwrite("/media/max/Data/pathcam_SAM/m1.png", tempH);
+        // int k = 0;
 
         if (neighbor.first->segmentations.find(_segmentationID) == neighbor.first->segmentations.end()
             && !clicksFromMasks.empty()/*cuda::countNonZero(neighbor.first->inputMaskMat*/) {
@@ -301,19 +301,29 @@ namespace pathCam {
     cuda::split(noncontiguousWrapper, split_channels);
 
     size_t nBytesPerChannel = sizeof(float) * noncontiguousWrapper.cols * noncontiguousWrapper.rows;
-    //cudaMalloc(&rawBuffer, nBytesPerChannel * 3);
+
+    if (!rawBuffer && !_buffer) {
+      //_buffer wasnt passed so were writing to member rawBuffer, but its not allocated yet
+      cudaMalloc(&rawBuffer, nBytesPerChannel * 3);
+    }
 
     for (int i = 0; i < 3; ++i) {
-      void *dst = static_cast<char *>(_buffer) + i * nBytesPerChannel;
-      cudaMemcpy2D(dst,
+      void *dst;
+
+      if (_buffer) {
+        dst = static_cast<char *>(_buffer) + i * nBytesPerChannel;
+      }else {
+        dst = static_cast<char *>(rawBuffer) + i * nBytesPerChannel;
+      }
+
+      CHECK_CUDA(cudaMemcpy2D(dst,
                    split_channels[2 - i].cols * sizeof(float),
                    split_channels[2 - i].data,
                    split_channels[2 - i].step,
                    split_channels[2 - i].cols * sizeof(float),
                    split_channels[2 - i].rows,
-                   cudaMemcpyDeviceToDevice);
+                   cudaMemcpyDeviceToDevice));
     }
-    cudaGetLastError();
     noncontiguousWrapper.release();
   }
 
@@ -384,6 +394,7 @@ namespace pathCam {
         for (int x = ul.x; x <= lr.x; ++x) {
           if ((xTileCount - 1) % (interval - 1) == 0) {
             auto st = new SAMTile(id, {x - 1, y - 1}, this, 0, parent->SAMTileSize);
+            st->valid = true;
             tiles.push_back(st);
             ++id;
 
@@ -444,12 +455,14 @@ namespace pathCam {
   }
 
 
-  void AccessSAM::embed_SAM_tiles() {
+  void AccessSAM::embed_SAM_tiles(bool _buildBuffer) {
     load_model();
 
     std::deque<SAMTile *> embedQueue;
     for (auto &st: tiles) {
-      embedQueue.push_back(st);
+      if (st->valid) {
+        embedQueue.push_back(st);
+      }
     }
     size_t nElementsPerChannel = parent->SAMTileSize * parent->SAMTileSize;
     auto comp = parent->composites[0];
@@ -461,10 +474,11 @@ namespace pathCam {
       auto tile = embedQueue.front();
       embedQueue.pop_front();
 
-      tile->get_tile_data(comp, parent->SAMTileSize / parent->tileSize);
-      cudaMalloc(&tile->rawBuffer, nElementsPerChannel * 3 * sizeof(float));
-      tile->make_raw_buffer(tile->rawBuffer);
-
+      if (_buildBuffer) {
+        tile->get_tile_data(comp, parent->SAMTileSize / parent->tileSize);
+        cudaMalloc(&tile->rawBuffer, nElementsPerChannel * 3 * sizeof(float));
+        tile->make_raw_buffer(tile->rawBuffer);
+      }
       cudaMalloc(&tile->high_res_feats_0, 32 * 256 * 256 * sizeof(float));
       cudaMalloc(&tile->high_res_feats_1, 64 * 128 * 128 * sizeof(float));
       cudaMalloc(&tile->image_embed, 256 * 64 * 64 * sizeof(float));
@@ -588,24 +602,27 @@ namespace pathCam {
     auto myTile = comp->imagePyramid->level[0]->getIJ(_point);
     auto locInTile4 = _point - Point2f((float) parent->tileSize * myTile.x, (float) parent->tileSize * myTile.y);
     if (locInTile4.x < 0 || locInTile4.y < 0 || locInTile4.y > 256 || locInTile4.x > 256) {
-      int k = 0;
-      throw std::exception();
+      throw std::runtime_error("ACCESS SAM ERROR: RETURNING INCORRECT BASE TILE FOR CLICK POINT");
     }
 
     auto primarySAMTileID = get_tile_id(myTile, 0);
     auto primarySAMTile = tiles[primarySAMTileID];
-    auto locInTile12 = _point - Point2f((float) parent->tileSize * tiles[primarySAMTileID]->location.x,
-                                        (float) parent->tileSize * tiles[primarySAMTileID]->location.y);
-    if (locInTile12.x > 1024 || locInTile12.x < 0 || locInTile12.y > 1024 || locInTile12.y < 0) {
-      std::vector<SAMTile *> correctTiles;
-      for (auto &tile: tiles) {
-        if (_point.x - tile->location.x >= 0 && _point.x - tile->location.x <= 1024 && _point.y - tile->location.y >= 0
-            && _point.y - tile->location.y <= 1024) {
-          correctTiles.push_back(tile);
-        }
-      }
-      get_tile_id(myTile, 0);
-      throw std::exception();
+    auto locInTile12 = _point - Point2f((float) parent->tileSize * primarySAMTile->location.x,
+                                        (float) parent->tileSize * primarySAMTile->location.y);
+    if (locInTile12.x > parent->SAMTileSize || locInTile12.x < 0 || locInTile12.y > parent->SAMTileSize || locInTile12.y < 0) {
+      // std::vector<SAMTile *> correctTiles;
+      // for (auto &tile: tiles) {
+      //   if (_point.x - tile->location.x >= 0 && _point.x - tile->location.x <= 1024 && _point.y - tile->location.y >= 0
+      //       && _point.y - tile->location.y <= 1024) {
+      //     correctTiles.push_back(tile);
+      //   }
+      //   if (tile->ID == 99) {
+      //     int k = 0;
+      //   }
+      // }
+      // get_tile_id(myTile, 0);
+      // throw std::exception();
+      std::cout << "ACCESS SAM WARNING: INVALID CLICK LOCATION"<<std::endl;
     }
 
     out.push_back(primarySAMTileID);

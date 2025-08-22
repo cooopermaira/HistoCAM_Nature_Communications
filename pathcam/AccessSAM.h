@@ -39,10 +39,11 @@ namespace pathCam {
     cuda::GpuMat noncontiguousWrapper;
     Mat ncwStoreLocal;
 
-
+    bool valid = false;
     bool embeddingComplete = false;
-    void *rawBuffer, *image_embed, *high_res_feats_1, *high_res_feats_0;
-    void *clicksGPU, *clickLabelsGPU, *maskInput, *hasMaskInputGPU, *outputMask, *confidence;
+    void *rawBuffer = nullptr, *image_embed = nullptr, *high_res_feats_1 = nullptr, *high_res_feats_0 = nullptr;
+    void *clicksGPU = nullptr, *clickLabelsGPU = nullptr, *maskInput = nullptr, *hasMaskInputGPU = nullptr;
+    void *outputMask = nullptr, *confidence = nullptr;
     bool hasMaskInput = false;
     std::vector<Point3f> clicksVec;
     std::vector<Point3f> clicksFromMasks;
@@ -61,7 +62,7 @@ namespace pathCam {
 
     void get_tile_data(CompositeVoronoi *_comp, unsigned int _interval);
 
-    void make_raw_buffer(void *_buffer);
+    void make_raw_buffer(void *_buffer = nullptr);
 
     void increase_embed_priority();
 
@@ -126,7 +127,7 @@ namespace pathCam {
     int get_tile_id(Point2i _tileIndexPoint, unsigned int _componentIndex) const;
 
     //fills SAM tiles with image data and creates SAM embedding for each tile. Priority of each tile can be adjusted on the fly
-    void embed_SAM_tiles();
+    void embed_SAM_tiles(bool _buildBuffer = true);
 
     void push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID);
 

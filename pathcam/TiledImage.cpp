@@ -312,7 +312,7 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
 
 
 void TiledImage::insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box,
-                                   std::vector<Point2i> retileIndices) {
+                                   const std::vector<Point2i> &retileIndices) {
     unsigned int width = image_in.cols;
     unsigned int height = image_in.rows;
 
@@ -342,7 +342,7 @@ void TiledImage::insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, c
         } catch (cv::Exception &e) {
             std::cout<<"cv error in insertTilesAtBase"<<std::endl;
             std::cout << e.what() << std::endl;
-            int k = 0;
+            throw std::exception();
         }
     }
 }

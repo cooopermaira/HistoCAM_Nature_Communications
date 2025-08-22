@@ -94,6 +94,7 @@ namespace pathCam {
     cuda::GpuMat meshGridY;
     cuda::GpuMat rectMaskGPU;
     cuda::GpuMat circleMaskGPU;
+    cuda::GpuMat circleMaskGPU255;
     cuda::GpuMat polyMaskGPU;
     std::vector<cuda::GpuMat> channelsGPU;
     cuda::GpuMat ffGPU;

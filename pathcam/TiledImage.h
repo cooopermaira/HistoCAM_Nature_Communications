@@ -141,7 +141,7 @@ public:
   void matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask,int x, int y, Point2f rootOffset,
                cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
-  void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+  void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, const std::vector<Point2i> &retileIndices);
 
   void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &mat, Rect theirRoi, int _segID = -1);
 

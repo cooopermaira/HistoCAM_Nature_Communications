@@ -112,8 +112,8 @@ namespace pathCam {
     //if (false){
       auto start = std::chrono::high_resolution_clock::now();
       perform_global_alignment();
-      parent->as->initialize();
-      parent->as->embed_SAM_tiles();
+      //parent->as->initialize();
+      parent->as->embed_SAM_tiles(false);
 
 
       auto stop = std::chrono::high_resolution_clock::now();
