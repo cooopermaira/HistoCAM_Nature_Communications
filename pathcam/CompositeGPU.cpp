@@ -383,15 +383,19 @@ namespace pathCam {
       tileRoi.y -= tileRect.y;
 
       fourChannelPrealGPU(imageRoi).copyTo(samTile->noncontiguousWrapper(tileRoi));
+      samTile->noncontiguousWrapper.download(samTile->ncwStoreLocal);
+
       samTile->make_raw_buffer();
 
       std::vector<Point2i> retileIndices(9);
-      for (int xx = 0; xx < 3; ++xx) {
-        for (int yy = 0; yy < 3; ++yy) {
+      for (int xx = 0; xx < 4; ++xx) {
+        for (int yy = 0; yy < 4; ++yy) {
           Point2i sublocation(xx,yy);
           Point2i tileID(samTile->location.x + xx, samTile->location.y + yy);
           samTile->componentTiles.emplace_back(sublocation,tileID);
-          retileIndices[3 * xx + yy] = tileID;
+          if (xx < 3 && yy < 3) {
+            retileIndices[3 * xx + yy] = tileID;
+          }
         }
       }
       imagePyramid->insertTilesAtBase(fourChannelPrealGPU,rectMaskGPU,imageRect,retileIndices);

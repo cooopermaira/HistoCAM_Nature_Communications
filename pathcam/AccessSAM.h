@@ -135,6 +135,8 @@ namespace pathCam {
 
     std::vector<int> get_tiles_covering_point(const Point2f &_p, int _stride = 768);
 
+    Point2i get_transformation_to_display(SAMTile* _samTile,Point2i _subtile);
+
     static std::map<int, std::vector<Point3f> > choose_clicks_for_each_tile(
       const std::map<int, std::vector<std::pair<Point3f, bool> > > &clicksByTile,
       int cap = 10);

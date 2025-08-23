@@ -119,7 +119,7 @@ namespace pathCam {
 
     cudaFree(clicksGPU);
     cudaFree(clickLabelsGPU);
-    clicksVec.clear();
+    //clicksVec.clear(); TODO
     hasMaskInput = false;
 
     cuda::GpuMat output(256, 256,CV_32FC1, outputMask);
@@ -127,8 +127,8 @@ namespace pathCam {
     cuda::threshold(output, outputBinary, 0, 255, THRESH_BINARY);
     outputBinary.convertTo(outputBinary,CV_8U);
 
-
-    if (cuda::countNonZero(outputBinary) > 0.30 * outputBinary.rows * outputBinary.cols) {
+    auto val = cuda::countNonZero(outputBinary);
+    if (val > 0.30 * outputBinary.rows * outputBinary.cols) {
       int interval = 256 * 256 / size;
 
       //distribute mask information as input to neighbors
@@ -218,19 +218,19 @@ namespace pathCam {
           cuda::max(src1, src2, src2);
         }
 
-        // //proof of seed clicks falling where they should in mask
-        // cuda::GpuMat tempD;
-        // Mat tempH;
-        //
-        // cuda::threshold(neighbor.first->inputMaskMat, tempD, 0, 255, THRESH_BINARY);
-        // tempD.convertTo(tempD,CV_8U);
-        // cuda::resize(tempD, tempD, {int(size), int(size)});
-        // tempD.download(tempH);
-        // for (auto p: neighbor.first->clicksFromMasks) {
-        //   circle(tempH, Point(p.x, p.y), 50, p.z > .5 ? Scalar(50) : Scalar(200), -1);
-        // }
-        // imwrite("/media/max/Data/pathcam_SAM/m1.png", tempH);
-        // int k = 0;
+        //proof of seed clicks falling where they should in mask
+        cuda::GpuMat tempD;
+        Mat tempH;
+
+        cuda::threshold(neighbor.first->inputMaskMat, tempD, 0, 255, THRESH_BINARY);
+        tempD.convertTo(tempD,CV_8U);
+        cuda::resize(tempD, tempD, {int(size), int(size)});
+        tempD.download(tempH);
+        for (auto p: neighbor.first->clicksFromMasks) {
+          circle(tempH, Point(p.x, p.y), 50, p.z > .5 ? Scalar(50) : Scalar(200), -1);
+        }
+        imwrite("/media/max/Data/pathcam_SAM/"+std::to_string(neighbor.first->location.x)+" "+std::to_string(neighbor.first->location.y)+"_input.png", tempH);
+        int k = 0;
 
         if (neighbor.first->segmentations.find(_segmentationID) == neighbor.first->segmentations.end()
             && !clicksFromMasks.empty()/*cuda::countNonZero(neighbor.first->inputMaskMat*/) {
@@ -245,19 +245,27 @@ namespace pathCam {
     cuda::threshold(output, output, 0.0, 255.0, THRESH_BINARY);
     output.convertTo(output,CV_8U);
     segmentations[_segmentationID] = output;
-    /*
+
     Mat hostOutput;
     output.download(hostOutput);
 
-    auto ans = debug_draw_tile_with_clicks_and_mask(ncwStoreLocal, hostOutput, Scalar(0, 180, 150, 255), 0.5);
-    imwrite("/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + ".png",
+    Mat ans = debug_draw_tile_with_clicks_and_mask(ncwStoreLocal, hostOutput, Scalar(0, 180, 150, 255), 0.5);
+    for (auto p : clicksVec) {
+      Scalar color = p.z > 0.5 ? Scalar(0,200,0,255) : Scalar(0,0,200,255);
+      circle(ans,Point(p.x,p.y),30,color,-1);
+    }
+    imwrite("/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + "_output.png",
             ans);
     int k = 0;
-*/
+
 
     //part out the mask to tiles
     int tileSize = as->parent->tileSize;
     for (auto &tile: componentTiles) {
+      if (tile.first.x == 3 || tile.first.y == 3) {
+        auto transform = as->get_transformation_to_display(this,tile.first);
+        int k = 0;
+      }
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
       if (cuda::countNonZero(output(maskRoi))) {
         as->push_mask_for_display(tile.second, componentIndex, output(maskRoi), _segmentationID);
@@ -273,8 +281,8 @@ namespace pathCam {
         set_component_tile({location.x + xx, location.y + yy}, {xx, yy}, gMat.image);
       }
     }
-    //debug
-    //noncontiguousWrapper.download(ncwStoreLocal);
+    // //debug
+    // noncontiguousWrapper.download(ncwStoreLocal);
   }
 
 
@@ -616,9 +624,6 @@ namespace pathCam {
       //       && _point.y - tile->location.y <= 1024) {
       //     correctTiles.push_back(tile);
       //   }
-      //   if (tile->ID == 99) {
-      //     int k = 0;
-      //   }
       // }
       // get_tile_id(myTile, 0);
       // throw std::exception();
@@ -628,10 +633,10 @@ namespace pathCam {
     out.push_back(primarySAMTileID);
 
     auto diff = myTile - rootTile;
-    Point2i locInTile(diff.x % 3, diff.y % 3);
+    Point2i baseTileInSAMTile(diff.x % 3, diff.y % 3);
 
 
-    if (locInTile.x == 0) {
+    if (baseTileInSAMTile.x == 0) {
       //pushback SAM tile (-1,0) from primary tile
       auto pointThatWillFallInTile = myTile - Point2i(_stride / (int) parent->tileSize, 0);
       auto id = get_tile_id(pointThatWillFallInTile, 0);
@@ -643,7 +648,7 @@ namespace pathCam {
       }
       out.push_back(id);
     }
-    if (locInTile.y == 0) {
+    if (baseTileInSAMTile.y == 0) {
       //pushback SAM tile (0,-1) from primary tile
       auto pointThatWillFallInTile = myTile - Point2i(0, _stride / (int) parent->tileSize);
       auto id = get_tile_id(pointThatWillFallInTile, 0);
@@ -655,7 +660,7 @@ namespace pathCam {
       }
       out.push_back(id);
     }
-    if (locInTile.x == 0 && locInTile.y == 0) {
+    if (baseTileInSAMTile.x == 0 && baseTileInSAMTile.y == 0) {
       //pushback SAM tile (-1,-1) from primary tile
       auto pointThatWillFallInTile = myTile - Point2i(_stride / (int) parent->tileSize,
                                                       _stride / (int) parent->tileSize);
@@ -811,6 +816,41 @@ namespace pathCam {
 
     parent->notify_observers();
   }
+
+  Point2i AccessSAM::get_transformation_to_display(SAMTile *_samTile, Point2i _subtile) {
+    auto myImage = _samTile->img;
+
+    auto theirTileId = get_tile_id(_subtile + _samTile->location, 0);
+    auto theirSAMTile = tiles[theirTileId];
+    auto theirImage = theirSAMTile->img;
+
+    if (theirImage->index == myImage->index) {
+      return {0,0};
+    }
+
+    parent->resize_mmatch_mutex->readLock();
+    auto m1 = parent->matchM.match[myImage->index][theirImage->index];
+    if (m1 == nullptr) {
+      parent->resize_mmatch_mutex->unlock();
+      return {0,0};
+    }
+    Point2d actualDistance = {myImage->absoluteCoords.x - theirImage->absoluteCoords.x,myImage->absoluteCoords.y - theirImage->absoluteCoords.y};
+    Point2d matchedDistance = {m1->t_x,m1->t_y};
+    auto res = actualDistance - matchedDistance;
+/*
+    //visual proof
+    Rect myROI(_subtile.x * 256, _subtile.y * 256,256,256);
+    auto diff = _samTile->location - theirSAMTile->location;
+    auto theirSubTile = _subtile + diff;
+    theirSubTile.x = theirSubTile.x %4;
+    theirSubTile.y = theirSubTile.y %4;
+    Rect theirROI(theirSubTile.x * 256, theirSubTile.y * 256, 256, 256);
+    imwrite("/media/max/Data/pathcam_SAM/myTile.png",_samTile->ncwStoreLocal(myROI));
+    imwrite("/media/max/Data/pathcam_SAM/theirTile.png",theirSAMTile->ncwStoreLocal(theirROI));
+*/
+    return res;
+  }
+
 
   Seeds AccessSAM::pickSeedsFromLogits_v2(const cuda::GpuMat &logits,
                                           const cuda::GpuMat &mask8u,
