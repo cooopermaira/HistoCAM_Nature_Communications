@@ -17,6 +17,10 @@
 
 #include "opencv2/core.hpp"
 #ifdef HAVE_OPENCV_CUDAARITHM
+
+#define CHECK_CUDA(x) do { cudaError_t e=(x); if(e!=cudaSuccess){ \
+std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<<"\n"; std::exit(1);} } while(0)
+
 #include "opencv2/core/cuda.hpp"
 #include "opencv2/cudaarithm.hpp"
 #include "opencv2/cudawarping.hpp"
@@ -83,8 +87,8 @@
 #include <pybind11/embed.h>
 #include <torch/csrc/autograd/python_variable.h>
 
-//#include "speedSam.h"
 #include <NvInfer.h>
+
 
 #include "util.h"
 #include "DataObserver.h"
@@ -114,6 +118,8 @@
 
 #include "TiledImage.h"
 #include "MRTiledImage.h"
+
+
 
 
 #endif /* pathCam_h */

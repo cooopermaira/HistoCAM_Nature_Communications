@@ -6,7 +6,6 @@
 #define ACCESSSAM_H
 
 #include "pathCam.h"
-//#include "speedSam.h"
 
 namespace pathCam {
 
@@ -75,11 +74,11 @@ namespace pathCam {
   };
 
 
+
   inline bool tile_compare(const SAMTile *a, const SAMTile *b) {
     return a->priority < b->priority;
   }
 
-  //class SpeedSam;
   class AccessSAM {
   public:
     bool initialized = false;
@@ -96,7 +95,7 @@ namespace pathCam {
     Poco::Event processQEvent;
 
     std::vector<SAMTile *> tiles;
-    std::queue<SAMTile *> segmentProcessQ;
+    std::deque<SAMTile *> segmentProcessQ;
     std::map<Point2i, std::vector<std::pair<int, Mat> >, Point2iComparator> segmentationMasks;
 
     AccessSAM(StreamCam *_parent): parent(_parent), processQEvent(true) {
