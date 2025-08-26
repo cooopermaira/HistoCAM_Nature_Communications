@@ -218,8 +218,11 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
           AffineTransform maskToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
 
+          auto annoColor = (*parent->annotate->annotations.get())[mask.first].get()->getColor();
+          //Colour annoColor = parent->annotate
+
           g.reduceClipRegion(*jImg,maskToCanvas);
-          g.setColour(juce::Colours::blue.withAlpha(0.5f));
+          g.setColour(annoColor.withAlpha(0.5f));
           g.fillAll();
           g.restoreState();
         }

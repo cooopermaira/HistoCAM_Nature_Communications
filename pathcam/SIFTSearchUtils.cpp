@@ -292,7 +292,7 @@ namespace pathCam {
 
     }
     const cuba::RobustKernelType robustKernelType = cuba::RobustKernelType::HUBER;
-    const double deltaMono = sqrt(5.99);
+    const double deltaMono = sqrt(1.5);
 
     optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 

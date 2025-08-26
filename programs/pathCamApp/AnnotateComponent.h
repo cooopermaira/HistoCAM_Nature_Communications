@@ -132,7 +132,6 @@ public:
     repaint();
   }
 
-private:
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   std::shared_ptr< Annotation > selected;
   

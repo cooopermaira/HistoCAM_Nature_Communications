@@ -31,8 +31,8 @@ bool AnnoViewComponent::keyPressed(const juce::KeyPress& key, juce::Component* o
     if (key == juce::KeyPress::createFromDescription("q")) {
       std::cout << "Run SAM\n";
       SegmentAnnotation *cast = dynamic_cast < SegmentAnnotation * >(parent->getSelected().get());
-      //cast->call_SAM();
-      parent->parent->sCam->segment_with_SAM(cast->input,parent->segID++);
+      //cast->ID = parent->segID++;
+      parent->parent->sCam->segment_with_SAM(cast->input,cast->ID);
       repaint();
       return true; // Key press handled
     }
@@ -153,8 +153,10 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent& event)
 {
   if(event.mods.isLeftButtonDown() && event.mods.isShiftDown()){
     if(parent->getMode() == Annotation::_SEG){
+      auto seg = new SegmentAnnotation("SAM");
+      seg->ID = annotations->size();
       std::shared_ptr < Annotation > new_annotation;
-      new_annotation.reset(new SegmentAnnotation("SAM"));
+      new_annotation.reset(seg);
       parent->setSelected(new_annotation);
       annotations->push_back(new_annotation);
       parent->annotationsUpdated();

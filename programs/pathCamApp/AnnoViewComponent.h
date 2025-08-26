@@ -64,7 +64,6 @@ public:
   void setSelected(std::shared_ptr< Annotation > annotation);
 
   
-private:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
     

@@ -115,7 +115,7 @@ namespace pathCam {
   class FeatureTrackGenerator {
   private:
     struct ImageFeaturePair {
-      unsigned long image_id;
+      long image_id;
       int feature_id;
 
       bool operator<(const ImageFeaturePair &other) const {

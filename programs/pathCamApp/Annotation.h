@@ -288,7 +288,7 @@ public:
   }
 
   std::vector < Point3f > input;
-  
+  int ID;
 };
 
 class MeasureAnnotation : public Annotation{
