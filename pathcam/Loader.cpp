@@ -85,13 +85,13 @@ namespace pathCam {
 
       detector->detect_and_compute(image,0);
 
-      if (image->keypoints.size() < 200) {
+      if (image->keypoints.size() < 250) {
         detector->set_ORB_params();
         detector->detect_and_compute(image,0);
       }
       delete detector;
 
-      if (image->keypoints.size() < 200) {
+      if (image->keypoints.size() < 250) {
         successful = true;
         image->label = Image::_LOWFEAT;
         parent->loaderCount--;

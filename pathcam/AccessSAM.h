@@ -38,7 +38,9 @@ namespace pathCam {
     cuda::GpuMat noncontiguousWrapper;
     Mat ncwStoreLocal;
 
+    bool runIsRepeat = false;
     bool valid = false;
+    bool canRun;
     bool embeddingComplete = false;
     void *rawBuffer = nullptr, *image_embed = nullptr, *high_res_feats_1 = nullptr, *high_res_feats_0 = nullptr;
     void *clicksGPU = nullptr, *clickLabelsGPU = nullptr, *maskInput = nullptr, *hasMaskInputGPU = nullptr;
@@ -68,7 +70,7 @@ namespace pathCam {
     void run_segmentation(int _segmentationID);
 
     Mat debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
-                                             const cv::Scalar &shadeColor, float alpha);
+                                             const cv::Scalar &shadeColor, float alpha, int _segmentationID);
 
     Rect get_shared_ROI(SAMTile* neighbor);
   };

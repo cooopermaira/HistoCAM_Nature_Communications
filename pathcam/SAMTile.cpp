@@ -8,7 +8,7 @@
 namespace pathCam {
   using namespace nvinfer1;
 
-SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _componentIndex, unsigned _size) : ID(_ID),
+  SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _componentIndex, unsigned _size) : ID(_ID),
     location(_location),
     componentIndex(_componentIndex),
     size(_size),
@@ -23,11 +23,23 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
   }
 
   void SAMTile::run_segmentation(int _segmentationID) {
+    if (clicksVec.size() > 10) {
+      int k = 0;
+    }
     if (clicksVec.empty() && !clicksFromMasks.empty()/*!hasMaskInput*/) { return; }
+    std::vector<Point3f> clicksForCurrentRun = clicksVec;
+    clicksVec.clear();
 
-    if (clicksVec.empty()) {
+    if (!clicksFromMasks.empty() && !runIsRepeat) {
+      int i = 0;
+      while (clicksForCurrentRun.size() < 10 && i < clicksFromMasks.size()) {
+        clicksForCurrentRun.push_back(clicksFromMasks[i++]);
+      }
+    }
+
+    if (clicksForCurrentRun.empty()) {
       //give dummy input to avoid input requirements, -1 means ignore
-      clicksVec.push_back({0, 0, -1});
+      clicksForCurrentRun.push_back({0, 0, -1});
     }
 
     cuda::GpuMat temp;
@@ -37,7 +49,7 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
     }
 
     //get embeddings
-    AccessSAM::get_clicks_embedding(clicksVec, clicksGPU, clickLabelsGPU);
+    AccessSAM::get_clicks_embedding(clicksForCurrentRun, clicksGPU, clickLabelsGPU);
 
     if (!hasMaskInputGPU) {
       cudaMalloc(&hasMaskInputGPU, sizeof(float));
@@ -64,9 +76,12 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
                    cudaMemcpyDeviceToDevice);
     }
 
+    if (clicksForCurrentRun.size() > 10) {
+      int k = 0;
+    }
     //set binding dimension for dynamic input (clicks)
-    as->decoderCtx->setInputShape("point_coords", Dims3{1, static_cast<int>(clicksVec.size()), 2});
-    as->decoderCtx->setInputShape("point_labels", Dims2{1, static_cast<int>(clicksVec.size())});
+    as->decoderCtx->setInputShape("point_coords", Dims3{1, static_cast<int>(clicksForCurrentRun.size()), 2});
+    as->decoderCtx->setInputShape("point_labels", Dims2{1, static_cast<int>(clicksForCurrentRun.size())});
 
     //set input and output addresses
     as->decoderCtx->setInputTensorAddress("image_embed", image_embed);
@@ -169,14 +184,6 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
           if (lowVal < 0) {
             neighbor.first->clicksFromMasks.push_back(Point3f(lowloc.x, lowloc.y, 0.f));
           }
-
-          if (!neighbor.first->clicksFromMasks.empty()) {
-            int i = 0;
-            while (neighbor.first->clicksVec.size() < 10 && i < neighbor.first->clicksFromMasks.size()) {
-              neighbor.first->clicksVec.push_back(neighbor.first->clicksFromMasks[i++]);
-            }
-          }
-
         }
 
         for (auto &linkedSubTile: neighbor.second) {
@@ -193,19 +200,19 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
           cuda::max(src1, src2, src2);
         }
 
-        //proof of seed clicks falling where they should in mask
-        cuda::GpuMat tempD;
-        Mat tempH;
-
-        cuda::threshold(neighbor.first->inputMaskMat, tempD, 0, 255, THRESH_BINARY);
-        tempD.convertTo(tempD,CV_8U);
-        cuda::resize(tempD, tempD, {int(size), int(size)});
-        tempD.download(tempH);
-        for (auto p: neighbor.first->clicksFromMasks) {
-          circle(tempH, Point(p.x, p.y), 50, p.z > .5 ? Scalar(50) : Scalar(200), -1);
-        }
-        imwrite("/media/max/Data/pathcam_SAM/"+std::to_string(neighbor.first->location.x)+" "+std::to_string(neighbor.first->location.y)+"_input.png", tempH);
-        int k = 0;
+        // //proof of seed clicks falling where they should in mask
+        // cuda::GpuMat tempD;
+        // Mat tempH;
+        //
+        // cuda::threshold(neighbor.first->inputMaskMat, tempD, 0, 255, THRESH_BINARY);
+        // tempD.convertTo(tempD,CV_8U);
+        // cuda::resize(tempD, tempD, {int(size), int(size)});
+        // tempD.download(tempH);
+        // for (auto p: neighbor.first->clicksFromMasks) {
+        //   circle(tempH, Point(p.x, p.y), 50, p.z > .5 ? Scalar(50) : Scalar(200), -1);
+        // }
+        // imwrite("/media/max/Data/pathcam_SAM/"+std::to_string(neighbor.first->location.x)+"_"+std::to_string(neighbor.first->location.y)+"_input.png", tempH);
+        // int k = 0;
 
         if (neighbor.first->segmentations.find(_segmentationID) == neighbor.first->segmentations.end()
             && !clicksFromMasks.empty()/*cuda::countNonZero(neighbor.first->inputMaskMat*/) {
@@ -221,24 +228,24 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
     output.convertTo(output,CV_8U);
     segmentations[_segmentationID] = output;
 
-    Mat hostOutput;
-    output.download(hostOutput);
-
-    Mat ans = debug_draw_tile_with_clicks_and_mask(ncwStoreLocal, hostOutput, Scalar(0, 180, 150, 255), 0.5);
-    for (auto p : clicksVec) {
-      Scalar color = p.z > 0.5 ? Scalar(0,200,0,255) : Scalar(0,0,200,255);
-      circle(ans,Point(p.x,p.y),30,color,-1);
-    }
-    imwrite("/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + "_output.png",
-            ans);
-    int k = 0;
+    // Mat hostOutput;
+    // output.download(hostOutput);
+    //
+    // Mat ans = debug_draw_tile_with_clicks_and_mask(ncwStoreLocal, hostOutput, Scalar(0, 180, 150, 255), 0.5);
+    // for (auto p : clicksForCurrentRun) {
+    //   Scalar color = p.z > 0.5 ? Scalar(0,200,0,255) : Scalar(0,0,200,255);
+    //   circle(ans,Point(p.x,p.y),30,color,-1);
+    // }
+    // imwrite("/media/max/Data/pathcam_SAM/" + std::to_string(location.x) + "_" + std::to_string(location.y) + "_output.png",
+    //         ans);
+    // int k = 0;
 
 
     //part out the mask to tiles
     int tileSize = as->parent->tileSize;
     for (auto &tile: componentTiles) {
       if (tile.first.x == 3 || tile.first.y == 3) {
-        auto transform = as->get_transformation_to_display(this,tile.first);
+        auto transform = as->get_transformation_to_display(this, tile.first);
         int k = 0;
       }
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
@@ -246,6 +253,8 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
         as->push_mask_for_display(tile.second, componentIndex, output(maskRoi), _segmentationID);
       }
     }
+    runIsRepeat = false;
+    canRun = false;
   }
 
 
@@ -295,17 +304,17 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
 
       if (_buffer) {
         dst = static_cast<char *>(_buffer) + i * nBytesPerChannel;
-      }else {
+      } else {
         dst = static_cast<char *>(rawBuffer) + i * nBytesPerChannel;
       }
 
       CHECK_CUDA(cudaMemcpy2D(dst,
-                   split_channels[2 - i].cols * sizeof(float),
-                   split_channels[2 - i].data,
-                   split_channels[2 - i].step,
-                   split_channels[2 - i].cols * sizeof(float),
-                   split_channels[2 - i].rows,
-                   cudaMemcpyDeviceToDevice));
+        split_channels[2 - i].cols * sizeof(float),
+        split_channels[2 - i].data,
+        split_channels[2 - i].step,
+        split_channels[2 - i].cols * sizeof(float),
+        split_channels[2 - i].rows,
+        cudaMemcpyDeviceToDevice));
     }
     noncontiguousWrapper.release();
   }
@@ -319,7 +328,7 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
   }
 
   Mat SAMTile::debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
-                                                    const cv::Scalar &shadeColor, float alpha) {
+                                                    const cv::Scalar &shadeColor, float alpha, int _segmentationID) {
     CV_Assert(bgraImage.type() == CV_8UC4);
     CV_Assert(binaryMask.type() == CV_8UC1);
     CV_Assert(bgraImage.size() == binaryMask.size());
@@ -356,9 +365,4 @@ SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _component
 
     return result;
   }
-
-
-
 }
-
-

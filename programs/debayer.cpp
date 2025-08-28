@@ -52,8 +52,8 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 }
 
 int main(int argc, char *argv[]) {
-  auto renameFiles = true;
-  auto convertImages = true;
+  auto renameFiles = false;
+  auto convertImages = false;
   bool makeInput = true;
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x, flat_field40x;
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/media/max/Data/scale_neg_NaN/input.txt";
+    std::string outputfilepath = "/media/max/Data/annotate_new/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {

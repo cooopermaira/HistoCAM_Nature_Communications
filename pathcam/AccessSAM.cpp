@@ -214,6 +214,9 @@ namespace pathCam {
     for (auto &kv: ans) {
       auto tile = tiles[kv.first];
       tile->increase_embed_priority();
+      if (tile->segmentations.find(_segID) != tile->segmentations.end()) {
+        tile->runIsRepeat = true;
+      }
 
       for (auto &point: kv.second) {
         Point3f pointInTileSpace = point - Point3f((float) parent->tileSize * tile->location.x,
@@ -230,6 +233,7 @@ namespace pathCam {
 
 
       //tile ready to be enqueued
+      tile->canRun = true;
       segmentProcessQ.push_back(tile);
     }
 
@@ -246,15 +250,13 @@ namespace pathCam {
 
       //skip tile if its already been processed. This happens because it gets added once if it has clicks
       //and can then be subsequently added by neighbors if there is mask > 0 in overlapping regions
-      if (tile->segmentations.find(_segID) != tile->segmentations.end()) {
-        continue;
+      if (tile->canRun) {
+        //ensure the tiles embedding has completed
+        cudaEventSynchronize(tile->embeddingCompleteCudaEvent);
+
+        //process the segmentation
+        tile->run_segmentation(_segID);
       }
-
-      //ensure the tiles embedding has completed
-      cudaEventSynchronize(tile->embeddingCompleteCudaEvent);
-
-      //process the segmentation
-      tile->run_segmentation(_segID);
     }
   }
 
