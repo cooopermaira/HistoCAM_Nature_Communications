@@ -77,12 +77,12 @@ namespace pathCam {
       cudaMalloc(&maskInput, sizeof(float) * 256 * 256);
     }
 
-    if (hasMaskInput) {
-      Mat inputMaskMatHost;
-
-      cudaMemcpy2D(maskInput, sizeof(float) * 256, inputMaskMat.data, inputMaskMat.step, sizeof(float) * 256, 256,
-                   cudaMemcpyDeviceToDevice);
-    }
+    // if (hasMaskInput) {
+    //   Mat inputMaskMatHost;
+    //
+    //   cudaMemcpy2D(maskInput, sizeof(float) * 256, inputMaskMat.data, inputMaskMat.step, sizeof(float) * 256, 256,
+    //                cudaMemcpyDeviceToDevice);
+    // }
 
     if (clicksForCurrentRun.size() > 10) {
       int k = 0;
@@ -341,6 +341,21 @@ namespace pathCam {
       p.first->priority = 1;
     }
   }
+
+
+  void SAMTile::embed_tile_with_engine(nvinfer1::IExecutionContext *_encoderCtx) {
+    cudaMalloc(&high_res_feats_0, 32 * 256 * 256 * sizeof(float));
+    cudaMalloc(&high_res_feats_1, 64 * 128 * 128 * sizeof(float));
+    cudaMalloc(&image_embed, 256 * 64 * 64 * sizeof(float));
+
+    _encoderCtx->setInputTensorAddress("image", rawBuffer);
+    _encoderCtx->setOutputTensorAddress("high_res_feats_0", high_res_feats_0);
+    _encoderCtx->setOutputTensorAddress("high_res_feats_1", high_res_feats_1);
+    _encoderCtx->setOutputTensorAddress("image_embed", image_embed);
+
+    _encoderCtx->enqueueV3(as->decoderStream);
+  }
+
 
   Mat SAMTile::debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
                                                     const cv::Scalar &shadeColor, float alpha, int _segmentationID) {

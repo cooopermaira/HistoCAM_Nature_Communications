@@ -176,8 +176,8 @@ namespace pathCam {
       cudaFree(tileToFree->rawBuffer);
     }
 
-    delete encoderCtx;
-    delete encoderEngine;
+    //delete encoderCtx;
+    //delete encoderEngine;
 
     std::cout << "embedded tiles: " << tiles.size() << std::endl;
   }
@@ -185,14 +185,15 @@ namespace pathCam {
 
   void AccessSAM::create_segmentation_course_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f> &_fov) {
     cudaSetDevice(parent->compositorCudaDevice);
+    for (auto &p : _clicks) {
+      assert(p.x >= _fov[0].x && p.y >= _fov[0].y && p.x <= _fov[1].x && p.y <= _fov[1].y);
+    }
+    assert(_fov.size() == 2);
 
     //get base component (for now)
     auto ipBase = parent->composites[0]->imagePyramid->level[0];
 
     //create mat from tiles
-    Rect2i fieldOfView(_fov[0].x,_fov[0].y,_fov[1].x - _fov[0].x,_fov[1].y - _fov[0].y);
-    cuda::GpuMat fovMat(fieldOfView.height,fieldOfView.width,CV_8UC4);
-
     auto ul = ipBase->getIJ(_fov[0]);
     auto lr = ipBase->getIJ(_fov[1]);
 
@@ -200,6 +201,9 @@ namespace pathCam {
       std::cout <<"I don't think so. That fild of view is too big. Delete this annotation and try again. Don't zoom out so far when you're clicking"<<std::endl;
       return;
     }
+
+    Rect2i fieldOfView(_fov[0].x,_fov[0].y,_fov[1].x - _fov[0].x,_fov[1].y - _fov[0].y);
+    cuda::GpuMat fovMat(fieldOfView.height,fieldOfView.width,CV_8UC4);
 
     for (int y = ul.y; y <= lr.y; ++y) {
       for (int x = ul.x; x <= lr.x; ++x) {
@@ -219,15 +223,40 @@ namespace pathCam {
       }
     }
 
+    //resize field of view to SAM tile size so all clicks can be processed together
     cuda::resize(fovMat,fovMat,Size(parent->SAMTileSize,parent->SAMTileSize));
 
     //make dummy SAMTile
     auto fovTile = SAMTile(-1,{0,0},this,0);
     fovTile.noncontiguousWrapper = fovMat;
+    fovTile.noncontiguousWrapper.download(fovTile.ncwStoreLocal);
+
     fovTile.make_raw_buffer();
+    fovTile.embed_tile_with_engine(encoderCtx);
+
+    //reshape clicks
+    for (auto &p : _clicks) {
+      p.x -= _fov[0].x;
+      p.y -= _fov[0].y;
+
+      p.x *= (float)parent->SAMTileSize / (_fov[1].x - _fov[0].x);
+      p.y *= (float)parent->SAMTileSize / (_fov[1].y - _fov[0].y);
+    }
     fovTile.clicksVec = _clicks;
 
     auto output = fovTile.run_segmentation(_segID);
+    cuda::resize(output,output,fieldOfView.size());
+    // cuda::GpuMat outputBinary;
+    // cuda::resize(output,output,{parent->SAMTileSize,parent->SAMTileSize});
+    // cuda::threshold(output, outputBinary, 0, 255, THRESH_BINARY);
+    // outputBinary.convertTo(outputBinary,CV_8U);
+    // Mat opbLocal;
+    // outputBinary.download(opbLocal);
+
+
+    //auto test = fovTile.debug_draw_tile_with_clicks_and_mask(fovTile.ncwStoreLocal,opbLocal,Scalar(0,150,0,255),0.7,_segID);
+    //imwrite("/media/max/Data/pathcam_SAM/fov.png",test);
+    int k = 0;
 
   }
 

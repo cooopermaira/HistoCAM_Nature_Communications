@@ -67,6 +67,8 @@ namespace pathCam {
 
     void increase_embed_priority();
 
+    void embed_tile_with_engine(nvinfer1::IExecutionContext *_encoderCtx);
+
     cuda::GpuMat run_segmentation(int _segmentationID);
 
     Mat debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
