@@ -232,15 +232,7 @@ namespace pathCam {
 
     void notify_observers();
 
-    bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID) {
-      if (segmentWithSAM) {
-        if (as) {
-          as->create_segmentation(_clicks,_segID);
-          return true;
-        }
-      }
-      return false;
-    }
+    bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID);
 
     unsigned int increment_and_get_components() { return components++; }
 

@@ -540,6 +540,29 @@ namespace pathCam {
     }
   }
 
+  bool StreamCam::segment_with_SAM(std::vector<Point3f> &_clicks, int _segID) {
+    if (segmentWithSAM) {
+      if (as) {
+        if ((_clicks.end() - 2)->z == 4) {
+          if (_clicks.back().z == 5) {
+            std::vector<Point3f> inputClicks(_clicks.begin(),_clicks.end() - 2);
+            Point2i fovUL((_clicks.end() - 2)->x,(_clicks.end() - 2)->y);
+            Point2i fovLR(_clicks.back().x,_clicks.back().y);
+            as->create_segmentation_course_to_fine(inputClicks,_segID,{fovUL,fovLR});
+            return true;
+          }else {
+            throw std::runtime_error("one FOV point but not the other");
+          }
+        }else {
+          as->create_segmentation(_clicks,_segID);
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
   std::vector<Image *> StreamCam::get_component_image_refs(unsigned long component) {
     auto dm = composites[component]->delaunayMembers;
     std::vector<unsigned long> res(dm.size());

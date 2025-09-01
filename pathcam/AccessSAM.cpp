@@ -183,8 +183,59 @@ namespace pathCam {
   }
 
 
+  void AccessSAM::create_segmentation_course_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f> &_fov) {
+    cudaSetDevice(parent->compositorCudaDevice);
+
+    //get base component (for now)
+    auto ipBase = parent->composites[0]->imagePyramid->level[0];
+
+    //create mat from tiles
+    Rect2i fieldOfView(_fov[0].x,_fov[0].y,_fov[1].x - _fov[0].x,_fov[1].y - _fov[0].y);
+    cuda::GpuMat fovMat(fieldOfView.height,fieldOfView.width,CV_8UC4);
+
+    auto ul = ipBase->getIJ(_fov[0]);
+    auto lr = ipBase->getIJ(_fov[1]);
+
+    if ((lr.x - ul.x) * (lr.y - ul.y) > 10000) {
+      std::cout <<"I don't think so. That fild of view is too big. Delete this annotation and try again. Don't zoom out so far when you're clicking"<<std::endl;
+      return;
+    }
+
+    for (int y = ul.y; y <= lr.y; ++y) {
+      for (int x = ul.x; x <= lr.x; ++x) {
+        Rect2i tileRect(x * parent->tileSize, y * parent->tileSize, parent->tileSize, parent->tileSize);
+        auto worldspaceROI = tileRect & fieldOfView;
+
+        auto tileROI = worldspaceROI;
+        tileROI.x -= tileRect.x;
+        tileROI.y -= tileRect.y;
+
+        auto fovMatROI = worldspaceROI;
+        fovMatROI.x -= fieldOfView.x;
+        fovMatROI.y -= fieldOfView.y;
+
+        auto tileObj = ipBase->getTile(x,y);
+        tileObj.image(tileROI).copyTo(fovMat(fovMatROI));
+      }
+    }
+
+    cuda::resize(fovMat,fovMat,Size(parent->SAMTileSize,parent->SAMTileSize));
+
+    //make dummy SAMTile
+    auto fovTile = SAMTile(-1,{0,0},this,0);
+    fovTile.noncontiguousWrapper = fovMat;
+    fovTile.make_raw_buffer();
+    fovTile.clicksVec = _clicks;
+
+    auto output = fovTile.run_segmentation(_segID);
+
+  }
+
+
+
   void AccessSAM::create_segmentation(std::vector<Point3f> &_clicks, int _segID) {
     cudaSetDevice(parent->compositorCudaDevice);
+
 
     // Set the optimization profile
     decoderCtx->setOptimizationProfileAsync(0, decoderStream);
@@ -452,7 +503,7 @@ namespace pathCam {
 
 
   void AccessSAM::push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask,
-                                        int _segID) {
+                                        int _segID, bool _unionWithExistingMask) {
     auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
     TileObj &tileObj = pyrBase->getTile(_tileCoord.x, _tileCoord.y);
 
@@ -462,7 +513,12 @@ namespace pathCam {
     }
 
     //combine with current mask by taking max at each pixel
-    cuda::max(_mask, tileObj.SAMMasks[_segID].first, tileObj.SAMMasks[_segID].first);
+    //parent->composites[0]->imagePyramid->imgPyramidMutex->lock();
+    if (_unionWithExistingMask) {
+      cuda::max(_mask, tileObj.SAMMasks[_segID].first, tileObj.SAMMasks[_segID].first);
+    }else {
+      tileObj.SAMMasks[_segID].first = _mask.clone();
+    }
     tileObj.newAnnoData = true;
 
     //pick level region as own bounds and roi as entire tile
@@ -472,6 +528,7 @@ namespace pathCam {
 
     auto level = parent->composites[0]->imagePyramid->level[0];
     level->tileUpwards(_tileCoord, levelRegion, tileObj, tileRegion, _segID);
+    //parent->composites[0]->imagePyramid->imgPyramidMutex->unlock();
 
     parent->notify_observers();
   }

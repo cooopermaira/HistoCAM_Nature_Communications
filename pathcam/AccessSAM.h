@@ -67,7 +67,7 @@ namespace pathCam {
 
     void increase_embed_priority();
 
-    void run_segmentation(int _segmentationID);
+    cuda::GpuMat run_segmentation(int _segmentationID);
 
     Mat debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
                                              const cv::Scalar &shadeColor, float alpha, int _segmentationID);
@@ -130,9 +130,11 @@ namespace pathCam {
     //fills SAM tiles with image data and creates SAM embedding for each tile. Priority of each tile can be adjusted on the fly
     void embed_SAM_tiles(bool _buildBuffer = true);
 
-    void push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID);
+    void push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask, int _segID, bool _unionWithExistingMask);
 
     void create_segmentation(std::vector<Point3f> &_clicks, int _segID);
+
+    void create_segmentation_course_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f>& _fov);
 
     std::vector<int> get_tiles_covering_point(const Point2f &_p, int _stride = 768);
 

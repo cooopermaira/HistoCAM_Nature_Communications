@@ -259,7 +259,10 @@ public:
 
 class SegmentAnnotation : public PolygonAnnotation{
 public:
-  SegmentAnnotation(juce::String name): PolygonAnnotation(name) {};
+  SegmentAnnotation(juce::String name): PolygonAnnotation(name) {
+    fovUpperLeftCorner = {0,0};
+    fovUpperLeftCorner = {0,0};
+  };
   
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
     //PolygonAnnotation::paint(g, offset, selected, scale);
@@ -280,7 +283,29 @@ public:
 
   void add(Point3f p) {
     input.push_back(p);
+  }
 
+  void update_FOV(fPoint _upperLeft, fPoint _lowerRight) {
+    if (fovUpperLeftCorner.x == 0 && fovUpperLeftCorner.y == 0) {
+      fovUpperLeftCorner.x = _upperLeft.x;
+      fovUpperLeftCorner.y = _upperLeft.y;
+    }
+    if (fovLowerRightCorner.x == 0 && fovLowerRightCorner.y == 0) {
+      fovLowerRightCorner.x = _lowerRight.x;
+      fovLowerRightCorner.y = _lowerRight.y;
+    }
+    if (_upperLeft.x < fovUpperLeftCorner.x) {
+      fovUpperLeftCorner.x = _upperLeft.x;
+    }
+    if (_lowerRight.x > fovLowerRightCorner.x) {
+      fovLowerRightCorner.x = _lowerRight.x;
+    }
+    if (_upperLeft.y < fovUpperLeftCorner.y) {
+      fovUpperLeftCorner.y = _upperLeft.y;
+    }
+    if (_lowerRight.y > fovLowerRightCorner.y) {
+      fovLowerRightCorner.y = _lowerRight.y;
+    }
   }
 
   void call_SAM() {
@@ -289,6 +314,7 @@ public:
 
   std::vector < Point3f > input;
   int ID;
+  Point2f fovUpperLeftCorner, fovLowerRightCorner;
 };
 
 class MeasureAnnotation : public Annotation{

@@ -22,11 +22,19 @@ namespace pathCam {
     cudaEventCreate(&embeddingCompleteCudaEvent);
   }
 
-  void SAMTile::run_segmentation(int _segmentationID) {
+  cuda::GpuMat SAMTile::run_segmentation(int _segmentationID) {
     if (clicksVec.size() > 10) {
       int k = 0;
     }
-    if (clicksVec.empty() && !clicksFromMasks.empty()/*!hasMaskInput*/) { return; }
+    if (clicksVec.empty() && !clicksFromMasks.empty()/*!hasMaskInput*/) { return cuda::GpuMat(); }
+
+    bool letMaskShrink = false;
+    for (auto point : clicksVec) {
+      if (point.z == 0) {
+        letMaskShrink = true;
+        break;
+      }
+    }
     std::vector<Point3f> clicksForCurrentRun = clicksVec;
     clicksVec.clear();
 
@@ -105,6 +113,11 @@ namespace pathCam {
     hasMaskInput = false;
 
     cuda::GpuMat output(256, 256,CV_32FC1, outputMask);
+
+    if (ID == -1) {
+      return output;
+    }
+
     cuda::GpuMat outputBinary;
     cuda::threshold(output, outputBinary, 0, 255, THRESH_BINARY);
     outputBinary.convertTo(outputBinary,CV_8U);
@@ -250,11 +263,13 @@ namespace pathCam {
       }
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
       if (cuda::countNonZero(output(maskRoi))) {
-        as->push_mask_for_display(tile.second, componentIndex, output(maskRoi), _segmentationID);
+        as->push_mask_for_display(tile.second, componentIndex, output(maskRoi), _segmentationID, !letMaskShrink);
       }
     }
     runIsRepeat = false;
     canRun = false;
+
+    return output;
   }
 
 
