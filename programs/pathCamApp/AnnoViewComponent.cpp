@@ -172,7 +172,7 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent &event) {
       fPoint temp = screen2view(fPoint(event.x, event.y), *view);
       Point3f point(temp.x, temp.y, 1.0);
       cast->add(point);
-      parent->parent->sCam->as->on_click(point);
+      //parent->parent->sCam->as->on_click(point);
       return true;
     }
   }
@@ -188,7 +188,7 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent &event) {
       fPoint temp = screen2view(fPoint(event.x, event.y), *view);
       Point3f point(temp.x, temp.y, 0.0);
       cast->add(point);
-      parent->parent->sCam->as->on_click(point);
+      //parent->parent->sCam->as->on_click(point);
       return true;
     }
   }

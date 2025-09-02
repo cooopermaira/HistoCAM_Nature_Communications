@@ -383,7 +383,7 @@ namespace pathCam {
       tileRoi.y -= tileRect.y;
 
       fourChannelPrealGPU(imageRoi).copyTo(samTile->noncontiguousWrapper(tileRoi));
-      //samTile->noncontiguousWrapper.download(samTile->ncwStoreLocal);
+      samTile->noncontiguousWrapper.download(samTile->ncwStoreLocal);
 
       samTile->make_raw_buffer();
 

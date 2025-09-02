@@ -202,21 +202,21 @@ namespace pathCam {
       return;
     }
 
-    Rect2i fieldOfView(_fov[0].x,_fov[0].y,_fov[1].x - _fov[0].x,_fov[1].y - _fov[0].y);
-    cuda::GpuMat fovMat(fieldOfView.height,fieldOfView.width,CV_8UC4);
+    Rect2i fovRect(_fov[0].x,_fov[0].y,_fov[1].x - _fov[0].x,_fov[1].y - _fov[0].y);
+    cuda::GpuMat fovMat(fovRect.height,fovRect.width,CV_8UC4);
 
     for (int y = ul.y; y <= lr.y; ++y) {
       for (int x = ul.x; x <= lr.x; ++x) {
         Rect2i tileRect(x * parent->tileSize, y * parent->tileSize, parent->tileSize, parent->tileSize);
-        auto worldspaceROI = tileRect & fieldOfView;
+        auto worldspaceROI = tileRect & fovRect;
 
         auto tileROI = worldspaceROI;
         tileROI.x -= tileRect.x;
         tileROI.y -= tileRect.y;
 
         auto fovMatROI = worldspaceROI;
-        fovMatROI.x -= fieldOfView.x;
-        fovMatROI.y -= fieldOfView.y;
+        fovMatROI.x -= fovRect.x;
+        fovMatROI.y -= fovRect.y;
 
         auto tileObj = ipBase->getTile(x,y);
         tileObj.image(tileROI).copyTo(fovMat(fovMatROI));
@@ -234,28 +234,73 @@ namespace pathCam {
     fovTile.make_raw_buffer();
     fovTile.embed_tile_with_engine(encoderCtx);
 
-    //reshape clicks
+    //reshape clicks and determine if mask should shrink
+    bool unionWithExistingMask = true;
     for (auto &p : _clicks) {
       p.x -= _fov[0].x;
       p.y -= _fov[0].y;
 
       p.x *= (float)parent->SAMTileSize / (_fov[1].x - _fov[0].x);
       p.y *= (float)parent->SAMTileSize / (_fov[1].y - _fov[0].y);
+      unionWithExistingMask = unionWithExistingMask && p.z;
     }
     fovTile.clicksVec = _clicks;
 
-    auto output = fovTile.run_segmentation(_segID);
-    cuda::resize(output,output,fieldOfView.size());
-    // cuda::GpuMat outputBinary;
-    // cuda::resize(output,output,{parent->SAMTileSize,parent->SAMTileSize});
-    // cuda::threshold(output, outputBinary, 0, 255, THRESH_BINARY);
-    // outputBinary.convertTo(outputBinary,CV_8U);
-    // Mat opbLocal;
-    // outputBinary.download(opbLocal);
+    //generate segmentation for FOV
+    auto output = fovTile.run_segmentation(_segID, false);
 
+    cuda::resize(output,output,fovRect.size());
+    cuda::threshold(output,output,0,255,THRESH_BINARY);
+    output.convertTo(output,CV_8U);
 
-    //auto test = fovTile.debug_draw_tile_with_clicks_and_mask(fovTile.ncwStoreLocal,opbLocal,Scalar(0,150,0,255),0.7,_segID);
-    //imwrite("/media/max/Data/pathcam_SAM/fov.png",test);
+    cuda::GpuMat tileMaskPreal(parent->tileSize,parent->tileSize,CV_8U);
+
+    for (int y = ul.y; y <= lr.y; ++y) {
+      for (int x = ul.x; x <= lr.x; ++x) {
+
+        Point2i locationPoint(x * parent->tileSize,y * parent->tileSize);
+        Rect tileRect(locationPoint ,Size(parent->tileSize,parent->tileSize));
+        Rect worldspaceROI = tileRect & fovRect;
+
+        Rect fovROI = worldspaceROI;
+        fovROI.x -= fovRect.x;
+        fovROI.y -= fovRect.y;
+
+        if (cuda::countNonZero(output(fovROI))) {
+
+          Rect tileROI = worldspaceROI;
+          tileROI.x -= tileRect.x;
+          tileROI.y -= tileRect.y;
+
+          tileMaskPreal.setTo(Scalar(0));
+          output(fovROI).copyTo(tileMaskPreal(tileROI));
+
+          push_mask_for_display({x,y},0,tileMaskPreal,_segID,unionWithExistingMask);
+          // maskMatHolding_32F.setTo(Scalar(0));
+          // maskMatHolding_8U.setTo(Scalar(0));
+          // output(fovROI).copyTo(maskMatHolding_32F(samTileROI));
+          // cuda::resize(maskMatHolding_32F,samTile->inputMaskMat,{256,256});
+          //
+          //
+          // Mat mask;
+          // cuda::threshold(maskMatHolding_32F, maskMatHolding_32F, 0, 255, THRESH_BINARY);
+          // maskMatHolding_32F.convertTo(maskMatHolding_8U,CV_8U);
+          // maskMatHolding_8U.download(mask);
+          // auto test2 = samTile->debug_draw_tile_with_clicks_and_mask(samTile->ncwStoreLocal,mask,Scalar(0,150,0,255),0.7,_segID);
+          // imwrite("/media/max/Data/pathcam_SAM/test_images/"+std::to_string(samTile->location.x)+"_"+std::to_string(samTile->location.y)+"_inputmask.png",test2);
+
+          // auto tileOutput = samTile->run_segmentation(_segID,false);
+          // cuda::resize(tileOutput,maskMatHolding_32F,{1024,1024});
+          // cuda::threshold(maskMatHolding_32F,maskMatHolding_32F, 0, 255, THRESH_BINARY);
+          // maskMatHolding_32F.convertTo(maskMatHolding_8U,CV_8U);
+          // maskMatHolding_8U.download(mask);
+          // auto test3 = samTile->debug_draw_tile_with_clicks_and_mask(samTile->ncwStoreLocal,mask,Scalar(0,150,0,255),0.7,_segID);
+          // imwrite("/media/max/Data/pathcam_SAM/test_images/"+std::to_string(samTile->location.x)+"_"+std::to_string(samTile->location.y)+"_refined.png",test3);
+
+        }
+      }
+    }
+
     int k = 0;
 
   }

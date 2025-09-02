@@ -69,7 +69,7 @@ namespace pathCam {
 
     void embed_tile_with_engine(nvinfer1::IExecutionContext *_encoderCtx);
 
-    cuda::GpuMat run_segmentation(int _segmentationID);
+    cuda::GpuMat run_segmentation(int _segmentationID, bool _cascadeToNeighbors = true);
 
     Mat debug_draw_tile_with_clicks_and_mask(const cv::Mat &bgraImage, const cv::Mat &binaryMask,
                                              const cv::Scalar &shadeColor, float alpha, int _segmentationID);

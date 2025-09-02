@@ -22,11 +22,13 @@ namespace pathCam {
     cudaEventCreate(&embeddingCompleteCudaEvent);
   }
 
-  cuda::GpuMat SAMTile::run_segmentation(int _segmentationID) {
+  cuda::GpuMat SAMTile::run_segmentation(int _segmentationID, bool _cascadeToNeighbors) {
     if (clicksVec.size() > 10) {
       int k = 0;
     }
-    if (clicksVec.empty() && !clicksFromMasks.empty()/*!hasMaskInput*/) { return cuda::GpuMat(); }
+    if (clicksVec.empty() && !clicksFromMasks.empty()/*!hasMaskInput*/) {
+      return cuda::GpuMat();
+    }
 
     bool letMaskShrink = false;
     for (auto point : clicksVec) {
@@ -77,12 +79,10 @@ namespace pathCam {
       cudaMalloc(&maskInput, sizeof(float) * 256 * 256);
     }
 
-    // if (hasMaskInput) {
-    //   Mat inputMaskMatHost;
-    //
-    //   cudaMemcpy2D(maskInput, sizeof(float) * 256, inputMaskMat.data, inputMaskMat.step, sizeof(float) * 256, 256,
-    //                cudaMemcpyDeviceToDevice);
-    // }
+    if (hasMaskInput) {
+      cudaMemcpy2D(maskInput, sizeof(float) * 256, inputMaskMat.data, inputMaskMat.step, sizeof(float) * 256, 256,
+                   cudaMemcpyDeviceToDevice);
+    }
 
     if (clicksForCurrentRun.size() > 10) {
       int k = 0;
@@ -114,7 +114,7 @@ namespace pathCam {
 
     cuda::GpuMat output(256, 256,CV_32FC1, outputMask);
 
-    if (ID == -1) {
+    if (!_cascadeToNeighbors) {
       return output;
     }
 
