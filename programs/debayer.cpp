@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/media/max/Data/annotate_new/input.txt";
+    std::string outputfilepath = "/media/max/Data/rebuild_on_failure/input.txt";
     std::ofstream outputFile(outputfilepath);
 
     for (int i = 0; i < images.size(); i++) {

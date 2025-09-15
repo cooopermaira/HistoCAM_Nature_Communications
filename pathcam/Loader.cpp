@@ -25,9 +25,9 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
-    if(parent->recordingMode){
-      image->write_to_path();
-    }
+    // if(parent->recordingMode){
+    //   image->write_to_path();
+    // }
 
 
     // if(image->check_blur() < 100){

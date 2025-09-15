@@ -230,10 +230,18 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         tile->mutex->unlock();
 
         if (shadeLevels) {
-          int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
+          Graphics::ScopedSaveState save(g);
 
+          const float sx = bounds.getWidth()  / (float) im->getWidth();
+          const float sy = bounds.getHeight() / (float) im->getHeight();
+          AffineTransform imgToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
+
+          g.reduceClipRegion(*im, imgToCanvas);
+
+          int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
           auto color = levelColors[4 - maglab];
-          auto overlayColor = Colour(color.getRed(), color.getGreen(), color.getBlue(), (uint8) 100);
+          auto overlayColor = Colour(color.getRed(), color.getGreen(), color.getBlue(), (uint8)100);
+
           g.setColour(overlayColor);
           g.fillRect(bounds);
         }

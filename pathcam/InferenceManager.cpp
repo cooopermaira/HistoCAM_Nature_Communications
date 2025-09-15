@@ -52,7 +52,8 @@ namespace pathCam {
 
 
   void InferenceManager::run() {
-    bool multiGPU = false;
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     int inferenceDevice = -1;
 
     torch::NoGradGuard noGrad;
@@ -69,9 +70,8 @@ namespace pathCam {
 
       if (inferenceDevice != parent->compositorCudaDevice) {
         //create buffers for moving data from gpu1 to gpu2
-        multiGPU = true;
         size_t bufferSize = parent->tileSize * parent->tileSize * parent->maxTilesPerBatch;
-        bufferMemory = (char*) malloc(bufferSize * 4);
+        bufferMemory = static_cast<char *>(malloc(bufferSize * 4));
 
         //set cuda memory on inference gpu
         cudaSetDevice(inferenceDevice);
@@ -101,14 +101,18 @@ namespace pathCam {
     {
       // Load the tile encoder TorchScript model and move it to the selected device
       auto val = parent->tile_encoder_path.toString();
-      auto tileEncoderModel = torch::jit::load(val);
-      tileEncoderModel.to(device);
+      //auto tileEncoderModel = torch::jit::load(val);
+      //tileEncoderModel.to(device);
+      torch::jit::Module tileEncoderModel = torch::jit::load(val, c10::Device(torch::kCUDA, inferenceDevice));
+      tileEncoderModel.eval();
+
 
       //set standard deviation and mean tensors to match imageNet normalization
       auto mean = torch::tensor({0.485, 0.456, 0.406}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
       auto stddv = torch::tensor({0.229, 0.224, 0.225}, torch::kFloat32).view({1, 3, 1, 1}).to(device);
 
       at::Tensor batch_tensor;
+      std::cout<<"model loaded "<<(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime)).count()<<std::endl;
 
       while (parent->compositing || !parent->tileEmbedQ.empty()) {
         auto tileList = parent->get_tile_embed_Q_front();
@@ -220,7 +224,7 @@ namespace pathCam {
     }//scope to expire 4+ gb tile encoder model
     tileEmbeds = tileEmbeds.to(torch::kCPU);
 
-    std::cout << "Tile Embedding Complete" << std::endl;
+    std::cout << "Tile Embedding Completed in " <<(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime)).count()<< std::endl;
     parent->tileEmbeddingComplete = true;
 
 
