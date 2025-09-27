@@ -56,7 +56,8 @@ namespace pathCam {
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
-    siftCudaDevice = GPU_select_cuda_device();
+    //siftCudaDevice = GPU_select_cuda_device();
+    siftCudaDevice = compositorCudaDevice;
 
     // cudaSetDevice(compositorCudaDevice);
     // SpeedSam ss2("/home/max/Downloads/sam2_hiera_large.encoder.onnx","/home/max/Downloads/sam2_hiera_large.decoder.onnx");
@@ -361,9 +362,6 @@ namespace pathCam {
 
     auto answer = get_image_ref(neighborhood);
 
-    // for (auto img: answer) {
-    //   img->mark_too_dark();
-    // }
     JobQ->queue_mutex->lock();
     JobQ->update_job_readiness(2, _index);
     JobQ->queue_mutex->unlock();
@@ -628,9 +626,11 @@ namespace pathCam {
     while (!siftDataQueue.empty()) {
       auto img = siftDataQueue.front();
       _images.push_back(img);
-      cudaMalloc((void **) &img->siftData.d_data, sizeof(SiftPoint) * img->siftData.numPts);
-      cudaMemcpy(img->siftData.d_data, img->siftData.h_data, sizeof(SiftPoint) * img->siftData.numPts,
-                 cudaMemcpyHostToDevice);
+      if (siftCudaDevice != compositorCudaDevice) {
+        CHECK_CUDA(cudaMalloc((void **) &img->siftData.d_data, sizeof(SiftPoint) * img->siftData.numPts));
+        CHECK_CUDA(cudaMemcpy(img->siftData.d_data, img->siftData.h_data, sizeof(SiftPoint) * img->siftData.numPts,
+                   cudaMemcpyHostToDevice));
+      }
       siftDataQueue.pop();
     }
   }

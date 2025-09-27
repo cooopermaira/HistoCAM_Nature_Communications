@@ -97,7 +97,7 @@ namespace pathCam {
 
 
         cvtColor(readMat, readMat, COLOR_BayerBG2RGB);
-        resize(readMat,image_Mat,cv::Size(image->width/2, image->height/2));
+        resize(readMat,image_Mat,cv::Size(image->width/8, image->height/8));
 //
 //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
 //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);

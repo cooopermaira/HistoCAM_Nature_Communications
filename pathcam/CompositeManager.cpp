@@ -93,8 +93,8 @@ namespace pathCam {
         }
         auto start = std::chrono::high_resolution_clock::now();
         parent->composites[current_component]->update(new_info);
-        Poco::Thread::sleep(100);
-        ++updateCount;
+        //Poco::Thread::sleep(100);
+        //++updateCount;
         auto stop = std::chrono::high_resolution_clock::now();
         duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
       }
@@ -107,25 +107,25 @@ namespace pathCam {
     }
     std::cout << "CM duration: " + std::to_string(duration) <<" in "<<updateCount<<" iterations"<< std::endl;
 
-    std::cout<<"component sizes:"<<std::endl;
-    int tilecount = 0;
-    for (auto & comp : parent->composites) {
-      auto width = comp->max_offset.x - comp->root_offset.x;
-      auto height = comp->max_offset.y - comp->root_offset.y;
-      std::cout<<"Magnification: "+Image::get_label(comp->componentMagLabel)+" width: "+std::to_string((int)width)+" height: "+std::to_string((int)height)<<std::endl;
-
-      auto ul = comp->imagePyramid->level[0]->getIJ(Point2i(comp->root_offset.x,comp->root_offset.y));
-      auto lr = comp->imagePyramid->level[0]->getIJ(Point2i(comp->max_offset.x,comp->max_offset.y));
-
-      for (int x = ul.x; x<= lr.x; ++x) {
-        for (int y = ul.y; y <= lr.y; ++y) {
-          if (comp->imagePyramid->level[0]->tiles(x,y)) {
-            ++tilecount;
-          }
-        }
-      }
-    }
-    std::cout<<"Tile Count: "+std::to_string(tilecount)<<std::endl;
+    // std::cout<<"component sizes:"<<std::endl;
+    // int tilecount = 0;
+    // for (auto & comp : parent->composites) {
+    //   auto width = comp->max_offset.x - comp->root_offset.x;
+    //   auto height = comp->max_offset.y - comp->root_offset.y;
+    //   std::cout<<"Magnification: "+Image::get_label(comp->componentMagLabel)+" width: "+std::to_string((int)width)+" height: "+std::to_string((int)height)<<std::endl;
+    //
+    //   auto ul = comp->imagePyramid->level[0]->getIJ(Point2i(comp->root_offset.x,comp->root_offset.y));
+    //   auto lr = comp->imagePyramid->level[0]->getIJ(Point2i(comp->max_offset.x,comp->max_offset.y));
+    //
+    //   for (int x = ul.x; x<= lr.x; ++x) {
+    //     for (int y = ul.y; y <= lr.y; ++y) {
+    //       if (comp->imagePyramid->level[0]->tiles(x,y)) {
+    //         ++tilecount;
+    //       }
+    //     }
+    //   }
+    // }
+    // std::cout<<"Tile Count: "+std::to_string(tilecount)<<std::endl;
 
     push_remaining_tiles_for_inference();
 

@@ -286,7 +286,7 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
 
       matROI = mat(ROIrect);
 
-      auto &tileObject = getTile(x, y);
+      TileObj &tileObject = getTile(x, y);
 
       tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                          matROI.rows);

@@ -53,7 +53,7 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 
 int main(int argc, char *argv[]) {
   auto renameFiles = false;
-  auto convertImages = false;
+  auto convertImages = true;
   bool makeInput = true;
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x, flat_field40x;
@@ -172,8 +172,9 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    std::string outputfilepath = "/media/max/Data/rebuild_on_failure/input.txt";
-    std::ofstream outputFile(outputfilepath);
+    auto outputfilepath = outFile;
+    outputfilepath.makeParent().append("input.txt");
+    std::ofstream outputFile(outputfilepath.toString());
 
     for (int i = 0; i < images.size(); i++) {
       if (renameFiles) {

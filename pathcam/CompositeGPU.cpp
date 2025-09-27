@@ -533,6 +533,8 @@ namespace pathCam {
 
 
   SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
+    SiftData siftData;
+    try{
     if (_img.channels() == 1) {
       cuda::cvtColor(_img, gry, COLOR_BayerBG2GRAY);
     } else if (_img.channels() == 3) {
@@ -551,15 +553,22 @@ namespace pathCam {
     cImgGry.Allocate(image_size.width, image_size.height, gry2.step / sizeof(float), false,
                      reinterpret_cast<float *>(gry2.data), nullptr);
 
-    SiftData siftData;
-    if (parent->compositorCudaDevice != parent->siftCudaDevice) {
+
+    // if (parent->compositorCudaDevice != parent->siftCudaDevice) {
       InitSiftData(siftData, 10000, true, true);
-    } else {
-      InitSiftData(siftData, 10000, false, true);
+    // } else {
+    //   InitSiftData(siftData, 10000, false, true);
+    // }
+
+    if (0 < ExtractSift(siftData, cImgGry, 5, 1.f, 3.5f, 0.f, false)) {
+      int k = 0;
     }
-
-    ExtractSift(siftData, cImgGry, 5, 1.f, 3.5f, 0.f, false);
-
+      if (siftData.numPts > 10000) {
+        int k = 0;
+      }
+  }catch (cv::Exception &e) {
+    int k = 0;
+  }
     return siftData;
 
     //int k = 0;

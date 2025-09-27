@@ -190,8 +190,8 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         if (tile->newData) {
           auto img = tile->image;
           juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-          cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
-                       img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost);
+          CHECK_CUDA(cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
+                       img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost));
           tile->newData = false;
         }
         if (tile->newAnnoData) {
@@ -202,7 +202,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
             auto annoMask = static_cast<juce::Image *>(kv.second.second);
             juce::Image::BitmapData bitmap_data(*annoMask,juce::Image::BitmapData::ReadWriteMode::writeOnly);
             auto img = kv.second.first;
-            cudaMemcpy2D(bitmap_data.data,img.cols,img.data,img.step,img.cols,img.rows,cudaMemcpyDeviceToHost);
+            CHECK_CUDA(cudaMemcpy2D(bitmap_data.data,img.cols,img.data,img.step,img.cols,img.rows,cudaMemcpyDeviceToHost));
           }
         }
 

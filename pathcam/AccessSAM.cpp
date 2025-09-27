@@ -136,12 +136,12 @@ namespace pathCam {
 
       if (_buildBuffer) {
         tile->get_tile_data(comp, parent->SAMTileSize / parent->tileSize);
-        cudaMalloc(&tile->rawBuffer, nElementsPerChannel * 3 * sizeof(float));
+        CHECK_CUDA(cudaMalloc(&tile->rawBuffer, nElementsPerChannel * 3 * sizeof(float)));
         tile->make_raw_buffer(tile->rawBuffer);
       }
-      cudaMalloc(&tile->high_res_feats_0, 32 * 256 * 256 * sizeof(float));
-      cudaMalloc(&tile->high_res_feats_1, 64 * 128 * 128 * sizeof(float));
-      cudaMalloc(&tile->image_embed, 256 * 64 * 64 * sizeof(float));
+      CHECK_CUDA(cudaMalloc(&tile->high_res_feats_0, 32 * 256 * 256 * sizeof(float)));
+      CHECK_CUDA(cudaMalloc(&tile->high_res_feats_1, 64 * 128 * 128 * sizeof(float)));
+      CHECK_CUDA(cudaMalloc(&tile->image_embed, 256 * 64 * 64 * sizeof(float)));
 
       /*the more intuitive way to do this is to use an 'input consumed' event and then free the raw buffer as soon as that
        * turns true rather than wait for the next iteration, sync the whole stream and then free the input. The reason
@@ -153,7 +153,7 @@ namespace pathCam {
       CHECK_CUDA(cudaStreamSynchronize(encoderStream));
       if (tileToFree) {
         tile->embeddingComplete = true;
-        cudaFree(tileToFree->rawBuffer);
+        CHECK_CUDA(cudaFree(tileToFree->rawBuffer));
       }
 
       encoderCtx->setInputTensorAddress("image", tile->rawBuffer);

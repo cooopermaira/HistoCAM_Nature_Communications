@@ -156,8 +156,8 @@ namespace pathCam {
     stream.read(buffer, nBytes);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    cudaMalloc(&bufferCuda, nBytes);
-    cudaMemcpy(bufferCuda, buffer, nBytes, cudaMemcpyHostToDevice);
+    CHECK_CUDA(cudaMalloc(&bufferCuda, nBytes));
+    CHECK_CUDA(cudaMemcpy(bufferCuda, buffer, nBytes, cudaMemcpyHostToDevice));
 
     ffGPU = cuda::GpuMat(Size(parent->image_width, parent->image_height), CV_8U, bufferCuda);
 

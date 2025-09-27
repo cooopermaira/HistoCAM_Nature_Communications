@@ -257,6 +257,7 @@ namespace pathCam {
     bool tryWaiting = true;
     std::vector<unsigned int> skipComponents;
 
+    auto tempReg = parent->get_reg_ref(image_idx);
 
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
@@ -275,6 +276,8 @@ namespace pathCam {
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
         bestMatch = prev_idx;
+        tempReg->bestMatch = bestMatch;
+        tempReg->numBestMatches = mostMatches;
       }
 
       if (result == 1) {
@@ -284,7 +287,7 @@ namespace pathCam {
           parent->set_match(image_idx, prev_idx, m);
 
           //this should all be in the damn constructor
-          auto tempReg = parent->get_reg_ref(image_idx);
+
           tempReg->accessMutex->lock();
           tempReg->index = image_idx;
           tempReg->root = false;

@@ -120,10 +120,12 @@ namespace pathCam {
     int compositorCudaDevice;
     int siftCudaDevice = -1;
 
+    int lastActiveComponent = 0;
     int maxTilesPerBatch = 512;
     int maxMatchesPerPull = 50;
     int minPixelDistanceBetweenFrames;
     std::vector<Vec2> lastAcceptedCoords;
+
 
     std::vector<double> labelScales = { -10.0, 1.0, 0.5, 0.2, 0.1, 0.05 };
 

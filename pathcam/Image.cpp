@@ -39,10 +39,10 @@ namespace pathCam {
     if (!raw_buffer) {
       return false;
     }
-    cudaSetDevice(_device);
+    CHECK_CUDA(cudaSetDevice(_device));
     size_t nBytes = parent->image_height * parent->image_width;
-    cudaMalloc(&raw_buffer_cuda,nBytes);
-    cudaMemcpy(raw_buffer_cuda,raw_buffer,nBytes,cudaMemcpyHostToDevice);
+    CHECK_CUDA(cudaMalloc(&raw_buffer_cuda,nBytes));
+    CHECK_CUDA(cudaMemcpy(raw_buffer_cuda,raw_buffer,nBytes,cudaMemcpyHostToDevice));
 
     {
       std::lock_guard lock(cudaBufferMutex);

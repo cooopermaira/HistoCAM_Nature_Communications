@@ -311,7 +311,7 @@ namespace pathCam {
 
     if (!rawBuffer && !_buffer) {
       //_buffer wasnt passed so were writing to member rawBuffer, but its not allocated yet
-      cudaMalloc(&rawBuffer, nBytesPerChannel * 3);
+      CHECK_CUDA(cudaMalloc(&rawBuffer, nBytesPerChannel * 3));
     }
 
     for (int i = 0; i < 3; ++i) {
@@ -344,9 +344,9 @@ namespace pathCam {
 
 
   void SAMTile::embed_tile_with_engine(nvinfer1::IExecutionContext *_encoderCtx) {
-    cudaMalloc(&high_res_feats_0, 32 * 256 * 256 * sizeof(float));
-    cudaMalloc(&high_res_feats_1, 64 * 128 * 128 * sizeof(float));
-    cudaMalloc(&image_embed, 256 * 64 * 64 * sizeof(float));
+    CHECK_CUDA(cudaMalloc(&high_res_feats_0, 32 * 256 * 256 * sizeof(float)));
+    CHECK_CUDA(cudaMalloc(&high_res_feats_1, 64 * 128 * 128 * sizeof(float)));
+    CHECK_CUDA(cudaMalloc(&image_embed, 256 * 64 * 64 * sizeof(float)));
 
     _encoderCtx->setInputTensorAddress("image", rawBuffer);
     _encoderCtx->setOutputTensorAddress("high_res_feats_0", high_res_feats_0);

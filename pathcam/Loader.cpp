@@ -98,7 +98,9 @@ namespace pathCam {
         jobComplete.set();
         image->release_reg_image();
         //std::cout<<"Low Ft: "+std::to_string(image_index)<<std::endl;
-        parent->mark_neighbors_as_underexposed(image_index);
+        //parent->mark_neighbors_as_underexposed(image_index);
+        parent->JobQ->cancel_job(2,image_index);
+        parent->JobQ->update_job_readiness(2,image_index);
         image->free_memory_RAW();
         return;
       }

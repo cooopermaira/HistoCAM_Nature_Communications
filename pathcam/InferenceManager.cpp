@@ -74,9 +74,9 @@ namespace pathCam {
         bufferMemory = static_cast<char *>(malloc(bufferSize * 4));
 
         //set cuda memory on inference gpu
-        cudaSetDevice(inferenceDevice);
-        cudaMalloc(&bufferGPU,bufferSize * 4);
-        cudaMalloc(&bufferGPU_rcv,bufferSize * 3);
+        CHECK_CUDA(cudaSetDevice(inferenceDevice));
+        CHECK_CUDA(cudaMalloc(&bufferGPU,bufferSize * 4));
+        CHECK_CUDA(cudaMalloc(&bufferGPU_rcv,bufferSize * 3));
 
         elementSize = 4;
         dstPitch = elementSize * parent->tileSize;
@@ -158,7 +158,7 @@ namespace pathCam {
             int y = std::get<1>(tileList[i]);
             threeChannelPrealGPU = pyramidLevel->getTile(x, y).image;
             uchar* bufferPtr = reinterpret_cast<uchar*>(bufferMemory + i * tileSizeInBytes);
-            cudaMemcpy2D(bufferPtr,dstPitch,threeChannelPrealGPU.data,threeChannelPrealGPU.step,dstPitch,threeChannelPrealGPU.rows,cudaMemcpyDeviceToHost);
+            CHECK_CUDA(cudaMemcpy2D(bufferPtr,dstPitch,threeChannelPrealGPU.data,threeChannelPrealGPU.step,dstPitch,threeChannelPrealGPU.rows,cudaMemcpyDeviceToHost));
 
 #else
             cvtColor(pyramidLevel->getTile(std::get<0>(tileList[i]), std::get<1>(tileList[i])),

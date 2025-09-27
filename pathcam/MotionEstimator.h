@@ -42,6 +42,9 @@ public:
   std::vector<RegInfo*> callersWaiting;
   std::vector<std::pair<unsigned int, Match*>> componentCallersWaiting;
   std::vector<std::pair<Point2f,double>> rootHomographies;
+
+  int bestMatch;
+  int numBestMatches = 0;
   
   RegInfo(StreamCam* parent, bool successful=false, Vec2 absoluteCoords=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
   successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),accessMutex(new Poco::FastMutex), parent(parent),

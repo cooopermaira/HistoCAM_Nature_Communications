@@ -96,7 +96,7 @@ namespace pathCam {
         if (mutualMatches.size() > mostMutualMatches) {
           mostMutualMatches = mutualMatches.size();
         }
-        if (mutualMatches.size() > 200) {
+        if (mutualMatches.size() > 200 || (mp.first->component_membership != mp.second->component_membership && mutualMatches.size() > 10)) {
           H = findHomography(pts2, pts1, RANSAC, 3.0, inlierMask);
           numInliers = std::count(inlierMask.begin(), inlierMask.end(), 1);
 
@@ -104,7 +104,7 @@ namespace pathCam {
             mostInliers = numInliers;
           }
 
-          if (numInliers > 150) {
+          if (numInliers > 150|| (mp.first->component_membership != mp.second->component_membership && numInliers > 10)) {
             for (size_t i = 0; i < mutualMatches.size(); ++i) {
               if (inlierMask[i]) {
                 matchesInfo.matches.push_back(mutualMatches[i]);
