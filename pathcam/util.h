@@ -18,6 +18,18 @@ namespace std {
 }
 
 namespace pathCam {
+
+  struct ScaleResult {
+    double scale = 0.0;
+    double response = -1.0;
+    cv::Point2d shift{0.0, 0.0};
+    double shiftNorm = 0.0;
+    double shiftNormDiag = 0.0;
+    cv::Size cropSize;
+    bool valid = false;
+  };
+
+
   struct PointComparator {
     bool operator()(const cv::Point2i& lhs, const cv::Point2i& rhs) const {
       if (lhs.x != rhs.x) {

@@ -117,6 +117,7 @@ namespace pathCam {
       indexes.push_back(_newInfo[i]->index);
     }
 
+
     std::vector<Image *> images = parent->get_image_ref(indexes);
     bool update = false;
     bool rootFound = false;

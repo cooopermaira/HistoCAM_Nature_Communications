@@ -18,7 +18,18 @@
 extern "C" {
 #endif
 
-void launch_drop_alpha_and_swap(char* dst, const char* src, int count);
+void launch_drop_alpha_and_swap(char *dst, const char *src, int count);
+
+void ensure1DHann(int w, int h, cuda::GpuMat &wx, cuda::GpuMat &wy, cudaStream_t stream = nullptr);
+
+void launch_apply_hann_2d(cuda::GpuMat &wx, cuda::GpuMat &wy, cuda::GpuMat &win, cuda::GpuMat &magNorm,
+                          cudaStream_t stream = nullptr);
+
+void launch_CPS(const cuda::GpuMat &F,
+                const cuda::GpuMat &G,
+                cuda::GpuMat &CPS,
+                float eps = 1e-9f,
+                cudaStream_t stream = nullptr);
 
 #ifdef __cplusplus
 }
@@ -31,7 +42,8 @@ namespace pathCam {
   public:
     RunnableIntermediate(unsigned long image_index, int jobTypeFlag) : image_index(image_index),
                                                                        jobTypeFlag(jobTypeFlag), jobComplete(false),
-                                                                       someoneWaitingOnJobCompleteEvent(false),unprocessed(true),
+                                                                       someoneWaitingOnJobCompleteEvent(false),
+                                                                       unprocessed(true),
                                                                        precedingJobCount(0) {
     }
 
@@ -86,13 +98,15 @@ namespace pathCam {
 
 
   class PostProcessManager : public Poco::Runnable {
-    public:
-    PostProcessManager(StreamCam* _parent):parent(_parent){}
+  public:
+    PostProcessManager(StreamCam *_parent): parent(_parent) {
+    }
+
     void run() override;
 
-    StreamCam* parent;
+    StreamCam *parent;
 
-    std::vector<PostProcessorBase*> postProcesses;
+    std::vector<PostProcessorBase *> postProcesses;
   };
 
   class CompositeManager : public Poco::Runnable {
@@ -123,9 +137,11 @@ namespace pathCam {
 
     void decrement_rebuild_jobs_outstanding();
 
-    void build_match_pairs(std::vector<std::pair<Image*, Image*> > &_imagePairsToMatch, std::vector<RegInfo*> &_regs);
+    void build_match_pairs(std::vector<std::pair<Image *, Image *> > &_imagePairsToMatch,
+                           std::vector<RegInfo *> &_regs);
 
-    cv::detail::MatchesInfo compute_matches_info(SiftData& _sift1, SiftData& _sift2, unsigned long _img1_idx, unsigned long _img2_idx);
+    cv::detail::MatchesInfo compute_matches_info(SiftData &_sift1, SiftData &_sift2, unsigned long _img1_idx,
+                                                 unsigned long _img2_idx);
 
     void perform_SIFT_multires_bundle_adjustment();
 
@@ -176,9 +192,9 @@ namespace pathCam {
     Mat threeChannelPreallocated;
 #ifdef HAVE_OPENCV_CUDAARITHM
     cuda::GpuMat threeChannelPrealGPU;
-    char* bufferGPU_rcv;
-    char* bufferGPU;
-    char* bufferMemory;
+    char *bufferGPU_rcv;
+    char *bufferGPU;
+    char *bufferMemory;
 #endif
 
     std::vector<std::vector<float> > tileEmbedVec;
@@ -197,7 +213,6 @@ namespace pathCam {
     torch::Tensor tileEmbeds;
 
     Poco::FastMutex tileEmbedMutex;
-
 
   public:
     explicit InferenceManager(StreamCam *parent);

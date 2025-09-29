@@ -125,6 +125,7 @@ namespace pathCam {
 
     //save_components_to_disk();
 
+
     if (parent->segmentWithSAM) {
       auto start = std::chrono::high_resolution_clock::now();
       perform_global_alignment();
