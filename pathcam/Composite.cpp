@@ -71,6 +71,8 @@ namespace pathCam {
     expand_subdiv(new_info);
 #ifdef HAVE_OPENCV_CUDAARITHM
     GPU_add_images_no_composite(new_info, _force_add);
+
+
 #else
     add_images_no_composite(new_info, _force_add);
 #endif

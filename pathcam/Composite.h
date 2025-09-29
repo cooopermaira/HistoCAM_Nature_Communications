@@ -15,8 +15,6 @@
 
 
 namespace pathCam {
-
-
   template<typename T>
   struct PointCompare {
     inline bool operator()(const T &p1, const T &p2) {
@@ -48,21 +46,19 @@ namespace pathCam {
     Rect_<float> tiledImageBounds;
     Poco::FastMutex *update_mutex;
 
-    std::shared_ptr< MRTiledImage >  imagePyramid;
+    std::shared_ptr<MRTiledImage> imagePyramid;
 
     Composite(StreamCam *parent);
 
-    void add_images(std::vector<RegInfo*> new_info);
+    void add_images(std::vector<RegInfo *> new_info);
 
-    void update_Bbox(std::vector<RegInfo*> new_info);
+    void update_Bbox(std::vector<RegInfo *> new_info);
 
-    void update(std::vector<RegInfo*> new_info);
+    void update(std::vector<RegInfo *> new_info);
 
     Mat get_composite();
 
     Mat score_image_2X(int, int, int);
-    
-
   };
 
 
@@ -70,6 +66,7 @@ namespace pathCam {
     friend class ImageToTileCopyRunnable;
     friend class CompositeManager;
     friend class RebuildRunnable;
+
   public:
     unsigned long lastAcceptedImageIndex;
     unsigned int minPixelDistanceBetweenFrames;
@@ -89,7 +86,7 @@ namespace pathCam {
     cuda::GpuMat xp2;
     cuda::GpuMat binaryCompare;
 
-    long long bigx = 0,bigy = 0;
+    long long bigx = 0, bigy = 0;
     cuda::GpuMat meshGridX;
     cuda::GpuMat meshGridY;
     cuda::GpuMat rectMaskGPU;
@@ -104,8 +101,8 @@ namespace pathCam {
     cuda::GpuMat gry;
     cuda::GpuMat gry2;
 
-    std::vector<RegInfo*> delaunayRegInfos;
-    std::vector<Image*> delaunayImages;
+    std::vector<RegInfo *> delaunayRegInfos;
+    std::vector<Image *> delaunayImages;
 #endif
 
     Subdiv2D subdiv;
@@ -117,7 +114,7 @@ namespace pathCam {
     std::atomic<unsigned int> jobCount = 0;
     Bbox subdiv_Bbox;
     Poco::Event wakeEvent;
-    RegInfo* storedNewInfo;
+    RegInfo *storedNewInfo;
 
     std::vector<Point2i> push_for_inferencing(std::vector<Point2i> &_tiles);
 
@@ -125,7 +122,7 @@ namespace pathCam {
 
     long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
 
-    void add_images_with_composite(std::vector<RegInfo*> new_info);
+    void add_images_with_composite(std::vector<RegInfo *> new_info);
 
     void add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);
 
@@ -134,11 +131,26 @@ namespace pathCam {
     static void ensure_clockwise(std::vector<Point2i> &_face);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
+    static std::pair<Point2d, double> phase_correlate_GPU(const cuda::GpuMat &A32F, const cuda::GpuMat &B32F,
+                                                          cudaStream_t stream = nullptr);
+
+    static ScaleResult estimate_cale_discrete_GPU(
+      const cuda::GpuMat &dLow_bgr,
+      const cuda::GpuMat &dHigh_bgr,
+      const std::vector<double> &scales = {2.0, 2.5, 4.0, 5.0, 10.0, 20.0},
+      cudaStream_t stream);
+
+    static ScaleResult estimate_scale_auto_GPU(const cuda::GpuMat &imgA, const cuda::GpuMat &imgB,
+                                               const std::vector<double> &scales = {2.0, 2.5, 4.0, 5.0, 10.0, 20},
+                                               cudaStream_t stream = nullptr);
+
+    static cuda::GpuMat preprocess_GPU(const cuda::GpuMat& bgr_or_gray, cudaStream_t stream);
+
     void make_meshgrid();
 
     void GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add = false);
 
-    std::vector<std::pair<Image*,Image*>> calculate_new_overlaps();
+    std::vector<std::pair<Image *, Image *> > calculate_new_overlaps();
 
     SiftData GPU_extract_SIFT(cuda::GpuMat &_img);
 
@@ -146,11 +158,11 @@ namespace pathCam {
 
     void rebuild_and_initialize_SAM();
 
-    void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i>& _face);
+    void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i> &_face);
 
     void ff_correct_and_brighten();
 
-    void populate_SAM_tile(SAMTile* _samTile);
+    void populate_SAM_tile(SAMTile *_samTile);
 #endif
     int pixels_overlapping_between(Image *_img, Rect _rect);
 
@@ -158,11 +170,13 @@ namespace pathCam {
 
     void create_and_submit_rebuild_jobs();
 
-    void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord);
+    void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
+                                        Vec2 absCoord);
 
-    void calculate_effected_tiles_count_nonzero(Mat polyMaskOutput,std::vector<Point2i> &result, Vec2 absCoord);
+    void calculate_effected_tiles_count_nonzero(Mat polyMaskOutput, std::vector<Point2i> &result, Vec2 absCoord);
 
-    void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord, std::vector<Point2i> *additionalResult = {});
+    void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord,
+                                  std::vector<Point2i> *additionalResult = {});
 
     static void remove_duplicates_without_sort(std::vector<Point2i> &vec);
 
@@ -172,7 +186,7 @@ namespace pathCam {
 
     void debug_write_contribution_on_grid(std::string name, Vec2 absCoord, Mat &img, Mat &mask);
 
-    void expand_subdiv(std::vector<RegInfo*> new_info);
+    void expand_subdiv(std::vector<RegInfo *> new_info);
 
     void self_reset();
 
@@ -182,9 +196,11 @@ namespace pathCam {
                                             std::vector<Point2i> &_face, bool _forceAdd, bool _drawMask = true);
 
     int add_point_to_delaunay_triangulation_with_adjustment(cv::Point2f _point, pathCam::Image *_image,
-                                            std::vector<Point2i> &_face, bool _forceAdd);
-    
-    void coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon, bool shouldCleanData, std::map<long, long>& systemIndexToFrameIndex, double epsilonClean = 0, cv::Mat bOther = cv::Mat());
+                                                            std::vector<Point2i> &_face, bool _forceAdd);
+
+    void coopers_conjugate_gradient(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon, bool shouldCleanData,
+                                    std::map<long, long> &systemIndexToFrameIndex, double epsilonClean = 0,
+                                    cv::Mat bOther = cv::Mat());
 
     void coopers_conjugate_gradient2(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,
                                      bool shouldCleanData, std::map<long, long> &systemIndexToFrameIndex,
@@ -194,8 +210,8 @@ namespace pathCam {
     void clean_data(cv::Mat A, cv::Mat b, cv::Mat bOther, cv::Mat x, std::map<long, long> &systemIndexToFrameIndex);
 
   public:
+    enum { SIFT_GPU = 0, ORB_CPU };
 
-    enum{SIFT_GPU = 0,ORB_CPU};
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
     unsigned int componentMagLabel;
@@ -203,8 +219,8 @@ namespace pathCam {
     long firstImageIdx = -1;
     bool needsAlignment = false;
     std::atomic<unsigned int> matchableCount = 0;
-    std::vector<std::pair<long, long>> matchedEdges;
-    std::vector<std::pair<Image*, bool>> memberImages;
+    std::vector<std::pair<long, long> > matchedEdges;
+    std::vector<std::pair<Image *, bool> > memberImages;
     std::map<int, unsigned long> delaunayMembers;
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
@@ -221,13 +237,13 @@ namespace pathCam {
 
     void get_flatfield();
 
-    void store_new_info(RegInfo* _new_info);
+    void store_new_info(RegInfo *_new_info);
 
     void update_from_stored_info();
 
-    void update(std::vector<RegInfo*> _new_info, bool _force_add = false);
+    void update(std::vector<RegInfo *> _new_info, bool _force_add = false);
 
-    void update_Bbox_no_composite(std::vector<RegInfo*> new_info);
+    void update_Bbox_no_composite(std::vector<RegInfo *> new_info);
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
 
@@ -235,15 +251,22 @@ namespace pathCam {
                               std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,
                               cv::Mat &by, cv::Mat &x, cv::Mat &y);
 
-    std::map<std::string,int> tileToSumNonZero;
-    bool rebuildTile(Point2i tile,int sum);
+    std::map<std::string, int> tileToSumNonZero;
+
+    bool rebuildTile(Point2i tile, int sum);
+
     void notify_job_complete();
-    void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false ,bool _withGridAndIndexes = false, bool _withEffectedTiles = true, bool _outline = false,std::vector<Point2i> effectedTiles = {});
-    void debug_draw_voronoi(Mat &img, Subdiv2D &subdiv,bool _drawPathInsteadOfFaces = false,bool _drawIntersect = false, Point2i _intrCenter = Point2i(0,0));
+
+    void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false, bool _withGridAndIndexes = false,
+                               bool _withEffectedTiles = true, bool _outline = false,
+                               std::vector<Point2i> effectedTiles = {});
+
+    void debug_draw_voronoi(Mat &img, Subdiv2D &subdiv, bool _drawPathInsteadOfFaces = false,
+                            bool _drawIntersect = false, Point2i _intrCenter = Point2i(0, 0));
 
   protected:
     //std::vector<std::pair<int,int>> falselyClaimedTiles;
-    std::vector<Point_<int>> falselyClaimedTiles;
+    std::vector<Point_<int> > falselyClaimedTiles;
     std::priority_queue<unsigned int> freeMasks;
     std::vector<Mat> masks;
     int removeCount = 0;
