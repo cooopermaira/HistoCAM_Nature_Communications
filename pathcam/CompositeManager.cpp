@@ -99,7 +99,7 @@ namespace pathCam {
         parent->lastViewedFrame = parent->get_image_ref(indexes.back()->index);
 
         int endInd = int(indexes.back()->index) - 1;
-        for (int i = lastViewedFrame; i < endInd; ++i) {
+        for (int i = lastViewedFrame; i <= endInd; ++i) {
           parent->clear_buffer(i);
         }
         lastViewedFrame = parent->lastViewedFrame->index;
@@ -116,34 +116,9 @@ namespace pathCam {
         submit_outstanding_jobs();
       }
     }
-    std::cout << "CM duration: " + std::to_string(duration) <<" in "<<updateCount<<" iterations"<< std::endl;
-    std::vector<unsigned long> temp;
-    auto images = parent->get_image_ref(temp);
-    for (auto img : images) {
-      if (img->get_Raw() || img->get_raw_cuda()) {
-        std::cout<<img->index<<std::endl;
-      }
-    }
+    std::cout << "CM duration: " + std::to_string(duration) << std::endl;
 
-    // std::cout<<"component sizes:"<<std::endl;
-    // int tilecount = 0;
-    // for (auto & comp : parent->composites) {
-    //   auto width = comp->max_offset.x - comp->root_offset.x;
-    //   auto height = comp->max_offset.y - comp->root_offset.y;
-    //   std::cout<<"Magnification: "+Image::get_label(comp->componentMagLabel)+" width: "+std::to_string((int)width)+" height: "+std::to_string((int)height)<<std::endl;
-    //
-    //   auto ul = comp->imagePyramid->level[0]->getIJ(Point2i(comp->root_offset.x,comp->root_offset.y));
-    //   auto lr = comp->imagePyramid->level[0]->getIJ(Point2i(comp->max_offset.x,comp->max_offset.y));
-    //
-    //   for (int x = ul.x; x<= lr.x; ++x) {
-    //     for (int y = ul.y; y <= lr.y; ++y) {
-    //       if (comp->imagePyramid->level[0]->tiles(x,y)) {
-    //         ++tilecount;
-    //       }
-    //     }
-    //   }
-    // }
-    // std::cout<<"Tile Count: "+std::to_string(tilecount)<<std::endl;
+    parent->clear_buffer(lastViewedFrame);
 
     push_remaining_tiles_for_inference();
 
@@ -151,7 +126,6 @@ namespace pathCam {
     //save_components_to_disk();
 
     if (parent->segmentWithSAM) {
-    //if (false){
       auto start = std::chrono::high_resolution_clock::now();
       perform_global_alignment();
       //parent->as->initialize();
