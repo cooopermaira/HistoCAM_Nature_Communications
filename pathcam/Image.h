@@ -153,12 +153,12 @@ namespace pathCam {
     }
 
     inline char *get_Raw() {
-      assert(raw_buffer);
+      //assert(raw_buffer);
       return raw_buffer;
     }
 
     inline char *get_raw_cuda() {
-      assert(raw_buffer_cuda);
+      //assert(raw_buffer_cuda);
       return raw_buffer_cuda;
     }
 

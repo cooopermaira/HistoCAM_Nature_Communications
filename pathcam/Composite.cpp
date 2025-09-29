@@ -57,6 +57,8 @@ namespace pathCam {
 
 
   void CompositeVoronoi::update(std::vector<RegInfo *> new_info, bool _force_add) {
+    if (new_info.empty()){return;}
+
     update_mutex->lock();
 
     if (new_info.size() > 1) {

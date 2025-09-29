@@ -34,6 +34,7 @@ public:
   unsigned long index,matchedTo;
   bool successful,root,resolved,rootOfRoot;
   bool stayFixedDuringBundleAdjustment = false;
+  bool tryComposite = false;
   unsigned int component_membership;
   Vec2 absoluteCoords;
   Vec2 relativeCoords = Vec2(0.0, 0.0);

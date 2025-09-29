@@ -323,6 +323,12 @@ namespace pathCam {
     resize_mmatch_mutex->unlock();
   }
 
+  void StreamCam::clear_buffer(int _image_idx) {
+    auto img = get_image_ref(_image_idx);
+    img->free_memory_RAW();
+    img->free_memory_cuda();
+  }
+
   Point2f StreamCam::get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC,
                                                     unsigned int _dstCompIdx) {
     /*returns coordinates in dst component space given coordinates in src component space*/

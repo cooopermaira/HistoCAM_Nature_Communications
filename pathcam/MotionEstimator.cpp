@@ -54,9 +54,9 @@ namespace pathCam {
     bool proceed = queue_for_compositing && parent->sufficient_distance(absoluteCoords,component_membership);
 
     if (proceed) {
-      parent->push_compositeQ(this);
+      tryComposite = true;
     }
-
+    parent->push_compositeQ(this);
 
     for (auto cw: callersWaiting) {
       auto theirRelCoords = cw->relativeCoords;
@@ -81,7 +81,7 @@ namespace pathCam {
 
 
     if(!proceed){
-      image->free_memory_RAW();
+      //image->free_memory_RAW();
       return;
     }
 

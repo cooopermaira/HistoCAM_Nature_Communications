@@ -127,6 +127,7 @@ namespace pathCam {
 
       if (images[i]->regInfo->root && !images[i]->regInfo->rootOfRoot) {
         rootFound = true;
+        assert(parent->lastViewedFrame->get_raw_cuda() || parent->lastViewedFrame->get_Raw());
       }
       //add point to delaunay triangulation
       std::vector<Point2i> face;
@@ -160,7 +161,7 @@ namespace pathCam {
       cuda::GpuMat image_Mat(image_size, CV_8U, images[i]->get_raw_cuda());
       cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
 
-      images[i]->free_memory_cuda();
+      //images[i]->free_memory_cuda();
 
       ff_correct_and_brighten();
 

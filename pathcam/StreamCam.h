@@ -121,10 +121,11 @@ namespace pathCam {
     int siftCudaDevice = -1;
 
     int lastActiveComponent = 0;
-    int maxTilesPerBatch = 512;
+        int maxTilesPerBatch = 512;
     int maxMatchesPerPull = 50;
     int minPixelDistanceBetweenFrames;
     std::vector<Vec2> lastAcceptedCoords;
+    Image* lastViewedFrame = nullptr;
 
 
     std::vector<double> labelScales = { -10.0, 1.0, 0.5, 0.2, 0.1, 0.05 };
@@ -215,6 +216,8 @@ namespace pathCam {
     bool sufficient_distance(pathCam::Vec2 _coordsInQuestion, int _componentIdx);
 
     void set_match(unsigned long _image_idx, unsigned long _prev_idx, Match *_m, bool _invert = true);
+
+    void clear_buffer(int _image_idx);
 
     void set_scale_and_offset(unsigned int component_index, double scale, Point2f offset) {
       scaleRepoMutex->lock();

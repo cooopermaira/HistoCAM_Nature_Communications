@@ -26,6 +26,7 @@ namespace pathCam {
 #endif
 
     rebuildJobsOutstanding = 0;
+    int lastViewedFrame = 0;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
 
@@ -76,9 +77,11 @@ namespace pathCam {
 
         //sort the new frames by component and pass them to their respective components for compositing.
         for (int i = 0; i < indexes.size(); i++) {
+          if (!indexes[i]->tryComposite){continue;}
           if (current_component == indexes[i]->component_membership) {
             new_info.push_back(indexes[i]);
           } else {
+            parent->lastViewedFrame = parent->get_image_ref(indexes[i-1]->index); //cant happen unless index is already >0
             auto start = std::chrono::high_resolution_clock::now();
 
             parent->composites[current_component]->update(new_info);
@@ -93,6 +96,14 @@ namespace pathCam {
         }
         auto start = std::chrono::high_resolution_clock::now();
         parent->composites[current_component]->update(new_info);
+        parent->lastViewedFrame = parent->get_image_ref(indexes.back()->index);
+
+        int endInd = int(indexes.back()->index) - 1;
+        for (int i = lastViewedFrame; i < endInd; ++i) {
+          parent->clear_buffer(i);
+        }
+        lastViewedFrame = parent->lastViewedFrame->index;
+
         //Poco::Thread::sleep(100);
         //++updateCount;
         auto stop = std::chrono::high_resolution_clock::now();
@@ -106,6 +117,13 @@ namespace pathCam {
       }
     }
     std::cout << "CM duration: " + std::to_string(duration) <<" in "<<updateCount<<" iterations"<< std::endl;
+    std::vector<unsigned long> temp;
+    auto images = parent->get_image_ref(temp);
+    for (auto img : images) {
+      if (img->get_Raw() || img->get_raw_cuda()) {
+        std::cout<<img->index<<std::endl;
+      }
+    }
 
     // std::cout<<"component sizes:"<<std::endl;
     // int tilecount = 0;
