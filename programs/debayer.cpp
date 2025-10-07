@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
       Poco::Path p(it.path());
 
 
-      if (p.getExtension() == "Raw") {
+      if (p.getExtension() == "Raw" || p.getExtension() == "raw") {
         //std::cout << "read:" << p.toString() << "\n";
 
         auto *image = new pathCam::Image(6464, 4852, 2190);

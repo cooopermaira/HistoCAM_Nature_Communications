@@ -137,7 +137,7 @@ namespace pathCam {
     static ScaleResult estimate_cale_discrete_GPU(
       const cuda::GpuMat &dLow_bgr,
       const cuda::GpuMat &dHigh_bgr,
-      const std::vector<double> &scales = {2.0, 2.5, 4.0, 5.0, 10.0, 20.0},
+      const std::vector<double> &scales,
       cudaStream_t stream);
 
     static ScaleResult estimate_scale_auto_GPU(const cuda::GpuMat &imgA, const cuda::GpuMat &imgB,

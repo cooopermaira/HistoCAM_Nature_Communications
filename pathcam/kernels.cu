@@ -99,7 +99,7 @@ __global__ void cross_power_spectrum(const float2 *__restrict__ F, size_t Fstep,
 extern "C" void launch_CPS(const cv::cuda::GpuMat &F,
                            const cv::cuda::GpuMat &G,
                            cv::cuda::GpuMat &CPS,
-                           float eps = 1e-9f,
+                           float eps,
                            cudaStream_t stream) {
   const int w = F.cols;
   const int h = F.rows;

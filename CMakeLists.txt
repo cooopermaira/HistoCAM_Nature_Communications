@@ -97,6 +97,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     set(ONNXRUNTIME_DIR "/home/max/Documents/onnxruntime-linux-x64-gpu-1.22.0" CACHE PATH "Path to the extracted ONNX Runtime directory")
 
+    set(OpenCV_DIR "/home/max/opencv4_build_cuda/install/lib/cmake/opencv4")
 else()
     message(STATUS "else here")
 ENDIF ()
@@ -188,6 +189,9 @@ ENDIF ()
 
 add_executable(process_list_xml programs/process_list_xml.cpp)
 target_link_libraries(process_list_xml pathCamLib)
+
+add_executable(test_phase_corr programs/test_phase_corr.cpp)
+target_link_libraries(test_phase_corr pathCamLib)
 
 
 IF (BUILD_DEBAYER)
