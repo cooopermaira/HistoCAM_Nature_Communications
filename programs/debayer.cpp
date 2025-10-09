@@ -54,7 +54,7 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 int main(int argc, char *argv[]) {
   auto renameFiles = false;
   auto convertImages = true;
-  bool makeInput = true;
+  bool makeInput = false;
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x, flat_field40x;
   std::ifstream stream;
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
 //    }else{
 //      ff = flat_field20x;
 //    }
-        ff = flat_field20x;
+        ff = flat_field2x;
         string of = outFile.toString();
         auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
         jq.add_runnable(dr, i);

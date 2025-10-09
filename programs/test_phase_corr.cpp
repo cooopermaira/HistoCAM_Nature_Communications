@@ -2,6 +2,8 @@
 // Created by cooper maira on 9/29/25.
 //
 
+#include <filesystem>
+
 #include "pathCam.h"
 #include "Poco/DirectoryIterator.h"
 #include <opencv2/cudafeatures2d.hpp>
@@ -11,10 +13,154 @@
 
 using Poco::DirectoryIterator;
 
+std::ofstream logFile("/home/max/Documents/siftTune.log", std::ios::out | std::ios::app);
+float mag_ratio_lookup(int i, int j) {
+  float mags[] = {2.f, 4.f, 10.f, 20.f, 40.f};
+  return mags[j] / mags[i];
+}
 
-void compareSiftPoints(const SiftPoint* a, const SiftPoint* b,
-                       int numA, int numB, float eps = 1e-4f)
-{
+using GroupCallback = std::function<void(const std::string &, const std::array<std::string, 5> &)>;
+
+inline int magIndex(int mag) {
+  switch (mag) {
+    case 2: return 0;
+    case 4: return 1;
+    case 10: return 2;
+    case 20: return 3;
+    case 40: return 4;
+    default: return -1;
+  }
+}
+
+struct Group {
+  std::string subdir;                 // the subfolder where the group was found
+  int caseId;                         // 1, 2, or 3
+  std::array<std::string,5> paths;    // ordered by {2,4,10,20,40}
+  std::vector<cuda::GpuMat> images;
+};
+
+std::vector<Group> collectGroups(const std::string& rootDir, bool onlyComplete = true) {
+  // File name pattern: <CapitalLetter><[1|2|3]>_(2|4|10|20|40)x.raw
+  // e.g., A1_20x.raw, Z3_4x.raw
+  const std::regex pat(R"(^([A-Z])([123])_(2|4|10|20|40)x\.raw$)");
+
+  std::vector<Group> out;
+
+  Poco::File root(rootDir);
+  if (!root.exists() || !root.isDirectory()) {
+    std::cerr << "Root directory does not exist or is not a directory: " << rootDir << "\n";
+    return out;
+  }
+
+  // Iterate immediate subfolders
+  for (Poco::DirectoryIterator it(root), end; it != end; ++it) {
+    if (!it->isDirectory()) continue;
+
+    const std::string subDirPath = it->path();
+
+    // For each subfolder, group by the first number (caseId: 1,2,3)
+    // Each entry holds 5 paths ordered by magnification indices {2,4,10,20,40}
+    std::unordered_map<int, std::array<std::string,5>> groups;
+
+    for (Poco::DirectoryIterator jt(subDirPath), jend; jt != jend; ++jt) {
+      if (!jt->isFile()) continue;
+
+      const std::string fname = Poco::Path(jt->path()).getFileName();
+      std::smatch m;
+      if (!std::regex_match(fname, m, pat)) continue;
+
+      int caseId = std::stoi(m[2].str()); // 1..3
+      int mag    = std::stoi(m[3].str()); // 2,4,10,20,40
+      int idx    = magIndex(mag);
+      if (idx < 0) continue;
+
+      auto& arr = groups[caseId];
+      arr[idx] = jt->path();
+    }
+
+    // Push groups
+    for (auto& kv : groups) {
+      const int caseId = kv.first;
+      const auto& arr  = kv.second;
+
+      bool complete = true;
+      for (const auto& p : arr) {
+        if (p.empty()) { complete = false; break; }
+      }
+
+      if (!onlyComplete || complete) {
+        out.push_back(Group{ subDirPath, caseId, arr });
+      }
+    }
+  }
+
+  return out;
+}
+void groupMagnificationsPerCase(const std::string &rootDir, const GroupCallback &onGroup) {
+  // File name pattern: <CapitalLetter><[1|2|3]>_<[2|4|10|20|40]>x.raw
+  // e.g., A1_20x.raw, Z3_4x.raw
+  // Capture: 1) letter, 2) caseId (1..3), 3) magnification
+  const std::regex pat(R"(^([A-Z])([123])_(2|4|10|20|40)x\.raw$)");
+
+  Poco::File root(rootDir);
+  if (!root.exists() || !root.isDirectory()) {
+    std::cerr << "Root directory does not exist or is not a directory: " << rootDir << "\n";
+    return;
+  }
+
+  // Iterate immediate subfolders
+  for (Poco::DirectoryIterator it(root), end; it != end; ++it) {
+    if (!it->isDirectory()) continue;
+
+    const std::string subDirPath = it->path();
+    // For each subfolder, group by the first number (caseId: 1,2,3)
+    // Each entry holds 5 paths ordered by magnification indices {2,4,10,20,40}
+    std::unordered_map<int, std::array<std::string, 5> > groups;
+
+    for (Poco::DirectoryIterator jt(subDirPath), jend; jt != jend; ++jt) {
+      if (!jt->isFile()) continue;
+
+      const std::string fname = Poco::Path(jt->path()).getFileName();
+      std::smatch m;
+      if (!std::regex_match(fname, m, pat)) continue;
+
+      // Parse captures
+      // std::string letter = m[1]; // unused letter
+      int caseId = std::stoi(m[2].str()); // 1,2,3
+      int mag = std::stoi(m[3].str()); // 2,4,10,20,40
+      int idx = magIndex(mag);
+      if (idx < 0) continue;
+
+      auto &arr = groups[caseId];
+      arr[idx] = jt->path();
+    }
+
+    // Emit only complete groups (all five mags present)
+    for (auto &kv: groups) {
+      const int caseId = kv.first;
+      const auto &arr = kv.second;
+
+      bool complete = true;
+      for (const auto &p: arr) {
+        if (p.empty()) {
+          complete = false;
+          break;
+        }
+      }
+      if (complete) {
+        onGroup(subDirPath, arr);
+      } else {
+        // Optional: warn about missing magnifications for this caseId
+        std::cerr << "Warning: In subdir " << subDirPath
+            << " case " << caseId << " is missing one or more magnifications.\n";
+      }
+    }
+  }
+}
+
+
+void compareSiftPoints(const SiftPoint *a, const SiftPoint *b,
+                       int numA, int numB, float eps = 1e-4f) {
   if (!a || !b) {
     std::cerr << "Null pointer passed to compareSiftPoints.\n";
     return;
@@ -24,10 +170,10 @@ void compareSiftPoints(const SiftPoint* a, const SiftPoint* b,
   int total_diffs = 0;
 
   for (int i = 0; i < N; ++i) {
-    const SiftPoint& pa = a[i];
-    const SiftPoint& pb = b[i];
+    const SiftPoint &pa = a[i];
+    const SiftPoint &pb = b[i];
 
-auto odif = std::fabs(pa.orientation - pb.orientation);
+    auto odif = std::fabs(pa.orientation - pb.orientation);
 
     bool same_pos =
         std::fabs(pa.xpos - pb.xpos) < eps &&
@@ -45,86 +191,81 @@ auto odif = std::fabs(pa.orientation - pb.orientation);
     }
 
     if (!same_pos || !same_scale || !same_orient || desc_diff > 0) {
-      if (i>0) {
-        const SiftPoint& a1 = a[i-1];
-        const SiftPoint& a2 = a[i+1];
-        const SiftPoint& b1 = b[i-1];
-        const SiftPoint& b2 = b[i+1];
+      if (i > 0) {
+        const SiftPoint &a1 = a[i - 1];
+        const SiftPoint &a2 = a[i + 1];
+        const SiftPoint &b1 = b[i - 1];
+        const SiftPoint &b2 = b[i + 1];
         int k = 0;
       }
       total_diffs++;
       std::cout << "Idx " << i
-                << " Δx=" << pa.xpos - pb.xpos
-                << " Δy=" << pa.ypos - pb.ypos
-                << " Δscale=" << pa.scale - pb.scale
-                << " Δorient=" << pa.orientation - pb.orientation
-                << " descDiffs=" << desc_diff
-                << " meanDescΔ=" << (desc_sum_diff / 128.0f)
-                << "\n";
+          << " Δx=" << pa.xpos - pb.xpos
+          << " Δy=" << pa.ypos - pb.ypos
+          << " Δscale=" << pa.scale - pb.scale
+          << " Δorient=" << pa.orientation - pb.orientation
+          << " descDiffs=" << desc_diff
+          << " meanDescΔ=" << (desc_sum_diff / 128.0f)
+          << "\n";
     }
   }
 
   std::cout << "Compared " << N << " descriptors, "
-            << total_diffs << " show differences.\n";
+      << total_diffs << " show differences.\n";
 
   if (numA != numB)
     std::cout << "Warning: array sizes differ ("
-              << numA << " vs " << numB << ")\n";
+        << numA << " vs " << numB << ")\n";
 }
 
-void sortSiftDataByScaleHost(SiftData& sd,
-                                    bool descending = false,
-                                    bool upload_after = true)
-{
+template<typename T1 = float, typename T2 = float>
+void sortSiftDataHost(SiftData &sd,
+                      T1 SiftPoint::*primary = &SiftPoint::scale,
+                      T2 SiftPoint::*secondary = &SiftPoint::orientation,
+                      bool descending = false,
+                      bool upload_after = true) {
   const int N = sd.numPts;
   if (N <= 1) {
-    if (upload_after && sd.d_data && sd.h_data) {
+    if (upload_after && sd.d_data && sd.h_data)
       cudaMemcpy(sd.d_data, sd.h_data, N * sizeof(SiftPoint), cudaMemcpyHostToDevice);
-    }
     return;
   }
 
-  // Ensure we have host data; if not, create a host buffer and download first
   bool owns_temp_host = false;
   if (!sd.h_data) {
-    sd.h_data = new SiftPoint[sd.maxPts]; // assumes maxPts valid
+    sd.h_data = new SiftPoint[sd.maxPts];
     cudaMemcpy(sd.h_data, sd.d_data, N * sizeof(SiftPoint), cudaMemcpyDeviceToHost);
     owns_temp_host = true;
   }
 
-  // Make a copy we can reorder
   std::vector<SiftPoint> tmp(N);
   std::memcpy(tmp.data(), sd.h_data, N * sizeof(SiftPoint));
 
-  // Sort by scale
+  // Generic comparator based on the member pointers
   if (descending) {
     std::stable_sort(tmp.begin(), tmp.end(),
-        [](const SiftPoint& a, const SiftPoint& b) {
-            if (a.scale == b.scale)
-              return a.orientation < b.orientation;  // tie-break by orientation
-          return a.scale > b.scale;                   // primary: larger scale first
-      });
+                     [primary, secondary](const SiftPoint &a, const SiftPoint &b) {
+                       if (a.*primary == b.*primary)
+                         return a.*secondary < b.*secondary;
+                       return a.*primary > b.*primary;
+                     });
   } else {
     std::stable_sort(tmp.begin(), tmp.end(),
-        [](const SiftPoint& a, const SiftPoint& b) {
-            if (a.scale == b.scale)
-              return a.orientation < b.orientation;  // tie-break by orientation
-          return a.scale < b.scale;                   // primary: larger scale first
-      });
+                     [primary, secondary](const SiftPoint &a, const SiftPoint &b) {
+                       if (a.*primary == b.*primary)
+                         return a.*secondary < b.*secondary;
+                       return a.*primary < b.*primary;
+                     });
   }
 
-  // Write back to host buffer
   std::memcpy(sd.h_data, tmp.data(), N * sizeof(SiftPoint));
 
-  // Optionally upload to device
-  if (upload_after && sd.d_data) {
+  if (upload_after && sd.d_data)
     cudaMemcpy(sd.d_data, sd.h_data, N * sizeof(SiftPoint), cudaMemcpyHostToDevice);
-  }
 
-  // If we allocated a temporary host buffer (because sd.h_data was null), free it
   if (owns_temp_host) {
     delete[] sd.h_data;
-    sd.h_data = nullptr;  // restore original state
+    sd.h_data = nullptr;
   }
 }
 
@@ -179,92 +320,27 @@ static bool loadRawToGpuGray(const std::string &path,
   return true;
 }
 
-// ---- Main routine: pairwise scaling among all .Raw images in a directory ----
-void estimateScalesForRawDirectory(const std::string &dirPath,
-                                   int width, int height,
-                                   const std::vector<double> &scales = {2.0, 2.5, 4.0, 5.0, 10.0}) {
-  try {
-    // 1) Collect .Raw file paths
-    std::vector<std::string> files;
-    for (Poco::DirectoryIterator it(dirPath), end; it != end; ++it) {
-      if (!it->isFile()) continue;
-      const std::string p = it->path();
-      if (hasRawExtension(p)) files.push_back(p);
-    }
 
-    if (files.size() < 2) {
-      std::cerr << "[INFO] Need at least two .Raw files in " << dirPath << "\n";
-      return;
-    }
-
-    // 2) For every unordered pair (i, j), i<j:
-    for (size_t i = 0; i + 1 < files.size(); ++i) {
-      for (size_t j = i + 1; j < files.size(); ++j) {
-        const std::string &fA = files[i];
-        const std::string &fB = files[j];
-
-        cv::cuda::GpuMat dGrayA, dGrayB;
-        if (!loadRawToGpuGray(fA, width, height, dGrayA)) {
-          std::cerr << "[WARN] Skipping pair due to load failure: " << fA << " & " << fB << "\n";
-          continue;
-        }
-        if (!loadRawToGpuGray(fB, width, height, dGrayB)) {
-          std::cerr << "[WARN] Skipping pair due to load failure: " << fA << " & " << fB << "\n";
-          continue;
-        }
-
-        // 3) Estimate scale (auto tries both orders)
-        auto r = pathCam::CompositeVoronoi::estimate_scale_auto_GPU(dGrayA, dGrayB, scales);
-
-        // 4) Print result
-        Poco::Path pa(fA), pb(fB);
-        std::cout << pa.getFileName() << "  <->  " << pb.getFileName() << " : ";
-        if (!r.valid) {
-          std::cout << "no valid estimate\n";
-        } else {
-          std::cout << "scale=" << r.scale
-              << "  response=" << r.response
-              << "  shift=(" << r.shift.x << "," << r.shift.y << ")"
-              << "  |shift|=" << r.shiftNorm
-              << "  normShift=" << r.shiftNormDiag
-              << "\n";
-        }
-      }
-    }
-  } catch (const Poco::Exception &e) {
-    std::cerr << "[ERROR] Poco exception: " << e.displayText() << "\n";
-  } catch (const std::exception &e) {
-    std::cerr << "[ERROR] std::exception: " << e.what() << "\n";
-  }
-}
-
-
-SiftData get_sift_data_from_raw(cuda::GpuMat &_img, float initBlur, float thresh, float lowestScale) {
+SiftData get_sift_data_from_gry(cuda::GpuMat &_img, float initBlur, float thresh, float lowestScale,
+                                int numPts = 200000) {
   SiftData siftData;
   cuda::GpuMat gry, gry2;
 
-  //cuda::cvtColor(_img, gry, COLOR_BayerBG2GRAY);
   _img.convertTo(gry2,CV_32FC1);
 
   CudaImage cImgGry;
   cImgGry.Allocate(_img.cols, _img.rows, gry2.step / sizeof(float), false,
                    reinterpret_cast<float *>(gry2.data), nullptr);
 
-  int n = 200000;
+  int n = numPts;
   InitSiftData(siftData, n, true, true);
-  if (siftData.numPts == n) {
-    int k = 0;
-  }
 
-
-  if (0 < ExtractSift(siftData, cImgGry, 5, initBlur, thresh, lowestScale, false)) {
-    int k = 0;
-  }
-
+  ExtractSift(siftData, cImgGry, 5, initBlur, thresh, lowestScale, false);
 
   return siftData;
 }
-void shuffle_sift_data(SiftData& sd) {
+
+void shuffle_sift_data(SiftData &sd) {
   // 1. Create an index vector 0..numPts-1
   std::vector<int> enm(sd.numPts);
   std::iota(enm.begin(), enm.end(), 0);
@@ -279,7 +355,7 @@ void shuffle_sift_data(SiftData& sd) {
 
   // 4. Copy shuffled data into tmp
   for (int i = 0; i < sd.numPts; ++i)
-    tmp[i] = sd.h_data[enm[i]];  // direct struct assignment, not memcpy
+    tmp[i] = sd.h_data[enm[i]]; // direct struct assignment, not memcpy
 
   // 5. Write back to original
   for (int i = 0; i < sd.numPts; ++i)
@@ -299,14 +375,33 @@ int extractMagnification(const std::string &path) {
   return -1; // fallback if no match
 }
 
-int test_ordered_match(SiftData &sd1, SiftData & sd2) {
-  MatchSiftData(sd1,sd2);
+int test_oneway_homography(SiftData &sd) {
+  std::vector<Point2f> pts1, pts2;
+  for (int i = 0; i < sd.numPts; ++i) {
+    if (sd.h_data[i].match > 0) {
+      pts1.emplace_back(sd.h_data[i].xpos, sd.h_data[i].ypos);
+      pts2.emplace_back(sd.h_data[i].match_xpos, sd.h_data[i].match_ypos);
+    }
+  }
+
+  if (pts1.size() < 4 || pts2.size() < 4) { return 0; }
+
+  std::vector<uchar> inlierMask;
+
+  auto H = findHomography(pts2, pts1, RANSAC, 3.0, inlierMask);
+  int numInliers = std::count(inlierMask.begin(), inlierMask.end(), 1);
+
+  return numInliers;
+}
+
+int test_ordered_match(SiftData &sd1, SiftData &sd2) {
+  MatchSiftData(sd1, sd2);
   std::vector<Point2f> pts1, pts2;
   for (int i = 0; i < sd1.numPts; ++i) {
     if (sd1.h_data[i].match > 0) {
-      pts1.emplace_back(sd1.h_data[i].xpos,sd1.h_data[i].ypos);
+      pts1.emplace_back(sd1.h_data[i].xpos, sd1.h_data[i].ypos);
       int match = sd1.h_data[i].match;
-      pts2.emplace_back(sd2.h_data[match].xpos,sd2.h_data[match].ypos);
+      pts2.emplace_back(sd2.h_data[match].xpos, sd2.h_data[match].ypos);
     }
   }
 
@@ -339,10 +434,10 @@ int find_inliers(SiftData soldier1, SiftData soldier2) {
     if (soldier2.h_data[matchIdx].match == i) {
       auto amb = soldier2.h_data[matchIdx].ambiguity;
       //if (soldier2.h_data[matchIdx].ambiguity < 0.75) {
-        mutualMatches.emplace_back(i, matchIdx, soldier1.h_data[i].match_error);
+      mutualMatches.emplace_back(i, matchIdx, soldier1.h_data[i].match_error);
 
-        pts1.emplace_back(soldier1.h_data[i].xpos, soldier1.h_data[i].ypos);
-        pts2.emplace_back(soldier2.h_data[matchIdx].xpos, soldier2.h_data[matchIdx].ypos);
+      pts1.emplace_back(soldier1.h_data[i].xpos, soldier1.h_data[i].ypos);
+      pts2.emplace_back(soldier2.h_data[matchIdx].xpos, soldier2.h_data[matchIdx].ypos);
       //}
     }
   }
@@ -360,68 +455,6 @@ int find_inliers(SiftData soldier1, SiftData soldier2) {
   //}
   return numInliers;
 }
-
-int min_inliers_2(std::vector<cuda::GpuMat> &_files, cuda::SURF_CUDA &_surf, Ptr<cuda::DescriptorMatcher> &_matcher) {
-  int minInliers = 10000000;
-
-  std::vector<cuda::GpuMat> descriptors(_files.size()), keypoints(_files.size());
-  std::vector<std::vector<KeyPoint> > kpH(_files.size());
-  Mat circleMask(_files[0].size(),CV_8UC1, Scalar(0));
-  circle(circleMask, {3232, 2426}, 2100, Scalar(255), -1);
-  cuda::GpuMat mask2x;
-  mask2x.upload(circleMask);
-  for (int i = 0; i < _files.size(); ++i) {
-    if (i == 0) {
-      _surf(_files[i], mask2x, keypoints[i], descriptors[i]);
-    } else {
-      _surf(_files[i], cuda::GpuMat(), keypoints[i], descriptors[i]);
-    }
-    _surf.downloadKeypoints(keypoints[i], kpH[i]);
-  }
-
-  const float ratio = 0.75f;
-  for (size_t i = 0; i + 1 < _files.size(); ++i) {
-    for (size_t j = i + 1; j < _files.size(); ++j) {
-      if (j - i >= 4) {
-        continue; //skip extreme jumps in mag, 2x -> 40x
-      }
-      std::vector<std::vector<DMatch> > knn;
-      _matcher->knnMatch(descriptors[i], descriptors[j], knn, 2);
-
-      std::vector<DMatch> good;
-      good.reserve(knn.size());
-      for (auto &pair: knn) {
-        if (pair.size() == 2 && pair[0].distance <= ratio * pair[1].distance)
-          good.push_back(pair[0]);
-      }
-
-      if (good.size() < 4) {
-        std::cout << "failure between " << i << " and " << j << std::endl;
-        continue;
-      }
-
-      std::vector<Point2f> p1, p2;
-      p1.reserve(good.size());
-      p2.reserve(good.size());
-      for (auto &m: good) {
-        p1.push_back(kpH[i][m.queryIdx].pt);
-        p2.push_back(kpH[j][m.trainIdx].pt);
-      }
-      std::vector<unsigned char> inl;
-      cv::Mat H = cv::findHomography(p1, p2, cv::RANSAC, 3.0, inl);
-
-      int inliers = std::count(inl.begin(), inl.end(), 1);
-      std::cout << inliers << " " << i << " " << j << std::endl;
-
-      if (inliers < minInliers) {
-        minInliers = inliers;
-      }
-    }
-  }
-
-  return minInliers;
-}
-
 
 
 SiftData fill_cudasift_from_cv(Mat _descriptors, std::vector<KeyPoint> _kp) {
@@ -442,7 +475,7 @@ SiftData fill_cudasift_from_cv(Mat _descriptors, std::vector<KeyPoint> _kp) {
     sp.match_xpos = sp.match_ypos = 0.0f;
     sp.ambiguity = 0.0f;
 
-    const float* src = _descriptors.ptr<float>(i);
+    const float *src = _descriptors.ptr<float>(i);
     std::memcpy(sp.data, src, 128 * sizeof(float));
   }
 
@@ -451,139 +484,8 @@ SiftData fill_cudasift_from_cv(Mat _descriptors, std::vector<KeyPoint> _kp) {
   return siftData;
 }
 
-int min_inliers_3(std::vector<cv::Mat> const &imgs,
-                  cv::Ptr<cv::SIFT> const &sift,
-                  cv::Ptr<cv::DescriptorMatcher> const &matcher) {
-  int minInliers = std::numeric_limits<int>::max();
-
-  std::vector<cv::Mat> descriptors(imgs.size());
-  std::vector<std::vector<cv::KeyPoint> > kps(imgs.size());
-
-  // Optional mask only for the first image
-  cv::Mat mask;
-  if (!imgs.empty()) {
-    mask = cv::Mat(imgs[0].size(), CV_8UC1, cv::Scalar(0));
-    cv::circle(mask, {3232, 2426}, 2100, cv::Scalar(255), -1);
-  }
-
-  // Detect & compute (CPU)
-  for (size_t i = 0; i < imgs.size(); ++i) {
-    const cv::Mat &m = imgs[i];
-    if (m.empty() || m.type() != CV_8UC1) {
-      std::cerr << "Image " << i << " empty or not CV_8UC1\n";
-      return 0;
-    }
-    sift->detectAndCompute(m, (i == 0 ? mask : cv::Mat()), kps[i], descriptors[i]);
-
-    // SIFT should give CV_32F. Convert if needed (safety).
-    if (!descriptors[i].empty() && descriptors[i].type() != CV_32F)
-      descriptors[i].convertTo(descriptors[i], CV_32F);
-  }
-
-  const float ratio = 0.75f;
-
-  for (size_t i = 0; i + 1 < imgs.size(); ++i) {
-    for (size_t j = i + 1; j < imgs.size(); ++j) {
-      if (j - i >= 4) continue; // your skip
-
-      // Guard empties BEFORE knnMatch
-      if (descriptors[i].empty() || descriptors[j].empty()) {
-        std::cout << "skip pair i=" << i << " j=" << j
-            << " (empty descriptors: "
-            << descriptors[i].rows << "x" << descriptors[i].cols << " , "
-            << descriptors[j].rows << "x" << descriptors[j].cols << ")\n";
-        continue;
-      }
-      if (descriptors[i].type() != CV_32F || descriptors[j].type() != CV_32F) {
-        std::cerr << "Type mismatch (expect CV_32F) at i=" << i << " j=" << j << "\n";
-        continue;
-      }
-      if (descriptors[i].cols != descriptors[j].cols) {
-        std::cerr << "Descriptor dim mismatch ("
-            << descriptors[i].cols << " vs " << descriptors[j].cols
-            << ") at i=" << i << " j=" << j << "\n";
-        continue;
-      }
-
-      auto sf1 = fill_cudasift_from_cv(descriptors[i], kps[i]);
-      auto sf2 = fill_cudasift_from_cv(descriptors[j], kps[j]);
-      auto val = find_inliers(sf1, sf2);
-      std::cout << "CudaSift inliers: " << val << "  i=" << i << " j=" << j<< std::endl;
-      shuffle_sift_data(sf1);
-      shuffle_sift_data(sf2);
-      val = find_inliers(sf1,sf2);
-      std::cout << "CudaSift inliers try 2: " << val << "  i=" << i << " j=" << j<< std::endl;
-
-
-
-      std::vector<std::vector<cv::DMatch> > knn;
-      matcher->knnMatch(descriptors[i], descriptors[j], knn, 2);
-
-      std::vector<cv::DMatch> good;
-      good.reserve(knn.size());
-      for (auto const &pair: knn) {
-        if (pair.size() == 2 && pair[0].distance <= ratio * pair[1].distance)
-          good.push_back(pair[0]);
-      }
-      if (good.size() < 4) {
-        std::cout << "failure between " << i << " and " << j
-            << " (good=" << good.size() << ")\n";
-        continue;
-      }
-
-      std::vector<cv::Point2f> p1, p2;
-      p1.reserve(good.size());
-      p2.reserve(good.size());
-      for (auto const &m: good) {
-        p1.push_back(kps[i][m.queryIdx].pt);
-        p2.push_back(kps[j][m.trainIdx].pt);
-      }
-
-      std::vector<unsigned char> inl;
-      cv::Mat H = cv::findHomography(p1, p2, cv::RANSAC, 3.0, inl);
-      int inliers = H.empty() ? 0 : int(std::count(inl.begin(), inl.end(), 1));
-
-      std::cout << "inliers=" << inliers << "  i=" << i << " j=" << j << "\n";
-
-      minInliers = std::min(minInliers, inliers);
-    }
-  }
-  return (minInliers == std::numeric_limits<int>::max() ? 0 : minInliers);
-}
-
-void min_inliers4(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale) {
-  std::vector<SiftData> siftData;
-  for (int i = 0; i < files.size(); ++i) {
-    auto sd = get_sift_data_from_raw(files[i], initBlur, thresh, lowestScale);
-    sortSiftDataByScaleHost(sd);
-    siftData.push_back(sd);
-  }
-
-  int i = 0,j = 2;
-
-  std::vector<SiftPoint> saveBuffer(siftData[i].numPts);
-  std::memcpy(saveBuffer.data(),siftData[i].h_data,siftData[i].numPts * sizeof(SiftPoint));
-
-  for (int z = 0; z < 5; ++z) {
-    auto val = test_ordered_match(siftData[i],siftData[j]);
-    std::cout<<"static try "<<z<<" val="<<val<<std::endl;
-  }
-
-  shuffle_sift_data(siftData[i]);
-  for (int z = 0; z < 5; ++z) {
-    auto val = test_ordered_match(siftData[i],siftData[j]);
-    std::cout<<"shuffle try "<<z<<" val="<<val<<std::endl;
-  }
-  sortSiftDataByScaleHost(siftData[i]);
-  for (int z = 0; z < 5; ++z) {
-    auto val = test_ordered_match(siftData[i],siftData[j]);
-    std::cout<<"second static try "<<z<<" val="<<val<<std::endl;
-  }
-
-  compareSiftPoints(saveBuffer.data(),siftData[i].h_data,siftData[i].numPts,siftData[i].numPts);
-  int k = 0;
-
-}
+int ImproveHomography(SiftData &data, float *homography, int numLoops, float minScore, float maxAmbiguity,
+                      float thresh);
 
 int min_inliers(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale) {
   int minInliers = 10000000;
@@ -594,14 +496,14 @@ int min_inliers(std::vector<cuda::GpuMat> files, float initBlur, float thresh, f
       // if (i == 2) {
       //   siftData.push_back(SiftData());
       // }
-      auto sd = get_sift_data_from_raw(files[i], initBlur, thresh, lowestScale);
-      sortSiftDataByScaleHost(sd);
+      auto sd = get_sift_data_from_gry(files[i], initBlur, thresh, lowestScale);
+      sortSiftDataHost(sd);
       siftData.push_back(sd);
     }
 
     std::vector<SiftPoint> test;
-    for (int i = 0; i < 1000; i+=51) {
-      SiftPoint &p = siftData[i%5].h_data[i];
+    for (int i = 0; i < 1000; i += 51) {
+      SiftPoint &p = siftData[i % 5].h_data[i];
       test.push_back(p);
     }
 
@@ -613,7 +515,7 @@ int min_inliers(std::vector<cuda::GpuMat> files, float initBlur, float thresh, f
           continue; //skip extreme jumps in mag, 2x -> 40x
         }
         auto inliers = find_inliers(siftData[i], siftData[j]);
-        std::cout<<inliers<<" i="<<i<<" j="<<j<<std::endl;
+        std::cout << inliers << " i=" << i << " j=" << j << std::endl;
 
         if (inliers < minInliers) {
           minInliers = inliers;
@@ -697,7 +599,262 @@ void tune_sift(const std::string &dirPath, int width, int height, bool _sort) {
   int k = 0;
 }
 
-int main(int argc, char *argv[]) {
+
+void min_inliers4(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale) {
+  std::vector<SiftData> siftData;
+  for (int i = 0; i < files.size(); ++i) {
+    auto sd = get_sift_data_from_gry(files[i], initBlur, thresh, lowestScale);
+    sortSiftDataHost(sd);
+    siftData.push_back(sd);
+  }
+
+  int x = 0, y = 2;
+
+  for (int i = 0; i < siftData[x].numPts; ++i) {
+    siftData[x].h_data[i].empty[0] = float(i);
+  }
+
+  SiftData sdi;
+  InitSiftData(sdi, 200000, true, true);
+  sdi.numPts = siftData[x].numPts;
+  memcpy(sdi.h_data, siftData[x].h_data, sdi.numPts * sizeof(SiftPoint));
+  cudaMemcpy(sdi.d_data, sdi.h_data, sdi.numPts * sizeof(SiftPoint), cudaMemcpyHostToDevice);
+
+  shuffle_sift_data(siftData[x]);
+
+  MatchSiftData(siftData[x], siftData[y]);
+  MatchSiftData(sdi, siftData[y]);
+
+  int count = 0;
+  auto sdx = siftData[x];
+  for (int i = 0; i < sdx.numPts; ++i) {
+    int index = static_cast<int>(sdx.h_data[i].empty[0]);
+    assert(index == sdi.h_data[index].empty[0]);
+    auto &spx = sdx.h_data[i];
+    auto &spi = sdi.h_data[index];
+    if (spx.match != spi.match) {
+      ++count;
+    }
+  }
+
+  sortSiftDataHost(sdx, &SiftPoint::ambiguity, &SiftPoint::score);
+  auto v1 = sdx.h_data[0];
+  auto v2 = sdx.h_data[10000];
+  int ii = 0, ii2 = 0;
+  while (ii < 10) {
+    ++ii2;
+
+
+    //auto val = test_oneway_homography(sdx);
+    float homography[9];
+    int numMatches;
+    FindHomography(sdx, homography, &numMatches, 10000, 0.00f, 0.88f, 5.0);
+
+
+    if (homography[0] == 0 || numMatches < 100) {
+      shuffle_sift_data(sdx);
+      continue;
+    }
+
+    int numFit = ImproveHomography(sdx, homography, 5, 0.00f, 1.0f, 3.0);
+
+    for (int z = 0; z < 9; ++z) {
+      std::cout << homography[z] << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "cudasift findhomography " << numFit << " " << numMatches << std::endl;
+    //std::cout<<"opencv ransac "<<val<<std::endl;
+
+    shuffle_sift_data(sdx);
+
+    ++ii;
+  }
+
+
+  for (int z = 0; z < 5; ++z) {
+    auto val = test_ordered_match(siftData[x], siftData[y]);
+    std::cout << "static try " << z << " val=" << val << std::endl;
+  }
+
+  shuffle_sift_data(siftData[x]);
+  for (int z = 0; z < 5; ++z) {
+    auto val = test_ordered_match(siftData[x], siftData[y]);
+    std::cout << "shuffle try " << z << " val=" << val << std::endl;
+  }
+  sortSiftDataHost(siftData[x]);
+  for (int z = 0; z < 5; ++z) {
+    auto val = test_ordered_match(siftData[x], siftData[y]);
+    std::cout << "second static try " << z << " val=" << val << std::endl;
+  }
+
+  compareSiftPoints(sdi.h_data, siftData[x].h_data, siftData[x].numPts, siftData[x].numPts);
+  int k = 0;
+}
+
+bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale,
+                               float ambiguityMax, float scoreMin, int numPts) {
+  std::vector<SiftData> siftData;
+  for (int i = 0; i < files.size(); ++i) {
+    siftData.push_back(get_sift_data_from_gry(files[i], initBlur, thresh, lowestScale, numPts));
+  }
+
+  for (int i = 0; i < files.size() - 1; ++i) {
+    for (int j = i + 1; j < files.size(); ++j) {
+      if (j - i >= 4) { continue; }
+
+      MatchSiftData(siftData[i], siftData[j]);
+
+      float correctRatio = mag_ratio_lookup(i, j);
+      int iters = 5;
+      for (int z = 0; z < iters; ++z) {
+        float homography[9];
+        int numMatches;
+        FindHomography(siftData[i], homography, &numMatches, 10000, scoreMin, ambiguityMax, 5.0);
+        if (fabs(homography[0] - correctRatio) > 0.1 * homography[0]) {
+          for (auto &sd : siftData) {
+            FreeSiftData(sd);
+          }
+          std::cout<<"i="<<i<<" j="<<j<<std::endl;
+          return false;
+        }
+        if (z < iters - 1) {
+          shuffle_sift_data(siftData[i]);
+        }
+      }
+    }
+  }
+  for (auto &sd : siftData) {
+    FreeSiftData(sd);
+  }
+  return true;
+}
+
+int main(int argc, char** argv) {
+  if (argc < 2) {
+    std::cerr << "Usage: app <rootDir>\n";
+    return 1;
+  }
+
+  std::vector<std::string> allowedTissueTypes = {"liver","prostate","breast"};
+  std::vector<Group> groups = collectGroups(argv[1], /*onlyComplete=*/true);
+  std::vector<Group> gkeep;
+  for (auto &g : groups) {
+    std::filesystem::path p(g.paths[0]);
+    auto parent = p.parent_path().filename().string();
+    if (std::find(allowedTissueTypes.begin(),allowedTissueTypes.end(),parent) == allowedTissueTypes.end()){continue;}
+    for (auto &p: g.paths) {
+      cuda::GpuMat im;
+      loadRawToGpuGray(p, 6464, 4852, im);
+      g.images.push_back(im);
+    }
+    gkeep.push_back(g);
+  }
+
+  // Iterate sequentially (you can keep an index and call repeatedly)
+  int mostGroupsPassed = 0;
+  float bestInitBlur,bestThresh,bestLowestScale;
+
+  bool continueFrom = true;
+  float lsCF = 0.2, tCF = .4, ibCF = .7;
+
+  for (float lowestScale = 0.f; lowestScale <= 2.001f; lowestScale += 0.1) {
+    //21
+    if (lsCF > lowestScale) {
+      continue;
+    }
+
+    for (float thresh = 0.2f; thresh <= 5.001f; thresh += 0.2) {
+      if (lowestScale == lsCF && thresh < tCF) {
+        continue;
+      }
+      //21
+      for (float initBlur = 0.f; initBlur <= 2.001f; initBlur += 0.1) {
+        //skip already checked combos
+        if (lowestScale == lsCF  && thresh == tCF && initBlur < ibCF) {
+          continue;;
+        }
+        std::cout<<"initBlur = "<<initBlur<< " thresh = "<<thresh<<" lowestScale = "<<lowestScale<<std::endl;
+        logFile << "initBlur = "<<initBlur<< " thresh = "<<thresh<<" lowestScale = "<<lowestScale<<std::endl;
+
+        //21
+        for (float ambiguity = 0.82;ambiguity < 0.95; ambiguity += 0.02) {
+          bool testPassed;
+          for (size_t i = 0; i < gkeep.size(); ++i) {
+            const auto& g = gkeep[i];
+
+            //std::cout<<"group "<<i<<std::endl;
+            if (i > mostGroupsPassed) {
+              mostGroupsPassed = i;
+              bestInitBlur = initBlur;
+              bestThresh = thresh;
+              bestLowestScale = lowestScale;
+              logFile <<"BEST "<<mostGroupsPassed<< " ambiguity "<<ambiguity<< " initBlur = "<<bestInitBlur<< " thresh = "<<bestThresh<<" lowestScale = "<<bestLowestScale<<std::endl;
+            }
+
+
+            testPassed = verify_group_given_params(g.images,initBlur, thresh, lowestScale,ambiguity,0.0,200000);
+            if (!testPassed) {
+              std::cout<<"fail on group "<<i<<std::endl;
+              break;
+            }
+
+          }
+          if (testPassed) {
+            //solution found
+            std::cout<<"********** SOLUTION FOUND ***********"<<std::endl;
+            std::cout<<"initBlur = "<<initBlur<<std::endl;
+            std::cout<<"thresh = "<<thresh<<std::endl;
+            std::cout<<"lowestScale = "<<lowestScale<<std::endl;
+            std::cout<<"ambiguity = "<<ambiguity<<std::endl;
+            std::cout<<"********** SOLUTION FOUND ***********"<<std::endl;
+            int k = 0;
+          }
+        }
+      }
+    }
+  }
+
+  // If you truly want a “next()” feel:
+  // maintain a static/global size_t idx and reuse the 'groups' vector.
+  return 0;
+}
+
+int main3(int argc, char **argv) {
+  if (argc < 2) {
+    std::cerr << "Usage: app <rootDir>\n";
+    return 1;
+  }
+
+  groupMagnificationsPerCase(argv[1],
+                             [](const std::string &subdir, const std::array<std::string, 5> &paths) {
+                               // paths[0..4] correspond to magnifications {2,4,10,20,40}
+                               static const int mags[5] = {2, 4, 10, 20, 40};
+                               std::cout << "Group found in: " << subdir << "\n";
+                               for (int i = 0; i < 5; ++i) {
+                                 std::cout << "  " << mags[i] << "x: " << paths[i] << "\n";
+                               }
+
+                               // Call your function here with the 5 paths:
+                               // yourFunction(paths);  // replace with your actual call
+                               std::vector<cuda::GpuMat> images;
+                               for (auto &p: paths) {
+                                 cuda::GpuMat im;
+                                 loadRawToGpuGray(p, 6464, 4852, im);
+                                 images.push_back(im);
+                               }
+                               if (!verify_group_given_params(images,1, 2, 0,0.9,0.0,100000)) {
+                                 int k = 0;
+                               }
+                             }
+  );
+
+  return 0;
+}
+
+
+
+int main2(int argc, char *argv[]) {
   //estimateScalesForRawDirectory(argv[1], 6464, 4852);
   //tune_sift(argv[1], 6464, 4852, true);
   //
@@ -739,9 +896,9 @@ int main(int argc, char *argv[]) {
     im.download(temp);
     files2.push_back(temp);
   }
-min_inliers4(files,.1, 1, 1.3);
+  min_inliers4(files, .1, 1, 1.3);
 
-  auto val = min_inliers(files,.1, 1, 1.3);
+  auto val = min_inliers(files, .1, 1, 1.3);
 
   //auto val = min_inliers(files,.1, 1, 1.3);
   // auto val = min_inliers(files, 0, 1.8, 0.5);
@@ -758,7 +915,6 @@ min_inliers4(files,.1, 1, 1.3);
   // }
   auto matcher2 = cv::BFMatcher::create(NORM_L2);
   auto sift = cv::SIFT::create(200000, 5, .02, 10, 1.6);
-  auto val2 = min_inliers_3(files2, sift, matcher2);
   //}
   int k = 0;
 }

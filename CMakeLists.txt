@@ -193,6 +193,9 @@ target_link_libraries(process_list_xml pathCamLib)
 add_executable(test_phase_corr programs/test_phase_corr.cpp)
 target_link_libraries(test_phase_corr pathCamLib)
 
+add_executable(bitwise_semi_norm_dot_product programs/bitwise_semi_norm_dot_product.cpp programs/util.cpp programs/BitwiseImage.cu)
+target_link_libraries(bitwise_semi_norm_dot_product pathCamLib)
+
 
 IF (BUILD_DEBAYER)
     add_executable(debayer programs/debayer.cpp)

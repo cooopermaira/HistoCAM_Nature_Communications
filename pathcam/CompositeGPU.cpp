@@ -562,9 +562,10 @@ namespace pathCam {
     //   InitSiftData(siftData, 10000, false, true);
     // }
 
-    if (0 < ExtractSift(siftData, cImgGry, 5, 1.f, 3.5f, 0.f, false)) {
-      int k = 0;
-    }
+      ExtractSift(siftData, cImgGry, 5, 1.f, 3.5f, 0.f, false);
+    // if (0 < ExtractSift(siftData, cImgGry, 5, 1.f, 3.5f, 0.f, false)) {
+    //   int k = 0;
+    // }
       if (siftData.numPts > 10000) {
         int k = 0;
       }
