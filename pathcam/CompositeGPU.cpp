@@ -164,15 +164,21 @@ namespace pathCam {
 
       //images[i]->free_memory_cuda();
 
+      if (rootFound) {
+        establish_scale_at_root(images[i]);
+      }
+
       ff_correct_and_brighten();
 
       //get sift data and push it to sift ft extraction gpu
       images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
-      parent->push_SIFT_matches(newOverlaps, images[i]);
-      if (_newInfo[i]->root && !newOverlaps.empty()) {
-        wakeEvent.wait();
-        ff_correct_and_brighten();
-      }
+
+
+      // parent->push_SIFT_matches(newOverlaps, images[i]);
+      // if (_newInfo[i]->root && !newOverlaps.empty()) {
+      //   wakeEvent.wait();
+      //   ff_correct_and_brighten();
+      // }
 
       //add alpha channel
       cuda::split(threeChannelPrealGPU, channelsGPU);
@@ -556,19 +562,9 @@ namespace pathCam {
                      reinterpret_cast<float *>(gry2.data), nullptr);
 
 
-    // if (parent->compositorCudaDevice != parent->siftCudaDevice) {
-      InitSiftData(siftData, 10000, true, true);
-    // } else {
-    //   InitSiftData(siftData, 10000, false, true);
-    // }
+      InitSiftData(siftData, 100000, true, true);
+      ExtractSift(siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
 
-      ExtractSift(siftData, cImgGry, 5, 1.f, 3.5f, 0.f, false);
-    // if (0 < ExtractSift(siftData, cImgGry, 5, 1.f, 3.5f, 0.f, false)) {
-    //   int k = 0;
-    // }
-      if (siftData.numPts > 10000) {
-        int k = 0;
-      }
   }catch (cv::Exception &e) {
     int k = 0;
   }

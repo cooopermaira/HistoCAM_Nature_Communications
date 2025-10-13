@@ -83,24 +83,47 @@ namespace pathCam {
       std::cout << "Issue loading image.\n";
       return;
     }
-//    auto val = image->check_blur();
-//        blur->at(sort_order) = val;
-//        names->at(sort_order) = image->get_ImageFile().getFileName();
+    //    auto val = image->check_blur();
+    //        blur->at(sort_order) = val;
+    //        names->at(sort_order) = image->get_ImageFile().getFileName();
 
     if (convertAndSave) {
-      try {
-        //image->create_reg_image(1.0,1.0,true,cv::INTER_CUBIC, false);
-        cv::Size image_size(image->width, image->height);
-        Mat readMat = cv::Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-        Mat image_Mat;
+
+      std::vector<std::string> ffs={"/media/max/Data/2_20/2x/cal/2x_cal.Raw","/media/max/Data/2_20/4x/cal/4x_cal.Raw",
+            "/media/max/Data/2_20/10x/cal/10x_cal.Raw",
+            "/media/max/Data/2_20/20x/cal/20x_cal.Raw"};
+
+      Size image_size(image->width, image->height);
+      Mat image_Mat;
+      Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+      cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+
+      readMat.convertTo(readMat,CV_32FC3);
+
+      for (int i = 0; i < ffs.size(); ++i) {
+        Mat ff;
+        std::ifstream stream;
+        stream.open(ffs[i], std::ios::binary);
+        {
+          char *raw_buffer = new char[6464 * 4852];
+          stream.read(raw_buffer, 6464 * 4852);
+          stream.close();
+          ff = Mat(Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
+        }
+        cvtColor(ff, ff, COLOR_BayerBG2BGR);
+        ff.convertTo(ff, CV_32F);
+        ff *= 1 / 170.0;
+        divide(readMat, ff, image_Mat, 1, CV_32F);
+
+        //cv::pow(image_Mat, 1.1, image_Mat);
+
+        image_Mat.convertTo(image_Mat, CV_8UC3);
 
 
-
-        cvtColor(readMat, readMat, COLOR_BayerBG2RGB);
-        resize(readMat,image_Mat,cv::Size(image->width, image->height));
-//
-//      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
-//      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
+        resize(image_Mat, image_Mat, Size(image->width / 4, image->height / 4));
+        //
+        //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
+        //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
 
 
         //divide(readMat, flatfield, image_Mat, 1, CV_32F);
@@ -110,31 +133,33 @@ namespace pathCam {
         //image_Mat.convertTo(image_Mat, CV_8UC3);
 
         //add subdir for png
-        auto r = o;
+        auto r = outfile;
 
-        outfile.setFileName(image->get_ImageFile().getFileName());
-        outfile.setExtension("png");
-        imwrite(outfile.toString(), image_Mat);
-        //
-        // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
-//        image_Mat = ConvertBGR2Bayer(image_Mat);
-//
-//        //save .Raw
-//        auto name = std::stoi(image->get_ImageFile().getBaseName());
-//        name += 250;
-//
-//
-//        r.setFileName(std::to_string(name));
-//        r.setExtension("Raw");
-//        std::fstream file;
-//        file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
-//        if (file.fail()) {
-//          throw new std::exception;
-//        }
-//        file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
-      } catch (...) {
-        int k = 0;
+        r.setFileName(image->get_ImageFile().getBaseName()+"_"+std::to_string(i));
+        r.setExtension("png");
+        imwrite(r.toString(), image_Mat);
       }
+      //
+      // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
+      //        image_Mat = ConvertBGR2Bayer(image_Mat);
+      //
+      //        //save .Raw
+      //        auto name = std::stoi(image->get_ImageFile().getBaseName());
+      //        name += 250;
+      //
+      //
+      //        r.setFileName(std::to_string(name));
+      //        r.setExtension("Raw");
+      //        std::fstream file;
+      //        file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
+      //        if (file.fail()) {
+      //          throw new std::exception;
+      //        }
+      //        file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
+
+      // } catch (cv::Exception &e) {
+      //   int k = 0;
+      // }
     }
     image->free_memory_RAW();
     int k = 0;

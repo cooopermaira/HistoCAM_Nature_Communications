@@ -28,7 +28,7 @@ namespace pathCam {
   }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-  bool Image::move_buffer_to_gpu(int _device, bool _trueMove) {
+  bool Image::move_buffer_to_gpu(int _device, bool _freeHostBuffer) {
     // if (raw_buffer_cuda) {
     //   std::lock_guard lock(cudaBufferMutex);
     //   cudaBufferReady = true;
@@ -51,7 +51,7 @@ namespace pathCam {
     }
 
     //release from system memory, keep on gpu only
-    if (_trueMove) {
+    if (_freeHostBuffer) {
       free_memory_RAW();
     }
 
@@ -125,8 +125,8 @@ namespace pathCam {
       cv::Scalar mean, stddev;
       cv::meanStdDev(laplacian, mean, stddev); */
       cv::Mat grad_x, grad_y;
-      Sobel(ROI, grad_x, CV_64F, 1, 0, 3);
-      Sobel(ROI, grad_y, CV_64F, 0, 1, 3);
+      Sobel(ROI, grad_x, CV_64F, 1, 0, 5);
+      Sobel(ROI, grad_y, CV_64F, 0, 1, 5);
       cv::Mat grad_magnitude;
       magnitude(grad_x, grad_y, grad_magnitude);
       cv::Scalar mean, stddev;

@@ -96,8 +96,8 @@ int main(int argc, char *argv[]) {
   cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2BGR);
   flat_field10x.convertTo(flat_field10x, CV_32F);
   flat_field10x *= 1 / 170.0;
-
-  stream.open("/Users/coopermaira/Desktop/pathcam_data/1at1/other_rec/cal/20x_cal.Raw", std::ios::binary);
+*/
+  stream.open("/media/max/Data/2_20/20x/cal/20x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
     stream.read(raw_buffer, 6464 * 4852);
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
   cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2BGR);
   flat_field20x.convertTo(flat_field20x, CV_32F);
   flat_field20x *= 1 / 170.0;
-*/
+
 //  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
 //  {
 //    char *raw_buffer = new char[6464 * 4852];
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
 //    }else{
 //      ff = flat_field20x;
 //    }
-        ff = flat_field2x;
+        ff = flat_field20x;
         string of = outFile.toString();
         auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
         jq.add_runnable(dr, i);

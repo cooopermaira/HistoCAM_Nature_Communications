@@ -255,7 +255,7 @@ namespace pathCam {
 
     std::vector<Image *> get_component_image_refs(unsigned long component);
 
-    std::vector<RegInfo*> get_Q_front();
+    std::vector<RegInfo*> get_Q_front(bool _pop);
 
     std::vector<std::tuple<int,int,unsigned int>> get_tile_embed_Q_front();
 

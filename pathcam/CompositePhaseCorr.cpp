@@ -124,14 +124,14 @@ namespace pathCam {
     // 1) Center crop from LOW (assumes image is big enough)
     if (dLow_bgr.cols < K || dLow_bgr.rows < K) return best;
     //Rect lowR = centeredRect(dLow_bgr.cols, dLow_bgr.rows, K, K);
-    Size newsize(dLow_bgr.cols/2,dLow_bgr.rows/2);
+    Size newsize(dLow_bgr.cols / 2, dLow_bgr.rows / 2);
     cuda::GpuMat dlowRS;
-    cuda::resize(dLow_bgr,dlowRS,newsize);
-    Rect lowR((dLow_bgr.cols - K) / 2,(dLow_bgr.rows - K)/2,K,K);
+    cuda::resize(dLow_bgr, dlowRS, newsize);
+    Rect lowR((dLow_bgr.cols - K) / 2, (dLow_bgr.rows - K) / 2, K, K);
     cuda::GpuMat lowK = dLow_bgr(lowR);
 
-    Scalar lowMean,stddev;
-    cuda::meanStdDev(lowK,lowMean,stddev);
+    Scalar lowMean, stddev;
+    cuda::meanStdDev(lowK, lowMean, stddev);
 
     Mat temp;
     lowK.download(temp);
@@ -167,42 +167,42 @@ namespace pathCam {
       // imwrite("/media/max/Data/phase_corr_test/"+std::to_string(s)+".png",temp);
 
       cuda::GpuMat temp1;
-      cuda::resize(dHigh_bgr,temp1,{dHigh_bgr.cols/int(2*s),dHigh_bgr.rows/int(2*s)});
+      cuda::resize(dHigh_bgr, temp1, {dHigh_bgr.cols / int(2 * s), dHigh_bgr.rows / int(2 * s)});
       temp1.convertTo(temp1,CV_32F);
       lowK.convertTo(lowK,CV_32F);
-       auto div = cuda::norm(lowK,NORM_L2);
-       cuda::divide(lowK,Scalar(div),lowK);
-       std::vector<double> dots;
-       cuda::GpuMat templow;
-       double maxval = 0,secondplace = 0;
-       std::pair<int,int>loc;
-       for (int y = temp1.rows/2 - 150; y < temp1.rows/2 + 150;++y) {
-         for (int x = temp1.cols/2 - 150; x < temp1.cols/2 + 150; ++x) {
-           Rect roi(x,y,K,K);
-           auto div1 = cuda::norm(temp1(roi),NORM_L2);
-           cuda::divide(temp1(roi),Scalar(div1),templow);
-           cuda::multiply(templow,lowK,templow);
-           Scalar dot = cuda::sum(templow);
-           dots.push_back(dot[0]);
-           if (dot[0] > maxval) {
-             secondplace = maxval;
-             maxval = dot[0];
-             loc = {x,y};
-           }
-         }
-         if (y%100==0) {
-           std::cout<<y<<std::endl;
-         }
-       }
-       Rect roi(loc.first,loc.second,K,K);
-       Mat temp11;
-       temp1(roi).download(temp11);
-       imwrite("/media/max/Data/phase_corr_test/maxcrop.png",temp11);
-       auto max_it = std::max_element(dots.begin(),dots.end());
-       double max_val = (max_it != dots.end()) ? *max_it : 0.0;
-       std::cout<<"max: "<<max_val<<std::endl;
-       double mean = std::accumulate(dots.begin(),dots.end(),0.0)/double(dots.size());
-       std::cout<<"mean: "<<mean<<std::endl;
+      auto div = cuda::norm(lowK, NORM_L2);
+      cuda::divide(lowK, Scalar(div), lowK);
+      std::vector<double> dots;
+      cuda::GpuMat templow;
+      double maxval = 0, secondplace = 0;
+      std::pair<int, int> loc;
+      for (int y = temp1.rows / 2 - 150; y < temp1.rows / 2 + 150; ++y) {
+        for (int x = temp1.cols / 2 - 150; x < temp1.cols / 2 + 150; ++x) {
+          Rect roi(x, y, K, K);
+          auto div1 = cuda::norm(temp1(roi), NORM_L2);
+          cuda::divide(temp1(roi), Scalar(div1), templow);
+          cuda::multiply(templow, lowK, templow);
+          Scalar dot = cuda::sum(templow);
+          dots.push_back(dot[0]);
+          if (dot[0] > maxval) {
+            secondplace = maxval;
+            maxval = dot[0];
+            loc = {x, y};
+          }
+        }
+        if (y % 100 == 0) {
+          std::cout << y << std::endl;
+        }
+      }
+      Rect roi(loc.first, loc.second, K, K);
+      Mat temp11;
+      temp1(roi).download(temp11);
+      imwrite("/media/max/Data/phase_corr_test/maxcrop.png", temp11);
+      auto max_it = std::max_element(dots.begin(), dots.end());
+      double max_val = (max_it != dots.end()) ? *max_it : 0.0;
+      std::cout << "max: " << max_val << std::endl;
+      double mean = std::accumulate(dots.begin(), dots.end(), 0.0) / double(dots.size());
+      std::cout << "mean: " << mean << std::endl;
 
       // 3) Photometric preprocessing AFTER both are KxK (gray -> Sobel mag -> norm -> Hann)
       cuda::GpuMat lowProc = preprocess_GPU(lowK, stream);
@@ -229,14 +229,73 @@ namespace pathCam {
     return best;
   }
 
+  void CompositeVoronoi::establish_scale_between_two_centered_Images(Image *img1, Image *img2, double &scale, Point2f &offset) {
+    assert(img1->siftData.numPts > 0 && img2->siftData.numPts > 0);
+    MatchSiftData(img1->siftData,img2->siftData);
+
+    std::vector<float> homography(9);
+    int numMatches;
+    FindHomography(img1->siftData,homography.data(),&numMatches,10000,0.8,0.9,5);
+
+
+  }
+
+
+
+  void CompositeVoronoi::establish_scale_at_root(Image *_rootImg) {
+    //get my sift data
+    if (_rootImg->siftData.numPts == 0) {
+      if (!_rootImg->cudaBufferReady) {
+        _rootImg->move_buffer_to_gpu(parent->compositorCudaDevice,true);
+      }
+      auto myGray = get_grayscale(_rootImg);
+      CudaImage cImgGry;
+      cImgGry.Allocate(image_size.width, image_size.height, myGray.step / sizeof(float), false,
+                       reinterpret_cast<float *>(myGray.data), nullptr);
+      InitSiftData(_rootImg->siftData, 100000, true, true);
+      ExtractSift(_rootImg->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+    }
+
+    //get their sift data
+    if (parent->lastViewedFrame->siftData.numPts == 0) {
+      if (!parent->lastViewedFrame->cudaBufferReady) {
+        parent->lastViewedFrame->move_buffer_to_gpu(parent->compositorCudaDevice,true);
+      }
+      auto theirGray = get_grayscale(parent->lastViewedFrame);
+      CudaImage cImgGry;
+      cImgGry.Allocate(image_size.width, image_size.height, theirGray.step / sizeof(float), false,
+                       reinterpret_cast<float *>(theirGray.data), nullptr);
+      InitSiftData(parent->lastViewedFrame->siftData, 100000, true, true);
+      ExtractSift(parent->lastViewedFrame->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+    }
+
+    MatchSiftData(_rootImg->siftData,parent->lastViewedFrame->siftData);
+    std::vector<float> homography(9);
+    int numMatches;
+    FindHomography(_rootImg->siftData, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
+
+    float relativeScale = (homography[0] + homography[4]) / 2;
+
+    auto queryComponent = parent->lastViewedFrame->regInfo->component_membership;
+    Point2f theirAbC(parent->lastViewedFrame->regInfo->absoluteCoords.x, parent->lastViewedFrame->regInfo->absoluteCoords.y);
+    Point2f pairwiseDistance = Point2f(homography[2] , homography[5]);
+    Point2f queryAbC = pairwiseDistance + theirAbC;
+    auto resultantPoint = parent->get_AbC_relative_from_relative(queryComponent, queryAbC, 0);
+
+    double scale = relativeScale * parent->composites[queryComponent]->imagePyramid->scale;
+    _rootImg->regInfo->rootHomographies.emplace_back(resultantPoint, scale);
+
+    assert(scale > 0);
+    parent->composites[componentIndex]->set_scale(scale);
+    parent->composites[componentIndex]->set_offset(resultantPoint/scale);
+    // auto comp = parent->composites[componentIndex];
+    // comp->set_scale(scale);
+    // comp->set_offset(resultantPoint/scale);
+  }
+
 
   ScaleResult CompositeVoronoi::estimate_scale_auto_GPU(const cuda::GpuMat &imgA, const cuda::GpuMat &imgB,
                                                         const std::vector<double> &scales,
                                                         cudaStream_t stream) {
-    ScaleResult ab = estimate_cale_discrete_GPU(imgA, imgB, scales, stream);
-    ScaleResult ba = estimate_cale_discrete_GPU(imgB, imgA, scales, stream);
-    if (!ab.valid) return ba;
-    if (!ba.valid) return ab;
-    return (ab.response >= ba.response) ? ab : ba;
   }
 }

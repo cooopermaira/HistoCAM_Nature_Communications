@@ -30,29 +30,13 @@ namespace pathCam {
     // }
 
 
-    // if(image->check_blur() < 100){
-    //   successful = true;
-    //   parent->loaderCount--;
-    //   image->free_memory_RAW();
-    //   jobComplete.set();
-    //   return;
-    // }
-    image->index = image_index;
-    //image->find_label();
 
-//    if (image->label == Image::_2X || image->label == Image::_4X){
-//      if (image->blurVariance < 300){
-//        successful = true;
-//        parent->loaderCount--;
-//        jobComplete.set();
-//        return;
-//      }
-//    }
+    //image->check_blur();
+    image->index = image_index;
 
 
 
     if (!image->is_mostly_black()) {
-
 
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,

@@ -238,7 +238,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
           g.reduceClipRegion(*im, imgToCanvas);
 
-          int maglab = MRImage->images[i]->parent->composites[i]->componentMagLabel;
+          int maglab = MRImage->images[i]->magLabel;
           auto color = levelColors[4 - maglab];
           auto overlayColor = Colour(color.getRed(), color.getGreen(), color.getBlue(), (uint8)100);
 

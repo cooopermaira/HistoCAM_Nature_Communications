@@ -58,13 +58,14 @@ namespace pathCam {
           Poco::Thread::sleep(100);
         }
       } else {
-        auto indexes = parent->get_Q_front();
+        auto indexes = parent->get_Q_front(false);
         if (isNewComp) {
           if (indexes.front()->index > std::get<0>(newComp)) {
             parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
             parent->newComponentQ.pop();
           }
         }
+        indexes = parent->get_Q_front(true);
         std::sort(indexes.begin(), indexes.end());
 
         while (parent->composites.size() <= indexes.back()->component_membership) {
@@ -124,6 +125,11 @@ namespace pathCam {
 
 
     //save_components_to_disk();
+    // for (auto &img:parent->images) {
+    //   if (!img){continue;}
+    //   unsigned int magLabel = parent->composites[img->component_membership]->componentMagLabel;
+    //   std::cout<< " mag "<<magLabel<<"image: "<<img->index<<" blur: "<<img->blurVariance<<std::endl;
+    // }
 
 
     if (parent->segmentWithSAM) {

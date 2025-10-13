@@ -335,7 +335,7 @@ SiftData get_sift_data_from_gry(cuda::GpuMat &_img, float initBlur, float thresh
   int n = numPts;
   InitSiftData(siftData, n, true, true);
 
-  ExtractSift(siftData, cImgGry, 5, initBlur, thresh, lowestScale, false);
+  ExtractSift(siftData, cImgGry, 1, initBlur, thresh, lowestScale, false);
 
   return siftData;
 }
@@ -692,42 +692,65 @@ void min_inliers4(std::vector<cuda::GpuMat> files, float initBlur, float thresh,
   int k = 0;
 }
 
-bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale,
+bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale, float ambiguityMin,
                                float ambiguityMax, float scoreMin, int numPts) {
   std::vector<SiftData> siftData;
+
   for (int i = 0; i < files.size(); ++i) {
-    siftData.push_back(get_sift_data_from_gry(files[i], initBlur, thresh, lowestScale, numPts));
+    if (i==2) {
+      siftData.push_back(SiftData());
+      continue;;
+    }
+    cuda::GpuMat tempImg;
+    float scale = i>2?0.1:1;
+    cuda::resize(files[i],tempImg,Size(files[i].cols * scale,files[i].rows * scale),0,0,INTER_CUBIC);
+    siftData.push_back(get_sift_data_from_gry(tempImg, initBlur, thresh, lowestScale, numPts));
   }
+  bool failure;
+  for (float amb = ambiguityMin; amb <= ambiguityMax; amb+=0.02) {
+    failure = false;
+    for (int i = 0; i < files.size() - 1; ++i) {
+      for (int j = i + 1; j < files.size(); ++j) {
+        //if (j - i >= 4) { continue; }
+        if (j - i != 3){continue;}
 
-  for (int i = 0; i < files.size() - 1; ++i) {
-    for (int j = i + 1; j < files.size(); ++j) {
-      if (j - i >= 4) { continue; }
+        MatchSiftData(siftData[i], siftData[j]);
 
-      MatchSiftData(siftData[i], siftData[j]);
+        float correctRatio = mag_ratio_lookup(i, j);
+        int iters = 5;
+        for (int z = 0; z < iters; ++z) {
+          float homography[9];
+          int numMatches;
+          FindHomography(siftData[i], homography, &numMatches, 10000, scoreMin, ambiguityMax, 5.0);
+          if (fabs(homography[0] - 1) > 0.1 * homography[0]) {
+            failure = true;
 
-      float correctRatio = mag_ratio_lookup(i, j);
-      int iters = 5;
-      for (int z = 0; z < iters; ++z) {
-        float homography[9];
-        int numMatches;
-        FindHomography(siftData[i], homography, &numMatches, 10000, scoreMin, ambiguityMax, 5.0);
-        if (fabs(homography[0] - correctRatio) > 0.1 * homography[0]) {
-          for (auto &sd : siftData) {
-            FreeSiftData(sd);
+            std::cout<<"i="<<i<<" j="<<j<<std::endl;
+            break;
           }
-          std::cout<<"i="<<i<<" j="<<j<<std::endl;
-          return false;
+          if (z < iters - 1) {
+            shuffle_sift_data(siftData[i]);
+          }
         }
-        if (z < iters - 1) {
-          shuffle_sift_data(siftData[i]);
+        if (failure) {
+          break;
         }
       }
+      if (failure) {
+        break;
+      }
+    }
+    if (!failure) {
+      for (auto &sd : siftData) {
+        FreeSiftData(sd);
+      }
+      return true;
     }
   }
   for (auto &sd : siftData) {
     FreeSiftData(sd);
   }
-  return true;
+  return false;
 }
 
 int main(int argc, char** argv) {
@@ -750,13 +773,14 @@ int main(int argc, char** argv) {
     }
     gkeep.push_back(g);
   }
+  auto val = verify_group_given_params(gkeep[0].images,0.0,0.4,0.1,0.9,0.901,0,100000);
 
   // Iterate sequentially (you can keep an index and call repeatedly)
   int mostGroupsPassed = 0;
   float bestInitBlur,bestThresh,bestLowestScale;
 
   bool continueFrom = true;
-  float lsCF = 0.2, tCF = .4, ibCF = .7;
+  float lsCF = 0.6, tCF = 6, ibCF = 1.4;
 
   for (float lowestScale = 0.f; lowestScale <= 2.001f; lowestScale += 0.1) {
     //21
@@ -778,7 +802,7 @@ int main(int argc, char** argv) {
         logFile << "initBlur = "<<initBlur<< " thresh = "<<thresh<<" lowestScale = "<<lowestScale<<std::endl;
 
         //21
-        for (float ambiguity = 0.82;ambiguity < 0.95; ambiguity += 0.02) {
+
           bool testPassed;
           for (size_t i = 0; i < gkeep.size(); ++i) {
             const auto& g = gkeep[i];
@@ -789,11 +813,11 @@ int main(int argc, char** argv) {
               bestInitBlur = initBlur;
               bestThresh = thresh;
               bestLowestScale = lowestScale;
-              logFile <<"BEST "<<mostGroupsPassed<< " ambiguity "<<ambiguity<< " initBlur = "<<bestInitBlur<< " thresh = "<<bestThresh<<" lowestScale = "<<bestLowestScale<<std::endl;
+              logFile <<"BEST "<<mostGroupsPassed<< " initBlur = "<<bestInitBlur<< " thresh = "<<bestThresh<<" lowestScale = "<<bestLowestScale<<std::endl;
             }
 
 
-            testPassed = verify_group_given_params(g.images,initBlur, thresh, lowestScale,ambiguity,0.0,200000);
+            testPassed = verify_group_given_params(g.images,initBlur, thresh, lowestScale,0.82,0.95,0.0,200000);
             if (!testPassed) {
               std::cout<<"fail on group "<<i<<std::endl;
               break;
@@ -806,11 +830,11 @@ int main(int argc, char** argv) {
             std::cout<<"initBlur = "<<initBlur<<std::endl;
             std::cout<<"thresh = "<<thresh<<std::endl;
             std::cout<<"lowestScale = "<<lowestScale<<std::endl;
-            std::cout<<"ambiguity = "<<ambiguity<<std::endl;
+            //std::cout<<"ambiguity = "<<ambiguity<<std::endl;
             std::cout<<"********** SOLUTION FOUND ***********"<<std::endl;
             int k = 0;
           }
-        }
+
       }
     }
   }
@@ -843,7 +867,7 @@ int main3(int argc, char **argv) {
                                  loadRawToGpuGray(p, 6464, 4852, im);
                                  images.push_back(im);
                                }
-                               if (!verify_group_given_params(images,1, 2, 0,0.9,0.0,100000)) {
+                               if (!verify_group_given_params(images,1, 2, 0,.89,0.9,0.0,100000)) {
                                  int k = 0;
                                }
                              }

@@ -107,8 +107,10 @@ namespace pathCam {
 
 
   void CompositeVoronoi::set_scale(double _scale) {
-    imagePyramid->scale = _scale;
+    imagePyramid->set_scale(_scale);
     deduce_label();
+    imagePyramid->set_mag_label(componentMagLabel);
+    parent->MRimage->sort_by_scale();
   }
 
 

@@ -18,7 +18,7 @@ class MRTiledImage{
   
 public:
   cv::Rect_<float> bounds;
-  unsigned int tile_size;
+  unsigned int tile_size,magLabel;
   double scale;
   Point2f offset;
   Poco::Event scaleSet;
@@ -45,7 +45,9 @@ public:
   
   void build(cv::Mat &image_in);
 
-  void set_scale(double _scale){scale = _scale;}
+  void set_scale(double _scale) {scale = _scale;}
+
+  void set_mag_label(unsigned int _magLabel){magLabel = _magLabel;}
 
   void set_offset(Point2f _offset){offset = _offset;}
   
@@ -90,6 +92,12 @@ public:
 
   void add(std::shared_ptr<MRTiledImage> image){
     images.push_back(image);
+  }
+
+  void sort_by_scale() {
+    std::stable_sort(images.begin(), images.end(),
+  [](const auto& a, const auto& b) { return a->scale > b->scale; });
+    int k = 0;
   }
   
   bool empty(){ return images.empty(); }

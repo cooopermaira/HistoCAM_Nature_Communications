@@ -39,6 +39,7 @@ namespace pathCam {
   }
 
   void RegInfo::set_abc(pathCam::Vec2 _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing) {
+
     _absoluteCoords.x = std::round(_absoluteCoords.x);
     _absoluteCoords.y = std::round(_absoluteCoords.y);
     accessMutex->lock();
@@ -221,6 +222,10 @@ namespace pathCam {
     m->t_x = a2 * (1.0 / m->image_2->get_reg_scale());
     m->t_y = d2 * (1.0 / m->image_2->get_reg_scale());
     m->scale = (a + d) / 2;
+    if (std::abs(m->scale - 1.0) > 0.05) {
+      //multiresolution matches are not handled here. reject and allow this to be found elsewhere
+      return -1;
+    }
     if(flag == 1){
       m->t_x *= a;
       m->t_x += (m->image_2->reg_crop_initial / 4.0) * (1 - a) * m->image_2->width;

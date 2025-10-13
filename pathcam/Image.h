@@ -82,7 +82,7 @@ namespace pathCam {
     }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    bool move_buffer_to_gpu(int _device, bool _trueMove = false);
+    bool move_buffer_to_gpu(int _device, bool _freeHostBuffer = false);
 #endif
 
     bool is_mostly_black();

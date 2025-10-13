@@ -39,7 +39,6 @@ namespace pathCam {
                                                            compositeWait(true),
                                                            microscopeInput(true) {
     //inferencing = false;
-
     if (inferencing) {
       inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
@@ -578,10 +577,12 @@ namespace pathCam {
     return get_image_ref(res);
   }
 
-  std::vector<RegInfo *> StreamCam::get_Q_front() {
+  std::vector<RegInfo *> StreamCam::get_Q_front(bool _pop) {
     compositeQ_mutex->lock();
     std::vector<RegInfo *> temp = compositeBatch.top();
-    compositeBatch.pop();
+    if (_pop) {
+      compositeBatch.pop();
+    }
     compositeQ_mutex->unlock();
     return temp;
   }

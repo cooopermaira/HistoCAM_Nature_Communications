@@ -140,11 +140,24 @@ namespace pathCam {
       const std::vector<double> &scales,
       cudaStream_t stream);
 
+    static cuda::GpuMat get_grayscale(Image* &_img) {
+      cuda::GpuMat temp;
+      Size size(_img->width,_img->height);
+      cuda::GpuMat image_Mat(size, CV_8U, _img->get_raw_cuda());
+      cuda::cvtColor(image_Mat, temp, COLOR_BayerBG2GRAY);
+      temp.convertTo(image_Mat,CV_32FC1);
+      return image_Mat;
+    }
+
     static ScaleResult estimate_scale_auto_GPU(const cuda::GpuMat &imgA, const cuda::GpuMat &imgB,
                                                const std::vector<double> &scales = {2.0, 2.5, 4.0, 5.0, 10.0, 20},
                                                cudaStream_t stream = nullptr);
 
     static cuda::GpuMat preprocess_GPU(const cuda::GpuMat& bgr_or_gray, cudaStream_t stream);
+
+    void establish_scale_at_root(Image *_rootImg);
+
+    static void establish_scale_between_two_centered_Images(Image* img1, Image* img2, double &scale, Point2f &offset);
 
     void make_meshgrid();
 
