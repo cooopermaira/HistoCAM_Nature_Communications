@@ -98,69 +98,79 @@ namespace pathCam {
       Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
       cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
 
-      readMat.convertTo(readMat,CV_32FC3);
+      resize(readMat,readMat,Size(image->width / 4, image->height / 4));
+      auto r = outfile;
 
-      for (int i = 0; i < ffs.size(); ++i) {
-        Mat ff;
-        std::ifstream stream;
-        stream.open(ffs[i], std::ios::binary);
-        {
-          char *raw_buffer = new char[6464 * 4852];
-          stream.read(raw_buffer, 6464 * 4852);
-          stream.close();
-          ff = Mat(Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
-        }
-        cvtColor(ff, ff, COLOR_BayerBG2BGR);
-        ff.convertTo(ff, CV_32F);
-        ff *= 1 / 170.0;
-        divide(readMat, ff, image_Mat, 1, CV_32F);
-
-        //cv::pow(image_Mat, 1.1, image_Mat);
-
-        image_Mat.convertTo(image_Mat, CV_8UC3);
-
-
-        resize(image_Mat, image_Mat, Size(image->width / 4, image->height / 4));
-        //
-        //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
-        //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
-
-
-        //divide(readMat, flatfield, image_Mat, 1, CV_32F);
-
-        //cv::pow(image_Mat, 1.1, image_Mat);
-
-        //image_Mat.convertTo(image_Mat, CV_8UC3);
-
-        //add subdir for png
-        auto r = outfile;
-
-        r.setFileName(image->get_ImageFile().getBaseName()+"_"+std::to_string(i));
-        r.setExtension("png");
-        imwrite(r.toString(), image_Mat);
-      }
-      //
-      // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
-      //        image_Mat = ConvertBGR2Bayer(image_Mat);
-      //
-      //        //save .Raw
-      //        auto name = std::stoi(image->get_ImageFile().getBaseName());
-      //        name += 250;
-      //
-      //
-      //        r.setFileName(std::to_string(name));
-      //        r.setExtension("Raw");
-      //        std::fstream file;
-      //        file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
-      //        if (file.fail()) {
-      //          throw new std::exception;
-      //        }
-      //        file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
-
-      // } catch (cv::Exception &e) {
-      //   int k = 0;
-      // }
-    }
+      r.setFileName(image->get_ImageFile().getBaseName());
+      r.setExtension("png");
+      imwrite(r.toString(), readMat);
+    //   readMat.convertTo(readMat,CV_32FC3);
+    //
+    //   for (int i = 0; i < ffs.size(); ++i) {
+    //     Mat ff;
+    //     std::ifstream stream;
+    //     stream.open(ffs[i], std::ios::binary);
+    //     {
+    //       char *raw_buffer = new char[6464 * 4852];
+    //       stream.read(raw_buffer, 6464 * 4852);
+    //       stream.close();
+    //       ff = Mat(Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
+    //     }
+    //     Mat gray;
+    //     cvtColor(ff,gray,COLOR_BayerBG2GRAY);
+    //     resize(gray,gray,Size(image->width / 4, image->height / 4));
+    //     cvtColor(ff, ff, COLOR_BayerBG2BGR);
+    //     imwrite("/media/max/Data/2_20/wrong_flatfield_test/png2/ff_"+std::to_string(i)+".png",gray);
+    //     ff.convertTo(ff, CV_32F);
+    //     ff *= 1 / 170.0;
+    //     divide(readMat, ff, image_Mat, 1, CV_32F);
+    //
+    //     //cv::pow(image_Mat, 1.1, image_Mat);
+    //
+    //     image_Mat.convertTo(image_Mat, CV_8UC3);
+    //
+    //
+    //     resize(image_Mat, image_Mat, Size(image->width / 4, image->height / 4));
+    //     //
+    //     //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
+    //     //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
+    //
+    //
+    //     //divide(readMat, flatfield, image_Mat, 1, CV_32F);
+    //
+    //     //cv::pow(image_Mat, 1.1, image_Mat);
+    //
+    //     //image_Mat.convertTo(image_Mat, CV_8UC3);
+    //
+    //     //add subdir for png
+    //     auto r = outfile;
+    //
+    //     r.setFileName(image->get_ImageFile().getBaseName()+"_"+std::to_string(i));
+    //     r.setExtension("png");
+    //     imwrite(r.toString(), image_Mat);
+    //   }
+    //   //
+    //   // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
+    //   //        image_Mat = ConvertBGR2Bayer(image_Mat);
+    //   //
+    //   //        //save .Raw
+    //   //        auto name = std::stoi(image->get_ImageFile().getBaseName());
+    //   //        name += 250;
+    //   //
+    //   //
+    //   //        r.setFileName(std::to_string(name));
+    //   //        r.setExtension("Raw");
+    //   //        std::fstream file;
+    //   //        file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
+    //   //        if (file.fail()) {
+    //   //          throw new std::exception;
+    //   //        }
+    //   //        file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
+    //
+    //   // } catch (cv::Exception &e) {
+    //   //   int k = 0;
+    //   // }
+     }
     image->free_memory_RAW();
     int k = 0;
   }

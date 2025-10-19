@@ -105,6 +105,5 @@ extern "C" void thresholdAndPackToBits(const cv::cuda::GpuMat& gray8u,
         d_bin.ptr<unsigned char>(), d_bin.step, rows, cols,
         bitmaskBytes.ptr<unsigned char>(), bitmaskBytes.step
     );
-    // Optional: sync if you need the result immediately on host or for timing
-    // stream.waitForCompletion();
+
 }

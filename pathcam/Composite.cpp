@@ -150,9 +150,12 @@ namespace pathCam {
     }
     componentMagLabel = parent->labelScales.size() - 1;
     get_flatfield();
+
   }
 
   void CompositeVoronoi::get_flatfield() {
+    set_candidate_scale_ratios();
+
     std::string filename = parent->get_flatfield(componentMagLabel);
     size_t nBytes = parent->image_height * parent->image_width;
     char *buffer = new char[nBytes];
@@ -184,6 +187,29 @@ namespace pathCam {
     ff *= 1/170.0;
 #endif
   }
+
+  void CompositeVoronoi::set_candidate_scale_ratios() {
+    switch (componentMagLabel) {
+      case Image::_2X:
+        candidateScaleRatios = {1.0, 2.0, 5.0, 10.0, 20.0};
+        break;
+      case Image::_4X:
+        candidateScaleRatios = {0.5, 1.0, 2.5, 5.0, 10.0};
+        break;
+      case Image::_10X:
+        candidateScaleRatios = {0.2, 0.4, 1.0, 2.0, 4.0};
+        break;
+      case Image::_20X:
+        candidateScaleRatios = {0.1, 0.2, 0.5, 1.0, 2.0};
+        break;
+      case Image::_40X:
+        candidateScaleRatios = {0.05, 0.1, 0.25, 0.5, 1.0};
+        break;
+      default:
+        throw std::runtime_error("unknown component mag label");
+    }
+  }
+
 
   void CompositeVoronoi::self_reset() {
     imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y), Point2i(max_offset.x, max_offset.y));

@@ -228,6 +228,7 @@ namespace pathCam {
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
     unsigned int componentMagLabel;
+    std::vector<float> candidateScaleRatios;
     unsigned int componentIndex;
     long firstImageIdx = -1;
     bool needsAlignment = false;
@@ -247,6 +248,8 @@ namespace pathCam {
     void set_offset(const Point2f &_offset) const;
 
     void deduce_label();
+
+    void set_candidate_scale_ratios();
 
     void get_flatfield();
 

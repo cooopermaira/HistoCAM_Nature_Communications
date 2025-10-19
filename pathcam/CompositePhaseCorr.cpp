@@ -19,6 +19,31 @@ namespace pathCam {
                     std::min(w, W), std::min(h, H));
   }
 
+  void shuffle_sift_data(SiftData &sd) {
+    // 1. Create an index vector 0..numPts-1
+    std::vector<int> enm(sd.numPts);
+    std::iota(enm.begin(), enm.end(), 0);
+
+    // 2. Shuffle the indices
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::shuffle(enm.begin(), enm.end(), gen);
+
+    // 3. Create a temporary copy buffer
+    std::vector<SiftPoint> tmp(sd.numPts);
+
+    // 4. Copy shuffled data into tmp
+    for (int i = 0; i < sd.numPts; ++i)
+      tmp[i] = sd.h_data[enm[i]]; // direct struct assignment, not memcpy
+
+    // 5. Write back to original
+    for (int i = 0; i < sd.numPts; ++i)
+      sd.h_data[i] = tmp[i];
+
+    // Optional: re-upload to GPU if device copy exists
+    if (sd.d_data)
+      cudaMemcpy(sd.d_data, sd.h_data, sd.numPts * sizeof(SiftPoint), cudaMemcpyHostToDevice);
+  }
 
   cuda::GpuMat CompositeVoronoi::preprocess_GPU(const cuda::GpuMat &bgr_or_gray, cudaStream_t stream) {
     CV_Assert(!bgr_or_gray.empty());
@@ -272,8 +297,27 @@ namespace pathCam {
     MatchSiftData(_rootImg->siftData,parent->lastViewedFrame->siftData);
     std::vector<float> homography(9);
     int numMatches;
-    FindHomography(_rootImg->siftData, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
+    bool validHomography = false;
+    int count = 0;
+    while (!validHomography && count < 20) {
+      ++count;
+      FindHomography(_rootImg->siftData, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
 
+      auto matchedComp = parent->composites[parent->lastViewedFrame->component_membership];
+      for (auto scale : matchedComp->candidateScaleRatios) {
+        scale = 1/scale;
+        if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
+          validHomography = true;
+        }
+      }
+      if (!validHomography) {
+        shuffle_sift_data(_rootImg->siftData);
+      }
+    }
+
+    if (!validHomography) {
+      throw std::runtime_error("not sure what to do, matching failed");
+    }
     float relativeScale = (homography[0] + homography[4]) / 2;
 
     auto queryComponent = parent->lastViewedFrame->regInfo->component_membership;
@@ -288,9 +332,7 @@ namespace pathCam {
     assert(scale > 0);
     parent->composites[componentIndex]->set_scale(scale);
     parent->composites[componentIndex]->set_offset(resultantPoint/scale);
-    // auto comp = parent->composites[componentIndex];
-    // comp->set_scale(scale);
-    // comp->set_offset(resultantPoint/scale);
+
   }
 
 

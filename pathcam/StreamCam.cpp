@@ -511,7 +511,7 @@ namespace pathCam {
       //this becomes the base scale
       temp->set_scale(1);
     } else {
-      //this is saying "unknown scale" - will be determined in align_and_rebuild
+      //this is saying "unknown scale" - will be determined later
       temp->set_scale(0);
     }
     temp->set_offset(Point2f(0, 0));
