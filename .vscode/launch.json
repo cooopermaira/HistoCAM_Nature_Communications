@@ -4,12 +4,13 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": ["--config-file=/media/max/Data/pathcam_SAM/config.xml"],
+            "args": ["--config-file=/media/max/Data/cudasift_problems/config.xml"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],

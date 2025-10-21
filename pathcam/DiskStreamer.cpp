@@ -74,8 +74,29 @@ namespace pathCam {
 
   void DebayerRunnable::run() {
     Poco::Path o = outfile;
-
     image->load_raw_from_disk();
+    image->create_reg_image(.25,.5,true,INTER_CUBIC,false);
+    Mat temp = image->get_reg_image();
+    image->sharpness = image->compute_sharpness(temp);
+    // Size image_size(image->width, image->height);
+    // Mat image_Mat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+    // cvtColor(image_Mat, image_Mat, COLOR_BayerBG2GRAY);
+    // Point2f ans;
+    //
+    // Rect roi(image_Mat.cols/2-64,image_Mat.rows/2-64,128,128);
+    // Mat temp = image_Mat(roi);
+    // ans = image->compute_sharpness(temp);
+    // imwrite("/media/max/Data/blur_test/roi.png",temp);
+    // for (int i = 0; i < 5; ++i) {
+    //   resize(image_Mat,image_Mat,Size(image_Mat.cols/2,image_Mat.rows/2),0,0,INTER_CUBIC);
+    //   roi = Rect(image_Mat.cols/2-64,image_Mat.rows/2-64,128,128);
+    //   Mat temp = image_Mat(roi);
+    //   ans = image->compute_sharpness(temp);
+    //   imwrite("/media/max/Data/blur_test/roi.png",temp);
+    //   int k = 0;
+    // }
+
+    return;
 
     bool convertAndSave = true;
 

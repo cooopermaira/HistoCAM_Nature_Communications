@@ -38,7 +38,6 @@ int extractMagnification(const std::string &path) {
 float test_ratios(std::vector<cuda::GpuMat> files,std::vector<float> ratios) {
   assert(files.size() == 2);
 
-  float
 }
 
 int main(int argc, char *argv[]) {

@@ -171,7 +171,8 @@ namespace pathCam {
       ff_correct_and_brighten();
 
       //get sift data and push it to sift ft extraction gpu
-      images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
+      //images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
+      // images[i]->siftInitialized = true;
 
 
       // parent->push_SIFT_matches(newOverlaps, images[i]);
@@ -563,7 +564,7 @@ namespace pathCam {
 
 
       InitSiftData(siftData, 100000, true, true);
-      ExtractSift(siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+      catch_ExtractSift(siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
 
   }catch (cv::Exception &e) {
     int k = 0;

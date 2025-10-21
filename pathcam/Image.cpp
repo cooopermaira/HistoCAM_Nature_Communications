@@ -3,7 +3,88 @@
 using namespace cv;
 
 namespace pathCam {
+  static cv::Mat filterAnomaliesRelMean(const cv::Mat& img_f32, double theta) {
+    CV_Assert(img_f32.type() == CV_32F);
+    cv::Mat out = img_f32.clone();
+    const int H = img_f32.rows, W = img_f32.cols;
+    auto pix = [&](int y,int x){ return img_f32.at<float>(y,x); };
+    for (int y = 1; y < H-1; ++y) {
+      for (int x = 1; x < W-1; ++x) {
+        float sum = 0.f;
+        int n = 0;
+        for (int dy=-1; dy<=1; ++dy) {
+          for (int dx=-1; dx<=1; ++dx) {
+            if (dx||dy) {
+              sum += pix(y+dy,x+dx);
+              ++n;
+            }
+          }
+        }
+        float mu = sum / std::max(n,1);
+        float p  = pix(y,x);
+        // avoid division by tiny mu: if mu≈0, only consider large absolute deviation
+        bool is_anom = (std::abs(mu) > 1e-6f) ? (std::abs(p - mu) / std::abs(mu) > theta)
+                                              : (std::abs(p) > 0.f); // crude but safe
+        if (is_anom) out.at<float>(y,x) = mu;
+      }
+    }
+    return out;
+  }
 
+  static float meanRelativeDrop(const cv::Mat& num, const cv::Mat& den, float eps=1e-6f) {
+    CV_Assert(num.type() == CV_32F && den.type() == CV_32F);
+    double sum = 0.0; size_t cnt = 0;
+    for (int y=0; y<num.rows; ++y) {
+      const float* np = num.ptr<float>(y);
+      const float* dp = den.ptr<float>(y);
+      for (int x=0; x<num.cols; ++x) {
+        float d = dp[x];
+        if (d > eps) { sum += (double)np[x] / (double)d; ++cnt; }
+      }
+    }
+    return cnt ? (float)(sum / (double)cnt) : 0.f;
+  }
+
+  static std::pair<float,float> maskedAbsGradPercentiles(const cv::Mat& grad_f32, const cv::Mat& mask_u8,
+                                                       double pL, double pU) {
+    CV_Assert(grad_f32.type() == CV_32F && mask_u8.type() == CV_8U);
+    std::vector<float> vals; vals.reserve(grad_f32.rows*grad_f32.cols/10);
+    for (int y=0; y<grad_f32.rows; ++y) {
+      const float* gptr = grad_f32.ptr<float>(y);
+      const uchar* mptr = mask_u8.ptr<uchar>(y);
+      for (int x=0; x<grad_f32.cols; ++x) if (mptr[x]) vals.push_back(std::abs(gptr[x]));
+    }
+    if (vals.empty()) return {0.f, 0.f};
+    std::sort(vals.begin(), vals.end());
+    auto pick = [&](double p)->float {
+      if (vals.empty()) return 0.f;
+      double idx = (p/100.0) * (vals.size()-1);
+      size_t i0 = (size_t)std::floor(idx);
+      size_t i1 = std::min(i0+1, vals.size()-1);
+      double t = idx - i0;
+      return (float)((1.0-t)*vals[i0] + t*vals[i1]);
+    };
+    return {pick(pL), pick(pU)};
+  }
+
+  // Keep only values whose abs lies within [pL,pU] percentiles; returns filtered gradient (others zeroed)
+  static cv::Mat filterGradByPercentiles(const cv::Mat& grad_f32, const cv::Mat& mask_u8,
+                                         double pL, double pU) {
+    auto [lo, hi] = maskedAbsGradPercentiles(grad_f32, mask_u8, pL, pU);
+    cv::Mat out = cv::Mat::zeros(grad_f32.size(), CV_32F);
+    if (hi <= 0.f) return out;
+    for (int y=0; y<grad_f32.rows; ++y) {
+      const float* gp = grad_f32.ptr<float>(y);
+      const uchar* mp = mask_u8.ptr<uchar>(y);
+      float*       op = out.ptr<float>(y);
+      for (int x=0; x<grad_f32.cols; ++x) {
+        if (!mp[x]) continue;
+        float a = std::abs(gp[x]);
+        if (a >= lo && a <= hi) op[x] = a; // store magnitude (paper multiplies mask; magnitude is fine)
+      }
+    }
+    return out;
+  }
 
   Image::Image(unsigned int width, unsigned int height, unsigned int scope_radius, MemoryPool *mempool) : width(width),
                                                                                                           height(
@@ -20,7 +101,7 @@ namespace pathCam {
                                                                                                           image_file(
                                                                                                               Poco::Path()),
                                                                                                           blurVariance(
-                                                                                                              0),
+                                                                                                              1000),
   cudaBufferReady(false) {};
 
   Image::~Image() {
@@ -103,15 +184,55 @@ namespace pathCam {
     return false;
   }
 
+  Point2f Image::compute_sharpness(Mat &_img) {
+    CV_Assert(_img.type() == CV_8U);
+    Mat img32;
+
+    _img.convertTo(img32,CV_32F);
+    auto denoised = filterAnomaliesRelMean(img32,0.5);
+
+    Mat mask = (_img > 0) & (_img < 255);
+    assert(mask.type() == CV_8U);
+
+    Mat gx, gy;
+    Sobel(denoised,gx,CV_32F,1,0,5);
+    Sobel(denoised,gy,CV_32F,0,1,5);
+
+    Mat sbx = filterGradByPercentiles(gx,mask,98.5,99.5);
+    Mat sby = filterGradByPercentiles(gy,mask,98.5,99.5);
+
+    Mat blur_f32;
+    GaussianBlur(denoised,blur_f32,Size(5,5),1,1);
+
+    Mat bgx,bgy;
+    Sobel(blur_f32,bgx,CV_32F,1,0,5);
+    Sobel(blur_f32,bgy,CV_32F,0,1,5);
+
+    Mat GBx = filterGradByPercentiles(bgx,mask,98.5,99.5);
+    Mat GBy = filterGradByPercentiles(bgy,mask,98.5,99.5);
+
+    Mat dx,dy;
+    subtract(sbx,GBx,dx,noArray(),CV_32F);
+    subtract(sby,GBy,dy,noArray(),CV_32F);
+
+    float mx = meanRelativeDrop(dx, sbx);
+    float my = meanRelativeDrop(dy, sby);
+
+    Point2f r;
+    r.x = 100.f * std::max(0.f, std::min(mx, 1.f)); // clamp to [0,100] if desired
+    r.y = 100.f * std::max(0.f, std::min(my, 1.f));
+    return r;
+  }
+
+
   double Image::check_blur() {
     if (!in_memory()) {
-      throw std::invalid_argument("Image not in memory during blur check");
+      throw std::runtime_error("Image not in memory during blur check");
     }
 
     cv::Mat temp = cv::Mat(Size(width, height), CV_8UC1, raw_buffer, Mat::AUTO_STEP);
-    int steps = 4;
+    int steps = 6;
     int radius = 2190;
-    double tempVariance = 0;
     for (int i = 0; i < steps; i++) {
       int xloc = width / 2 + (radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
       int yloc = height / 2 + (radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
@@ -120,22 +241,14 @@ namespace pathCam {
       cv::Rect rectROI(xloc - 64, yloc - 64, 128, 128);
       Mat ROI = temp(rectROI).clone();
       cvtColor(ROI, ROI, COLOR_BayerBG2GRAY);
-      /*Mat laplacian;
-      cv::Laplacian(ROI, laplacian, CV_64F);
-      cv::Scalar mean, stddev;
-      cv::meanStdDev(laplacian, mean, stddev); */
-      cv::Mat grad_x, grad_y;
-      Sobel(ROI, grad_x, CV_64F, 1, 0, 5);
-      Sobel(ROI, grad_y, CV_64F, 0, 1, 5);
-      cv::Mat grad_magnitude;
-      magnitude(grad_x, grad_y, grad_magnitude);
-      cv::Scalar mean, stddev;
-      cv::meanStdDev(grad_magnitude, mean, stddev);
-      double tempVariance = std::pow(stddev[0], 2);
 
-      if (blurVariance < tempVariance) {
-        blurVariance = tempVariance;
-      }
+      auto val = compute_sharpness(ROI);
+      float p = min(val.x,val.y);
+      blurVariance = min(blurVariance,p);
+
+
+      //imwrite("/media/max/Data/blur_test/roi.png",ROI);
+      int k = 0;
     }
 
     return blurVariance;
@@ -436,6 +549,7 @@ namespace pathCam {
                      image_size.width, image_size.height);
       reg_image = reg_image(myROI);
     }
+    int k = 0;
 
   };
 

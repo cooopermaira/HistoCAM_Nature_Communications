@@ -21,7 +21,8 @@ namespace pathCam {
     std::atomic<unsigned int> reference_count;
 
     float reg_full_scale;
-    double blurVariance;
+    float blurVariance = 1000;
+    cv::Point2f sharpness;
     double reg_scale_initial,reg_scale_full;
     double reg_crop_initial,reg_crop_full;
     enum {
@@ -48,6 +49,7 @@ namespace pathCam {
     cv::cuda::GpuMat SIFTDescriptors;
     cv::cuda::GpuMat SIFTKeypoints;
     SiftData siftData;
+    bool siftInitialized = false;
 #endif
 
 
@@ -102,6 +104,8 @@ namespace pathCam {
     bool is_good();
 
     double check_blur();
+
+    cv::Point2f compute_sharpness(cv::Mat &_img);
 
     float debayer(int x, int y);
 

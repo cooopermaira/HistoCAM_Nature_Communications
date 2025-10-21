@@ -90,9 +90,9 @@ namespace pathCam {
     image->move_buffer_to_gpu(parent->compositorCudaDevice);
 #endif
 
-    if(parent->recordingMode){
-      image->write_to_path();
-    }
+    // if(parent->recordingMode){
+    //   image->write_to_path();
+    // }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     image->free_memory_RAW();

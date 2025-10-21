@@ -395,7 +395,7 @@ int SpinPath::spinUpCamera(){
     //Set exposure mode to "Timed"
     pCam->ExposureMode.SetValue(Spinnaker::ExposureModeEnums::ExposureMode_Timed);
     //Set absolute value of shutter exposure time to 1500 microseconds
-    pCam->ExposureTime.SetValue(1500);
+    pCam->ExposureTime.SetValue(1504);
 
     //Turn auto gain off
     pCam->GainAuto.SetValue(Spinnaker::GainAutoEnums::GainAuto_Off);

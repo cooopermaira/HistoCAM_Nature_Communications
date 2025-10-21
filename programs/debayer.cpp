@@ -54,7 +54,7 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 int main(int argc, char *argv[]) {
   auto renameFiles = false;
   auto convertImages = true;
-  bool makeInput = false;
+  bool makeInput = true;
 
   Mat flat_field2x, flat_field4x, flat_field10x, flat_field20x, flat_field40x;
   std::ifstream stream;

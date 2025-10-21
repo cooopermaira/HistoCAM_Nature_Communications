@@ -29,6 +29,66 @@ namespace pathCam {
     bool valid = false;
   };
 
+  inline void catch_ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh,
+                float lowestScale, bool scaleUp) {
+    // Debug logging for SIFT extraction parameters
+    std::cout << "=== SIFT EXTRACTION DEBUG ===" << std::endl;
+    std::cout << "numOctaves: " << numOctaves << std::endl;
+    std::cout << "initBlur: " << initBlur << std::endl;
+    std::cout << "thresh: " << thresh << std::endl;
+    std::cout << "lowestScale: " << lowestScale << std::endl;
+    std::cout << "scaleUp: " << (scaleUp ? "true" : "false") << std::endl;
+    
+    // Debug logging for image properties
+    std::cout << "Image width: " << img.width << std::endl;
+    std::cout << "Image height: " << img.height << std::endl;
+    std::cout << "Image pitch: " << img.pitch << std::endl;
+    std::cout << "Image data pointer: " << (void*)img.d_data << std::endl;
+    std::cout << "Image host data pointer: " << (void*)img.h_data << std::endl;
+    
+    // Parameter validation
+    bool validParams = true;
+    if (numOctaves <= 0 || numOctaves > 8) {
+      std::cout << "ERROR: Invalid numOctaves (" << numOctaves << "), should be 1-8" << std::endl;
+      validParams = false;
+    }
+    if (initBlur <= 0.0 || initBlur > 5.0) {
+      std::cout << "ERROR: Invalid initBlur (" << initBlur << "), should be 0.0-5.0" << std::endl;
+      validParams = false;
+    }
+    if (thresh < 0.0 || thresh > 10.0) {
+      std::cout << "ERROR: Invalid thresh (" << thresh << "), should be 0.0-10.0" << std::endl;
+      validParams = false;
+    }
+    if (lowestScale <= 0.0 || lowestScale > 2.0) {
+      std::cout << "ERROR: Invalid lowestScale (" << lowestScale << "), should be 0.0-2.0" << std::endl;
+      validParams = false;
+    }
+    if (img.width <= 0 || img.height <= 0) {
+      std::cout << "ERROR: Invalid image dimensions (" << img.width << "x" << img.height << ")" << std::endl;
+      validParams = false;
+    }
+    if (img.d_data == nullptr) {
+      std::cout << "ERROR: Null GPU data pointer" << std::endl;
+      validParams = false;
+    }
+    
+    if (!validParams) {
+      std::cout << "ABORTING: Invalid parameters detected" << std::endl;
+      return;
+    }
+    
+    std::cout << "All parameters appear valid, proceeding with ExtractSift..." << std::endl;
+    
+    if (0 > ExtractSift(siftData,img,numOctaves,initBlur,thresh,lowestScale,scaleUp)) {
+      int k = 0;
+      std::cout<<"extract sift failure"<<std::endl;
+      std::cout<<"=== END SIFT DEBUG ===" << std::endl;
+    } else {
+      std::cout << "ExtractSift completed successfully" << std::endl;
+      std::cout<<"=== END SIFT DEBUG ===" << std::endl;
+    }
+  }
 
   struct PointComparator {
     bool operator()(const cv::Point2i& lhs, const cv::Point2i& rhs) const {

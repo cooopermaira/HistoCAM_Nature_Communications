@@ -269,7 +269,7 @@ namespace pathCam {
 
   void CompositeVoronoi::establish_scale_at_root(Image *_rootImg) {
     //get my sift data
-    if (_rootImg->siftData.numPts == 0) {
+    if (!_rootImg->siftInitialized) {
       if (!_rootImg->cudaBufferReady) {
         _rootImg->move_buffer_to_gpu(parent->compositorCudaDevice,true);
       }
@@ -277,12 +277,15 @@ namespace pathCam {
       CudaImage cImgGry;
       cImgGry.Allocate(image_size.width, image_size.height, myGray.step / sizeof(float), false,
                        reinterpret_cast<float *>(myGray.data), nullptr);
+
       InitSiftData(_rootImg->siftData, 100000, true, true);
-      ExtractSift(_rootImg->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+      _rootImg->siftInitialized = true;
+
+      catch_ExtractSift(_rootImg->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
     }
 
     //get their sift data
-    if (parent->lastViewedFrame->siftData.numPts == 0) {
+    if (!parent->lastViewedFrame->siftInitialized) {
       if (!parent->lastViewedFrame->cudaBufferReady) {
         parent->lastViewedFrame->move_buffer_to_gpu(parent->compositorCudaDevice,true);
       }
@@ -290,8 +293,11 @@ namespace pathCam {
       CudaImage cImgGry;
       cImgGry.Allocate(image_size.width, image_size.height, theirGray.step / sizeof(float), false,
                        reinterpret_cast<float *>(theirGray.data), nullptr);
+
       InitSiftData(parent->lastViewedFrame->siftData, 100000, true, true);
-      ExtractSift(parent->lastViewedFrame->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+      parent->lastViewedFrame->siftInitialized = true;
+
+      catch_ExtractSift(parent->lastViewedFrame->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
     }
 
     MatchSiftData(_rootImg->siftData,parent->lastViewedFrame->siftData);
