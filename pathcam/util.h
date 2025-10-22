@@ -8,6 +8,19 @@
 #ifndef util_h
 #define util_h
 
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <limits>
+#include <cmath>
+#include <functional>
+#include <unordered_set>
+#include <unordered_map>
+#include <queue>
+#include <vector>
+#include <tuple>
+#include <stdexcept>
+
 namespace std {
   template <>
   struct hash<cv::Point2i> {
@@ -31,54 +44,74 @@ namespace pathCam {
 
   inline void catch_ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh,
                 float lowestScale, bool scaleUp) {
-    // Debug logging for SIFT extraction parameters
-    std::cout << "=== SIFT EXTRACTION DEBUG ===" << std::endl;
-    std::cout << "numOctaves: " << numOctaves << std::endl;
-    std::cout << "initBlur: " << initBlur << std::endl;
-    std::cout << "thresh: " << thresh << std::endl;
-    std::cout << "lowestScale: " << lowestScale << std::endl;
-    std::cout << "scaleUp: " << (scaleUp ? "true" : "false") << std::endl;
-    
-    // Debug logging for image properties
-    std::cout << "Image width: " << img.width << std::endl;
-    std::cout << "Image height: " << img.height << std::endl;
-    std::cout << "Image pitch: " << img.pitch << std::endl;
-    std::cout << "Image data pointer: " << (void*)img.d_data << std::endl;
-    std::cout << "Image host data pointer: " << (void*)img.h_data << std::endl;
-    
-    // Parameter validation
-    bool validParams = true;
-    if (numOctaves <= 0 || numOctaves > 8) {
-      std::cout << "ERROR: Invalid numOctaves (" << numOctaves << "), should be 1-8" << std::endl;
-      validParams = false;
-    }
-    if (initBlur <= 0.0 || initBlur > 5.0) {
-      std::cout << "ERROR: Invalid initBlur (" << initBlur << "), should be 0.0-5.0" << std::endl;
-      validParams = false;
-    }
-    if (thresh < 0.0 || thresh > 10.0) {
-      std::cout << "ERROR: Invalid thresh (" << thresh << "), should be 0.0-10.0" << std::endl;
-      validParams = false;
-    }
-    if (lowestScale <= 0.0 || lowestScale > 2.0) {
-      std::cout << "ERROR: Invalid lowestScale (" << lowestScale << "), should be 0.0-2.0" << std::endl;
-      validParams = false;
-    }
-    if (img.width <= 0 || img.height <= 0) {
-      std::cout << "ERROR: Invalid image dimensions (" << img.width << "x" << img.height << ")" << std::endl;
-      validParams = false;
-    }
-    if (img.d_data == nullptr) {
-      std::cout << "ERROR: Null GPU data pointer" << std::endl;
-      validParams = false;
-    }
-    
-    if (!validParams) {
-      std::cout << "ABORTING: Invalid parameters detected" << std::endl;
-      return;
-    }
-    
-    std::cout << "All parameters appear valid, proceeding with ExtractSift..." << std::endl;
+    // // Debug logging for SIFT extraction parameters
+    // std::cout << "=== SIFT EXTRACTION DEBUG ===" << std::endl;
+    // std::cout << "numOctaves: " << numOctaves << std::endl;
+    // std::cout << "initBlur: " << initBlur << std::endl;
+    // std::cout << "thresh: " << thresh << std::endl;
+    // std::cout << "lowestScale: " << lowestScale << std::endl;
+    // std::cout << "scaleUp: " << (scaleUp ? "true" : "false") << std::endl;
+    //
+    // // Debug logging for image properties
+    // std::cout << "Image width: " << img.width << std::endl;
+    // std::cout << "Image height: " << img.height << std::endl;
+    // std::cout << "Image pitch: " << img.pitch << std::endl;
+    // std::cout << "Image data pointer: " << (void*)img.d_data << std::endl;
+    // std::cout << "Image host data pointer: " << (void*)img.h_data << std::endl;
+    //
+    // // Parameter validation
+    // bool validParams = true;
+    // if (numOctaves <= 0 || numOctaves > 8) {
+    //   std::cout << "ERROR: Invalid numOctaves (" << numOctaves << "), should be 1-8" << std::endl;
+    //   validParams = false;
+    // }
+    // if (initBlur <= 0.0 || initBlur > 5.0) {
+    //   std::cout << "ERROR: Invalid initBlur (" << initBlur << "), should be 0.0-5.0" << std::endl;
+    //   validParams = false;
+    // }
+    // if (thresh < 0.0 || thresh > 10.0) {
+    //   std::cout << "ERROR: Invalid thresh (" << thresh << "), should be 0.0-10.0" << std::endl;
+    //   validParams = false;
+    // }
+    // if (lowestScale <= 0.0 || lowestScale > 2.0) {
+    //   std::cout << "ERROR: Invalid lowestScale (" << lowestScale << "), should be 0.0-2.0" << std::endl;
+    //   validParams = false;
+    // }
+    // if (img.width <= 0 || img.height <= 0) {
+    //   std::cout << "ERROR: Invalid image dimensions (" << img.width << "x" << img.height << ")" << std::endl;
+    //   validParams = false;
+    // }
+    // if (img.d_data == nullptr) {
+    //   std::cout << "ERROR: Null GPU data pointer" << std::endl;
+    //   validParams = false;
+    // }
+    //
+    // if (!validParams) {
+    //   std::cout << "ABORTING: Invalid parameters detected" << std::endl;
+    //   return;
+    // }
+    //
+    // std::cout << "All parameters appear valid, proceeding with ExtractSift..." << std::endl;
+    //
+    // // Additional GPU memory checks
+    // size_t imageSize = img.width * img.height * sizeof(float);
+    // std::cout << "Image size in bytes: " << imageSize << " (" << (imageSize/1024/1024) << " MB)" << std::endl;
+    //
+    // // Check if image dimensions are within reasonable CUDA limits
+    // if (img.width > 8192 || img.height > 8192) {
+    //   std::cout << "WARNING: Very large image dimensions may cause CUDA kernel issues" << std::endl;
+    // }
+    //
+    // // Check GPU memory availability before SIFT extraction
+    // size_t free_mem, total_mem;
+    // if (cudaMemGetInfo(&free_mem, &total_mem) == cudaSuccess) {
+    //   std::cout << "GPU Memory - Free: " << (free_mem/1024/1024) << " MB, Total: " << (total_mem/1024/1024) << " MB" << std::endl;
+    //   if (imageSize * 10 > free_mem) { // SIFT needs ~10x image size for processing
+    //     std::cout << "ERROR: Insufficient GPU memory for SIFT processing" << std::endl;
+    //   }
+    // } else {
+    //   std::cout << "WARNING: Could not check GPU memory status" << std::endl;
+    // }
     
     if (0 > ExtractSift(siftData,img,numOctaves,initBlur,thresh,lowestScale,scaleUp)) {
       int k = 0;

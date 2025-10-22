@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     names->resize(5000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(1, 1);
+    auto jq = pathCam::JobQueue(15, 15);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
@@ -231,6 +231,13 @@ int main(int argc, char *argv[]) {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << duration.count() << std::endl;
+    auto blurfile = outFile;
+    blurfile.makeParent().append("blurfile.txt");
+    std::ofstream blurfilestream(outputfilepath.toString());
+    for (int i = 0; i < blur->size();++i) {
+      blurfilestream<<blur[i]<<" "<<names[i]<<std::endl;
+    }
+    blurfilestream.close();
     int k = 0;
 
 

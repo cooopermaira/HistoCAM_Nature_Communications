@@ -95,7 +95,7 @@ namespace pathCam {
                                                                                                               _NOLABEL),
                                                                                                           mempool(
                                                                                                               mempool),
-                                                                                                          raw_buffer(0),
+                                                                                                          raw_buffer(0),raw_buffer_cuda(nullptr),
                                                                                                           reference_count(
                                                                                                               0),
                                                                                                           image_file(

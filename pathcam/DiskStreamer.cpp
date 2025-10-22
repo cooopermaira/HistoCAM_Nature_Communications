@@ -75,28 +75,19 @@ namespace pathCam {
   void DebayerRunnable::run() {
     Poco::Path o = outfile;
     image->load_raw_from_disk();
-    image->create_reg_image(.25,.5,true,INTER_CUBIC,false);
-    Mat temp = image->get_reg_image();
-    image->sharpness = image->compute_sharpness(temp);
-    // Size image_size(image->width, image->height);
-    // Mat image_Mat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-    // cvtColor(image_Mat, image_Mat, COLOR_BayerBG2GRAY);
-    // Point2f ans;
-    //
-    // Rect roi(image_Mat.cols/2-64,image_Mat.rows/2-64,128,128);
-    // Mat temp = image_Mat(roi);
-    // ans = image->compute_sharpness(temp);
-    // imwrite("/media/max/Data/blur_test/roi.png",temp);
-    // for (int i = 0; i < 5; ++i) {
-    //   resize(image_Mat,image_Mat,Size(image_Mat.cols/2,image_Mat.rows/2),0,0,INTER_CUBIC);
-    //   roi = Rect(image_Mat.cols/2-64,image_Mat.rows/2-64,128,128);
-    //   Mat temp = image_Mat(roi);
-    //   ans = image->compute_sharpness(temp);
-    //   imwrite("/media/max/Data/blur_test/roi.png",temp);
-    //   int k = 0;
-    // }
+    Mat temp;
+    if (sort_order>120) {
+      image->create_reg_image(.25,.5,true,INTER_CUBIC,false);
+      temp = image->get_reg_image();
+    }else {
+      image->create_reg_image(.5,.5,true,INTER_CUBIC,false);
+      temp = image->get_reg_image();
+    }
 
-    return;
+    image->sharpness = image->compute_sharpness(temp);
+
+
+
 
     bool convertAndSave = true;
 
@@ -104,27 +95,26 @@ namespace pathCam {
       std::cout << "Issue loading image.\n";
       return;
     }
-    //    auto val = image->check_blur();
-    //        blur->at(sort_order) = val;
-    //        names->at(sort_order) = image->get_ImageFile().getFileName();
+    auto val = min(image->sharpness.x,image->sharpness.y);
+        blur->at(sort_order) = val;
+        names->at(sort_order) = image->get_ImageFile().getFileName();
 
     if (convertAndSave) {
 
-      std::vector<std::string> ffs={"/media/max/Data/2_20/2x/cal/2x_cal.Raw","/media/max/Data/2_20/4x/cal/4x_cal.Raw",
-            "/media/max/Data/2_20/10x/cal/10x_cal.Raw",
-            "/media/max/Data/2_20/20x/cal/20x_cal.Raw"};
 
-      Size image_size(image->width, image->height);
-      Mat image_Mat;
-      Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-      cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
 
-      resize(readMat,readMat,Size(image->width / 4, image->height / 4));
-      auto r = outfile;
-
-      r.setFileName(image->get_ImageFile().getBaseName());
-      r.setExtension("png");
-      imwrite(r.toString(), readMat);
+      // Size image_size(image->width, image->height);
+      // Mat image_Mat;
+      // Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+      // cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+      //
+      // resize(readMat,readMat,Size(image->width / 3, image->height / 3));
+      // auto r = outfile;
+      //
+      // r.setFileName(image->get_ImageFile().getBaseName());
+      // r.setExtension("png");
+      // imwrite(r.toString(), readMat);
+      int k = 0;
     //   readMat.convertTo(readMat,CV_32FC3);
     //
     //   for (int i = 0; i < ffs.size(); ++i) {

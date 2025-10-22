@@ -309,7 +309,7 @@ namespace pathCam {
       ++count;
       FindHomography(_rootImg->siftData, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
 
-      auto matchedComp = parent->composites[parent->lastViewedFrame->component_membership];
+      auto matchedComp = parent->composites[parent->lastViewedFrame->regInfo->component_membership];
       for (auto scale : matchedComp->candidateScaleRatios) {
         scale = 1/scale;
         if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
