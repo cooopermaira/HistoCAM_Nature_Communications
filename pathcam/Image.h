@@ -14,6 +14,7 @@ namespace pathCam {
     RegInfo* regInfo;
 
     long index;
+    long writeTime = 0;
 
     int width, height;
     int scope_radius;
@@ -105,7 +106,7 @@ namespace pathCam {
 
     double check_blur();
 
-    cv::Point2f compute_sharpness(cv::Mat &_img);
+    static cv::Point2f compute_sharpness(cv::Mat &_img);
 
     float debayer(int x, int y);
 
@@ -184,7 +185,7 @@ namespace pathCam {
 
     void free_memory_cuda();
 
-    void write_to_path();
+    void write_to_path(bool _profile = false);
     
     Poco::Path image_file;
   private:

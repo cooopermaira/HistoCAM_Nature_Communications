@@ -26,7 +26,7 @@ namespace pathCam {
       return;
     }
     if(parent->recordingMode){
-      image->write_to_path();
+      image->write_to_path(true);
     }
 
 

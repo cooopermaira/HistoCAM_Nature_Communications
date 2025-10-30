@@ -254,13 +254,20 @@ namespace pathCam {
     return blurVariance;
   }
 
-  void Image::write_to_path() {
+  void Image::write_to_path(bool _profile) {
     std::fstream file;
+
+    auto start = std::chrono::high_resolution_clock::now();
+
     file = std::fstream(image_file.toString(), std::ios::out | std::ios::binary);
     if (file.fail()) {
       throw new std::exception;
     }
     file.write(get_Raw(), width * height);
+
+    if (_profile) {
+      writeTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    }
   }
 
 

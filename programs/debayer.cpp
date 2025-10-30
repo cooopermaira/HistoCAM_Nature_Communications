@@ -52,7 +52,7 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 }
 
 int main(int argc, char *argv[]) {
-  auto renameFiles = false;
+  auto renameFiles = true;
   auto convertImages = true;
   bool makeInput = true;
 
@@ -198,23 +198,7 @@ int main(int argc, char *argv[]) {
       }
       if (convertImages) {
         Mat ff;
-        // if(i<=1753){
-        //   ff = flat_field4x;
-        // }//else if(i>1753 && i <=2404){
-//          ff = flat_field4x;
-//        }else{
-//          ff = flat_field10x;
-//        }
 
-//    if(i < 420){
-//      ff = flat_field2x;
-//    }else if(i >= 420 && i <777) {
-//      ff = flat_field4x;
-//    }else if(i >= 777 && i < 1358){
-//      ff = flat_field10x;
-//    }else{
-//      ff = flat_field20x;
-//    }
         ff = flat_field20x;
         string of = outFile.toString();
         auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
@@ -231,14 +215,14 @@ int main(int argc, char *argv[]) {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << duration.count() << std::endl;
-    auto blurfile = outFile;
+    /*auto blurfile = outFile;
     blurfile.makeParent().append("blurfile.txt");
     std::ofstream blurfilestream(outputfilepath.toString());
     for (int i = 0; i < blur->size();++i) {
       blurfilestream<<blur[i]<<" "<<names[i]<<std::endl;
     }
     blurfilestream.close();
-    int k = 0;
+    int k = 0;*/
 
 
   } else {

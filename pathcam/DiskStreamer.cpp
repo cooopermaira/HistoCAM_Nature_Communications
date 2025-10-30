@@ -76,15 +76,30 @@ namespace pathCam {
     Poco::Path o = outfile;
     image->load_raw_from_disk();
     Mat temp;
-    if (sort_order>120) {
-      image->create_reg_image(.25,.5,true,INTER_CUBIC,false);
-      temp = image->get_reg_image();
-    }else {
-      image->create_reg_image(.5,.5,true,INTER_CUBIC,false);
-      temp = image->get_reg_image();
-    }
 
-    image->sharpness = image->compute_sharpness(temp);
+
+    Size image_size(image->width, image->height);
+    Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+    //cvtColor(readMat, temp, COLOR_BayerBG2GRAY);
+
+    // Rect fullRoi(image_size.width/2 - 200,image_size.height/2-200,400,400);
+    // Mat fullCrop = readMat(fullRoi);
+    // auto val = Image::compute_sharpness(fullCrop);
+    // double fullVal = min(val.x,val.y);
+
+
+    // Point2i cropSize(800,800);
+    // Rect halfRoi(image_size.width/2-cropSize.x,image_size.height/2 - cropSize.y,cropSize.x * 2,cropSize.y*2);
+    // Mat halfCrop = temp(halfRoi);
+    // Mat halfTemp;
+    // resize(halfCrop,halfTemp,Size(halfCrop.cols/2,halfCrop.rows/2));
+    //
+    // auto val = Image::compute_sharpness(halfTemp);
+    // double halfVal = min(val.x,val.y);
+    //
+    // blur->at(sort_order) = halfVal;
+    // names->at(sort_order) = image->get_ImageFile().getFileName();
+    //return;
 
 
 
@@ -95,26 +110,32 @@ namespace pathCam {
       std::cout << "Issue loading image.\n";
       return;
     }
-    auto val = min(image->sharpness.x,image->sharpness.y);
-        blur->at(sort_order) = val;
-        names->at(sort_order) = image->get_ImageFile().getFileName();
+    // auto val = min(image->sharpness.x,image->sharpness.y);
+    //     blur->at(sort_order) = val;
+    //     names->at(sort_order) = image->get_ImageFile().getFileName();
+
 
     if (convertAndSave) {
 
 
-
+      //
       // Size image_size(image->width, image->height);
       // Mat image_Mat;
       // Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-      // cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
-      //
-      // resize(readMat,readMat,Size(image->width / 3, image->height / 3));
-      // auto r = outfile;
-      //
-      // r.setFileName(image->get_ImageFile().getBaseName());
-      // r.setExtension("png");
-      // imwrite(r.toString(), readMat);
-      int k = 0;
+      cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+
+      resize(readMat,readMat,Size(image->width / 1, image->height / 1)); //resize if you want by changing it here
+      auto r = outfile;
+
+      Rect zoomCrop(image_size.width/2-1000,image_size.height/2-1000,2000,2000);
+      //Mat saveMat = readMat(zoomCrop)
+      r.setFileName(image->get_ImageFile().getBaseName());
+      r.setExtension("png");
+      imwrite(r.toString(), readMat(zoomCrop));
+
+
+
+      // int k = 0;
     //   readMat.convertTo(readMat,CV_32FC3);
     //
     //   for (int i = 0; i < ffs.size(); ++i) {

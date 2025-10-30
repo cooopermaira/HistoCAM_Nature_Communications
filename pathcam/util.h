@@ -115,11 +115,6 @@ namespace pathCam {
     
     if (0 > ExtractSift(siftData,img,numOctaves,initBlur,thresh,lowestScale,scaleUp)) {
       int k = 0;
-      std::cout<<"extract sift failure"<<std::endl;
-      std::cout<<"=== END SIFT DEBUG ===" << std::endl;
-    } else {
-      std::cout << "ExtractSift completed successfully" << std::endl;
-      std::cout<<"=== END SIFT DEBUG ===" << std::endl;
     }
   }
 

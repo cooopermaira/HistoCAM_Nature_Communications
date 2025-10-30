@@ -125,12 +125,16 @@ namespace pathCam {
 
 
     //save_components_to_disk();
-    // for (auto &img:parent->images) {
-    //   if (!img){continue;}
-    //   unsigned int magLabel = parent->composites[img->component_membership]->componentMagLabel;
-    //   std::cout<< " mag "<<magLabel<<"image: "<<img->index<<" blur: "<<img->blurVariance<<std::endl;
-    // }
-
+    if (parent->recordingMode) {
+      long totalTime = 0;
+      int totalImages = 0;
+      for (auto &img:parent->images) {
+        if (!img){continue;}
+        totalTime += img->writeTime;
+        ++totalImages;
+      }
+      std::cout<<"write time: "<<totalTime<<"   total images: "<<totalImages<<std::endl;
+    }
 
     if (parent->segmentWithSAM) {
       auto start = std::chrono::high_resolution_clock::now();
