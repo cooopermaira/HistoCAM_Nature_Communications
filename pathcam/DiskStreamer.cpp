@@ -75,11 +75,28 @@ namespace pathCam {
   void DebayerRunnable::run() {
     Poco::Path o = outfile;
     image->load_raw_from_disk();
+    auto val = image->check_blur_unified();
+    blur->at(sort_order) = val;
+    image->free_memory_RAW();
+    return;
+
+
+    Size image_size(image->width , image->height);
+    cuda::GpuMat readMat(image_size, CV_8U, image->get_Raw());
+
+    cuda::cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+    //cuda::resize(greyRoi,greyRoi,Size(greyRoi.cols / 4, greyRoi.rows / 4));
+
+    auto r = outfile;
+    r.setFileName(image->get_ImageFile().getBaseName());
+    r.setExtension("png");
+    Rect roi(readMat.cols/2 - 1000,readMat.rows/2 - 1000,2000,2000);
     Mat temp;
+    //Mat temp(readMat.rows, readMat.cols, CV_8U,readMat.datastart,readMat.step); //operations on this object segfault
+    readMat(roi).download(temp); //this is fine
 
-
-    Size image_size(image->width, image->height);
-    Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
+    imwrite(r.toString(), temp);
+    return;
     //cvtColor(readMat, temp, COLOR_BayerBG2GRAY);
 
     // Rect fullRoi(image_size.width/2 - 200,image_size.height/2-200,400,400);
@@ -122,16 +139,17 @@ namespace pathCam {
       // Size image_size(image->width, image->height);
       // Mat image_Mat;
       // Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-      cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+      cuda::cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
 
-      resize(readMat,readMat,Size(image->width / 1, image->height / 1)); //resize if you want by changing it here
+      cuda::resize(readMat,readMat,Size(image->width / 4, image->height / 4)); //resize if you want by changing it here
       auto r = outfile;
 
-      Rect zoomCrop(image_size.width/2-1000,image_size.height/2-1000,2000,2000);
+      //Rect zoomCrop(image_size.width/2-1000,image_size.height/2-1000,2000,2000);
       //Mat saveMat = readMat(zoomCrop)
       r.setFileName(image->get_ImageFile().getBaseName());
       r.setExtension("png");
-      imwrite(r.toString(), readMat(zoomCrop));
+      Mat temp(readMat.rows, readMat.cols, CV_8UC3,readMat.data,readMat.step);
+      imwrite(r.toString(), temp);
 
 
 

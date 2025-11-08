@@ -521,8 +521,9 @@ namespace pathCam {
 
   //demo
   void StreamCam::run_agg_classify() {
+    throw std::runtime_error("this function hasn't been refactored since removing torch");
     if (inferencing && classifying) {
-      im->run_agg_classify();
+      //im->run_agg_classify();
       std::this_thread::sleep_for(std::chrono::seconds(2));
       compositeWait.set();
     }

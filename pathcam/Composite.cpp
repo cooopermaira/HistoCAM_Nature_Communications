@@ -1435,7 +1435,7 @@ namespace pathCam {
     blurVals.clear();
     blurVals.resize(images.size());
     for (int i = 0; i < images.size(); i++) {
-      blurVals[i] = images[i]->blurVariance;
+      blurVals[i] = images[i]->motionBlur;
     }
 
     if (blurVals.size() > 0) {
@@ -1450,7 +1450,7 @@ namespace pathCam {
       double stdev = sqrt(accum / (blurVals.size() - 1));
       std::vector<Image *> res, rej;
       for (auto img: images) {
-        if (img->blurVariance > m - 1.0 * stdev) {
+        if (img->motionBlur > m - 1.0 * stdev) {
           res.push_back(img);
         }
         //        else{

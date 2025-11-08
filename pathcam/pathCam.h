@@ -32,14 +32,13 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 
 #include <cuda_runtime.h>
 #include <cstdio>
+#include <condition_variable>
+#include <thread>
 
 #include "cudaImage.h"
 #include "cudaSift.h"
 #include "onnxruntime_cxx_api.h"
-//#include "sam2_image_inference.hpp"
 
-
-//#include "BAM/BAM.h"
 
 #include "cuda_bundle_adjustment_types.h"
 #include "cuda_bundle_adjustment.h"
@@ -80,12 +79,11 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "Poco/ThreadPool.h"
 #include "Poco/DateTimeFormatter.h"
 
+#if 0
 #include <torch/torch.h>
 #include <torch/script.h>
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/embed.h>
 #include <torch/csrc/autograd/python_variable.h>
+#endif
 
 #include <NvInfer.h>
 

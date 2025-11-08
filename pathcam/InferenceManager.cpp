@@ -19,7 +19,8 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  InferenceManager::InferenceManager(StreamCam *parent) : parent(parent), device(torch::Device(torch::kCPU)),
+
+  InferenceManager::InferenceManager(StreamCam *parent) : parent(parent), /*device(torch::Device(torch::kCPU)),*/
                                                           tileEmbedMutex(Poco::FastMutex()) {
 
 
@@ -52,6 +53,9 @@ namespace pathCam {
 
 
   void InferenceManager::run() {
+    return;
+  }
+#if 0
     auto startTime = std::chrono::high_resolution_clock::now();
 
     int inferenceDevice = -1;
@@ -324,4 +328,5 @@ namespace pathCam {
     parent->update_observers();
 
   }
+#endif
 }

@@ -77,7 +77,7 @@ namespace pathCam {
 
   class DebayerRunnable : public pathCam::RunnableIntermediate {
   public:
-    explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<double> *_blur,
+    explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<int> *_blur,
                              std::vector<std::string> *_names, unsigned long _sort_order) : image(image),
       flatfield(flat_field),
       outfile(outfile),
@@ -88,7 +88,7 @@ namespace pathCam {
     }
 
     Mat flatfield;
-    std::vector<double> *blur;
+    std::vector<int> *blur;
     std::vector<std::string> *names;
     Poco::Path outfile;
     pathCam::Image *image;
@@ -209,8 +209,10 @@ namespace pathCam {
     std::string embedFileIn;
     std::string signalFileIn;
 
+#if 0
     torch::Device device;
     torch::Tensor tileEmbeds;
+#endif
 
     Poco::FastMutex tileEmbedMutex;
 

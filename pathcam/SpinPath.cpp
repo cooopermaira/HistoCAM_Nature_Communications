@@ -529,7 +529,7 @@ int SpinPath::run(){
   int result = spinUpCamera();
   
   if(result != -1){
-      Poco::Path root_path = Poco::Path("/media/max/Data/test/");
+      Poco::Path root_path = Poco::Path("/home/pathcam/pcamdata/camRecord/data/");
 
       setRootPath(root_path);
       newCaptureSet();

@@ -54,7 +54,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Building on Linux")
 endif()
 
-message(STATUS "hell1o")
+
 IF (APPLE)
     SET(Torch_DIR "/Users/coopermaira/libtorch_2.4.0")
     add_compile_definitions(WITH_MPS)
@@ -80,41 +80,34 @@ ELSEIF (WIN32)
     set(Python3_LIB "python311")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
-    list(APPEND CMAKE_MODULE_PATH "/home/max/libtorch/share/cmake/Torch")
-    list(APPEND cmake_module_path "/home/max/Documents/onnxruntime-linux-x64-gpu-1.17.0")
-
-    #SET(Torch_DIR "/home/max/libtorch/share/cmake/Torch")
-    SET(Python3_INCLUDE_DIR "/home/max/Python-3.11.0/shared_library_dynamic/include/python3.11")
-    SET(Python3_LIBRARY_DIR "/home/max/Python-3.11.0/shared_library_dynamic/lib")
-    SET(Python3_LIB "/home/max/Python-3.11.0/shared_library_dynamic/lib/libpython3.11.so")
-
+    #find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
     set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 
-    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES 86 89)   # adjust as needed
-    endif()
+    set(CMAKE_CUDA_ARCHITECTURES 121)
     enable_language(CUDA)
 
-    set(ONNXRUNTIME_DIR "/home/max/Documents/onnxruntime-linux-x64-gpu-1.22.0" CACHE PATH "Path to the extracted ONNX Runtime directory")
 
-    set(OpenCV_DIR "/home/max/opencv4_build_cuda/install/lib/cmake/opencv4")
-else()
-    message(STATUS "else here")
 ENDIF ()
 
-link_directories(${Python3_INCLUDE_DIR})
-include_directories(${Python3_INCLUDE_DIR})
+#link_directories(${Python3_INCLUDE_DIR})
+#include_directories(${Python3_INCLUDE_DIR})
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
+#set(TORCH_CUDA_ARCH_LIST "12.1")
+#set(Torch_DIR  "${PROJECT_SOURCE_DIR}/libtorch/share/cmake/Torch")
 
-set(Torch_DIR "/home/max/libtorch/share/cmake/Torch")
 
-find_package(Torch REQUIRED)
+#find_package(Torch REQUIRED)
 
+link_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/lib)
+link_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/lib)
+
+include_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/include)
+include_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/include)
 
 add_subdirectory(CudaSift)
 include_directories(CudaSift)
@@ -161,17 +154,8 @@ ENDIF ()
 add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
-#add_subdirectory(SPEED-SAM-C-TENSORRT)
-#include_directories("/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/include")
 
-link_directories(${ONNXRUNTIME_DIR}/lib)
-link_directories(/home/max/Documents/TensorRT-10.13.2.6.Linux.x86_64-gnu.cuda-12.9/TensorRT-10.13.2.6/lib)
-include_directories(${ONNXRUNTIME_DIR}/include)
-
-include_directories(/home/max/Documents/TensorRT-10.13.2.6.Linux.x86_64-gnu.cuda-12.9/TensorRT-10.13.2.6/include)
-
-
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util ${TORCH_LIBRARIES} ${Python3_LIB} cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_cuda nvinfer)# nvinfer_plugin)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util #[[${TORCH_LIBRARIES} Python3::Python]] cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_shared nvinfer)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

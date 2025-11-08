@@ -3,87 +3,25 @@
 using namespace cv;
 
 namespace pathCam {
-  static cv::Mat filterAnomaliesRelMean(const cv::Mat& img_f32, double theta) {
-    CV_Assert(img_f32.type() == CV_32F);
-    cv::Mat out = img_f32.clone();
-    const int H = img_f32.rows, W = img_f32.cols;
-    auto pix = [&](int y,int x){ return img_f32.at<float>(y,x); };
-    for (int y = 1; y < H-1; ++y) {
-      for (int x = 1; x < W-1; ++x) {
-        float sum = 0.f;
-        int n = 0;
-        for (int dy=-1; dy<=1; ++dy) {
-          for (int dx=-1; dx<=1; ++dx) {
-            if (dx||dy) {
-              sum += pix(y+dy,x+dx);
-              ++n;
-            }
-          }
-        }
-        float mu = sum / std::max(n,1);
-        float p  = pix(y,x);
-        // avoid division by tiny mu: if mu≈0, only consider large absolute deviation
-        bool is_anom = (std::abs(mu) > 1e-6f) ? (std::abs(p - mu) / std::abs(mu) > theta)
-                                              : (std::abs(p) > 0.f); // crude but safe
-        if (is_anom) out.at<float>(y,x) = mu;
-      }
-    }
-    return out;
-  }
+  cuda::GpuMat Image::hannWindow, Image::cornerRad;
+  static Ptr<cuda::Filter> g_gauss;
+  static std::once_flag g_gauss_once;
 
-  static float meanRelativeDrop(const cv::Mat& num, const cv::Mat& den, float eps=1e-6f) {
-    CV_Assert(num.type() == CV_32F && den.type() == CV_32F);
-    double sum = 0.0; size_t cnt = 0;
-    for (int y=0; y<num.rows; ++y) {
-      const float* np = num.ptr<float>(y);
-      const float* dp = den.ptr<float>(y);
-      for (int x=0; x<num.cols; ++x) {
-        float d = dp[x];
-        if (d > eps) { sum += (double)np[x] / (double)d; ++cnt; }
-      }
-    }
-    return cnt ? (float)(sum / (double)cnt) : 0.f;
+  inline void ensureGauss(int type) {
+    std::call_once(g_gauss_once, [type]{
+        const cv::Size ksize{5,5};
+        const double sigma = 3;
+        g_gauss = cv::cuda::createGaussianFilter(type, type, ksize, sigma, sigma,
+                                                 cv::BORDER_DEFAULT);
+    });
   }
-
-  static std::pair<float,float> maskedAbsGradPercentiles(const cv::Mat& grad_f32, const cv::Mat& mask_u8,
-                                                       double pL, double pU) {
-    CV_Assert(grad_f32.type() == CV_32F && mask_u8.type() == CV_8U);
-    std::vector<float> vals; vals.reserve(grad_f32.rows*grad_f32.cols/10);
-    for (int y=0; y<grad_f32.rows; ++y) {
-      const float* gptr = grad_f32.ptr<float>(y);
-      const uchar* mptr = mask_u8.ptr<uchar>(y);
-      for (int x=0; x<grad_f32.cols; ++x) if (mptr[x]) vals.push_back(std::abs(gptr[x]));
-    }
-    if (vals.empty()) return {0.f, 0.f};
-    std::sort(vals.begin(), vals.end());
-    auto pick = [&](double p)->float {
-      if (vals.empty()) return 0.f;
-      double idx = (p/100.0) * (vals.size()-1);
-      size_t i0 = (size_t)std::floor(idx);
-      size_t i1 = std::min(i0+1, vals.size()-1);
-      double t = idx - i0;
-      return (float)((1.0-t)*vals[i0] + t*vals[i1]);
-    };
-    return {pick(pL), pick(pU)};
-  }
-
-  // Keep only values whose abs lies within [pL,pU] percentiles; returns filtered gradient (others zeroed)
-  static cv::Mat filterGradByPercentiles(const cv::Mat& grad_f32, const cv::Mat& mask_u8,
-                                         double pL, double pU) {
-    auto [lo, hi] = maskedAbsGradPercentiles(grad_f32, mask_u8, pL, pU);
-    cv::Mat out = cv::Mat::zeros(grad_f32.size(), CV_32F);
-    if (hi <= 0.f) return out;
-    for (int y=0; y<grad_f32.rows; ++y) {
-      const float* gp = grad_f32.ptr<float>(y);
-      const uchar* mp = mask_u8.ptr<uchar>(y);
-      float*       op = out.ptr<float>(y);
-      for (int x=0; x<grad_f32.cols; ++x) {
-        if (!mp[x]) continue;
-        float a = std::abs(gp[x]);
-        if (a >= lo && a <= hi) op[x] = a; // store magnitude (paper multiplies mask; magnitude is fine)
-      }
-    }
-    return out;
+  static std::mutex g_gauss_mtx;
+  inline void blur_once(const cv::cuda::GpuMat& src, cv::cuda::GpuMat& dst,
+                     cv::cuda::Stream& s = cv::cuda::Stream::Null())
+  {
+    ensureGauss(src.type());
+    std::lock_guard<std::mutex> lk(g_gauss_mtx);
+    g_gauss->apply(src, dst, s);
   }
 
   Image::Image(unsigned int width, unsigned int height, unsigned int scope_radius, MemoryPool *mempool) : width(width),
@@ -100,9 +38,23 @@ namespace pathCam {
                                                                                                               0),
                                                                                                           image_file(
                                                                                                               Poco::Path()),
-                                                                                                          blurVariance(
-                                                                                                              1000),
-  cudaBufferReady(false) {};
+                                                                                                          motionBlur(
+                                                                                                              0),
+  cudaBufferReady(false) {
+    if (hannWindow.empty()) {
+      Mat temp;
+      createHanningWindow(temp,Size(512,512),CV_32F);
+      hannWindow.upload(temp);
+    }
+    if (cornerRad.empty()) {
+      Mat temp(512,512,CV_8U,Scalar(0));
+      circle(temp,Point(0,0),80,Scalar(255),1);
+      circle(temp,Point(0,512),80,Scalar(255),1);
+      circle(temp,Point(512,0),80,Scalar(255),1);
+      circle(temp,Point(512,512),80,Scalar(255),1);
+      cornerRad.upload(temp);
+    }
+  };
 
   Image::~Image() {
     free_memory_RAW(true);
@@ -184,75 +136,54 @@ namespace pathCam {
     return false;
   }
 
-  Point2f Image::compute_sharpness(Mat &_img) {
-    CV_Assert(_img.type() == CV_8U);
-    Mat img32;
-
-    _img.convertTo(img32,CV_32F);
-    auto denoised = filterAnomaliesRelMean(img32,0.5);
-
-    Mat mask = (_img > 0) & (_img < 255);
-    assert(mask.type() == CV_8U);
-
-    Mat gx, gy;
-    Sobel(denoised,gx,CV_32F,1,0,5);
-    Sobel(denoised,gy,CV_32F,0,1,5);
-
-    Mat sbx = filterGradByPercentiles(gx,mask,98.5,99.5);
-    Mat sby = filterGradByPercentiles(gy,mask,98.5,99.5);
-
-    Mat blur_f32;
-    GaussianBlur(denoised,blur_f32,Size(5,5),1,1);
-
-    Mat bgx,bgy;
-    Sobel(blur_f32,bgx,CV_32F,1,0,5);
-    Sobel(blur_f32,bgy,CV_32F,0,1,5);
-
-    Mat GBx = filterGradByPercentiles(bgx,mask,98.5,99.5);
-    Mat GBy = filterGradByPercentiles(bgy,mask,98.5,99.5);
-
-    Mat dx,dy;
-    subtract(sbx,GBx,dx,noArray(),CV_32F);
-    subtract(sby,GBy,dy,noArray(),CV_32F);
-
-    float mx = meanRelativeDrop(dx, sbx);
-    float my = meanRelativeDrop(dy, sby);
-
-    Point2f r;
-    r.x = 100.f * std::max(0.f, std::min(mx, 1.f)); // clamp to [0,100] if desired
-    r.y = 100.f * std::max(0.f, std::min(my, 1.f));
-    return r;
-  }
-
-
-  double Image::check_blur() {
+  int Image::check_blur_unified() {
     if (!in_memory()) {
       throw std::runtime_error("Image not in memory during blur check");
     }
+    cuda::Stream s;
 
-    cv::Mat temp = cv::Mat(Size(width, height), CV_8UC1, raw_buffer, Mat::AUTO_STEP);
-    int steps = 6;
-    int radius = 2190;
-    for (int i = 0; i < steps; i++) {
-      int xloc = width / 2 + (radius - 640) * cos(float(i) / float(steps) * 2.f * 3.14f);
-      int yloc = height / 2 + (radius - 640) * sin(float(i) / float(steps) * 2.f * 3.14f);
-      xloc += xloc % 2;
-      yloc += yloc % 2;
-      cv::Rect rectROI(xloc - 64, yloc - 64, 128, 128);
-      Mat ROI = temp(rectROI).clone();
-      cvtColor(ROI, ROI, COLOR_BayerBG2GRAY);
+    //wrap raw buffer in gpumat, this will fail on non unified systems
+    cuda::GpuMat raw(Size(width, height), CV_8UC1, raw_buffer);
 
-      auto val = compute_sharpness(ROI);
-      float p = min(val.x,val.y);
-      blurVariance = min(blurVariance,p);
+    //grab a 512 window in the center to debayer. smart placement of this window would be an improvement
+    int roiSize = 512;
+    Rect roi(width/2 - roiSize/2, height/2 - roiSize/2, roiSize, roiSize);
+    cuda::GpuMat gray;
 
+    //debayer and multiply by hanning window. if you dont, bright lines will corrupt borders and f up min max calc
+    cuda::cvtColor(raw(roi),gray,COLOR_BayerBG2GRAY,0,s);
+    gray.convertTo(gray,CV_32F);
+    cuda::multiply(gray,hannWindow,gray,1,-1,s);
 
-      //imwrite("/media/max/Data/blur_test/roi.png",ROI);
-      int k = 0;
-    }
+    //compute the log magnitude of the dft
+    cuda::GpuMat planes[] = {gray,cuda::GpuMat(gray.rows,gray.cols,CV_32F,Scalar(0))};
+    cuda::GpuMat complexI, mag;
+    cuda::merge(planes,2,complexI,s);
+    cuda::dft(complexI, complexI, Size(gray.cols,gray.rows),0,s);
 
-    return blurVariance;
+    cuda::split(complexI,planes,s);
+    cuda::magnitude(planes[0],planes[1],mag,s);
+    cuda::add(Scalar(1e-6),mag,mag,noArray(),-1,s);
+    cuda::log(mag,mag,s);
+
+    // blur the dft so noise doesnt interfere so bad. blur_once is quagmire because the box filter isnt thread safe
+    blur_once(mag,mag,s);
+    cuda::normalize(mag,mag,0,255,NORM_MINMAX,CV_8U,noArray(),s);
+
+    s.waitForCompletion();
+
+    // //debug for viewing normalized 8U dft
+    //Mat temp;
+    //mag.download(temp);
+
+    //calculate min max around specific region of dft. this region is uniform if clear and wavy if blurred
+    double maxval,minval;
+    cuda::minMax(mag,&minval,&maxval,cornerRad);
+    motionBlur = int(maxval) - int(minval);
+    return motionBlur;
   }
+
+
 
   void Image::write_to_path(bool _profile) {
     std::fstream file;
@@ -449,14 +380,12 @@ namespace pathCam {
       throw std::invalid_argument("image not in memory during decide_label_and_blur()");
     }
 
-    if (check_blur() < 200) {
-      return false;
-    }
+
 
     find_label();
 
     if (label == _2X || label == _4X) {
-      return blurVariance > 500.0;
+      return motionBlur > 500.0;
     }
 
     return true;

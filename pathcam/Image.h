@@ -22,7 +22,7 @@ namespace pathCam {
     std::atomic<unsigned int> reference_count;
 
     float reg_full_scale;
-    float blurVariance = 1000;
+    int motionBlur;
     cv::Point2f sharpness;
     double reg_scale_initial,reg_scale_full;
     double reg_crop_initial,reg_crop_full;
@@ -46,6 +46,7 @@ namespace pathCam {
     cv::Mat descriptorsMultilevel;
     cv::Mat descriptorsFull;
 
+    static cv::cuda::GpuMat hannWindow, cornerRad;
 #ifdef HAVE_OPENCV_CUDAFEATURES2D
     cv::cuda::GpuMat SIFTDescriptors;
     cv::cuda::GpuMat SIFTKeypoints;
@@ -105,6 +106,8 @@ namespace pathCam {
     bool is_good();
 
     double check_blur();
+
+    int check_blur_unified();
 
     static cv::Point2f compute_sharpness(cv::Mat &_img);
 

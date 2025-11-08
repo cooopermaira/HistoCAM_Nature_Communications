@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
   cvtColor(flat_field10x, flat_field10x, COLOR_BayerBG2BGR);
   flat_field10x.convertTo(flat_field10x, CV_32F);
   flat_field10x *= 1 / 170.0;
-*/
+
   stream.open("/media/max/Data/2_20/20x/cal/20x_cal.Raw", std::ios::binary);
   {
     char *raw_buffer = new char[6464 * 4852];
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
   cvtColor(flat_field20x, flat_field20x, COLOR_BayerBG2BGR);
   flat_field20x.convertTo(flat_field20x, CV_32F);
   flat_field20x *= 1 / 170.0;
-
+*/
 //  stream.open("/media/max/Data/afb/cal/40x_cal.Raw", std::ios::binary);
 //  {
 //    char *raw_buffer = new char[6464 * 4852];
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (inFile.isDirectory()) {
-    std::vector<double> *blur = new std::vector<double>;
+    std::vector<int> *blur = new std::vector<int>;
     std::vector<std::string> *names = new std::vector<std::string>;
 
     blur->resize(5000, 0);
@@ -215,6 +215,7 @@ int main(int argc, char *argv[]) {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << duration.count() << std::endl;
+    int k = 0;
     /*auto blurfile = outFile;
     blurfile.makeParent().append("blurfile.txt");
     std::ofstream blurfilestream(outputfilepath.toString());
