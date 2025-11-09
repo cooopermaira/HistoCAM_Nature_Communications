@@ -107,7 +107,7 @@ namespace pathCam {
 
     double check_blur();
 
-    int check_blur_unified();
+    int check_blur(bool _unifiedMemory);
 
     static cv::Point2f compute_sharpness(cv::Mat &_img);
 

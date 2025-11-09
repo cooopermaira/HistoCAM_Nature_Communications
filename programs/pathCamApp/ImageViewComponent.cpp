@@ -32,6 +32,8 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
   addChildComponent(verticalScrollBar);
 
   shadeClasses = false;
+
+  //gl.attachTo(*this);
 }
 
 ImageViewComponent::~ImageViewComponent() {

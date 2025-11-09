@@ -136,14 +136,20 @@ namespace pathCam {
     return false;
   }
 
-  int Image::check_blur_unified() {
+  int Image::check_blur(bool _unifiedMemory) {
     if (!in_memory()) {
       throw std::runtime_error("Image not in memory during blur check");
     }
     cuda::Stream s;
 
-    //wrap raw buffer in gpumat, this will fail on non unified systems
-    cuda::GpuMat raw(Size(width, height), CV_8UC1, raw_buffer);
+    cuda::GpuMat raw;
+    if (_unifiedMemory) {
+      //no copy, pretty dope
+      raw = cuda::GpuMat(Size(width, height), CV_8U, raw_buffer);
+    }else {
+      Mat temp(Size(width, height), CV_8U, raw_buffer);
+      raw.upload(temp);
+    }
 
     //grab a 512 window in the center to debayer. smart placement of this window would be an improvement
     int roiSize = 512;

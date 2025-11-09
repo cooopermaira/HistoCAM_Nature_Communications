@@ -70,6 +70,8 @@ namespace pathCam {
 
     bool segmentWithSAM;
 
+    bool unifiedMemory = false;
+
 
     std::string classes_title;
 

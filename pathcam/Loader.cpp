@@ -31,15 +31,13 @@ namespace pathCam {
 
 
     image->index = image_index;
-    image->check_blur_unified(); //this is computationally very expensive even for small windows
+    image->check_blur(parent->unifiedMemory); //this is computationally very expensive even for small windows
 
 
     if (!image->is_mostly_black()) {
 
-
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
-
 
       image->reg_scale_initial = parent->scale_factor;
       image->reg_crop_initial = parent->crop_factor;

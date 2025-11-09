@@ -75,10 +75,7 @@ namespace pathCam {
   void DebayerRunnable::run() {
     Poco::Path o = outfile;
     image->load_raw_from_disk();
-    auto val = image->check_blur_unified();
-    blur->at(sort_order) = val;
-    image->free_memory_RAW();
-    return;
+
 
 
     Size image_size(image->width , image->height);

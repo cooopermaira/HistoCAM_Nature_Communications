@@ -142,49 +142,56 @@ namespace pathCam {
 
       delaunayRegInfos.push_back(_newInfo[i]);
       delaunayImages.push_back(images[i]);
-      auto newOverlaps = calculate_new_overlaps();
 
       update = true;
       images[i]->vertexId = res;
 
-      polyMaskGPU.upload(polyMaskOutput);
+      if (parent->unifiedMemory) {
+        polyMaskGPU = cuda::GpuMat(polyMaskOutput.rows,polyMaskOutput.cols,CV_8U,polyMaskOutput.data);
+      }else {
+        polyMaskGPU.upload(polyMaskOutput,parent->cvCompositeStream);
+      }
 
       //indicate that a new image has been added since last global alignment
       needsAlignment = true;
 
-      //wait for buffer to be on gpu
-      {
+      cuda::GpuMat rawMat;
+      if (!parent->unifiedMemory){
+        //wait for buffer to be on gpu
         std::unique_lock lock(images[i]->cudaBufferMutex);
         images[i]->cudaBufferConVar.wait(lock, [&] { return images[i]->cudaBufferReady; });
+        rawMat = cuda::GpuMat(image_size, CV_8U, images[i]->get_raw_cuda());
+      }else {
+        rawMat = cuda::GpuMat(image_size, CV_8U, images[i]->get_Raw());
       }
 
       //debayer image on gpu
-      cuda::GpuMat image_Mat(image_size, CV_8U, images[i]->get_raw_cuda());
-      cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
+      cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR,0,parent->cvCompositeStream);
 
       //images[i]->free_memory_cuda();
 
       if (rootFound) {
+        parent->cvCompositeStream.waitForCompletion();
         establish_scale_at_root(images[i]);
       }
 
       ff_correct_and_brighten();
 
       //get sift data and push it to sift ft extraction gpu
-      //images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU);
+      //images[i]->siftData = GPU_extract_SIFT(threeChannelPrealGPU, 10000);
       // images[i]->siftInitialized = true;
 
-
-      // parent->push_SIFT_matches(newOverlaps, images[i]);
+      //auto newOverlaps = calculate_new_overlaps();
+      //parent->push_SIFT_matches(newOverlaps, images[i]);
       // if (_newInfo[i]->root && !newOverlaps.empty()) {
       //   wakeEvent.wait();
       //   ff_correct_and_brighten();
       // }
 
       //add alpha channel
-      cuda::split(threeChannelPrealGPU, channelsGPU);
+      cuda::split(threeChannelPrealGPU, channelsGPU,parent->cvCompositeStream);
       channelsGPU.push_back(rectMaskGPU);
-      cuda::merge(channelsGPU, fourChannelPrealGPU);
+      cuda::merge(channelsGPU, fourChannelPrealGPU,parent->cvCompositeStream);
 
       //calculate effected tiles
       std::vector<Point2i> effectedTiles;
@@ -200,6 +207,7 @@ namespace pathCam {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
         imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageBox, effectedTilesNoMask);
       }
+      parent->cvCompositeStream.waitForCompletion();
 
       imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);
 
@@ -212,13 +220,12 @@ namespace pathCam {
         auto pushForInferencing = push_for_inferencing(tiles);
         parent->push_tile_embed_Q(pushForInferencing, componentIndex);
       }
+
       //update pyramid bounds, reset mask
       imagePyramid->bounds = imagePyramid->level[0]->bounds;
       polyMaskOutput.setTo(Scalar(0));
     }
-    // if (rootFound) {
-    //   parent->align_and_rebuild();
-    // }
+
 
     //highlight bounds of last frame
     if (imagePyramid->scale > 0 && update) {
@@ -541,7 +548,7 @@ namespace pathCam {
   }
 
 
-  SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img) {
+  SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts) {
     SiftData siftData;
     try{
     if (_img.channels() == 1) {
@@ -639,11 +646,11 @@ namespace pathCam {
   void CompositeVoronoi::ff_correct_and_brighten() {
     if (componentMagLabel != 0) {
       //flatfield correct
-      threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F);
-      cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F);
+      threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F,parent->cvCompositeStream);
+      cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F,parent->cvCompositeStream);
       //brighten
-      cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU);
-      convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3);
+      cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU,parent->cvCompositeStream);
+      convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3,parent->cvCompositeStream);
     }
   }
 

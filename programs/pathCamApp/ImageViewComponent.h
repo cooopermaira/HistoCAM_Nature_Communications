@@ -78,6 +78,8 @@ protected:
   cv::Mat channelHolding;
   std::vector<cv::Mat> channels;
 
+  OpenGLContext gl;
+
   void mouseDown(const juce::MouseEvent &event) override;
   void mouseDrag(const juce::MouseEvent &event) override;
   void mouseWheelMove(const MouseEvent &event, const MouseWheelDetails &fwheel) override;

@@ -305,6 +305,17 @@ namespace pathCam {
       return false;
     }
 
+    if (pConf->has("system")) {
+      if (pConf->has("system.unified_memory")) {
+        bool temp = unifiedMemory;
+        try {
+          unifiedMemory = pConf->getBool("system.unified_memory");
+        }catch (std::string bad_input) {
+          unifiedMemory = temp;
+        }
+      }
+    }
+
     if(pConf->has("display.tile_size")){
       tileSize = pConf->getUInt("display.tile_size");
     }else{

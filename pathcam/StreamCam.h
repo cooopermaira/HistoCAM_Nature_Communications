@@ -120,6 +120,8 @@ namespace pathCam {
     int compositorCudaDevice;
     int siftCudaDevice = -1;
 
+    cuda::Stream cvCompositeStream;
+
     int lastActiveComponent = 0;
         int maxTilesPerBatch = 512;
     int maxMatchesPerPull = 50;

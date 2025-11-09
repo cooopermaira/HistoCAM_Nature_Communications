@@ -165,7 +165,7 @@ namespace pathCam {
 
     std::vector<std::pair<Image *, Image *> > calculate_new_overlaps();
 
-    SiftData GPU_extract_SIFT(cuda::GpuMat &_img);
+    SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
 
     void rebuild();
 

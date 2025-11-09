@@ -87,7 +87,9 @@ namespace pathCam {
     }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    image->move_buffer_to_gpu(parent->compositorCudaDevice);
+    if (!parent->unifiedMemory) {
+      image->move_buffer_to_gpu(parent->compositorCudaDevice);
+    }
 #endif
 
     // if(parent->recordingMode){
@@ -95,7 +97,9 @@ namespace pathCam {
     // }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    image->free_memory_RAW();
+    if (!parent->unifiedMemory) {
+      image->free_memory_RAW();
+    }
 #endif
   }
 
