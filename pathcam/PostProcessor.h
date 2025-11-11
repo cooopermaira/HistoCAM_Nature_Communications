@@ -60,6 +60,9 @@ class SiftFeatureMatcher : public PostProcessorBase {
 
   int numMatchesProcessed = 0;
 
+  pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
+    parent->matcher_type);
+  pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
 };
 
   // class Inferencer : public PostProcessorBase {

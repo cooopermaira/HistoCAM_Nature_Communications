@@ -39,6 +39,8 @@ namespace pathCam {
     channelsGPU.resize(4);
     threeChannelPrealGPU = cuda::GpuMat(image_size, CV_8UC3);
     fourChannelPreallocated = Mat::zeros(image_size, CV_8UC4);
+    fourChannelPreallocated = cv::Mat::zeros(image_size, CV_8UC4);
+
     //make_meshgrid();
 #endif
 

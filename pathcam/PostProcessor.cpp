@@ -58,6 +58,11 @@ namespace pathCam {
 
       size_t mostMutualMatches = 0,mostInliers = 0;
       for (auto mp: matchPairs) {
+        if (mp.first->component_membership == mp.second->component_membership) {
+          //match with orb features
+          Match m = Match(mp.first, mp.second);
+          matcher->match(&m,0);
+        }
         ++numMatchesProcessed;
         // Run matching in both directions
         MatchSiftData(mp.first->siftData, mp.second->siftData);

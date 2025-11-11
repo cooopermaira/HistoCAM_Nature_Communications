@@ -151,9 +151,15 @@ namespace pathCam {
       raw.upload(temp);
     }
 
-    //grab a 512 window in the center to debayer. smart placement of this window would be an improvement
     int roiSize = 512;
-    Rect roi(width/2 - roiSize/2, height/2 - roiSize/2, roiSize, roiSize);
+    //grab a 512 window in the center to debayer. smart placement of this window would be an improvement
+    for (int x = 0; x < width - roiSize; x+=roiSize) {
+      for (int y = 0; y < height - roiSize; y+=roiSize) {
+
+
+
+    //Rect roi(width/2 - roiSize/2, height/2 - roiSize/2, roiSize, roiSize);
+        Rect roi(x,y,roiSize,roiSize);
     cuda::GpuMat gray;
 
     //debayer and multiply by hanning window. if you dont, bright lines will corrupt borders and f up min max calc
@@ -186,6 +192,9 @@ namespace pathCam {
     double maxval,minval;
     cuda::minMax(mag,&minval,&maxval,cornerRad);
     motionBlur = int(maxval) - int(minval);
+    std::cout<<motionBlur<<std::endl;
+      }
+    }
     return motionBlur;
   }
 

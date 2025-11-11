@@ -155,20 +155,23 @@ namespace pathCam {
       //indicate that a new image has been added since last global alignment
       needsAlignment = true;
 
-      cuda::GpuMat rawMat;
+
+
       if (!parent->unifiedMemory){
         //wait for buffer to be on gpu
         std::unique_lock lock(images[i]->cudaBufferMutex);
         images[i]->cudaBufferConVar.wait(lock, [&] { return images[i]->cudaBufferReady; });
+
+        //build and debayer with gpumat objects
+        cuda::GpuMat rawMat;
         rawMat = cuda::GpuMat(image_size, CV_8U, images[i]->get_raw_cuda());
+        cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR,0,parent->cvCompositeStream);
       }else {
-        rawMat = cuda::GpuMat(image_size, CV_8U, images[i]->get_Raw());
+        Mat rawMat;
+        rawMat = Mat(image_size, CV_8U, images[i]->get_Raw());
+        cvtColor(rawMat,threeChannelPreallocated,COLOR_BayerBG2BGR);
+        threeChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC3,threeChannelPreallocated.data);
       }
-
-      //debayer image on gpu
-      cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR,0,parent->cvCompositeStream);
-
-      //images[i]->free_memory_cuda();
 
       if (rootFound) {
         parent->cvCompositeStream.waitForCompletion();
@@ -192,6 +195,7 @@ namespace pathCam {
       cuda::split(threeChannelPrealGPU, channelsGPU,parent->cvCompositeStream);
       channelsGPU.push_back(rectMaskGPU);
       cuda::merge(channelsGPU, fourChannelPrealGPU,parent->cvCompositeStream);
+
 
       //calculate effected tiles
       std::vector<Point2i> effectedTiles;

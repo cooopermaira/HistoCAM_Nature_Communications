@@ -79,28 +79,204 @@ namespace pathCam {
 
 
     Size image_size(image->width , image->height);
-    cuda::GpuMat readMat(image_size, CV_8U, image->get_Raw());
 
-    cuda::cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+
+    //get host buffer
+    char* bufHost = new char[image->height * image->width];
+    std::ifstream stream;
+    stream.open(image->image_file.toString(), std::ios::binary);
+    stream.read(bufHost, image->width * image->height);
+    stream.close();
+
+    char* ffraw = new char[image->height * image->width];
+    std::ifstream streamFF;
+    streamFF.open("/home/pathcam/pcamdata/cal/2x_cal.Raw",std::ios::binary);
+    streamFF.read(ffraw,image->width * image->height);
+    stream.close();
+    Mat ff(image_size,CV_8U,ffraw);
+    cvtColor(ff,ff,COLOR_BayerBG2BGR);
+    ff.convertTo(ff,CV_32F);
+    ff*= 1/170;
+
+    //allocate a managed buffer
+    char* buf;
+    cudaMallocManaged(&buf,image_size.width * image_size.height * 3);
+    int dev = 0;
+    cudaGetDevice(&dev);
+    cudaMemLocation loc{};
+    loc.type = cudaMemLocationTypeDevice;
+    loc.id   = dev;
+    cudaMemPrefetchAsync(buf, image_size.width * image_size.height * 3,loc, 0);
+
+    //prepare gpumat to receive data into managed buffer
+    cuda::GpuMat rcvgpu(image_size,CV_8UC3,buf);
+
+    Mat raw(image_size,CV_8U,image->get_Raw());
+    Mat dbd(image_size,CV_8UC3), rsz(image->height / 4,image->width / 4,CV_8UC3);
+    Mat tcpa(image_size,CV_8UC3);
+    Mat fcpa(image_size,CV_8UC4);
+    Mat cvh(image_size,CV_32FC3);
+    Mat alphac(image_size,CV_8UC1,Scalar(255));
+
+    double pt1 = 0,pt2 = 0,pt3 = 0;
+    auto start1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i<100;++i) {
+      cvtColor(raw,dbd,COLOR_BayerBG2BGR);
+      auto c = std::chrono::high_resolution_clock::now();
+      dbd.convertTo(cvh,CV_32FC3);
+      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      c = std::chrono::high_resolution_clock::now();
+      divide(cvh,ff,cvh);
+      pow(cvh,1.1,cvh);
+      pt1 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      c = std::chrono::high_resolution_clock::now();
+      cvh.convertTo(tcpa,CV_8UC3);
+      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      std::vector<Mat> chan;
+
+      c = std::chrono::high_resolution_clock::now();
+      split(tcpa,chan);
+      chan.push_back(alphac);
+      merge(chan,fcpa);
+      pt2 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+
+      auto val = fcpa.data[0];
+    }
+    std::cout<<"converting: "<<pt3/100<<std::endl;
+    std::cout<<"math: "<<pt1/100<<std::endl;
+    std::cout<<"alpha: "<<pt2/100.f<<std::endl;
+    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count()<<std::endl;
+
+    cuda::GpuMat dbdcuda(image_size,CV_8UC3),tcpaG(image_size,CV_8UC3);
+    cuda::GpuMat cvhG(image_size,CV_32FC3);
+    cuda::GpuMat ffGpu(image_size,CV_32FC3,ff.data);
+
+    char* buf1;
+    cudaMallocManaged(&buf1,image_size.width * image_size.height * 4);
+    cuda::GpuMat rszcuda(Size(image->width,image->height),CV_8UC4,buf1);
+    cuda::GpuMat rawcuda(image_size,CV_8U,image->get_Raw());
+    pt1 = 0;
+    pt2 = 0;
+    pt3 = 0;
+    start1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i<100;++i) {
+
+      cuda::cvtColor(rawcuda,dbdcuda,COLOR_BayerBG2BGR);
+
+      auto c = std::chrono::high_resolution_clock::now();
+      dbdcuda.convertTo(cvhG,CV_32F);
+      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      c = std::chrono::high_resolution_clock::now();
+      cuda::divide(cvhG,ffGpu,cvhG);
+      cuda::pow(cvhG,1.1,cvhG);
+      pt1 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      c = std::chrono::high_resolution_clock::now();
+      cvhG.convertTo(tcpaG,CV_8UC3);
+      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      std::vector<cuda::GpuMat> chan;
+
+      c = std::chrono::high_resolution_clock::now();
+      cuda::split(tcpaG,chan);
+      chan.push_back(cuda::GpuMat(image_size,CV_8UC1,alphac.data));
+      cuda::merge(chan,rszcuda);
+      pt2 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+
+
+      auto val = rszcuda.data[0];
+    }
+    std::cout<<"cuda converting: "<<pt3/100<<std::endl;
+    std::cout<<"cuda math: "<<pt1/100<<std::endl;
+    std::cout<<"cuda alpha: "<<pt2/100.f<<std::endl;
+    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count()<<std::endl;
+
+//100 times, wrap the host buffer in a gpu mat, debayer to managed buffer, verify cpu can access data
+    auto start = std::chrono::high_resolution_clock::now();
+    double accCvtMs = 0, accMatWrapMs = 0, accHostReadMs = 0;
+
+    for (int i = 0; i < 1000; ++i) {
+      auto t_start_wrap = std::chrono::high_resolution_clock::now();
+      cv::cuda::GpuMat readMat(image_size, CV_8U, bufHost);  // just header
+      auto t_end_wrap = std::chrono::high_resolution_clock::now();
+      accMatWrapMs += std::chrono::duration<double, std::milli>(t_end_wrap - t_start_wrap).count();
+
+      auto t_start_cvt = std::chrono::high_resolution_clock::now();
+      cv::cuda::cvtColor(readMat, rcvgpu, COLOR_BayerBG2BGR);
+      // force GPU to finish so the timing is meaningful
+      //cudaDeviceSynchronize();
+      auto t_end_cvt = std::chrono::high_resolution_clock::now();
+      accCvtMs += std::chrono::duration<double, std::milli>(t_end_cvt - t_start_cvt).count();
+
+      auto t_start_host = std::chrono::high_resolution_clock::now();
+      cv::Mat hostm(image_size, CV_8UC3, buf); // wrapping managed mem
+      auto val = hostm.data[0];                // host read
+      (void)val;
+      auto t_end_host = std::chrono::high_resolution_clock::now();
+      accHostReadMs += std::chrono::duration<double, std::milli>(t_end_host - t_start_host).count();
+    }
+
+    std::cout << "wrap GpuMat header: " << accMatWrapMs / 1000.0 << " ms/iter\n";
+    std::cout << "cuda::cvtColor:     " << accCvtMs     / 1000.0 << " ms/iter\n";
+    std::cout << "host read (UM):     " << accHostReadMs/ 1000.0 << " ms/iter\n";
+    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+
+    //prepare a gpumat to receive data from cvtColor command, prepare mat for .download()
+    cuda::GpuMat dbr(image_size.height,image_size.width,CV_8UC3);
+    Mat rcvhost(image_size,CV_8UC3);
+
+    //100 times, wrap host buffer in gpu mat, debayer into previously gpu allcated gpumat, download to host mat, verify cpu can access data
+    start = std::chrono::high_resolution_clock::now();
+    double accCvt2Ms = 0, accDownloadMs = 0;
+    accHostReadMs = 0;
+    for (int i = 0; i < 1000; ++i) {
+      cv::cuda::GpuMat readMat(image_size, CV_8U, bufHost);
+
+      auto t_start_cvt = std::chrono::high_resolution_clock::now();
+      cv::cuda::cvtColor(readMat, dbr, COLOR_BayerBG2BGR);
+      //cudaDeviceSynchronize();
+      auto t_end_cvt = std::chrono::high_resolution_clock::now();
+      accCvt2Ms += std::chrono::duration<double, std::milli>(t_end_cvt - t_start_cvt).count();
+
+      auto t_start_dl = std::chrono::high_resolution_clock::now();
+      dbr.download(rcvhost);
+      //cudaDeviceSynchronize();
+      auto t_end_dl = std::chrono::high_resolution_clock::now();
+      accDownloadMs += std::chrono::duration<double, std::milli>(t_end_dl - t_start_dl).count();
+
+      auto val = rcvhost.data[0];
+      (void)val;
+    }
+
+    std::cout << "cvtColor (2): " << accCvt2Ms    / 1000.0 << " ms/iter\n";
+    std::cout << "download():   " << accDownloadMs/ 1000.0 << " ms/iter\n";
+    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+
     //cuda::resize(greyRoi,greyRoi,Size(greyRoi.cols / 4, greyRoi.rows / 4));
 
     auto r = outfile;
-    r.setFileName(image->get_ImageFile().getBaseName());
-    r.setExtension("png");
-    Rect roi(readMat.cols/2 - 1000,readMat.rows/2 - 1000,2000,2000);
-    Mat temp;
-    //Mat temp(readMat.rows, readMat.cols, CV_8U,readMat.datastart,readMat.step); //operations on this object segfault
-    readMat(roi).download(temp); //this is fine
+    // r.setFileName(image->get_ImageFile().getBaseName());
+    // r.setExtension("png");
+    // Rect roi(readMat.cols/2 - 1000,readMat.rows/2 - 1000,2000,2000);
+    // Mat temp;
+    // //Mat temp(dbr.rows, dbr.cols, CV_8UC3,dbr.datastart,dbr.step); //operations on this object segfault
+    // readMat(roi).download(temp); //this is fine
 
-    imwrite(r.toString(), temp);
-    return;
+    // imwrite(r.toString(), temp);
+    // return;
     //cvtColor(readMat, temp, COLOR_BayerBG2GRAY);
 
     // Rect fullRoi(image_size.width/2 - 200,image_size.height/2-200,400,400);
     // Mat fullCrop = readMat(fullRoi);
     // auto val = Image::compute_sharpness(fullCrop);
     // double fullVal = min(val.x,val.y);
-
+    cuda::GpuMat readMat(image_size, CV_8U, image->get_Raw());
 
     // Point2i cropSize(800,800);
     // Rect halfRoi(image_size.width/2-cropSize.x,image_size.height/2 - cropSize.y,cropSize.x * 2,cropSize.y*2);
@@ -134,9 +310,9 @@ namespace pathCam {
 
       //
       // Size image_size(image->width, image->height);
-      // Mat image_Mat;
+      Mat image_Mat;
       // Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-      cuda::cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
+      // cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
 
       cuda::resize(readMat,readMat,Size(image->width / 4, image->height / 4)); //resize if you want by changing it here
       auto r = outfile;
