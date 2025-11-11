@@ -98,6 +98,7 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "MotionEstimator.h"
 #include "OverlapMatrix.h"
 #include "BatchCam.h"
+
 #include "StreamCam.h"
 #include "PostProcessor.h"
 #include "SIFTSearchUtils.h"
@@ -113,6 +114,8 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "Runnables.h"
 #include "JobQueue.h"
 #include "Composite.h"
+#include "MetricComposite.h"
+
 
 #include "TiledImage.h"
 #include "MRTiledImage.h"

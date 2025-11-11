@@ -273,7 +273,7 @@ namespace pathCam {
   }
 
 
-  void SAMTile::get_tile_data(CompositeVoronoi *_comp, unsigned int _interval) {
+  void SAMTile::get_tile_data(Composite *_comp, unsigned int _interval) {
     for (int xx = 0; xx < _interval; ++xx) {
       for (int yy = 0; yy < _interval; ++yy) {
         auto gMat = _comp->imagePyramid->level[0]->getTile(location.x + xx, location.y + yy);

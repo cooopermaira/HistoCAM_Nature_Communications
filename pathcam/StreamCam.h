@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 
+#include "MetricComposite.h"
 #include "AccessSAM.h"
 #include "pathCam.h"
 #include "MRTiledImage.h"
@@ -19,6 +20,7 @@ using Poco::Path;
 using Poco::Logger;
 
 class MRTiledImage;
+
 
 namespace pathCam {
   class Composite;
@@ -107,6 +109,7 @@ namespace pathCam {
     Poco::FastMutex *inferenceQMutex;
     Poco::FastMutex *siftQMutex;
     Poco::FastMutex *pixelDistanceMutex;
+    Poco::FastMutex pyramidQMutex;
 
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
@@ -156,7 +159,8 @@ namespace pathCam {
     JobQueue *JobQ;
 
     //std::vector < double > variancesForDebug;
-    std::vector<CompositeVoronoi *> composites;
+    //std::vector<CompositeVoronoi *> composites;
+    std::vector<MetricComposite*> composites;
     std::vector<bool> visited;
 
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
@@ -167,6 +171,7 @@ namespace pathCam {
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;
+    std::queue<std::pair<Point2i,unsigned>> pyramidBuilderQ;
 
     int windowWidth = 3;
     int maxIndex = -1;
@@ -200,6 +205,8 @@ namespace pathCam {
     void push_SIFT_matches(std::vector<std::pair<Image*,Image*>>& _newOverlaps, Image *_image);
 #endif
     Point2f get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC, unsigned int _requestedCompIdx);
+
+    void push_pyramid_builder_Q(Point2i _index, unsigned _componentIndex);
 
     bool has_flatfield(int label);
 

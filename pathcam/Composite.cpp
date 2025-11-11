@@ -11,16 +11,10 @@
 namespace pathCam {
   CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size,
                                      unsigned int component_index) : Composite(
-                                                                       parent), componentIndex(component_index),
-                                                                     wakeEvent(true), image_size(image_size) {
+                                                                       parent,image_size,component_index),
+                                                                     wakeEvent(true) {
     minPixelDistanceBetweenFrames = 200;
 
-    imagePyramid.reset(new MRTiledImage(parent));
-    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(
-      imagePyramid, parent->tileSize, parent->tileSize,
-      0);
-    imagePyramid->level.push_back(current);
-    parent->MRimage->add(imagePyramid);
 
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
@@ -39,7 +33,7 @@ namespace pathCam {
     channelsGPU.resize(4);
     threeChannelPrealGPU = cuda::GpuMat(image_size, CV_8UC3);
     fourChannelPreallocated = Mat::zeros(image_size, CV_8UC4);
-    fourChannelPreallocated = cv::Mat::zeros(image_size, CV_8UC4);
+    fourChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC4,fourChannelPreallocated.data);
 
     //make_meshgrid();
 #endif
@@ -103,12 +97,12 @@ namespace pathCam {
     }
   }
 
-  void CompositeVoronoi::set_offset(const Point2f &_offset) const {
+  void Composite::set_offset(const Point2f &_offset) const {
     imagePyramid->set_offset(_offset);
   }
 
 
-  void CompositeVoronoi::set_scale(double _scale) {
+  void Composite::set_scale(double _scale) {
     imagePyramid->set_scale(_scale);
     deduce_label();
     imagePyramid->set_mag_label(componentMagLabel);
@@ -116,7 +110,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::deduce_label() {
+  void Composite::deduce_label() {
     if (componentIndex == 0) {
       componentMagLabel = parent->initialLabel;
       get_flatfield();
@@ -155,7 +149,7 @@ namespace pathCam {
 
   }
 
-  void CompositeVoronoi::get_flatfield() {
+  void Composite::get_flatfield() {
     set_candidate_scale_ratios();
 
     std::string filename = parent->get_flatfield(componentMagLabel);
@@ -190,7 +184,7 @@ namespace pathCam {
 #endif
   }
 
-  void CompositeVoronoi::set_candidate_scale_ratios() {
+  void Composite::set_candidate_scale_ratios() {
     switch (componentMagLabel) {
       case Image::_2X:
         candidateScaleRatios = {1.0, 2.0, 5.0, 10.0, 20.0};
@@ -933,7 +927,7 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::save_pyramid_as_image(std::string _fileName, bool _withGrid, bool _withGridAndIndexes,
+  void Composite::save_pyramid_as_image(std::string _fileName, bool _withGrid, bool _withGridAndIndexes,
                                                bool _withEffectedTiles, bool _outline,
                                                std::vector<Point2i> effectedTiles) {
     int lineThickness = 40;
@@ -1121,11 +1115,18 @@ namespace pathCam {
   }
 
 
-  Composite::Composite(StreamCam *parent) : update_mutex(new Poco::FastMutex()), parent(parent),
+  Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : update_mutex(new Poco::FastMutex()), parent(parent),componentIndex(_componentIndex),imageSize(image_size),
                                             root_offset(0.0, 0.0),
                                             max_offset(0.0, 0.0) {
     flat_field = parent->flat_field2X;
 
+    imagePyramid.reset(new MRTiledImage(parent));
+    std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(
+      imagePyramid, parent->tileSize, parent->tileSize,
+      0);
+    imagePyramid->level.push_back(current);
+    imagePyramid->componentIndex = _componentIndex;
+    parent->MRimage->add(imagePyramid);
     //local_quality_score = score_image_2X(4852,6464,2190);
   }
 
@@ -1402,6 +1403,7 @@ namespace pathCam {
 
 
   void ImageToTileCopyRunnable::run() {
+    /*
     std::cout << "deprecated method ImageToTileCopyRunnable::run()" << std::endl;
     assert(false);
     auto composite = parent->composites[component_membership];
@@ -1419,6 +1421,7 @@ namespace pathCam {
     }
 
     composite->notify_job_complete();
+    */
   }
 
   void
@@ -1575,349 +1578,6 @@ namespace pathCam {
       y.at<double>(i) = coords.y;
     }
     int k = 0;
-  }
-
-
-  void CompositeVoronoi::perform_global_alignment(unsigned int flag, double closenessFactor) {
-    //exclude_for_blur();
-
-    //flag == 0 will pull delaunay edges. Flag == 1 will pull all possible overlaps < closenessFactor
-
-    if (!needsAlignment) {
-      return;
-    }
-
-
-    if (flag == 1) {
-      std::vector<std::tuple<unsigned long, unsigned long, int, bool> > indexIndexEdgenumJobneeded;
-      int edgeNumber = 0;
-      for (int i = 0; i < memberImages.size() - 1; i++) {
-        for (int j = i + 1; j < memberImages.size(); j++) {
-          auto image1 = memberImages[j].first;
-          auto image2 = memberImages[i].first;
-
-          if (abs(image2->absoluteCoords.x - image1->absoluteCoords.x) < closenessFactor * image_size.width &&
-              abs(image2->absoluteCoords.y - image1->absoluteCoords.y) < closenessFactor * image_size.
-              height) {
-            indexIndexEdgenumJobneeded.push_back({image1->index, image2->index, edgeNumber, true});
-            //}
-          }
-        }
-      }
-
-
-      matchedEdges.resize(indexIndexEdgenumJobneeded.size(), {-1, -1});
-
-      for (int i = 0; i < indexIndexEdgenumJobneeded.size(); i++) {
-        auto edge = indexIndexEdgenumJobneeded[i];
-        auto idx1 = std::get<0>(edge);
-        auto idx2 = std::get<1>(edge);
-        if ((idx1 == 367 && idx2 == 412) || (idx1 == 412 && idx2 == 367)) {
-          int k = 0;
-        }
-        if (std::get<3>(edge)) {
-          auto sm = new SingleMatchRunnable(parent, idx1, idx2, componentIndex, i, 0);
-          matchableCount++;
-          parent->JobQ->add_runnable(sm);
-        } else {
-          matchedEdges[i].first = idx1;
-          matchedEdges[i].second = idx2;
-        }
-      }
-
-      //from this point on is experimental use of all DT edges as constraints, updating constraints when
-      //point is removed
-
-      while (matchableCount > 0) {
-        Poco::Thread::sleep(100);
-      }
-      matchedEdges.clear();
-
-      std::vector<RegInfo *> new_info(memberImages.size());
-      for (int i = 0; i < memberImages.size(); i++) {
-        new_info[i] = memberImages[i].first->regInfo;
-      }
-
-      std::map<long, long> frameIndexToSystemIndex;
-      std::map<long, long> systemIndexToFrameIndex;
-
-      Mat A;
-      Mat xpr;
-      Mat ypr;
-      Mat xac;
-      Mat yac;
-
-      self_reset();
-      rebuild_DT_elementwise(new_info, true, false);
-      build_system_from_DT(systemIndexToFrameIndex, frameIndexToSystemIndex, A, xpr, ypr, xac, yac);
-
-      auto testValBefore = norm(A * xac - xpr);
-      //solve problem for x and y
-      std::map<long, long> temp;
-
-      coopers_conjugate_gradient2(A, xpr, xac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, ypr, 0);
-      coopers_conjugate_gradient2(A, ypr, yac, 10000, 0.0000001, true, systemIndexToFrameIndex, 0.005, xpr, 1);
-
-      auto testValAfter = norm(A * xac - xpr);
-
-      self_reset();
-      parent->update_observers();
-      parent->reg_results_mutex->readLock();
-      std::vector<RegInfo *> newinfo;
-      newinfo.push_back(parent->get_reg_ref(memberImages[0].first->index));
-      double xDiff, yDiff;
-      double xDiffMax = 0;
-      double yDiffMax = 0;
-      for (auto [i, elm]: systemIndexToFrameIndex) {
-        auto ri = parent->get_reg_ref(systemIndexToFrameIndex[i]);
-
-        xDiff = abs(ri->absoluteCoords.x - xac.at<double>(i));
-        if (xDiff > xDiffMax) {
-          xDiffMax = xDiff;
-        }
-
-        yDiff = abs(ri->absoluteCoords.y - yac.at<double>(i));
-        if (yDiff > yDiffMax) {
-          yDiffMax = yDiff;
-        }
-
-        //ri->absoluteCoords.x = xac.at<double>(i);
-        //ri->absoluteCoords.y = yac.at<double>(i);
-
-        newinfo.push_back(ri);
-      }
-
-      parent->reg_results_mutex->unlock();
-
-      update(newinfo);
-
-      int k = 0;
-
-      return;
-    } else if (flag == 0) {
-      //collect list of all edges.
-      std::vector<Vec4f> edges;
-      std::vector<Vec2i> verticePairs;
-      std::vector<Point2f> coords;
-
-      subdiv.getEdgeList(edges);
-      matchedEdges.resize(edges.size(), {-1, -1}); //preallocated to avoid mutex
-
-      //this mutex is locked here because each job created in the following loop needs this mutex to be read locked.
-      //They will not cause a reallocation because these images have already had initial matches, meaning the match
-      //matrix has already been resized to accommodate them. Its unlocked at end of loop
-
-      //collect list of all vertices that share an edge
-      int count = 0;
-      for (int i = 0; i < edges.size(); i++) {
-        //set point to shorten if statement
-        auto ep = edges[i];
-        auto x1 = subdiv_Bbox.max_x;
-        auto x2 = subdiv_Bbox.min_x;
-        auto y1 = subdiv_Bbox.max_y;
-        auto y2 = subdiv_Bbox.min_y;
-
-
-        //make sure edge ends are within bounding box
-        if (ep[0] < x1 && ep[0] > x2 && ep[1] < y1 && ep[1] > y2 && ep[2] < x1 && ep[2] > x2 && ep[3] < y1 &&
-            ep[3] > y2) {
-          //find vertex IDs
-          int vertId1 = subdiv.findNearest({ep[0], ep[1]});
-          int vertId2 = subdiv.findNearest({ep[2], ep[3]});
-
-          //verify vertices correspond to images added to composite
-          auto val1 = delaunayMembers.count(vertId1);
-          auto val2 = delaunayMembers.count(vertId2);
-
-          if (val1 > 0 && val2 > 0) {
-            auto image_idx1 = delaunayMembers[vertId1];
-            auto image_idx2 = delaunayMembers[vertId2];
-
-            //create matchable job
-            matchableCount++;
-            auto sm = new SingleMatchRunnable(parent, delaunayMembers[vertId1], delaunayMembers[vertId2],
-                                              componentIndex, i, 0);
-            parent->JobQ->add_runnable(sm);
-          }
-        }
-      }
-    } //end edge type job assignment
-
-    //wait until these jobs have completed
-    while (matchableCount > 0) {
-      Poco::Thread::sleep(100);
-    }
-
-
-    //give each frame index a linear system index.
-    std::map<long, long> frameIndexToSystemIndex;
-    std::map<long, long> systemIndexToFrameIndex;
-    for (int i = 0; i < matchedEdges.size();) {
-      if (matchedEdges[i].first == -1) {
-        //just because a delaunay edge exists between two frames doesn't mean they actually overlap. Some edges may
-        //be far enough away that a registration between them is impossible, but a delaunay edge still exists. Delete
-        //these so that an accurate count of system equations can be made.
-        matchedEdges.erase(matchedEdges.begin() + i);
-        continue;
-      }
-      if (matchedEdges[i].first != memberImages[0].first->index) {
-        if (frameIndexToSystemIndex.find(matchedEdges[i].first) == frameIndexToSystemIndex.end()) {
-          long val = frameIndexToSystemIndex.size();
-          frameIndexToSystemIndex[matchedEdges[i].first] = val;
-          systemIndexToFrameIndex[val] = matchedEdges[i].first;
-        }
-      }
-      if (matchedEdges[i].second != memberImages[0].first->index) {
-        long val = frameIndexToSystemIndex.size();
-        if (frameIndexToSystemIndex.find(matchedEdges[i].second) == frameIndexToSystemIndex.end()) {
-          frameIndexToSystemIndex[matchedEdges[i].second] = val;
-          systemIndexToFrameIndex[val] = matchedEdges[i].second;
-        }
-      }
-      i++;
-    }
-    //no constraints means no linear system to minimize
-    if (matchedEdges.size() == 0) {
-      return;
-    }
-
-    //minimize norm2(Ax-b).
-    Mat A = Mat::zeros(matchedEdges.size(), frameIndexToSystemIndex.size(), CV_64FC1);
-    Mat xpr = Mat::zeros(matchedEdges.size(), 1, CV_64FC1);
-    Mat ypr = xpr.clone();
-    Mat xprLP = xpr.clone();
-    Mat yprLP = ypr.clone();
-
-    double valtest1 = 0;
-    unsigned long ind1, ind2;
-    std::vector<int> bins1;
-    for (int i = 0; i < matchedEdges.size(); i++) {
-      //build system (A in Ax - b)
-      if (matchedEdges[i].first != 0) {
-        A.at<double>(i, frameIndexToSystemIndex[matchedEdges[i].first]) = 1;
-      } else {
-        xprLP.at<double>(i, 0) += root_offset.x;
-        yprLP.at<double>(i, 0) += root_offset.y;
-      }
-      if (matchedEdges[i].second != 0) {
-        A.at<double>(i, frameIndexToSystemIndex[matchedEdges[i].second]) = -1;
-      } else {
-        xprLP.at<double>(i, 0) += -1 * root_offset.x;
-        yprLP.at<double>(i, 0) += -1 * root_offset.y;
-      }
-      //build pairwise reg vector (b in Ax - b)
-      auto pwr = parent->matchM.match[matchedEdges[i].first][matchedEdges[i].second];
-      xpr.at<double>(i, 0) = pwr->t_x;
-      ypr.at<double>(i, 0) = pwr->t_y;
-      xprLP.at<double>(i, 0) += pwr->t_x;
-      yprLP.at<double>(i, 0) += pwr->t_y;
-
-      auto verify1 = parent->reg_results[matchedEdges[i].first]->absoluteCoords;
-      auto verify2 = parent->reg_results[matchedEdges[i].second]->absoluteCoords;
-      auto val = abs(verify1.x - verify2.x - pwr->t_x);
-
-      if (val > valtest1) {
-        valtest1 = val;
-        ind1 = matchedEdges[i].first;
-        ind2 = matchedEdges[i].second;
-      }
-      if (val > 35) {
-        int k = 0;
-      }
-      if ((int) val >= bins1.size()) {
-        bins1.resize((int) val + 1, 0);
-        bins1[(int) val] = 1;
-      } else {
-        bins1[(int) val]++;
-      }
-    }
-
-    //build absolute coord/solution vector (x in Ax - b)
-    Mat xac = Mat::zeros(systemIndexToFrameIndex.size(), 1, CV_64FC1);
-    Mat yac = xac.clone();
-
-    for (int i = 0; i < systemIndexToFrameIndex.size(); i++) {
-      auto coords = parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords;
-      xac.at<double>(i) = coords.x;
-      yac.at<double>(i) = coords.y;
-    }
-
-    /*some comments:
-     * Because of the geometry of the delaunay triangulation, A^T * A is guaranteed to be symmetric positive definite.
-     * For this reason, minimizing the 2norm of Ax-b is well suited for conjugate gradient. I have written my own
-     * easy implementation and compared it in time trials to calculating the moore-pemrose inverse. for 100 iterations,
-     * CG takes 3 miliseconds while the MP inverse takes 11. Results are comparable.
-     *
-    start = std::chrono::high_resolution_clock::now();
-    Mat At = A.t();
-    Mat MPI = (At*A).inv()*At*xpr;
-    stop = std::chrono::high_resolution_clock::now();
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << duration.count() << std::endl;
-     */
-
-    auto testValBefore = norm(A * xac - xpr);
-    //solve problem for x and y
-    std::map<long, long> temp;
-
-    coopers_conjugate_gradient(A, xpr, xac, 10000, 0.0000001, false, systemIndexToFrameIndex, 0.005, ypr);
-    coopers_conjugate_gradient(A, ypr, yac, 10000, 0.0000001, false, systemIndexToFrameIndex, 0.005, xpr);
-
-    auto testValAfter = norm(A * xac - xpr);
-    int k = 0;
-    /*
-
- //compute LP problem to minimize inf norm instead of 2 norm
-    Mat c = Mat::zeros(A.cols + 1, 1, CV_64FC1);
-    c.at<double>(A.cols) = -1.0;
-
-    Mat G = Mat::zeros(2 * A.rows, A.cols + 2, CV_64FC1);
-    A.copyTo(G(Rect(0, 0, A.cols, A.rows)));
-    A.copyTo(G(Rect(0, A.rows, A.cols, A.rows)));
-    G(Rect(0, A.rows, A.cols, A.rows)) *= -1;
-    for (int i = 0; i < G.rows; i++) {
-      G.at<double>(i, A.cols) = -1;
-    }
-
-    xprLP.copyTo(G(Rect(A.cols + 1, 0, 1, xpr.rows)));
-    xprLP.copyTo(G(Rect(A.cols + 1, xpr.rows, 1, xpr.rows)));
-    G(Rect(A.cols + 1, xpr.rows, 1, xprLP.rows)) *= -1;
-
-    Mat xLP;
-    auto result = cv::solveLP(c, G, xLP);
-
-
-    Mat hy = Mat::zeros(2*A.rows,1,CV_64FC1);
-    ypr.copyTo(hy(Rect(0,0,1,ypr.rows)));
-    ypr.copyTo(hy(Rect(0,ypr.rows,1,ypr.rows)));
-    hy(Rect(0,ypr.rows,1,ypr.rows)) *= -1;
-
-*/
-    auto start = std::chrono::high_resolution_clock::now();
-
-
-    parent->update_observers();
-    parent->reg_results_mutex->readLock();
-    std::vector<RegInfo *> newinfo;
-
-    newinfo.push_back(memberImages[0].first->regInfo);
-    for (auto [i, elm]: systemIndexToFrameIndex) {
-      parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords.x = xac.at<double>(i);
-      parent->reg_results[systemIndexToFrameIndex[i]]->absoluteCoords.y = yac.at<double>(i);
-      newinfo.push_back(parent->reg_results[systemIndexToFrameIndex[i]]);
-    }
-    parent->reg_results_mutex->unlock();
-
-    self_reset();
-    update(newinfo, true);
-    //rebuild_DT_elementwise(newinfo, true,false);
-    //create_and_submit_rebuild_jobs();
-
-
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << duration.count() << std::endl;
-    needsAlignment = false;
   }
 
   void CompositeVoronoi::coopers_conjugate_gradient2(cv::Mat A, cv::Mat b, cv::Mat x, int steps, double epsilon,

@@ -140,8 +140,8 @@ namespace pathCam {
         continue;
       }
 
-      delaunayRegInfos.push_back(_newInfo[i]);
-      delaunayImages.push_back(images[i]);
+      contributingRegInfos.push_back(_newInfo[i]);
+      contributingImages.push_back(images[i]);
 
       update = true;
       images[i]->vertexId = res;
@@ -213,7 +213,11 @@ namespace pathCam {
       }
       parent->cvCompositeStream.waitForCompletion();
 
-      imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);
+      auto t1 = std::chrono::high_resolution_clock::now();
+      // imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);
+
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
+      tileupwardsTime += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t1).count();
 
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
@@ -255,8 +259,8 @@ namespace pathCam {
     cudaSetDevice(parent->compositorCudaDevice);
 
     //do this first so we have root and max offset determined ahead of time
-    for (int i = 0; i < delaunayImages.size(); ++i) {
-      auto img = delaunayImages[i];
+    for (int i = 0; i < contributingImages.size(); ++i) {
+      auto img = contributingImages[i];
       Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
       std::vector<Point2i> face;
       if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
@@ -323,7 +327,7 @@ namespace pathCam {
 
             if (!st->img) {
               int bestCoverage = 0;
-              for (auto &img: delaunayImages) {
+              for (auto &img: contributingImages) {
                 int val = pixels_overlapping_between(img, tileRect);
                 if (val > bestCoverage) {
                   bestCoverage = val;
@@ -424,14 +428,14 @@ namespace pathCam {
 
 
   void CompositeVoronoi::rebuild() {
-    if (delaunayImages.size() == 1) {
+    if (contributingImages.size() == 1) {
       //return;
     }
     self_reset();
 
     //do this for all images first so we pull final voronoi face on reconstruct
-    for (int i = 0; i < delaunayImages.size(); ++i) {
-      auto img = delaunayImages[i];
+    for (int i = 0; i < contributingImages.size(); ++i) {
+      auto img = contributingImages[i];
       Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
       std::vector<Point2i> face;
       if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
@@ -442,8 +446,8 @@ namespace pathCam {
       }
     }
 
-    for (int i = 0; i < delaunayImages.size(); ++i) {
-      Image *img = delaunayImages[i];
+    for (int i = 0; i < contributingImages.size(); ++i) {
+      Image *img = contributingImages[i];
       //get voronoi facets for only this face
       std::vector<std::vector<Point2f> > facets;
       std::vector<Point2f> centers;
@@ -590,31 +594,31 @@ namespace pathCam {
     double radSq = pow(0.8 * parent->scope_radius, 2);
 
     //overlaps within component
-    for (int i = 0; i < delaunayRegInfos.size() - 1; ++i) {
+    for (int i = 0; i < contributingRegInfos.size() - 1; ++i) {
       if (componentMagLabel == Image::_2X) {
-        if (pow(delaunayRegInfos[i]->absoluteCoords.x - delaunayRegInfos.back()->absoluteCoords.x, 2) +
-            pow(delaunayRegInfos[i]->absoluteCoords.y - delaunayRegInfos.back()->absoluteCoords.y, 2) < radSq) {
-          newOverlaps.push_back({delaunayImages[i], delaunayImages.back()});
+        if (pow(contributingRegInfos[i]->absoluteCoords.x - contributingRegInfos.back()->absoluteCoords.x, 2) +
+            pow(contributingRegInfos[i]->absoluteCoords.y - contributingRegInfos.back()->absoluteCoords.y, 2) < radSq) {
+          newOverlaps.push_back({contributingImages[i], contributingImages.back()});
         }
       } else {
-        if (abs(delaunayRegInfos[i]->absoluteCoords.x - delaunayRegInfos.back()->absoluteCoords.x) < 0.7 * image_size.
+        if (abs(contributingRegInfos[i]->absoluteCoords.x - contributingRegInfos.back()->absoluteCoords.x) < 0.7 * image_size.
             width &&
-            abs(delaunayRegInfos[i]->absoluteCoords.y - delaunayRegInfos.back()->absoluteCoords.y) < 0.7 * image_size.
+            abs(contributingRegInfos[i]->absoluteCoords.y - contributingRegInfos.back()->absoluteCoords.y) < 0.7 * image_size.
             height) {
-          newOverlaps.emplace_back(delaunayImages[i], delaunayImages.back());
+          newOverlaps.emplace_back(contributingImages[i], contributingImages.back());
         }
       }
     }
-
+/*
     //overlaps between this and other components
     for (auto comp: parent->composites) {
+
       if (comp != this) {
         for (auto di: comp->delaunayImages) {
           if (delaunayRegInfos.back()->root) {
             newOverlaps.emplace_back(di, delaunayImages.back());
           } else {
             assert(imagePyramid->scale != 0);
-            /*TODO intersect bounding box of this image with bounding box of images from other components*/
             //calculate my position in base space
             auto myBaseAbC = delaunayRegInfos.back()->get_AbC_relative_from_local(0);
             auto theirBaseAbC = di->regInfo->get_AbC_relative_from_local(0);
@@ -642,7 +646,7 @@ namespace pathCam {
         }
       }
     }
-
+*/
     std::reverse(newOverlaps.begin(), newOverlaps.end());
     return newOverlaps;
   }

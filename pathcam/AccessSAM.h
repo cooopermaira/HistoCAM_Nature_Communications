@@ -5,6 +5,7 @@
 #ifndef ACCESSSAM_H
 #define ACCESSSAM_H
 
+#include "Composite.h"
 #include "pathCam.h"
 
 namespace pathCam {
@@ -19,7 +20,7 @@ namespace pathCam {
 
 
   class AccessSAM;
-  class CompositeVoronoi;
+  class Composite;
 
   class SAMTile {
   public:
@@ -61,7 +62,7 @@ namespace pathCam {
 
     void set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat);
 
-    void get_tile_data(CompositeVoronoi *_comp, unsigned int _interval);
+    void get_tile_data(pathCam::Composite * _comp, unsigned int _interval);
 
     void make_raw_buffer(void *_buffer = nullptr);
 

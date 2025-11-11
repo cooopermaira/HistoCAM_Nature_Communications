@@ -18,7 +18,7 @@ class MRTiledImage{
   
 public:
   cv::Rect_<float> bounds;
-  unsigned int tile_size,magLabel;
+  unsigned int tile_size,magLabel,componentIndex = 0;
   double scale;
   Point2f offset;
   Poco::Event scaleSet;
@@ -31,15 +31,17 @@ public:
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
 
-#ifdef HAVE_OPENCV_CUDAARITHM
+// #ifdef HAVE_OPENCV_CUDAARITHM
   void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, std::vector<Point2i> &retileIndices) {
     level[0]->insertTilesAtBase(image_in,mask,box,retileIndices);
 
   };
-#else
-  void insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+// #else
+  void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices){
+    level[0]->insertTilesAtBase(image_in,mask,box,retileIndices);
+  };;
 
-#endif
+// #endif
 
   int get_class_for_tile(std::tuple<int,int,unsigned> _tile);
   

@@ -53,6 +53,7 @@ public:
   }
 };
 struct TileObj {
+  int updateCount = 0;
   void* preferredObj;
   void* preferredBuffer;
 
@@ -66,7 +67,10 @@ struct TileObj {
   std::map<int,std::pair<cuda::GpuMat,void*>> SAMMasks;
 
   TileObj(int _tileSize) {
-    image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, Scalar(0, 0, 0, 0));
+    char* buf;
+    cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
+    cudaMemset(buf,0,_tileSize * _tileSize * 4);
+    image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4,buf);
     preferredBuffer = nullptr;
     preferredObj = nullptr;
     usingPreferred = false;
@@ -137,20 +141,25 @@ public:
 
   void saveBaseTilesToDisk();
 
+  void matToTile(const cv::Mat &mat, const cv::Mat &mask,int x, int y, Point2f rootOffset,
+                 cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
+
+  void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices);
+
 #ifdef HAVE_OPENCV_CUDAARITHM
   void matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask,int x, int y, Point2f rootOffset,
                cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
   void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, const std::vector<Point2i> &retileIndices);
 
+
+
   void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &mat, Rect theirRoi, int _segID = -1);
 
   TileObj &getTile(int x, int y);
 #else
-  void matToTile(const cv::Mat &mat, const cv::Mat &mask,int x, int y, Point2f rootOffset,
-               cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
-  void insertTilesAtBase(cv::Mat image_in, cv::Mat mask, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
+
 
   void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
 

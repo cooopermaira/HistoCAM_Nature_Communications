@@ -12,6 +12,8 @@
 #include <random>
 #include <numeric>
 #include "pathCam.h"
+#include "MRTiledImage.h"
+#include "AccessSAM.h"
 
 
 namespace pathCam {
@@ -48,7 +50,31 @@ namespace pathCam {
 
     std::shared_ptr<MRTiledImage> imagePyramid;
 
-    Composite(StreamCam *parent);
+    int componentIndex = 0;
+    int componentMagLabel;
+    bool needsAlignment = false;
+
+    std::vector<RegInfo *> contributingRegInfos;
+    std::vector<Image *> contributingImages;
+    std::map<int, unsigned long> delaunayMembers;
+
+    cuda::GpuMat ffGPU;
+
+    Size imageSize;
+
+    std::vector<float> candidateScaleRatios;
+
+    Composite(StreamCam *parent, Size image_size, int _componentIndex);
+
+    void set_scale(double _scale);
+
+    void set_offset(const Point2f &_offset) const;
+
+    void deduce_label();
+
+    void set_candidate_scale_ratios();
+
+    void get_flatfield();
 
     void add_images(std::vector<RegInfo *> new_info);
 
@@ -59,6 +85,10 @@ namespace pathCam {
     Mat get_composite();
 
     Mat score_image_2X(int, int, int);
+
+    void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false, bool _withGridAndIndexes = false,
+                           bool _withEffectedTiles = true, bool _outline = false,
+                           std::vector<Point2i> effectedTiles = {});
   };
 
 
@@ -101,8 +131,7 @@ namespace pathCam {
     cuda::GpuMat gry;
     cuda::GpuMat gry2;
 
-    std::vector<RegInfo *> delaunayRegInfos;
-    std::vector<Image *> delaunayImages;
+
 #endif
 
     Subdiv2D subdiv;
@@ -227,15 +256,12 @@ namespace pathCam {
 
     CompositeVoronoi(StreamCam *parent, cv::Size image_size, unsigned int componentIndex);
 
-    unsigned int componentMagLabel;
     std::vector<float> candidateScaleRatios;
-    unsigned int componentIndex;
     long firstImageIdx = -1;
-    bool needsAlignment = false;
     std::atomic<unsigned int> matchableCount = 0;
     std::vector<std::pair<long, long> > matchedEdges;
     std::vector<std::pair<Image *, bool> > memberImages;
-    std::map<int, unsigned long> delaunayMembers;
+
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
     int minTilex = 1000;
@@ -243,15 +269,15 @@ namespace pathCam {
     int minTiley = 1000;
     int maxTiley = 0;
 
-    void set_scale(double _scale);
+    //void set_scale(double _scale);
 
-    void set_offset(const Point2f &_offset) const;
+    // void set_offset(const Point2f &_offset) const;
 
-    void deduce_label();
+//    void deduce_label();
 
-    void set_candidate_scale_ratios();
+    //void set_candidate_scale_ratios();
 
-    void get_flatfield();
+    //void get_flatfield();
 
     void store_new_info(RegInfo *_new_info);
 
@@ -273,9 +299,7 @@ namespace pathCam {
 
     void notify_job_complete();
 
-    void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false, bool _withGridAndIndexes = false,
-                               bool _withEffectedTiles = true, bool _outline = false,
-                               std::vector<Point2i> effectedTiles = {});
+
 
     void debug_draw_voronoi(Mat &img, Subdiv2D &subdiv, bool _drawPathInsteadOfFaces = false,
                             bool _drawIntersect = false, Point2i _intrCenter = Point2i(0, 0));
@@ -286,6 +310,7 @@ namespace pathCam {
     std::priority_queue<unsigned int> freeMasks;
     std::vector<Mat> masks;
     int removeCount = 0;
+    double tileupwardsTime = 0;
   };
 }
 

@@ -123,6 +123,7 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
+    //std::cout<<parent->composites[0]->tileupwardsTime / parent->composites[0]->delaunayImages.size()<<std::endl;
 
     //save_components_to_disk();
     if (parent->recordingMode) {
@@ -153,11 +154,11 @@ namespace pathCam {
   }
 
   void CompositeManager::push_remaining_tiles_for_inference() {
-    for (auto i: parent->composites) {
-      parent->push_tile_embed_Q(i->queuedTiles, i->componentIndex);
-      i->queuedTiles.clear();
-    }
-    parent->inferenceWait.set();
+    // for (auto i: parent->composites) {
+    //   parent->push_tile_embed_Q(i->queuedTiles, i->componentIndex);
+    //   i->queuedTiles.clear();
+    // }
+    // parent->inferenceWait.set();
   }
 
   void CompositeManager::submit_outstanding_jobs() {

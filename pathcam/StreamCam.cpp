@@ -199,7 +199,7 @@ namespace pathCam {
                 double maxY = 0;
                 for (auto &comp: composites) {
                     if (comp->needsAlignment) {
-                        for (auto &img: comp->delaunayImages) {
+                        for (auto &img: comp->contributingImages) {
                             if (!img->regInfo->stayFixedDuringBundleAdjustment) {
                                 auto pv = sfm->bai->optimizer->poseVertex(img->index);
                                 if (img->regInfo->root && !img->regInfo->rootOfRoot) {
@@ -272,7 +272,7 @@ namespace pathCam {
                 std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
             }
             if (composites[i]->needsAlignment) {
-                composites[i]->rebuild();
+                //composites[i]->rebuild();
                 //composites[i]->rebuild_and_initialize_SAM();
             }
         }
@@ -283,7 +283,7 @@ namespace pathCam {
         //this is honestly unhinged to do this without at all checking if the space is available in memory or on the gpu
         //but for now were going with it TODO
 
-        for (auto &img: composites[_componentIndex]->delaunayImages) {
+        for (auto &img: composites[_componentIndex]->contributingImages) {
             if (!img->cudaBufferReady) {
                 img->load_raw_from_disk();
                 img->move_buffer_to_gpu(compositorCudaDevice, true);
@@ -307,6 +307,12 @@ namespace pathCam {
     }
 
 #endif
+
+    void StreamCam::push_pyramid_builder_Q(Point2i _index, unsigned _componentIndex) {
+        pyramidQMutex.lock();
+        pyramidBuilderQ.push({_index,_componentIndex});
+        pyramidQMutex.unlock();
+    }
 
     void StreamCam::set_match(unsigned long _image_idx, unsigned long _prev_idx, Match *_m, bool _invert) {
         resize_mmatch_mutex->writeLock();
@@ -500,7 +506,8 @@ namespace pathCam {
         ri->index = image_index;
         ri->matchedTo = image_index; //this is a root image, it has no match
 
-        auto *temp = new CompositeVoronoi(this, image_size, component_index);
+        //auto *temp = new CompositeVoronoi(this, image_size, component_index);
+        auto temp = new MetricComposite(this,image_size,component_index);
         component_mutex->lock();
         composites.push_back(temp);
 

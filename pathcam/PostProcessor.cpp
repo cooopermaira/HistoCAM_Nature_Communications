@@ -150,17 +150,17 @@ namespace pathCam {
         allMatches.push_back(matchesInfo);
         --matchWorkOutstanding;
       }
-      if (rootFound) {
-        assert(rootRegRef->rootHomographies.size() > 0);
-        double scale;
-        Point2f rootGuess;
-        rootRegRef->average_from_homographies(rootGuess,scale);
-        auto comp = parent->composites[rootRegRef->component_membership];
-        cudaSetDevice(parent->compositorCudaDevice);
-        comp->set_scale(scale);
-        comp->set_offset(rootGuess/scale);
-        comp->wakeEvent.set();
-      }
+      // if (rootFound) {
+      //   assert(rootRegRef->rootHomographies.size() > 0);
+      //   double scale;
+      //   Point2f rootGuess;
+      //   rootRegRef->average_from_homographies(rootGuess,scale);
+      //   auto comp = parent->composites[rootRegRef->component_membership];
+      //   cudaSetDevice(parent->compositorCudaDevice);
+      //   comp->set_scale(scale);
+      //   comp->set_offset(rootGuess/scale);
+      //   comp->wakeEvent.set();
+      // }
     }
     loopInProcess = false;
   }
