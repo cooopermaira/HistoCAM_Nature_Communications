@@ -160,7 +160,7 @@ namespace pathCam {
 
     //std::vector < double > variancesForDebug;
     //std::vector<CompositeVoronoi *> composites;
-    std::vector<MetricComposite*> composites;
+    std::vector<Composite*> composites;
     std::vector<bool> visited;
 
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;

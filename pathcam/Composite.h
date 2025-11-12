@@ -50,6 +50,10 @@ namespace pathCam {
 
     std::shared_ptr<MRTiledImage> imagePyramid;
 
+    int minTilex = 1000;
+    int maxTilex = 0;
+    int minTiley = 1000;
+    int maxTiley = 0;
     int componentIndex = 0;
     int componentMagLabel;
     bool needsAlignment = false;
@@ -57,6 +61,8 @@ namespace pathCam {
     std::vector<RegInfo *> contributingRegInfos;
     std::vector<Image *> contributingImages;
     std::map<int, unsigned long> delaunayMembers;
+    std::queue<RegInfo*> staging;
+
 
     cuda::GpuMat ffGPU;
 
@@ -65,6 +71,13 @@ namespace pathCam {
     std::vector<float> candidateScaleRatios;
 
     Composite(StreamCam *parent, Size image_size, int _componentIndex);
+
+    void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
+                                        Vec2 absCoord);
+
+    void stage(RegInfo* _ri){staging.push(_ri);}
+
+    void establish_scale_at_root(Image *_rootImg);
 
     void set_scale(double _scale);
 
@@ -80,7 +93,9 @@ namespace pathCam {
 
     void update_Bbox(std::vector<RegInfo *> new_info);
 
-    void update(std::vector<RegInfo *> new_info);
+    void update_Bbox_no_composite(std::vector<RegInfo *> new_info);
+
+    virtual void update();
 
     Mat get_composite();
 
@@ -169,22 +184,12 @@ namespace pathCam {
       const std::vector<double> &scales,
       cudaStream_t stream);
 
-    static cuda::GpuMat get_grayscale(Image* &_img) {
-      cuda::GpuMat temp;
-      Size size(_img->width,_img->height);
-      cuda::GpuMat image_Mat(size, CV_8U, _img->get_raw_cuda());
-      cuda::cvtColor(image_Mat, temp, COLOR_BayerBG2GRAY);
-      temp.convertTo(image_Mat,CV_32FC1);
-      return image_Mat;
-    }
 
-    static ScaleResult estimate_scale_auto_GPU(const cuda::GpuMat &imgA, const cuda::GpuMat &imgB,
-                                               const std::vector<double> &scales = {2.0, 2.5, 4.0, 5.0, 10.0, 20},
-                                               cudaStream_t stream = nullptr);
+
 
     static cuda::GpuMat preprocess_GPU(const cuda::GpuMat& bgr_or_gray, cudaStream_t stream);
 
-    void establish_scale_at_root(Image *_rootImg);
+
 
     static void establish_scale_between_two_centered_Images(Image* img1, Image* img2, double &scale, Point2f &offset);
 
@@ -211,11 +216,6 @@ namespace pathCam {
     void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
 
     void create_and_submit_rebuild_jobs();
-
-    void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
-                                        Vec2 absCoord);
-
-    void calculate_effected_tiles_count_nonzero(Mat polyMaskOutput, std::vector<Point2i> &result, Vec2 absCoord);
 
     void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord,
                                   std::vector<Point2i> *additionalResult = {});
@@ -264,10 +264,7 @@ namespace pathCam {
 
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
-    int minTilex = 1000;
-    int maxTilex = 0;
-    int minTiley = 1000;
-    int maxTiley = 0;
+
 
     //void set_scale(double _scale);
 
@@ -284,8 +281,6 @@ namespace pathCam {
     void update_from_stored_info();
 
     void update(std::vector<RegInfo *> _new_info, bool _force_add = false);
-
-    void update_Bbox_no_composite(std::vector<RegInfo *> new_info);
 
     void perform_global_alignment(unsigned int flag, double closenessFactor);
 

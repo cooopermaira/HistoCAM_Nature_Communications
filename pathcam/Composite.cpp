@@ -552,6 +552,13 @@ namespace pathCam {
     return temp;
   }
 
+  long segment_yval_at_point(float xloc, Point2f p1, Point2f p2) {
+    if (p1.x == p2.x) {
+      return max(p1.y, p2.y);
+    }
+    return long((p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y);
+  }
+
   void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                   Vec2 absCoord, std::vector<Point2i> *additionalResult) {
     std::vector<Point2i> tileIndices;
@@ -696,8 +703,7 @@ namespace pathCam {
     }
   }
 
-  void
-  CompositeVoronoi::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
+  void Composite::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                    Vec2 absCoord) {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -707,12 +713,12 @@ namespace pathCam {
     //get the tile column of the left and right edges of the image frame
     int columnBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
     int columnBoundHigh = imagePyramid->level[0]->getIJ(
-      Point2f(absCoord.x + image_size.width, absCoord.y)).x;
+      Point2f(absCoord.x + imageSize.width, absCoord.y)).x;
 
     //get the tile row the top and bottom edges of the image frame
     long rowBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
     long rowBoundHigh = imagePyramid->level[0]->getIJ(
-      Point2f(absCoord.x, absCoord.y + image_size.height)).y;
+      Point2f(absCoord.x, absCoord.y + imageSize.height)).y;
 
     float yPixelBoundLow = float(rowBoundLow) * float(imagePyramid->tile_size);
     float yPixelBoundHigh = float(rowBoundHigh) * float(imagePyramid->tile_size);
@@ -789,8 +795,8 @@ namespace pathCam {
           for (int i = 0; i < 4; i++) {
             int x = key * imagePyramid->tile_size + (i % 2 == 0 ? imagePyramid->tile_size : 0);
             int y = ii * imagePyramid->tile_size + (i % 3 == 0 ? imagePyramid->tile_size : 0);
-            auto dist = pow(absCoord.x + image_size.width / 2 - x, 2) + pow(
-                          absCoord.y + image_size.height / 2 - y, 2);
+            auto dist = pow(absCoord.x + imageSize.width / 2 - x, 2) + pow(
+                          absCoord.y + imageSize.height / 2 - y, 2);
             if (dist < scopeRadSqr) {
               result.push_back(Point2i(key, ii));
               if (key < minTilex) { minTilex = key; }
@@ -1131,11 +1137,10 @@ namespace pathCam {
   }
 
 
-  void CompositeVoronoi::update_Bbox_no_composite(std::vector<RegInfo *> new_info) {
+  void Composite::update_Bbox_no_composite(std::vector<RegInfo *> new_info) {
     bool update_box = false;
 
     //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
-    Vec2 temp_offset = root_offset;
 
     // If any new frames extend beyond the current extent, expand cv image dimensions
     for (int i = 0; i < new_info.size(); i++) {
@@ -1317,9 +1322,11 @@ namespace pathCam {
     */
   }
 
-  void Composite::update(std::vector<RegInfo *> new_info) {
+  void Composite::update() {
+    auto new_info = staging;
     update_Bbox(new_info);
     add_images(new_info);
+    staging.clear();
   }
 
   Mat Composite::get_composite() {
@@ -1333,12 +1340,7 @@ namespace pathCam {
     imageBoundsAsPolygon[3] = Point2i(0, image_size.height);
   }
 
-  long CompositeVoronoi::segment_yval_at_point(float xloc, Point2f p1, Point2f p2) {
-    if (p1.x == p2.x) {
-      return max(p1.y, p2.y);
-    }
-    return long((p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y);
-  }
+
 
   void CompositeVoronoi::remove_duplicates_without_sort(std::vector<Point2i> &vec) {
     auto new_last = vec.end() - 1;

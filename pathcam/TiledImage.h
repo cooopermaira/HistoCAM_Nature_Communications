@@ -53,6 +53,11 @@ public:
   }
 };
 struct TileObj {
+  enum {
+    noCoverage = 0, partialCoverage, singleFrameCoverage
+  };
+
+  int status = noCoverage;
   int updateCount = 0;
   void* preferredObj;
   void* preferredBuffer;

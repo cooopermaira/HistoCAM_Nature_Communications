@@ -73,42 +73,30 @@ namespace pathCam {
           Poco::Thread::sleep(100);
         }
 
-        unsigned int current_component = indexes[0]->component_membership;
-        std::vector<RegInfo *> new_info;
-
-        //sort the new frames by component and pass them to their respective components for compositing.
-        for (int i = 0; i < indexes.size(); i++) {
-          if (!indexes[i]->tryComposite){continue;}
-          if (current_component == indexes[i]->component_membership) {
-            new_info.push_back(indexes[i]);
-          } else {
-            parent->lastViewedFrame = parent->get_image_ref(indexes[i-1]->index); //cant happen unless index is already >0
-            auto start = std::chrono::high_resolution_clock::now();
-
-            parent->composites[current_component]->update(new_info);
-            ++updateCount;
-
-            auto stop = std::chrono::high_resolution_clock::now();
-            duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
-
-            current_component = indexes[i]->component_membership;
-            new_info.clear();
+        if (!indexes.empty()) {
+          for (auto index : indexes) {
+            parent->composites[index->component_membership]->stage(index);
           }
+
+          auto start = std::chrono::high_resolution_clock::now();
+          for (auto &comp : parent->composites) {
+            comp->update();
+          }
+          auto stop = std::chrono::high_resolution_clock::now();
+          duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
         }
-        auto start = std::chrono::high_resolution_clock::now();
-        parent->composites[current_component]->update(new_info);
+
         parent->lastViewedFrame = parent->get_image_ref(indexes.back()->index);
 
         int endInd = int(indexes.back()->index) - 1;
         for (int i = lastViewedFrame; i <= endInd; ++i) {
-          parent->clear_buffer(i);
+          //parent->clear_buffer(i);
         }
         lastViewedFrame = parent->lastViewedFrame->index;
 
         //Poco::Thread::sleep(100);
         //++updateCount;
-        auto stop = std::chrono::high_resolution_clock::now();
-        duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+
       }
 
       //check_render_info();

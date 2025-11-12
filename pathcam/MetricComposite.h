@@ -13,7 +13,11 @@ namespace pathCam {
     public:
         MetricComposite(StreamCam *parent, Size image_size, int componentIndex);
 
+        void update() override;
 
+        std::vector<std::pair<Point2i,int>> calculate_effected_tiles_with_status(Point2f _AbC);
+
+        //std::queue<std::pair<Image*,std::vector
 
 
 
