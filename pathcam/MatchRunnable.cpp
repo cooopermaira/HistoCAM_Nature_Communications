@@ -69,6 +69,7 @@ void MatchRunnable::run() {
           tempReg->relativeCoords.x = -1 * m->t_x;
           tempReg->relativeCoords.y = -1 * m->t_y;
           tempReg->accessMutex->unlock();
+          tempReg->image = image;
 
           parent->regCount++;
           auto rj = new RegistrationRunnable(parent, tempReg);

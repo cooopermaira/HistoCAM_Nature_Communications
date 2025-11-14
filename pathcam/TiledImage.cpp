@@ -333,6 +333,7 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
 
     tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                        matROI.rows);
+
     tileObject.mutex->lock();
     if (mask.data) {
       matROI.copyTo(temp(tileROI), mask(ROIrect));

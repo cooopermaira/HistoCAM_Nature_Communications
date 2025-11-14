@@ -521,6 +521,7 @@ namespace pathCam {
             temp->set_scale(0);
         }
         temp->set_offset(Point2f(0, 0));
+        ri->image = get_image_ref(ri->index);
         ri->set_abc(Vec2(0, 0), component_index, true);
         component_mutex->unlock();
     }

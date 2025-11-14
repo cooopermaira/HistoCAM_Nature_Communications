@@ -51,6 +51,7 @@ namespace pathCam {
 
     auto image = parent->get_image_ref(index);
     image->regInfo = this;
+    image->absoluteCoords = Point2i(absoluteCoords.x,absoluteCoords.y);
 
     bool proceed = queue_for_compositing && parent->sufficient_distance(absoluteCoords,component_membership);
 

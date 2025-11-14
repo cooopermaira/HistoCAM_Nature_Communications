@@ -7,6 +7,7 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
 
 
+
   void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
     _face.push_back(_face[0]);
     int i = 1;
@@ -107,6 +108,88 @@ namespace pathCam {
 
       cuda::multiply(polyMaskGPU, binaryCompare, polyMaskGPU);
     }
+  }
+
+  void adjust_roi_for_debayer(Rect &roi_) {
+    if (roi_.x%2 > 0) {
+      --roi_.x;
+      ++roi_.width;
+    }
+    if (roi_.y % 2 > 0) {
+      --roi_.y;
+      ++roi_.height;
+    }
+    if (roi_.width % 2 > 0) {
+      ++roi_.width;
+    }
+    if (roi_.height % 2 > 0) {
+      ++roi_.height;
+    }
+  }
+
+  bool Composite::prepare_4CPA(Image *img, std::vector<Point2i> &affectedTiles) {
+    if (affectedTiles.size() < 100) {
+      bool ans = false;
+      Rect imageBoxCompositeSpace(img->absoluteCoords.x,img->absoluteCoords.y,imageSize.width,imageSize.height);
+      for (auto &tile : affectedTiles) {
+        Rect tileBoxCompositeSpace(parent->tileSize * tile.x, parent->tileSize * tile.y, parent->tileSize, parent->tileSize);
+        auto intersectionInCompositeSpace = tileBoxCompositeSpace & imageBoxCompositeSpace;
+
+        if (intersectionInCompositeSpace.empty()){continue;}
+
+        intersectionInCompositeSpace -= img->absoluteCoords;
+        ans = ans || prepare_4CPA(img,intersectionInCompositeSpace);
+      }
+      return ans;
+    }else {
+      return prepare_4CPA(img);
+    }
+  }
+
+
+  bool Composite::prepare_4CPA(Image *img, Rect roi_) {
+    bool wholeImage = false;
+    if (roi_.width * roi_.height == 0) {
+      roi_ = Rect(0,0,imageSize.width,imageSize.height);
+      wholeImage = true;
+    }
+
+    if (!parent->unifiedMemory){
+      //wait for buffer to be on gpu
+      std::unique_lock lock(img->cudaBufferMutex);
+      img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
+
+      //build and debayer with gpumat objects
+      cuda::GpuMat rawMat;
+      rawMat = cuda::GpuMat(imageSize, CV_8U, img->get_raw_cuda());
+      cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR,0,parent->cvCompositeStream);
+      return true;
+    }else {
+      adjust_roi_for_debayer(roi_);
+      Mat rawMat;
+      rawMat = Mat(imageSize, CV_8U, img->get_Raw());
+      cvtColor(rawMat(roi_),threeChannelPreallocated(roi_),COLOR_BayerBG2BGR);
+      threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3,threeChannelPreallocated.data);
+    }
+
+    //ff correct
+    if (convertHoldingGPU.empty()) {
+      convertHoldingGPU = cuda::GpuMat(imageSize,CV_32FC3);
+    }
+    threeChannelPrealGPU(roi_).convertTo(convertHoldingGPU(roi_), CV_32F,parent->cvCompositeStream);
+    cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_), convertHoldingGPU(roi_), 1, CV_32F);//,parent->cvCompositeStream);
+
+    //brighten
+    cuda::pow(convertHoldingGPU(roi_), 1.1, convertHoldingGPU(roi_),parent->cvCompositeStream);
+    convertHoldingGPU(roi_).convertTo(threeChannelPrealGPU(roi_), CV_8UC3,parent->cvCompositeStream);
+
+    //add alpha channel
+    cuda::split(threeChannelPrealGPU(roi_), channelsGPU,parent->cvCompositeStream);
+    channelsGPU.push_back(rectMaskGPU(roi_));
+    cuda::merge(channelsGPU, fourChannelPrealGPU(roi_),parent->cvCompositeStream);
+
+    parent->cvCompositeStream.waitForCompletion();
+    return wholeImage;
   }
 
 
@@ -230,7 +313,7 @@ namespace pathCam {
       }
 
       //update pyramid bounds, reset mask
-      imagePyramid->bounds = imagePyramid->level[0]->bounds;
+
       polyMaskOutput.setTo(Scalar(0));
     }
 
@@ -556,7 +639,7 @@ namespace pathCam {
   }
 
 
-  SiftData CompositeVoronoi::GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts) {
+  SiftData Composite::GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts) {
     SiftData siftData;
     try{
     if (_img.channels() == 1) {
@@ -574,7 +657,7 @@ namespace pathCam {
     gry.convertTo(gry2,CV_32FC1);
 
     CudaImage cImgGry;
-    cImgGry.Allocate(image_size.width, image_size.height, gry2.step / sizeof(float), false,
+    cImgGry.Allocate(imageSize.width, imageSize.height, gry2.step / sizeof(float), false,
                      reinterpret_cast<float *>(gry2.data), nullptr);
 
 
@@ -588,6 +671,9 @@ namespace pathCam {
 
     //int k = 0;
   }
+
+
+
 
   std::vector<std::pair<Image *, Image *> > CompositeVoronoi::calculate_new_overlaps() {
     std::vector<std::pair<Image *, Image *> > newOverlaps;

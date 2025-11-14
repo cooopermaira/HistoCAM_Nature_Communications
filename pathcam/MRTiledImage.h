@@ -39,6 +39,7 @@ public:
 // #else
   void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices){
     level[0]->insertTilesAtBase(image_in,mask,box,retileIndices);
+    bounds = level[0]->bounds;
   };;
 
 // #endif

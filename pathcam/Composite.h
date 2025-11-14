@@ -14,6 +14,7 @@
 #include "pathCam.h"
 #include "MRTiledImage.h"
 #include "AccessSAM.h"
+#include "StreamCam.h"
 
 
 namespace pathCam {
@@ -44,7 +45,7 @@ namespace pathCam {
     Mat local_quality_score, composite_z_buffer, flat_field;
     Mat3f flat_field_composite;
     Mat4b composite;
-    Vec2 root_offset, max_offset;
+    Point2i root_offset, max_offset;
     Rect_<float> tiledImageBounds;
     Poco::FastMutex *update_mutex;
 
@@ -58,13 +59,45 @@ namespace pathCam {
     int componentMagLabel;
     bool needsAlignment = false;
 
+#ifdef HAVE_OPENCV_CUDAARITHM
+    cuda::GpuMat diffGPU;
+    cuda::GpuMat xp1;
+    cuda::GpuMat xp2;
+    cuda::GpuMat binaryCompare;
+
+    long long bigx = 0, bigy = 0;
+    cuda::GpuMat meshGridX;
+    cuda::GpuMat meshGridY;
+    cuda::GpuMat rectMaskGPU;
+    cuda::GpuMat circleMaskGPU;
+    cuda::GpuMat circleMaskGPU255;
+    cuda::GpuMat polyMaskGPU;
+    std::vector<cuda::GpuMat> channelsGPU;
+    cuda::GpuMat ffGPU;
+    cuda::GpuMat convertHoldingGPU;
+    cuda::GpuMat threeChannelPrealGPU;
+    cuda::GpuMat fourChannelPrealGPU;
+    cuda::GpuMat gry;
+    cuda::GpuMat gry2;
+
+
+#endif
+    Mat circleMask;
+
+    Mat rectMask;
+    Mat threeChannelPreallocated;
+    Mat fourChannelPreallocated;
+
     std::vector<RegInfo *> contributingRegInfos;
     std::vector<Image *> contributingImages;
     std::map<int, unsigned long> delaunayMembers;
     std::queue<RegInfo*> staging;
 
 
-    cuda::GpuMat ffGPU;
+    SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
+
+    bool prepare_4CPA(Image *img, std::vector<Point2i> &affectedTiles);
+    bool prepare_4CPA(Image*img, Rect roi = Rect());
 
     Size imageSize;
 
@@ -72,8 +105,10 @@ namespace pathCam {
 
     Composite(StreamCam *parent, Size image_size, int _componentIndex);
 
+
+
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
-                                        Vec2 absCoord);
+                                        Point2f absCoord);
 
     void stage(RegInfo* _ri){staging.push(_ri);}
 
@@ -117,37 +152,12 @@ namespace pathCam {
     unsigned int minPixelDistanceBetweenFrames;
     Vec2 lastAcceptedImageAbC;
     Vec2 lastImageAbC;
-    Mat circleMask;
-    Mat rectMask;
     Mat polyMaskOutput;
     Mat freshMask;
     Mat ff;
     Mat convertHolding;
-    Mat threeChannelPreallocated;
-    Mat fourChannelPreallocated;
-#ifdef HAVE_OPENCV_CUDAARITHM
-    cuda::GpuMat diffGPU;
-    cuda::GpuMat xp1;
-    cuda::GpuMat xp2;
-    cuda::GpuMat binaryCompare;
-
-    long long bigx = 0, bigy = 0;
-    cuda::GpuMat meshGridX;
-    cuda::GpuMat meshGridY;
-    cuda::GpuMat rectMaskGPU;
-    cuda::GpuMat circleMaskGPU;
-    cuda::GpuMat circleMaskGPU255;
-    cuda::GpuMat polyMaskGPU;
-    std::vector<cuda::GpuMat> channelsGPU;
-    cuda::GpuMat ffGPU;
-    cuda::GpuMat convertHoldingGPU;
-    cuda::GpuMat threeChannelPrealGPU;
-    cuda::GpuMat fourChannelPrealGPU;
-    cuda::GpuMat gry;
-    cuda::GpuMat gry2;
 
 
-#endif
 
     Subdiv2D subdiv;
     cv::Size image_size;
@@ -163,8 +173,6 @@ namespace pathCam {
     std::vector<Point2i> push_for_inferencing(std::vector<Point2i> &_tiles);
 
     void check_set_render_info();
-
-    long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2);
 
     void add_images_with_composite(std::vector<RegInfo *> new_info);
 
@@ -199,7 +207,7 @@ namespace pathCam {
 
     std::vector<std::pair<Image *, Image *> > calculate_new_overlaps();
 
-    SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
+
 
     void rebuild();
 
@@ -217,7 +225,7 @@ namespace pathCam {
 
     void create_and_submit_rebuild_jobs();
 
-    void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Vec2 absCoord,
+    void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Point2f absCoord,
                                   std::vector<Point2i> *additionalResult = {});
 
     static void remove_duplicates_without_sort(std::vector<Point2i> &vec);

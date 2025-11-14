@@ -96,7 +96,7 @@ namespace pathCam {
     Mat ff(image_size,CV_8U,ffraw);
     cvtColor(ff,ff,COLOR_BayerBG2BGR);
     ff.convertTo(ff,CV_32F);
-    ff*= 1/170;
+    ff*= 1/170.f;
 
     //allocate a managed buffer
     char* buf;
@@ -111,40 +111,50 @@ namespace pathCam {
     //prepare gpumat to receive data into managed buffer
     cuda::GpuMat rcvgpu(image_size,CV_8UC3,buf);
 
+
     Mat raw(image_size,CV_8U,image->get_Raw());
     Mat dbd(image_size,CV_8UC3), rsz(image->height / 4,image->width / 4,CV_8UC3);
     Mat tcpa(image_size,CV_8UC3);
     Mat fcpa(image_size,CV_8UC4);
     Mat cvh(image_size,CV_32FC3);
-    Mat alphac(image_size,CV_8UC1,Scalar(255));
+    Mat alphac(image_size,CV_8U,Scalar(255));
 
     double pt1 = 0,pt2 = 0,pt3 = 0;
 
-int roiSize = 512;
-    cuda::GpuMat dbdcuda({roiSize,roiSize},CV_8UC3),tcpaG({roiSize,roiSize},CV_8UC3);
+int roiSize = 256;
+    Mat dbdHost(Size(roiSize,roiSize),CV_8UC3);
+    cuda::GpuMat dbdcuda({roiSize,roiSize},CV_8UC3,dbdHost.data),tcpaG({roiSize,roiSize},CV_8UC3);
+
     cuda::GpuMat cvhG({roiSize,roiSize},CV_32FC3);
-    cuda::GpuMat ffGpu({roiSize,roiSize},CV_32FC3,ff.data);
+    cuda::GpuMat ffGpu(image_size,CV_32FC3,ff.data);
+
+
+
+
+
+
 
     char* buf1;
     //buf1 = new char[roiSize * roiSize * 4];
     cudaMallocManaged(&buf1,roiSize * roiSize * 4);
     cuda::GpuMat rszcuda({roiSize,roiSize},CV_8UC4,buf1);
     cuda::GpuMat rawcuda(image_size,CV_8U,image->get_Raw());
+    Mat rawMat(image_size,CV_8U,image->get_Raw());
 
     Rect roi(1024*2,1024*2,roiSize,roiSize);
     Mat alphCRoi = alphac(roi).clone();
-
+    float iter = 1000;
     auto start1 = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i<100;++i) {
+    for (int i = 0; i<int(iter);++i) {
 
-      cuda::cvtColor(rawcuda(roi),dbdcuda,COLOR_BayerBG2BGR);
+      cvtColor(rawMat(roi),dbdHost,COLOR_BayerBG2BGR);
 
       auto c = std::chrono::high_resolution_clock::now();
       dbdcuda.convertTo(cvhG,CV_32F);
       pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
 
       c = std::chrono::high_resolution_clock::now();
-      cuda::divide(cvhG,ffGpu,cvhG);
+      cuda::divide(cvhG,ffGpu(roi),cvhG);
       cuda::pow(cvhG,1.1,cvhG);
       pt1 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
 
@@ -165,14 +175,63 @@ int roiSize = 512;
 
       auto val = rszcuda.data[0];
     }
-    std::cout<<"cuda converting: "<<pt3/100<<std::endl;
-    std::cout<<"cuda math: "<<pt1/100<<std::endl;
-    std::cout<<"cuda alpha: "<<pt2/100.f<<std::endl;
-    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count()<<std::endl;
+    std::cout<<"cuda converting: "<<pt3/iter<<std::endl;
+    std::cout<<"cuda math: "<<pt1/iter<<std::endl;
+    std::cout<<"cuda alpha: "<<pt2/iter<<std::endl;
+    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count() / iter<<std::endl;
 
     pt1 = 0;
     pt2 = 0;
     pt3 = 0;
+
+    dbdHost = Mat(image_size,CV_8UC3);
+    dbdcuda = cuda::GpuMat(image_size,CV_8UC3,dbdHost.data);
+    cvhG = cuda::GpuMat(image_size,CV_32FC3);
+    ffGpu = cuda::GpuMat(image_size,CV_32FC3);
+    tcpaG = cuda::GpuMat(image_size,CV_8UC3);
+    cudaFree(buf1);
+    buf1 = new char[image->width * image->height * 4];
+    rszcuda = cuda::GpuMat(image_size,CV_8UC4,buf1);
+
+    start1 = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i<int(iter);++i) {
+
+      cvtColor(raw,dbdHost,COLOR_BayerBG2BGR);
+
+      auto c = std::chrono::high_resolution_clock::now();
+      dbdcuda.convertTo(cvhG,CV_32F);
+      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      c = std::chrono::high_resolution_clock::now();
+      cuda::divide(cvhG,ffGpu,cvhG);
+      cuda::pow(cvhG,1.1,cvhG);
+      pt1 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      c = std::chrono::high_resolution_clock::now();
+      cvhG.convertTo(tcpaG,CV_8UC3);
+      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+      std::vector<cuda::GpuMat> chan;
+
+
+      c = std::chrono::high_resolution_clock::now();
+      cuda::split(tcpaG,chan);
+      chan.push_back(cuda::GpuMat(image_size,CV_8UC1,alphac.data));
+      cuda::merge(chan,rszcuda);
+      pt2 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
+
+
+
+      auto val = rszcuda.data[0];
+    }
+    std::cout<<"cuda converting: "<<pt3/iter<<std::endl;
+    std::cout<<"cuda math: "<<pt1/iter<<std::endl;
+    std::cout<<"cuda alpha: "<<pt2/iter<<std::endl;
+    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count() / iter<<std::endl;
+
+
+
+
     start1 = std::chrono::high_resolution_clock::now();
     for (int i = 0; i<100;++i) {
       cvtColor(raw,dbd,COLOR_BayerBG2BGR);
@@ -205,6 +264,7 @@ int roiSize = 512;
     std::cout<<"alpha: "<<pt2/100.f<<std::endl;
     std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count()<<std::endl;
 //100 times, wrap the host buffer in a gpu mat, debayer to managed buffer, verify cpu can access data
+    return;
     auto start = std::chrono::high_resolution_clock::now();
     double accCvtMs = 0, accMatWrapMs = 0, accHostReadMs = 0;
 

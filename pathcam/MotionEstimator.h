@@ -31,6 +31,7 @@ public:
 class RegInfo{
 public:
   StreamCam* parent;
+  Image* image;
   unsigned long index,matchedTo;
   bool successful,root,resolved,rootOfRoot;
   bool stayFixedDuringBundleAdjustment = false;

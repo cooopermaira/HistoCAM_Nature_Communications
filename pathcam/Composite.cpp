@@ -215,8 +215,8 @@ namespace pathCam {
     memberImages.clear();
     matchedEdges.clear();
     delaunayMembers.clear();
-    root_offset = Vec2(0, 0);
-    max_offset = Vec2(0, 0);
+    root_offset = Point2i(0, 0);
+    max_offset = Point2i(0, 0);
   }
 
 
@@ -267,7 +267,7 @@ namespace pathCam {
       std::vector<Point2i> face;
       auto fShift = Point2f(ni->absoluteCoords.x, ni->absoluteCoords.y);
       auto img = parent->get_image_ref((*ni).index);
-      img->absoluteCoords = ni->absoluteCoords;
+      img->absoluteCoords = Point2i(ni->absoluteCoords.x,ni->absoluteCoords.y);
       auto res = add_point_to_delaunay_triangulation(fShift, img, face, forceAdd);
 
       update_Bbox_no_composite({ni});
@@ -346,7 +346,7 @@ namespace pathCam {
         return -1;
       }
     }
-    _image->absoluteCoords = Vec2(point.x, point.y);
+    _image->absoluteCoords = point;
     memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
@@ -418,7 +418,7 @@ namespace pathCam {
       return -1;
     }
 
-    _image->absoluteCoords = Vec2(_point.x, _point.y);
+    _image->absoluteCoords = _point;
     memberImages.push_back({_image, true});
     delaunayMembers.insert({vertxId, _image->index});
     return vertxId;
@@ -560,7 +560,7 @@ namespace pathCam {
   }
 
   void CompositeVoronoi::calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
-                                                  Vec2 absCoord, std::vector<Point2i> *additionalResult) {
+                                                  Point2f absCoord, std::vector<Point2i> *additionalResult) {
     std::vector<Point2i> tileIndices;
     std::map<int, std::vector<float> > tilesByColumn;
 
@@ -652,8 +652,8 @@ namespace pathCam {
         float firstPoint_y = *std::min_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
         float lastPoint_y = *std::max_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
 
-        firstPoint_y = std::max((double) firstPoint_y, absCoord.y);
-        lastPoint_y = std::min((double) lastPoint_y, absCoord.y + parent->image_height);
+        firstPoint_y = std::max( firstPoint_y, absCoord.y);
+        lastPoint_y = std::min(lastPoint_y, absCoord.y + parent->image_height);
 
         lastTile = imagePyramid->level[0]->getIJ(
           Point2f(x * imagePyramid->level[0]->getTileSize(), lastPoint_y)).y;
@@ -704,7 +704,7 @@ namespace pathCam {
   }
 
   void Composite::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
-                                                   Vec2 absCoord) {
+                                                 Point2f absCoord) {
     auto start = std::chrono::high_resolution_clock::now();
 
     std::vector<Point2i> tileIndices;
@@ -1106,7 +1106,7 @@ namespace pathCam {
       images[i]->free_memory_RAW();
 
       //calculate effected tiles
-      calculate_effected_tiles(face, effectedTiles, new_info[i]->absoluteCoords);
+      calculate_effected_tiles(face, effectedTiles, Point2f(new_info[i]->absoluteCoords.x,new_info[i]->absoluteCoords.y));
     }
     std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<Point2i>());
     effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<Point2i>()),
@@ -1203,7 +1203,7 @@ namespace pathCam {
     bool update_box = false;
 
     //root_offset is the distance from (0,0) of the cv image to the root frame, which is (0,0) in registration space. max_offset is the distance from (0,0) in registration space to the bottom right corner of the cv image. Total dimensions of image are max_offset - root_offset.
-    Vec2 temp_offset = root_offset;
+    Point2i temp_offset = root_offset;
 
     // If any new frames extend beyond the current extent, expand cv image dimensions
     for (int i = 0; i < new_info.size(); i++) {
@@ -1323,10 +1323,14 @@ namespace pathCam {
   }
 
   void Composite::update() {
-    auto new_info = staging;
+    std::vector<RegInfo*> new_info;
+    while (!staging.empty()) {
+      new_info.push_back(staging.front());
+      staging.pop();
+    }
     update_Bbox(new_info);
     add_images(new_info);
-    staging.clear();
+
   }
 
   Mat Composite::get_composite() {

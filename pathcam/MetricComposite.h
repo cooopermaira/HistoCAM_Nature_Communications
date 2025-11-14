@@ -15,9 +15,19 @@ namespace pathCam {
 
         void update() override;
 
-        std::vector<std::pair<Point2i,int>> calculate_effected_tiles_with_status(Point2f _AbC);
+        std::vector<std::pair<Point2i,int>> calculate_affected_tiles_with_status(Point2f AbC);
 
-        //std::queue<std::pair<Image*,std::vector
+        void process_tiles(Image *img, std::vector<Point2i> &tiles);
+
+        std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
+
+        int frameDelay;
+        int positionForNextWaitngFrame = 0;
+
+        int debugFrameCount = 0;
+        int debugTileCount1 = 0,debugTileCount2 = 0;
+
+        std::shared_ptr<TiledImage> compositeImage;
 
 
 

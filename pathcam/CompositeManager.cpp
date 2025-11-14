@@ -84,6 +84,8 @@ namespace pathCam {
           }
           auto stop = std::chrono::high_resolution_clock::now();
           duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
+
+          parent->notify_observers();
         }
 
         parent->lastViewedFrame = parent->get_image_ref(indexes.back()->index);
@@ -111,9 +113,14 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
-    //std::cout<<parent->composites[0]->tileupwardsTime / parent->composites[0]->delaunayImages.size()<<std::endl;
+    std::cout<<"here: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugFrameCount<<std::endl;
+    std::cout<<"immediate: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount1<<std::endl;
+    std::cout<<"later: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount2<<std::endl;
+
+
 
     //save_components_to_disk();
+
     if (parent->recordingMode) {
       long totalTime = 0;
       int totalImages = 0;
@@ -168,7 +175,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/media/max/Data/CORRECTED.png", false, false, false, false);
+      i->save_pyramid_as_image("/home/pathcam/pyr.png",true,true);
     }
   }
 
