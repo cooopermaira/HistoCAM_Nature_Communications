@@ -26,7 +26,7 @@ namespace pathCam {
 #endif
 
     rebuildJobsOutstanding = 0;
-    int lastViewedFrame = 0;
+
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
 
@@ -74,8 +74,10 @@ namespace pathCam {
         }
 
         if (!indexes.empty()) {
+          Image* lastViewedFrame = nullptr;
           for (auto index : indexes) {
             parent->composites[index->component_membership]->stage(index);
+            lastViewedFrame = index->image;
           }
 
           auto start = std::chrono::high_resolution_clock::now();
@@ -86,18 +88,9 @@ namespace pathCam {
           duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 
           parent->notify_observers();
+          parent->lastViewedFrame = lastViewedFrame;
         }
 
-        parent->lastViewedFrame = parent->get_image_ref(indexes.back()->index);
-
-        int endInd = int(indexes.back()->index) - 1;
-        for (int i = lastViewedFrame; i <= endInd; ++i) {
-          //parent->clear_buffer(i);
-        }
-        lastViewedFrame = parent->lastViewedFrame->index;
-
-        //Poco::Thread::sleep(100);
-        //++updateCount;
 
       }
 
@@ -107,9 +100,20 @@ namespace pathCam {
         submit_outstanding_jobs();
       }
     }
+
+
+    //process delayed frames
+    for (auto &comp: parent->composites) {
+      auto mc = reinterpret_cast<MetricComposite*>(comp);
+      for (int i = 0; i < mc->frameDelay; ++i) {
+        mc->update();
+      }
+      mc->mostRecentFrame->free_memory_RAW();
+    }
+
     std::cout << "CM duration: " + std::to_string(duration) << std::endl;
 
-    parent->clear_buffer(lastViewedFrame);
+
 
     push_remaining_tiles_for_inference();
 

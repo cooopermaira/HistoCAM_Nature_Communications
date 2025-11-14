@@ -189,6 +189,8 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
         auto im = static_cast<juce::Image *>(tile->preferredObj);
         tile->mutex->lock();
+        // auto img = tile->image;
+        // Mat temp(img.rows,img.cols,CV_8UC4,img.data);
         if (tile->newData) {
           auto img = tile->image;
           juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);

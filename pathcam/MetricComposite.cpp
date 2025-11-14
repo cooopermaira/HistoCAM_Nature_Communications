@@ -38,6 +38,7 @@ namespace pathCam {
             auto img = ri->image;
             staging.pop();
             update_Bbox_no_composite({ri});
+            mostRecentFrame = img;
 
             //grab affected tiles with their category of coverage
             auto affectedPyramidTilesWithStatus = calculate_affected_tiles_with_status(
@@ -89,32 +90,43 @@ namespace pathCam {
         //process delayed frames, allowing them to blur correct if necessary
         //this is an erase-remove_if implementation with a lambda function inside that updates tileObj if img should be owner,
         //otherwise it removes the tile from the img's list
-        for (auto &imgTilesetPair: waitingFrames) {
-            if (!imgTilesetPair.first){continue;}
-            imgTilesetPair.second.erase(
-                std::remove_if(imgTilesetPair.second.begin(),
-                               imgTilesetPair.second.end(),
+        for (auto &[img,tiles]: waitingFrames) {
+            if (!img) { continue; }
+            tiles.erase(
+                std::remove_if(tiles.begin(),
+                               tiles.end(),
                                [&](Point2i &tile) {
                                    auto &tileObj = compositeImage->getTile(tile.x, tile.y);
-                                   if (tileObj.owner == imgTilesetPair.first) {
+                                   if (tileObj.owner == img) {
                                        return false;
                                    }
-                                   if (tileObj.motionBlur > imgTilesetPair.first->motionBlur) {
-                                       tileObj.owner = imgTilesetPair.first;
-                                       tileObj.motionBlur = imgTilesetPair.first->motionBlur;
+                                   if (tileObj.motionBlur > img->motionBlur) {
+                                       tileObj.motionBlur = img->motionBlur;
+                                       tileObj.owner = img;
                                        return false;
                                    }
                                    return true;
-                               }), imgTilesetPair.second.end()
+                               }), tiles.end()
             );
+            if (tiles.empty() && img != mostRecentFrame) {
+                img->free_memory_RAW();
+                img = nullptr;
+            }
         }
 
-        //once delay is met, process frames
-        auto imgTileSet = waitingFrames[positionForNextWaitngFrame % frameDelay];
-        if (positionForNextWaitngFrame > frameDelay && !imgTileSet.second.empty()) {
-            process_tiles(imgTileSet.first,imgTileSet.second);
-            debugTileCount2 += imgTileSet.second.size();
+        //once delay is met, process frame
+        auto &[img,tiles] = waitingFrames[positionForNextWaitngFrame % frameDelay];
+        if (positionForNextWaitngFrame > frameDelay && !tiles.empty()) {
+            assert(img && img->get_Raw());
+            process_tiles(img, tiles);
+            debugTileCount2 += tiles.size();
             ++debugFrameCount;
+
+            tiles.clear();
+            if (img != mostRecentFrame) {
+                img->free_memory_RAW();
+            }
+            img = nullptr;
         }
     }
 

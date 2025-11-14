@@ -335,7 +335,7 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
                        matROI.rows);
 
     tileObject.mutex->lock();
-    if (mask.data) {
+    if (!mask.empty()) {
       matROI.copyTo(temp(tileROI), mask(ROIrect));
     } else {
       matROI.copyTo(temp(tileROI));

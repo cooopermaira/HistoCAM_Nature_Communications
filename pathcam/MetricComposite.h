@@ -29,6 +29,8 @@ namespace pathCam {
 
         std::shared_ptr<TiledImage> compositeImage;
 
+        Image* mostRecentFrame = nullptr;
+
 
 
 
