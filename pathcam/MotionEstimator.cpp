@@ -53,7 +53,7 @@ namespace pathCam {
     image->regInfo = this;
     image->absoluteCoords = Point2i(absoluteCoords.x,absoluteCoords.y);
 
-    bool proceed = queue_for_compositing && parent->sufficient_distance(absoluteCoords,component_membership);
+    bool proceed = queue_for_compositing;// && parent->sufficient_distance(absoluteCoords,component_membership);
 
     if (proceed) {
       tryComposite = true;
@@ -68,18 +68,18 @@ namespace pathCam {
       cw->set_abc(theirAbCs, component_membership,queue_for_compositing);
     }
 
-    for (auto el: componentCallersWaiting) {
-      double myScale;
-      Point2f myOffset;
-      while (!parent->get_scale_and_offset(component_membership, myScale, myOffset)) {
-        Poco::Thread::sleep(50);
-      }
-
-      auto theirScale = (el.second->H.at<double>(0, 0) + el.second->H.at<double>(1, 1)) / 2.0;
-      auto theirOffset = Point2f((el.second->t_x / theirScale + absoluteCoords.x + myOffset.x) / theirScale,
-                                 (el.second->t_y / theirScale + absoluteCoords.y + myOffset.y) / theirScale);
-      parent->set_scale_and_offset(el.first, theirScale * myScale, theirOffset);
-    }
+    // for (auto el: componentCallersWaiting) {
+    //   double myScale;
+    //   Point2f myOffset;
+    //   while (!parent->get_scale_and_offset(component_membership, myScale, myOffset)) {
+    //     Poco::Thread::sleep(50);
+    //   }
+    //
+    //   auto theirScale = (el.second->H.at<double>(0, 0) + el.second->H.at<double>(1, 1)) / 2.0;
+    //   auto theirOffset = Point2f((el.second->t_x / theirScale + absoluteCoords.x + myOffset.x) / theirScale,
+    //                              (el.second->t_y / theirScale + absoluteCoords.y + myOffset.y) / theirScale);
+    //   parent->set_scale_and_offset(el.first, theirScale * myScale, theirOffset);
+    // }
 
 
     if(!proceed){
@@ -204,8 +204,9 @@ namespace pathCam {
       return -1;
     }
 
+    m->inliers.clear();
     m->H = cv::findHomography(image_1_pts, image_2_pts, estimator_type,
-                              ransacReprojThreshold, noArray(), maxIters,
+                              ransacReprojThreshold, m->inliers, maxIters,
                               confidence);
 
     if (m->H.empty()) {

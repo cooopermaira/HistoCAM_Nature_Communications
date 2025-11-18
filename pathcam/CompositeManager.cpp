@@ -101,6 +101,12 @@ namespace pathCam {
       }
     }
 
+    // double val = 0;
+    // for (auto &img : parent->images) {
+    //   if (img) {
+    //     val += img->blurTime;
+    //   }
+    // }
 
     //process delayed frames
     for (auto &comp: parent->composites) {
@@ -110,6 +116,10 @@ namespace pathCam {
       }
       mc->mostRecentFrame->free_memory_RAW();
     }
+
+
+    //parent->composites[0]->align_and_rebuild();
+    // std::cout<<"calc blur time: "<<val<<std::endl;
 
     std::cout << "CM duration: " + std::to_string(duration) << std::endl;
 
@@ -130,7 +140,7 @@ namespace pathCam {
       int totalImages = 0;
       for (auto &img:parent->images) {
         if (!img){continue;}
-        totalTime += img->writeTime;
+        totalTime += img->blurTime;
         ++totalImages;
       }
       std::cout<<"write time: "<<totalTime<<"   total images: "<<totalImages<<std::endl;

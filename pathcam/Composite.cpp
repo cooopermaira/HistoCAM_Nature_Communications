@@ -168,7 +168,7 @@ namespace pathCam {
 
     cuda::cvtColor(ffGPU, ffGPU, COLOR_BayerBG2BGR);
     ffGPU.convertTo(ffGPU,CV_32F);
-    double scale = 1 / 170.0;
+    double scale = 1 / 270.0;
     cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
     // if (componentMagLabel == 2) {
     //   Mat temp;

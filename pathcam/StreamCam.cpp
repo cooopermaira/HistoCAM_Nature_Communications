@@ -53,6 +53,12 @@ namespace pathCam {
         minPixelDistanceBetweenFrames = 500;
         minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames, 2);
 
+
+        // Mat circleMaskFtExt((image_height * crop_factor) * scale_factor,
+        //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
+        // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
+
+        int k = 0;
 #ifdef HAVE_OPENCV_CUDAARITHM
         compositorCudaDevice = GPU_select_cuda_device(1);
         //siftCudaDevice = GPU_select_cuda_device();
@@ -72,11 +78,7 @@ namespace pathCam {
         circleMask = cv::Mat::zeros(image_height, image_width, CV_8U);
         cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
                    -1);
-        regCircleMask = cv::Mat::zeros(image_height * scale_factor, image_width * scale_factor, CV_8U);
-        cv::circle(regCircleMask,
-                   cv::Point(float(image_width / 2) * scale_factor, float(image_height / 2) * scale_factor),
-                   scope_radius, cv::Scalar(255),
-                   -1);
+
     }
 
     bool StreamCam::run() {
@@ -180,10 +182,16 @@ namespace pathCam {
         return devices[std::min(_priority, (int) devices.size() - 1)].index;
     }
 
+    void StreamCam::align_and_rebuild2() {
+        if (composites.empty()) { return; }
+
+    }
+
+
     void StreamCam::align_and_rebuild() {
         if (composites.empty()) { return; }
 
-        std::thread([this]() { this->load_delaunay_images_to_GPU(0); }).detach();
+        std::thread([this]() { load_delaunay_images_to_GPU(0); }).detach();
 
         while (true) {
             if (sfm->tracksReady()) {

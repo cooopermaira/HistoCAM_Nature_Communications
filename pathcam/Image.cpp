@@ -3,57 +3,86 @@
 using namespace cv;
 
 namespace pathCam {
-  cuda::GpuMat Image::hannWindow, Image::cornerRad;
+  cuda::GpuMat Image::hannWindow, Image::blurMask;
   static Ptr<cuda::Filter> g_gauss;
   static std::once_flag g_gauss_once;
 
-  inline void ensureGauss(int type) {
-    std::call_once(g_gauss_once, [type]{
-        const cv::Size ksize{5,5};
-        const double sigma = 3;
-        g_gauss = cv::cuda::createGaussianFilter(type, type, ksize, sigma, sigma,
-                                                 cv::BORDER_DEFAULT);
+  void Image::prepare_blur_check_statics() {
+    static std::once_flag flag;
+    std::call_once(flag, [&] {
+      Mat m1(blurPatch, blurPatch,CV_8UC1, Scalar(255));
+      circle(m1, Point(blurPatch / 2, blurPatch / 2), 70, Scalar(0), -1);
+      blurMask.upload(m1);
+
+      Mat temp(blurPatch, blurPatch,CV_8U, Scalar(0));
+      // circle(temp, Point(0, 0), blurCheckRadius, Scalar(255), 1);
+      // circle(temp, Point(0, blurPatch), blurCheckRadius, Scalar(255), 1);
+      // circle(temp, Point(blurPatch, 0), blurCheckRadius, Scalar(255), 1);
+      // circle(temp, Point(blurPatch, blurPatch), blurCheckRadius, Scalar(255), 1);
+      // blurMask.upload(temp);
+
+      createHanningWindow(temp, Size(blurPatch, blurPatch),CV_32F);
+      hannWindow.upload(temp);
+
+      const cv::Size ksize{5, 5};
+      const double sigma = 3;
+      g_gauss = cv::cuda::createGaussianFilter(CV_32F, CV_32F, ksize, sigma, sigma,
+                                               BORDER_DEFAULT);
     });
   }
+
+
+  inline void ensureGauss(int type) {
+    std::call_once(g_gauss_once, [type] {
+      const cv::Size ksize{5, 5};
+      const double sigma = 3;
+      g_gauss = cv::cuda::createGaussianFilter(type, type, ksize, sigma, sigma,
+                                               cv::BORDER_DEFAULT);
+    });
+  }
+
   static std::mutex g_gauss_mtx;
-  inline void blur_once(const cv::cuda::GpuMat& src, cv::cuda::GpuMat& dst,
-                     cv::cuda::Stream& s = cv::cuda::Stream::Null())
-  {
-    ensureGauss(src.type());
+
+  inline void blur_once(const cv::cuda::GpuMat &src, cv::cuda::GpuMat &dst,
+                        cv::cuda::Stream &s = cv::cuda::Stream::Null()) {
+    //ensureGauss(src.type());
     std::lock_guard<std::mutex> lk(g_gauss_mtx);
     g_gauss->apply(src, dst, s);
   }
 
-  Image::Image(unsigned int width, unsigned int height, unsigned int scope_radius, MemoryPool *mempool) : width(width),
-                                                                                                          height(
-                                                                                                              height),
-                                                                                                          scope_radius(
-                                                                                                              scope_radius),
-                                                                                                          label(
-                                                                                                              _NOLABEL),
-                                                                                                          mempool(
-                                                                                                              mempool),
-                                                                                                          raw_buffer(0),raw_buffer_cuda(nullptr),
-                                                                                                          reference_count(
-                                                                                                              0),
-                                                                                                          image_file(
-                                                                                                              Poco::Path()),
-                                                                                                          motionBlur(
-                                                                                                              0),
-  cudaBufferReady(false) {
-    if (hannWindow.empty()) {
-      Mat temp;
-      createHanningWindow(temp,Size(512,512),CV_32F);
-      hannWindow.upload(temp);
-    }
-    if (cornerRad.empty()) {
-      Mat temp(512,512,CV_8U,Scalar(0));
-      circle(temp,Point(0,0),80,Scalar(255),1);
-      circle(temp,Point(0,512),80,Scalar(255),1);
-      circle(temp,Point(512,0),80,Scalar(255),1);
-      circle(temp,Point(512,512),80,Scalar(255),1);
-      cornerRad.upload(temp);
-    }
+
+  Image::Image(unsigned int width, unsigned int height, unsigned int scope_radius,
+               MemoryPool *mempool) : width(width),
+                                      height(
+                                        height),
+                                      scope_radius(
+                                        scope_radius),
+                                      label(
+                                        _NOLABEL),
+                                      mempool(
+                                        mempool),
+                                      raw_buffer(0), raw_buffer_cuda(nullptr),
+                                      reference_count(
+                                        0),
+                                      image_file(
+                                        Poco::Path()),
+                                      motionBlur(
+                                        0),
+                                      cudaBufferReady(false) {
+    prepare_blur_check_statics();
+    // if (hannWindow.empty()) {
+    //   Mat temp;
+    //   createHanningWindow(temp,Size(blurPatch,blurPatch),CV_32F);
+    //   hannWindow.upload(temp);
+    // }
+    // if (cornerRad.empty()) {
+    //   Mat temp(blurPatch,blurPatch,CV_8U,Scalar(0));
+    //   circle(temp,Point(0,0),blurCheckRadius,Scalar(255),1);
+    //   circle(temp,Point(0,blurPatch),blurCheckRadius,Scalar(255),1);
+    //   circle(temp,Point(blurPatch,0),blurCheckRadius,Scalar(255),1);
+    //   circle(temp,Point(blurPatch,blurPatch),blurCheckRadius,Scalar(255),1);
+    //   cornerRad.upload(temp);
+    // }
   };
 
   Image::~Image() {
@@ -102,7 +131,6 @@ namespace pathCam {
 
 
   void Image::free_memory_RAW(bool force) {
-
     buffer_mutex.lock();
     if (raw_buffer != nullptr) {
       reference_count--;
@@ -119,7 +147,6 @@ namespace pathCam {
   }
 
   bool Image::is_mostly_black() {
-
     float threshold_value = 20.f;
     int checkPoints = 40;
     float countBlack = 0;
@@ -137,67 +164,69 @@ namespace pathCam {
   }
 
   int Image::check_blur(bool _unifiedMemory) {
+    auto start = std::chrono::high_resolution_clock::now();
     if (!in_memory()) {
       throw std::runtime_error("Image not in memory during blur check");
     }
     cuda::Stream s;
 
-    cuda::GpuMat raw;
-    if (_unifiedMemory) {
-      //no copy, pretty dope
-      raw = cuda::GpuMat(Size(width, height), CV_8U, raw_buffer);
-    }else {
-      Mat temp(Size(width, height), CV_8U, raw_buffer);
-      raw.upload(temp);
-    }
+    Mat raw(Size(width, height), CV_8U, raw_buffer);
 
-    int roiSize = 512;
-    //grab a 512 window in the center to debayer. smart placement of this window would be an improvement
-    // for (int x = 0; x < width - roiSize; x+=roiSize) {
-    //   for (int y = 0; y < height - roiSize; y+=roiSize) {
+    // for (int x = 0; x < width - blurPatch; x += blurPatch) {
+    //   for (int y = 0; y < height - blurPatch; y += blurPatch) {
 
 
-
-    Rect roi(width/2 - roiSize/2, height/2 - roiSize/2, roiSize, roiSize);
-        // Rect roi(x,y,roiSize,roiSize);
-    cuda::GpuMat gray;
+    const Rect roi(width / 2 - blurPatch / 2, height / 2 - blurPatch / 2, blurPatch, blurPatch);
+    //Rect roi(x,y,blurPatch,blurPatch);
+    Mat grayHost;
 
     //debayer and multiply by hanning window. if you dont, bright lines will corrupt borders and f up min max calc
-    cuda::cvtColor(raw(roi),gray,COLOR_BayerBG2GRAY,0,s);
-    gray.convertTo(gray,CV_32F);
-    cuda::multiply(gray,hannWindow,gray,1,-1,s);
+    cvtColor(raw(roi), grayHost, COLOR_BayerBG2GRAY);
+
+    grayHost.convertTo(grayHost,CV_32F);
+    cuda::GpuMat gray(grayHost.rows, grayHost.cols,CV_32FC1, grayHost.data);
+    cuda::multiply(gray, hannWindow, gray, 1, -1, s);
 
     //compute the log magnitude of the dft
-    cuda::GpuMat planes[] = {gray,cuda::GpuMat(gray.rows,gray.cols,CV_32F,Scalar(0))};
+    cuda::GpuMat planes[] = {gray, cuda::GpuMat(gray.rows, gray.cols,CV_32F, Scalar(0))};
     cuda::GpuMat complexI, mag;
-    cuda::merge(planes,2,complexI,s);
-    cuda::dft(complexI, complexI, Size(gray.cols,gray.rows),0,s);
+    cuda::merge(planes, 2, complexI, s);
+    cuda::dft(complexI, complexI, Size(gray.cols, gray.rows), 0, s);
 
-    cuda::split(complexI,planes,s);
-    cuda::magnitude(planes[0],planes[1],mag,s);
-    cuda::add(Scalar(1e-6),mag,mag,noArray(),-1,s);
-    cuda::log(mag,mag,s);
+    cuda::split(complexI, planes, s);
+    cuda::magnitude(planes[0], planes[1], mag, s);
+    cuda::add(Scalar(1e-6), mag, mag, noArray(), -1, s);
+    cuda::log(mag, mag, s);
 
     // blur the dft so noise doesnt interfere so bad. blur_once is quagmire because the box filter isnt thread safe
-    blur_once(mag,mag,s);
-    cuda::normalize(mag,mag,0,255,NORM_MINMAX,CV_8U,noArray(),s);
+    blur_once(mag, mag, s);
+    cuda::normalize(mag, mag, 0, 255, NORM_MINMAX,CV_8U, noArray(), s);
 
     s.waitForCompletion();
 
     // //debug for viewing normalized 8U dft
-    //Mat temp;
-    //mag.download(temp);
+    // Mat temp;
+    // mag.download(temp);
+    // Mat m1(blurPatch,blurPatch,CV_8UC1,Scalar(255));
+    // circle(m1,Point(blurPatch/2,blurPatch/2),70,Scalar(0),-1);
+    // cuda::GpuMat m2;
+    // m2.upload(m1);
+
 
     //calculate min max around specific region of dft. this region is uniform if clear and wavy if blurred
-    double maxval,minval;
-    cuda::minMax(mag,&minval,&maxval,cornerRad);
-    motionBlur = int(maxval) - int(minval);
-    //std::cout<<motionBlur<<std::endl;
-    //   }
-    // }
+    double maxval, minval;
+    Point maxLoc, minLoc;
+    mag.download(reg_image_uncropped);
+    cuda::minMaxLoc(mag, &minval, &maxval, &minLoc, &maxLoc, blurMask);
+    //motionBlur = int(maxval) - int(minval);
+    motionBlur = int(minval);
+    // std::cout<<motionBlur<<" "<<x<<" "<<y<<std::endl;
+    //       }
+    //     }
+    blurTime = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).
+        count();
     return motionBlur;
   }
-
 
 
   void Image::write_to_path(bool _profile) {
@@ -212,10 +241,10 @@ namespace pathCam {
     file.write(get_Raw(), width * height);
 
     if (_profile) {
-      writeTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+      blurTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - start).count();
     }
   }
-
 
 
   void Image::correct_registration(std::vector<unsigned long> adjacentVerts) {
@@ -270,7 +299,6 @@ namespace pathCam {
   }
 
 
-
   bool Image::is_mostly_white(Mat ROI) {
     unsigned int threshold_value = 225;
     Mat thresholded;
@@ -297,7 +325,6 @@ namespace pathCam {
   }
 
   bool Image::is_4x() {
-
     if (!in_memory()) {
       throw std::invalid_argument("Image not in memory during 4x check");
     }
@@ -350,9 +377,7 @@ namespace pathCam {
     float outside2X = debayer(width * 0.9, height * 0.9);
     buffer_mutex.unlock();
     return (center - outside2X) >= 150;
-
   }
-
 
 
   bool Image::is_good() {
@@ -364,13 +389,11 @@ namespace pathCam {
   }
 
   void Image::find_label() {
-
-
-/*
-    if (is_mostly_black()) {
-      label = _UNDEREXP;
-      return;
-    }*/
+    /*
+        if (is_mostly_black()) {
+          label = _UNDEREXP;
+          return;
+        }*/
 
     manually_set_label();
     //label = _10X;
@@ -398,7 +421,6 @@ namespace pathCam {
     }
 
 
-
     find_label();
 
     if (label == _2X || label == _4X) {
@@ -409,28 +431,28 @@ namespace pathCam {
   }
 
   void Image::manually_set_label() {
-//    if (index < 649) {
-//      label = Image::_2X;
-//    } else if ((index >= 649 && index < 754) || (index >= 832 && index < 1103)) {
-//      label = Image::_4X;
-//    } else if ((index >= 754 && index < 832) || (index >= 1103 && index < 1365)) {
-//      label = Image::_10X;
-//    } else {
-//      label = Image::_20X;
-//    }
+    //    if (index < 649) {
+    //      label = Image::_2X;
+    //    } else if ((index >= 649 && index < 754) || (index >= 832 && index < 1103)) {
+    //      label = Image::_4X;
+    //    } else if ((index >= 754 && index < 832) || (index >= 1103 && index < 1365)) {
+    //      label = Image::_10X;
+    //    } else {
+    //      label = Image::_20X;
+    //    }
 
-////2_20new
-//    if(index < 413){
-//      label = Image::_2X;
-//    }else if(index >= 413 && index <777) {
-//      label = _4X;
-//    }else if(index >= 777 && index < 1358){
-//      label = Image::_10X;
-//    }else{
-//      label = Image::_20X;
-//    }
+    ////2_20new
+    //    if(index < 413){
+    //      label = Image::_2X;
+    //    }else if(index >= 413 && index <777) {
+    //      label = _4X;
+    //    }else if(index >= 777 && index < 1358){
+    //      label = Image::_10X;
+    //    }else{
+    //      label = Image::_20X;
+    //    }
 
-//afb
+    //afb
     if (index < 141) {
       label = Image::_4X;
     } else if (index >= 141 && index < 315) {
@@ -473,18 +495,17 @@ namespace pathCam {
     buffer_mutex.unlock();
 
     if (release) {
-        free_memory_RAW();
+      free_memory_RAW();
     }
 
 
-
     if (convert) {
-//      if(flatfield_first){
-//        cvtColor(reg_image,reg_image,COLOR_BayerBG2BGR);
-//        divide(reg_image, flatfield, reg_image, 1, CV_8U);
-//        cvtColor(reg_image,reg_image,COLOR_BGR2GRAY);
-//      }else {
-        cvtColor(reg_image, reg_image, COLOR_BayerBG2GRAY);
+      //      if(flatfield_first){
+      //        cvtColor(reg_image,reg_image,COLOR_BayerBG2BGR);
+      //        divide(reg_image, flatfield, reg_image, 1, CV_8U);
+      //        cvtColor(reg_image,reg_image,COLOR_BGR2GRAY);
+      //      }else {
+      cvtColor(reg_image, reg_image, COLOR_BayerBG2GRAY);
       //}
     }
     if (real) {
@@ -503,7 +524,6 @@ namespace pathCam {
       reg_image = reg_image(myROI);
     }
     int k = 0;
-
   };
 
   void Image::load_raw_from_disk() {
@@ -524,6 +544,4 @@ namespace pathCam {
     reference_count++;
     buffer_mutex.unlock();
   }
-
 }
-

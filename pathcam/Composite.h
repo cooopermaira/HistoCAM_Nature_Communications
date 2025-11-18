@@ -105,7 +105,7 @@ namespace pathCam {
 
     Composite(StreamCam *parent, Size image_size, int _componentIndex);
 
-
+    virtual void align_and_rebuild(){};
 
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);

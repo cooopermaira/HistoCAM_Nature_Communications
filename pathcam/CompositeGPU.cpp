@@ -180,7 +180,7 @@ namespace pathCam {
     cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_), convertHoldingGPU(roi_), 1, CV_32F);//,parent->cvCompositeStream);
 
     //brighten
-    cuda::pow(convertHoldingGPU(roi_), 1.1, convertHoldingGPU(roi_),parent->cvCompositeStream);
+    //cuda::pow(convertHoldingGPU(roi_), 1.05, convertHoldingGPU(roi_),parent->cvCompositeStream);
     convertHoldingGPU(roi_).convertTo(threeChannelPrealGPU(roi_), CV_8UC3,parent->cvCompositeStream);
 
     //add alpha channel

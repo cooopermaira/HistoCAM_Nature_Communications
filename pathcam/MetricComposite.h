@@ -19,6 +19,12 @@ namespace pathCam {
 
         void process_tiles(Image *img, std::vector<Point2i> &tiles);
 
+        void align_and_rebuild() override;
+
+        std::vector<Image*> find_contributing_images() const;
+
+        std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});
+
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
 
         int frameDelay;

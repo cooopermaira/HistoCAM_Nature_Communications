@@ -23,6 +23,7 @@ public:
   
   
   std::vector<DMatch> good_matches;
+  std::vector<uchar> inliers;
   
   //image_2 from image_1
   cv::Mat H;

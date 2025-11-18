@@ -66,6 +66,7 @@ namespace pathCam {
       image->set_disk_file(imageFile);
       parent->pass_image(image, image_index);
       image_index++;
+      Poco::Thread::sleep(1000/21);
     }
     parent->microscopeInput = false;
     std::cout << "disk images set " << std::endl;
@@ -75,11 +76,65 @@ namespace pathCam {
   void DebayerRunnable::run() {
     Poco::Path o = outfile;
     image->load_raw_from_disk();
+    Mat img(image->height,image->width,CV_8UC1,image->get_Raw());
+    cvtColor(img,img,COLOR_BayerBG2BGR);
+
+    auto r = outfile;
+
+    r.setFileName(image->get_ImageFile().getBaseName());
+    r.setExtension("png");
+    Rect crop(image->width/2 - 1000,image->height/2-1000,2000,2000);
+    imwrite(r.toString(),img(crop));
+    return;
 
 
 
     Size image_size(image->width , image->height);
 
+    float iters = 1;
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i <int(iters);i++) {
+      image->check_blur(true);
+      int k = 0;
+    }
+    //std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() / iters<<std::endl;
+
+
+    //Rect zoomCrop(image_size.width/2-1000,image_size.height/2-1000,2000,2000);
+    //Mat saveMat = readMat(zoomCrop)
+    r.setFileName(image->get_ImageFile().getBaseName());
+    r.setExtension("png");
+    std::cout<<image->get_ImageFile().getBaseName()<<"   "<<image->motionBlur<<std::endl;
+    imwrite(r.toString(), image->reg_image_uncropped);
+
+return;
+    image->blurPatch = 512;
+    Mat temp;
+    createHanningWindow(temp,Size(image->blurPatch,image->blurPatch),CV_32F);
+    Image::hannWindow.upload(temp);
+    temp = Mat(image->blurPatch,image->blurPatch,CV_8U,Scalar(0));
+    circle(temp,Point(0,0),image->blurCheckRadius,Scalar(255),1);
+    circle(temp,Point(0,image->blurPatch),image->blurCheckRadius,Scalar(255),1);
+    circle(temp,Point(image->blurPatch,0),image->blurCheckRadius,Scalar(255),1);
+    circle(temp,Point(image->blurPatch,image->blurPatch),image->blurCheckRadius,Scalar(255),1);
+    Image::blurMask.upload(temp);
+
+    start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i <int(iters);i++) {
+      image->check_blur(true);
+    }
+    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() / iters<<std::endl;
+
+    Mat raw(image_size,CV_8U,image->get_Raw());
+    Mat dbr;
+
+    cvtColor(raw,dbr,COLOR_BayerBG2BGR);
+    resize(dbr,dbr,Size(image->width/4,image->height/4));
+    o.setFileName(image->get_ImageFile().getBaseName());
+    o.setExtension("png");
+    imwrite(o.toString(),dbr);
+    return;
+/*
 
     //get host buffer
     char* bufHost = new char[image->height * image->width];
@@ -264,7 +319,7 @@ int roiSize = 256;
     std::cout<<"alpha: "<<pt2/100.f<<std::endl;
     std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count()<<std::endl;
 //100 times, wrap the host buffer in a gpu mat, debayer to managed buffer, verify cpu can access data
-    return;
+
     auto start = std::chrono::high_resolution_clock::now();
     double accCvtMs = 0, accMatWrapMs = 0, accHostReadMs = 0;
 
@@ -324,10 +379,10 @@ int roiSize = 256;
     std::cout << "cvtColor (2): " << accCvt2Ms    / 1000.0 << " ms/iter\n";
     std::cout << "download():   " << accDownloadMs/ 1000.0 << " ms/iter\n";
     auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-
+*/
     //cuda::resize(greyRoi,greyRoi,Size(greyRoi.cols / 4, greyRoi.rows / 4));
 
-    auto r = outfile;
+    //auto r = outfile;
     // r.setFileName(image->get_ImageFile().getBaseName());
     // r.setExtension("png");
     // Rect roi(readMat.cols/2 - 1000,readMat.rows/2 - 1000,2000,2000);

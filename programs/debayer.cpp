@@ -52,7 +52,7 @@ bool customComparator(const pathCam::Image *lhs, const pathCam::Image *rhs) {
 }
 
 int main(int argc, char *argv[]) {
-  auto renameFiles = true;
+  auto renameFiles = false;
   auto convertImages = true;
   bool makeInput = true;
 
@@ -165,11 +165,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (renameFiles || makeInput) {
-      try {
-        std::sort(images.begin(), images.end(), customComparator2);
-      }catch(...){
-        std::sort(images.begin(), images.end(), customComparator);
-      }
+      // try {
+      //   std::sort(images.begin(), images.end(), customComparator2);
+      // }catch(...){
+      //   std::sort(images.begin(), images.end(), customComparator);
+      // }
     }
 
     auto outputfilepath = outFile;

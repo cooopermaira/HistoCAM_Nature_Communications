@@ -189,8 +189,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
         auto im = static_cast<juce::Image *>(tile->preferredObj);
         tile->mutex->lock();
-        // auto img = tile->image;
-        // Mat temp(img.rows,img.cols,CV_8UC4,img.data);
+
         if (tile->newData) {
           auto img = tile->image;
           juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
@@ -212,6 +211,16 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
         g.setOpacity(1.f);
         g.drawImage(*im, bounds);
+        g.setColour(juce::Colours::greenyellow);
+        g.drawRect(bounds, 3);
+
+        std::string ij;
+        if (tile->owner) {
+          ij = Poco::format("(%ld,%i)", tile->owner->index, tile->motionBlur);
+        }
+        g.setFont(20);
+        g.drawText(ij, bounds.getCentreX() - 50,
+                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
         for (auto & mask : tile->SAMMasks) {
           auto jImg = static_cast<juce::Image*>(mask.second.second);
           g.saveState();
@@ -248,6 +257,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
           g.setColour(overlayColor);
           g.fillRect(bounds);
+
         }
       }
     }

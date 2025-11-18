@@ -319,7 +319,7 @@ namespace pathCam {
     if(pConf->has("display.tile_size")){
       tileSize = pConf->getUInt("display.tile_size");
     }else{
-      tileSize = 224;
+      tileSize = 256;
     }
 
     if (pConf->has("registration")) {
@@ -385,7 +385,8 @@ namespace pathCam {
                   nlevels = pConf->getInt("registration.detector.features.params[@nlevels]");
                 } catch (std::string bad_input) {
                   logger->warning("Bad input for nlevels: " + bad_input + ". Using default.");
-                  nlevels = ORB_params.nlevels;
+                  //nlevels = ORB_params.nlevels;
+                  nlevels = 1;
                 }
                 ORB_params.nlevels = nlevels;
                 int edgeThreshold;

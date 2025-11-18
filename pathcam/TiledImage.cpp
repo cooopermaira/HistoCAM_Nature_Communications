@@ -340,6 +340,7 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
     } else {
       matROI.copyTo(temp(tileROI));
     }
+    tileObject.newData = true;
     tileObject.mutex->unlock();
 
     assert(tiles(x, y)->image.rows == tile_size && tiles(x, y)->image.cols == tile_size);

@@ -83,9 +83,9 @@ extern "C" void thresholdAndPackToBits(const cv::cuda::GpuMat& gray8u,
     int thr = percentileThresholdGPU(gray8u, percentile);
 
     // 2) Binary threshold on GPU: > thr -> 255, else 0
-    cv::cuda::GpuMat d_bin;
+    char* databin = new char[gray8u.rows * gray8u.cols];
+    cv::cuda::GpuMat d_bin(gray8u.rows,gray8u.cols,CV_8UC1,databin);
     cv::cuda::threshold(gray8u, d_bin, thr, 255, cv::THRESH_BINARY);
-
     // cv::Mat temp;
     // d_bin.download(temp);
     // cv::imwrite("/media/max/Data/phase_corr_test/thresholded_liver"+std::to_string(int(percentile))+".png",temp);
@@ -94,7 +94,8 @@ extern "C" void thresholdAndPackToBits(const cv::cuda::GpuMat& gray8u,
     int rows = d_bin.rows;
     int cols = d_bin.cols;
     int outColsBytes = (cols + 7) >> 3;
-    bitmaskBytes.create(rows, outColsBytes, CV_8UC1);
+    char* data = new char[rows * outColsBytes];
+    bitmaskBytes = cv::cuda::GpuMat(rows, outColsBytes, CV_8UC1,data);
 
     // 4) Launch pack kernel on same stream
     dim3 block(32, 16);

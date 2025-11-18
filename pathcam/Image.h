@@ -14,7 +14,7 @@ namespace pathCam {
     RegInfo* regInfo;
 
     long index;
-    long writeTime = 0;
+    double blurTime = 0;
 
     int width, height;
     int scope_radius;
@@ -23,6 +23,8 @@ namespace pathCam {
 
     float reg_full_scale;
     int motionBlur;
+    int blurPatch = 1024;
+    int blurCheckRadius = 100;
     cv::Point2f sharpness;
     double reg_scale_initial,reg_scale_full;
     double reg_crop_initial,reg_crop_full;
@@ -46,7 +48,7 @@ namespace pathCam {
     cv::Mat descriptorsMultilevel;
     cv::Mat descriptorsFull;
 
-    static cv::cuda::GpuMat hannWindow, cornerRad;
+    static cv::cuda::GpuMat hannWindow, blurMask;
 #ifdef HAVE_OPENCV_CUDAFEATURES2D
     cv::cuda::GpuMat SIFTDescriptors;
     cv::cuda::GpuMat SIFTKeypoints;
@@ -86,6 +88,7 @@ namespace pathCam {
     }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
+    void prepare_blur_check_statics();
     bool move_buffer_to_gpu(int _device, bool _freeHostBuffer = false);
 #endif
 
@@ -104,8 +107,6 @@ namespace pathCam {
     void find_label();
 
     bool is_good();
-
-    double check_blur();
 
     int check_blur(bool _unifiedMemory);
 
@@ -191,7 +192,6 @@ namespace pathCam {
     void write_to_path(bool _profile = false);
     
     Poco::Path image_file;
-  private:
 
     MemoryPool *mempool;
 
@@ -211,6 +211,7 @@ namespace pathCam {
 #endif
     cv::Mat reg_image;
     cv::Mat reg_image_uncropped;
+
 
 
 

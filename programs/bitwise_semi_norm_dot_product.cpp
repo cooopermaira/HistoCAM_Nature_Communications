@@ -65,6 +65,9 @@ int main(int argc, char *argv[]) {
     files.push_back(im);
   }
 
+  cuda::GpuMat bitmask;
+  thresholdAndPackToBits(files[0],70,bitmask);
+  int k = 0;
 
 
 
