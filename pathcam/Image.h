@@ -108,7 +108,7 @@ namespace pathCam {
 
     bool is_good();
 
-    int check_blur(bool _unifiedMemory);
+    int check_blur(bool _unifiedMemory, const cv::Mat& img = cv::Mat(),bool downloadDFT = false);
 
     static cv::Point2f compute_sharpness(cv::Mat &_img);
 
@@ -210,7 +210,7 @@ namespace pathCam {
     char *raw_buffer_cuda;
 #endif
     cv::Mat reg_image;
-    cv::Mat reg_image_uncropped;
+    cv::Mat blurDFT;
 
 
 

@@ -13,6 +13,243 @@
 using Poco::DirectoryIterator;
 
 namespace pathCam {
+  cv::Mat makeMotionKernel(int length, float angleDeg)
+  {
+    // Ensure length is at least 1 and odd
+    length = std::max(1, length);
+    if (length % 2 == 0) length += 1;
+
+    int ksize = length; // you can pad larger if you want, but this is enough
+    cv::Mat kernel = cv::Mat::zeros(ksize, ksize, CV_32F);
+
+    // Draw a horizontal line (center row) of "length" ones
+    int center = ksize / 2;
+    int half = length / 2;
+    for (int x = center - half+2; x <= center + half-2; ++x) {
+      kernel.at<float>(center, x) = 1.0f;
+    }
+    kernel.at<float>(center,center-half) = kernel.at<float>(center,center+half) = 0.3f;
+    kernel.at<float>(center,center-half+1) = kernel.at<float>(center,center+half-1) = 0.7f;
+
+    // Normalize to sum = 1
+    float sum1 = 0;
+    for (int x = center - half; x <= center + half; ++x) {
+      sum1 += kernel.at<float>(center, x);
+    }
+    kernel /= sum1;
+
+    // Rotate the kernel by angleDeg around its center
+    cv::Point2f rotCenter(ksize / 2.0f, ksize / 2.0f);
+    cv::Mat rotMat = cv::getRotationMatrix2D(rotCenter, angleDeg, 1.0);
+
+    cv::Mat rotated;
+    cv::warpAffine(kernel, rotated, rotMat, kernel.size(),
+                   cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0));
+
+    // Re-normalize (rotation/interpolation slightly changes sum)
+    double sum = cv::sum(rotated)[0];
+    if (sum != 0.0)
+      rotated /= static_cast<float>(sum);
+
+    return rotated;
+  }
+  cv::Mat makeSmoothMotionKernel(int length, float angleDeg)
+  {
+    // Ensure odd length
+    length = std::max(1, length);
+    if (length % 2 == 0) length += 1;
+
+    int ksize = length;
+    cv::Mat kernel = cv::Mat::zeros(ksize, ksize, CV_32F);
+
+    int center = ksize / 2;
+    int half   = length / 2;
+
+    // --- Create a smooth 1D line (Gaussian) ---
+    float sigma = length / 6.0f;   // controls softness; adjust as you like
+    auto gaussian = [&](int x) {
+      float dx = float(x - center);
+      return std::exp(-(dx*dx) / (2.0f * sigma * sigma));
+    };
+
+    // Fill the center row with Gaussian weights
+    for (int x = center - half; x <= center + half; ++x)
+      kernel.at<float>(center, x) = gaussian(x);
+
+    // Normalize initial kernel
+    float sum = cv::sum(kernel)[0];
+    if (sum > 0) kernel /= sum;
+
+    // --- Rotate kernel ---
+    cv::Point2f rotCenter(ksize / 2.0f, ksize / 2.0f);
+    cv::Mat rotMat = cv::getRotationMatrix2D(rotCenter, angleDeg, 1.0);
+
+    cv::Mat rotated;
+    cv::warpAffine(kernel, rotated, rotMat, kernel.size(),
+                   cv::INTER_LINEAR,
+                   cv::BORDER_CONSTANT, cv::Scalar(0));
+
+    // Final normalization
+    double finalSum = cv::sum(rotated)[0];
+    if (finalSum != 0.0)
+      rotated /= static_cast<float>(finalSum);
+
+    return rotated;
+  }
+
+  void applyMotionBlur(const cv::Mat &src, cv::Mat &dst,
+                       int length, float angleDeg) {
+    cv::Mat kernel = makeSmoothMotionKernel(length, angleDeg);
+
+    // Use BORDER_REPLICATE or REFLECT to avoid dark borders
+    cv::filter2D(src, dst, -1, kernel, cv::Point(-1, -1),
+                 0.0, cv::BORDER_REPLICATE);
+  }
+  cv::Mat extractRotatedROI(const cv::Mat& src,
+                          const cv::Point2f& center,
+                          const cv::Size& roiSize,
+                          float angleDeg)
+  {
+    // 1. Build rotation matrix around the ROI center in source image
+    cv::Mat M = cv::getRotationMatrix2D(center, angleDeg, 1.0);
+
+    float dst_cx = roiSize.width  * 0.5f;
+    float dst_cy = roiSize.height * 0.5f;
+
+    // M is 2x3: [ a11 a12 tx; a21 a22 ty ]
+    M.at<double>(0, 2) += dst_cx - center.x;
+    M.at<double>(1, 2) += dst_cy - center.y;
+
+    // 3. Warp the original image into the ROI-sized output using this transform
+    cv::Mat dst;
+    cv::warpAffine(src, dst, M, roiSize,
+                   cv::INTER_LINEAR,
+                   cv::BORDER_REFLECT101);  // or BORDER_CONSTANT, etc.
+
+    return dst;
+  }
+
+  Mat buildRotatedSqrMask(int s,int flag) {
+    Mat mask(s,s,CV_8UC1,Scalar(flag>0?0:255));
+    std::vector<Point2i> corners;
+    corners.emplace_back(s/2,0);
+    corners.emplace_back(s,s/2);
+    corners.emplace_back(s/2,s);
+    corners.emplace_back(0,s/2);
+
+    fillConvexPoly(mask,corners,Scalar(flag>0?255:0));
+    return mask;
+  }
+
+  float estimateSigma(Mat samples)
+  {
+    float sumsq = 0.0f;
+
+    assert(samples.rows == samples.cols);
+    for (int x = 0; x< samples.cols;++x) {
+      for (int y = 0; y < samples.cols; ++y) {
+        float val = samples.at<float>(x,y);
+        sumsq += val*val;
+      }
+    }
+
+    return std::sqrt(sumsq / static_cast<float>(samples.rows * samples.rows));
+  }
+  float sampleHalfGaussian(float sigma)
+  {
+    // Thread-local RNG (safe in multithreaded code)
+    static thread_local std::mt19937 rng{std::random_device{}()};
+    static thread_local std::normal_distribution<double> dist(0.0, 1.0);
+
+    // Sample a standard normal, scale it, take abs
+    double x = dist(rng) * static_cast<double>(sigma);
+
+    return static_cast<float>(x);
+  }
+  Mat get_noise(int size,float sigma) {
+    Mat noise(size,size,CV_32FC1,Scalar(0.0));
+    for (int x = 0;x<size;++x) {
+      for (int y = 0;y<size;++y) {
+        noise.at<float>(x,y) = sampleHalfGaussian(sigma);
+      }
+    }
+    return noise;
+  }
+
+  Mat getContrib(Mat img,int flag) {
+    Mat grayHost;
+    auto mask = buildRotatedSqrMask(img.rows,flag);
+    cuda::GpuMat maskGpu(mask.rows,mask.cols,CV_8UC1,mask.data);
+
+    cuda::Stream s;
+
+    img.convertTo(grayHost,CV_32F);
+    cuda::GpuMat gray(grayHost.rows, grayHost.cols,CV_32FC1, grayHost.data);
+    cuda::multiply(gray, Image::hannWindow, gray, 1, -1, s);
+
+    //compute the log magnitude of the dft
+    cuda::GpuMat planes[] = {gray, cuda::GpuMat(gray.rows, gray.cols,CV_32F, Scalar(0))};
+    cuda::GpuMat complexI, mag;
+    cuda::merge(planes, 2, complexI, s);
+    cuda::dft(complexI, complexI, Size(gray.cols, gray.rows), 0, s);
+
+    complexI.setTo(Scalar(0,0),cuda::GpuMat(maskGpu.rows,maskGpu.cols,CV_8UC1,maskGpu.data),s);
+
+    // //show dft after being zeroed out
+    // cuda::split(complexI, planes, s);
+    // cuda::magnitude(planes[0], planes[1], mag, s);
+    // cuda::add(Scalar(1e-6), mag, mag, noArray(), -1, s);
+    // cuda::log(mag, mag, s);
+    // cuda::normalize(mag, mag, 0, 255, NORM_MINMAX,CV_8U, noArray(), s);
+    // Mat temp1;
+    // mag.download(temp1);
+
+    cuda::dft(complexI,complexI,complexI.size(),cv::DFT_INVERSE|DFT_SCALE,s);
+    cuda::GpuMat comps[2];
+    cuda::split(complexI, comps, s);
+    s.waitForCompletion();
+
+    cuda::GpuMat filtered;
+    comps[0].copyTo(filtered);   // real part only
+    filtered.download(grayHost);
+    //grayHost.convertTo(grayHost,CV_8U);
+    return grayHost;
+  }
+
+
+
+  void DebayerRunnable::run() {
+    Size image_size(image->width, image->height);
+    auto r = outfile;
+
+    image->load_raw_from_disk();
+
+
+    Mat img(image->height, image->width,CV_8UC1, image->get_Raw());
+
+    //cvtColor(img, img, COLOR_BayerBG2GRAY);
+    img.convertTo(img,CV_32F);
+
+    int patchSize = image->blurPatch;
+    Point center(image->width/2,image->height/2);
+    Size patch(patchSize,patchSize);
+
+    Mat res;
+    for (int i = 0; i < 180; i+=1) {
+      auto rotPatch = extractRotatedROI(img,center,patch,i);
+      image->check_blur(true, rotPatch,true);
+      resize(image->blurDFT,res,{128,128});
+
+
+      auto k = r;
+      k.setFileName(image->get_ImageFile().getBaseName() + "_r" + std::to_string(i)+"r_s1s");
+      //k.setFileName(image->get_ImageFile().getBaseName());
+      k.setExtension("tiff");
+      imwrite(k.toString(),res);
+    }
+  }
+
+
   Mat ConvertBGR2Bayer(Mat BGRImage) {
     /*
     Assuming a Bayer filter that looks like this:
@@ -66,457 +303,12 @@ namespace pathCam {
       image->set_disk_file(imageFile);
       parent->pass_image(image, image_index);
       image_index++;
-      Poco::Thread::sleep(1000/21);
+      Poco::Thread::sleep(1000 / 21);
     }
     parent->microscopeInput = false;
     std::cout << "disk images set " << std::endl;
   }
 
 
-  void DebayerRunnable::run() {
-    Poco::Path o = outfile;
-    image->load_raw_from_disk();
-    Mat img(image->height,image->width,CV_8UC1,image->get_Raw());
-    cvtColor(img,img,COLOR_BayerBG2BGR);
 
-    auto r = outfile;
-
-    r.setFileName(image->get_ImageFile().getBaseName());
-    r.setExtension("png");
-    Rect crop(image->width/2 - 1000,image->height/2-1000,2000,2000);
-    imwrite(r.toString(),img(crop));
-    return;
-
-
-
-    Size image_size(image->width , image->height);
-
-    float iters = 1;
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i <int(iters);i++) {
-      image->check_blur(true);
-      int k = 0;
-    }
-    //std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() / iters<<std::endl;
-
-
-    //Rect zoomCrop(image_size.width/2-1000,image_size.height/2-1000,2000,2000);
-    //Mat saveMat = readMat(zoomCrop)
-    r.setFileName(image->get_ImageFile().getBaseName());
-    r.setExtension("png");
-    std::cout<<image->get_ImageFile().getBaseName()<<"   "<<image->motionBlur<<std::endl;
-    imwrite(r.toString(), image->reg_image_uncropped);
-
-return;
-    image->blurPatch = 512;
-    Mat temp;
-    createHanningWindow(temp,Size(image->blurPatch,image->blurPatch),CV_32F);
-    Image::hannWindow.upload(temp);
-    temp = Mat(image->blurPatch,image->blurPatch,CV_8U,Scalar(0));
-    circle(temp,Point(0,0),image->blurCheckRadius,Scalar(255),1);
-    circle(temp,Point(0,image->blurPatch),image->blurCheckRadius,Scalar(255),1);
-    circle(temp,Point(image->blurPatch,0),image->blurCheckRadius,Scalar(255),1);
-    circle(temp,Point(image->blurPatch,image->blurPatch),image->blurCheckRadius,Scalar(255),1);
-    Image::blurMask.upload(temp);
-
-    start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i <int(iters);i++) {
-      image->check_blur(true);
-    }
-    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count() / iters<<std::endl;
-
-    Mat raw(image_size,CV_8U,image->get_Raw());
-    Mat dbr;
-
-    cvtColor(raw,dbr,COLOR_BayerBG2BGR);
-    resize(dbr,dbr,Size(image->width/4,image->height/4));
-    o.setFileName(image->get_ImageFile().getBaseName());
-    o.setExtension("png");
-    imwrite(o.toString(),dbr);
-    return;
-/*
-
-    //get host buffer
-    char* bufHost = new char[image->height * image->width];
-    std::ifstream stream;
-    stream.open(image->image_file.toString(), std::ios::binary);
-    stream.read(bufHost, image->width * image->height);
-    stream.close();
-
-    char* ffraw = new char[image->height * image->width];
-    std::ifstream streamFF;
-    streamFF.open("/home/pathcam/pcamdata/cal/2x_cal.Raw",std::ios::binary);
-    streamFF.read(ffraw,image->width * image->height);
-    stream.close();
-    Mat ff(image_size,CV_8U,ffraw);
-    cvtColor(ff,ff,COLOR_BayerBG2BGR);
-    ff.convertTo(ff,CV_32F);
-    ff*= 1/170.f;
-
-    //allocate a managed buffer
-    char* buf;
-    cudaMallocManaged(&buf,image_size.width * image_size.height * 3);
-    int dev = 0;
-    cudaGetDevice(&dev);
-    cudaMemLocation loc{};
-    loc.type = cudaMemLocationTypeDevice;
-    loc.id   = dev;
-    cudaMemPrefetchAsync(buf, image_size.width * image_size.height * 3,loc, 0);
-
-    //prepare gpumat to receive data into managed buffer
-    cuda::GpuMat rcvgpu(image_size,CV_8UC3,buf);
-
-
-    Mat raw(image_size,CV_8U,image->get_Raw());
-    Mat dbd(image_size,CV_8UC3), rsz(image->height / 4,image->width / 4,CV_8UC3);
-    Mat tcpa(image_size,CV_8UC3);
-    Mat fcpa(image_size,CV_8UC4);
-    Mat cvh(image_size,CV_32FC3);
-    Mat alphac(image_size,CV_8U,Scalar(255));
-
-    double pt1 = 0,pt2 = 0,pt3 = 0;
-
-int roiSize = 256;
-    Mat dbdHost(Size(roiSize,roiSize),CV_8UC3);
-    cuda::GpuMat dbdcuda({roiSize,roiSize},CV_8UC3,dbdHost.data),tcpaG({roiSize,roiSize},CV_8UC3);
-
-    cuda::GpuMat cvhG({roiSize,roiSize},CV_32FC3);
-    cuda::GpuMat ffGpu(image_size,CV_32FC3,ff.data);
-
-
-
-
-
-
-
-    char* buf1;
-    //buf1 = new char[roiSize * roiSize * 4];
-    cudaMallocManaged(&buf1,roiSize * roiSize * 4);
-    cuda::GpuMat rszcuda({roiSize,roiSize},CV_8UC4,buf1);
-    cuda::GpuMat rawcuda(image_size,CV_8U,image->get_Raw());
-    Mat rawMat(image_size,CV_8U,image->get_Raw());
-
-    Rect roi(1024*2,1024*2,roiSize,roiSize);
-    Mat alphCRoi = alphac(roi).clone();
-    float iter = 1000;
-    auto start1 = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i<int(iter);++i) {
-
-      cvtColor(rawMat(roi),dbdHost,COLOR_BayerBG2BGR);
-
-      auto c = std::chrono::high_resolution_clock::now();
-      dbdcuda.convertTo(cvhG,CV_32F);
-      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      c = std::chrono::high_resolution_clock::now();
-      cuda::divide(cvhG,ffGpu(roi),cvhG);
-      cuda::pow(cvhG,1.1,cvhG);
-      pt1 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      c = std::chrono::high_resolution_clock::now();
-      cvhG.convertTo(tcpaG,CV_8UC3);
-      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      std::vector<cuda::GpuMat> chan;
-
-
-      c = std::chrono::high_resolution_clock::now();
-      cuda::split(tcpaG,chan);
-      chan.push_back(cuda::GpuMat({roiSize,roiSize},CV_8UC1,alphCRoi.data));
-      cuda::merge(chan,rszcuda);
-      pt2 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-
-
-      auto val = rszcuda.data[0];
-    }
-    std::cout<<"cuda converting: "<<pt3/iter<<std::endl;
-    std::cout<<"cuda math: "<<pt1/iter<<std::endl;
-    std::cout<<"cuda alpha: "<<pt2/iter<<std::endl;
-    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count() / iter<<std::endl;
-
-    pt1 = 0;
-    pt2 = 0;
-    pt3 = 0;
-
-    dbdHost = Mat(image_size,CV_8UC3);
-    dbdcuda = cuda::GpuMat(image_size,CV_8UC3,dbdHost.data);
-    cvhG = cuda::GpuMat(image_size,CV_32FC3);
-    ffGpu = cuda::GpuMat(image_size,CV_32FC3);
-    tcpaG = cuda::GpuMat(image_size,CV_8UC3);
-    cudaFree(buf1);
-    buf1 = new char[image->width * image->height * 4];
-    rszcuda = cuda::GpuMat(image_size,CV_8UC4,buf1);
-
-    start1 = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i<int(iter);++i) {
-
-      cvtColor(raw,dbdHost,COLOR_BayerBG2BGR);
-
-      auto c = std::chrono::high_resolution_clock::now();
-      dbdcuda.convertTo(cvhG,CV_32F);
-      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      c = std::chrono::high_resolution_clock::now();
-      cuda::divide(cvhG,ffGpu,cvhG);
-      cuda::pow(cvhG,1.1,cvhG);
-      pt1 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      c = std::chrono::high_resolution_clock::now();
-      cvhG.convertTo(tcpaG,CV_8UC3);
-      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      std::vector<cuda::GpuMat> chan;
-
-
-      c = std::chrono::high_resolution_clock::now();
-      cuda::split(tcpaG,chan);
-      chan.push_back(cuda::GpuMat(image_size,CV_8UC1,alphac.data));
-      cuda::merge(chan,rszcuda);
-      pt2 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-
-
-      auto val = rszcuda.data[0];
-    }
-    std::cout<<"cuda converting: "<<pt3/iter<<std::endl;
-    std::cout<<"cuda math: "<<pt1/iter<<std::endl;
-    std::cout<<"cuda alpha: "<<pt2/iter<<std::endl;
-    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count() / iter<<std::endl;
-
-
-
-
-    start1 = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i<100;++i) {
-      cvtColor(raw,dbd,COLOR_BayerBG2BGR);
-      auto c = std::chrono::high_resolution_clock::now();
-      dbd.convertTo(cvh,CV_32FC3);
-      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      c = std::chrono::high_resolution_clock::now();
-      divide(cvh,ff,cvh);
-      pow(cvh,1.1,cvh);
-      pt1 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      c = std::chrono::high_resolution_clock::now();
-      cvh.convertTo(tcpa,CV_8UC3);
-      pt3 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-      std::vector<Mat> chan;
-
-      c = std::chrono::high_resolution_clock::now();
-      split(tcpa,chan);
-      chan.push_back(alphac);
-      merge(chan,fcpa);
-      pt2 += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - c).count();
-
-
-      auto val = fcpa.data[0];
-    }
-    std::cout<<"converting: "<<pt3/100<<std::endl;
-    std::cout<<"math: "<<pt1/100<<std::endl;
-    std::cout<<"alpha: "<<pt2/100.f<<std::endl;
-    std::cout<<std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start1).count()<<std::endl;
-//100 times, wrap the host buffer in a gpu mat, debayer to managed buffer, verify cpu can access data
-
-    auto start = std::chrono::high_resolution_clock::now();
-    double accCvtMs = 0, accMatWrapMs = 0, accHostReadMs = 0;
-
-    for (int i = 0; i < 1000; ++i) {
-      auto t_start_wrap = std::chrono::high_resolution_clock::now();
-      cv::cuda::GpuMat readMat(image_size, CV_8U, bufHost);  // just header
-      auto t_end_wrap = std::chrono::high_resolution_clock::now();
-      accMatWrapMs += std::chrono::duration<double, std::milli>(t_end_wrap - t_start_wrap).count();
-
-      auto t_start_cvt = std::chrono::high_resolution_clock::now();
-      cv::cuda::cvtColor(readMat, rcvgpu, COLOR_BayerBG2BGR);
-      // force GPU to finish so the timing is meaningful
-      //cudaDeviceSynchronize();
-      auto t_end_cvt = std::chrono::high_resolution_clock::now();
-      accCvtMs += std::chrono::duration<double, std::milli>(t_end_cvt - t_start_cvt).count();
-
-      auto t_start_host = std::chrono::high_resolution_clock::now();
-      cv::Mat hostm(image_size, CV_8UC3, buf); // wrapping managed mem
-      auto val = hostm.data[0];                // host read
-      (void)val;
-      auto t_end_host = std::chrono::high_resolution_clock::now();
-      accHostReadMs += std::chrono::duration<double, std::milli>(t_end_host - t_start_host).count();
-    }
-
-    std::cout << "wrap GpuMat header: " << accMatWrapMs / 1000.0 << " ms/iter\n";
-    std::cout << "cuda::cvtColor:     " << accCvtMs     / 1000.0 << " ms/iter\n";
-    std::cout << "host read (UM):     " << accHostReadMs/ 1000.0 << " ms/iter\n";
-    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-
-    //prepare a gpumat to receive data from cvtColor command, prepare mat for .download()
-    cuda::GpuMat dbr(image_size.height,image_size.width,CV_8UC3);
-    Mat rcvhost(image_size,CV_8UC3);
-
-    //100 times, wrap host buffer in gpu mat, debayer into previously gpu allcated gpumat, download to host mat, verify cpu can access data
-    start = std::chrono::high_resolution_clock::now();
-    double accCvt2Ms = 0, accDownloadMs = 0;
-    accHostReadMs = 0;
-    for (int i = 0; i < 1000; ++i) {
-      cv::cuda::GpuMat readMat(image_size, CV_8U, bufHost);
-
-      auto t_start_cvt = std::chrono::high_resolution_clock::now();
-      cv::cuda::cvtColor(readMat, dbr, COLOR_BayerBG2BGR);
-      //cudaDeviceSynchronize();
-      auto t_end_cvt = std::chrono::high_resolution_clock::now();
-      accCvt2Ms += std::chrono::duration<double, std::milli>(t_end_cvt - t_start_cvt).count();
-
-      auto t_start_dl = std::chrono::high_resolution_clock::now();
-      dbr.download(rcvhost);
-      //cudaDeviceSynchronize();
-      auto t_end_dl = std::chrono::high_resolution_clock::now();
-      accDownloadMs += std::chrono::duration<double, std::milli>(t_end_dl - t_start_dl).count();
-
-      auto val = rcvhost.data[0];
-      (void)val;
-    }
-
-    std::cout << "cvtColor (2): " << accCvt2Ms    / 1000.0 << " ms/iter\n";
-    std::cout << "download():   " << accDownloadMs/ 1000.0 << " ms/iter\n";
-    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-*/
-    //cuda::resize(greyRoi,greyRoi,Size(greyRoi.cols / 4, greyRoi.rows / 4));
-
-    //auto r = outfile;
-    // r.setFileName(image->get_ImageFile().getBaseName());
-    // r.setExtension("png");
-    // Rect roi(readMat.cols/2 - 1000,readMat.rows/2 - 1000,2000,2000);
-    // Mat temp;
-    // //Mat temp(dbr.rows, dbr.cols, CV_8UC3,dbr.datastart,dbr.step); //operations on this object segfault
-    // readMat(roi).download(temp); //this is fine
-
-    // imwrite(r.toString(), temp);
-    // return;
-    //cvtColor(readMat, temp, COLOR_BayerBG2GRAY);
-
-    // Rect fullRoi(image_size.width/2 - 200,image_size.height/2-200,400,400);
-    // Mat fullCrop = readMat(fullRoi);
-    // auto val = Image::compute_sharpness(fullCrop);
-    // double fullVal = min(val.x,val.y);
-    cuda::GpuMat readMat(image_size, CV_8U, image->get_Raw());
-
-    // Point2i cropSize(800,800);
-    // Rect halfRoi(image_size.width/2-cropSize.x,image_size.height/2 - cropSize.y,cropSize.x * 2,cropSize.y*2);
-    // Mat halfCrop = temp(halfRoi);
-    // Mat halfTemp;
-    // resize(halfCrop,halfTemp,Size(halfCrop.cols/2,halfCrop.rows/2));
-    //
-    // auto val = Image::compute_sharpness(halfTemp);
-    // double halfVal = min(val.x,val.y);
-    //
-    // blur->at(sort_order) = halfVal;
-    // names->at(sort_order) = image->get_ImageFile().getFileName();
-    //return;
-
-
-
-
-    bool convertAndSave = true;
-
-    if (!image->in_memory()) {
-      std::cout << "Issue loading image.\n";
-      return;
-    }
-    // auto val = min(image->sharpness.x,image->sharpness.y);
-    //     blur->at(sort_order) = val;
-    //     names->at(sort_order) = image->get_ImageFile().getFileName();
-
-
-    if (convertAndSave) {
-
-
-      //
-      // Size image_size(image->width, image->height);
-      Mat image_Mat;
-      // Mat readMat = Mat(image_size, CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-      // cvtColor(readMat, readMat, COLOR_BayerBG2BGR);
-
-      cuda::resize(readMat,readMat,Size(image->width / 4, image->height / 4)); //resize if you want by changing it here
-      auto r = outfile;
-
-      //Rect zoomCrop(image_size.width/2-1000,image_size.height/2-1000,2000,2000);
-      //Mat saveMat = readMat(zoomCrop)
-      r.setFileName(image->get_ImageFile().getBaseName());
-      r.setExtension("png");
-      Mat temp(readMat.rows, readMat.cols, CV_8UC3,readMat.data,readMat.step);
-      imwrite(r.toString(), temp);
-
-
-
-      // int k = 0;
-    //   readMat.convertTo(readMat,CV_32FC3);
-    //
-    //   for (int i = 0; i < ffs.size(); ++i) {
-    //     Mat ff;
-    //     std::ifstream stream;
-    //     stream.open(ffs[i], std::ios::binary);
-    //     {
-    //       char *raw_buffer = new char[6464 * 4852];
-    //       stream.read(raw_buffer, 6464 * 4852);
-    //       stream.close();
-    //       ff = Mat(Size(6464, 4852), CV_8U, raw_buffer, Mat::AUTO_STEP);
-    //     }
-    //     Mat gray;
-    //     cvtColor(ff,gray,COLOR_BayerBG2GRAY);
-    //     resize(gray,gray,Size(image->width / 4, image->height / 4));
-    //     cvtColor(ff, ff, COLOR_BayerBG2BGR);
-    //     imwrite("/media/max/Data/2_20/wrong_flatfield_test/png2/ff_"+std::to_string(i)+".png",gray);
-    //     ff.convertTo(ff, CV_32F);
-    //     ff *= 1 / 170.0;
-    //     divide(readMat, ff, image_Mat, 1, CV_32F);
-    //
-    //     //cv::pow(image_Mat, 1.1, image_Mat);
-    //
-    //     image_Mat.convertTo(image_Mat, CV_8UC3);
-    //
-    //
-    //     resize(image_Mat, image_Mat, Size(image->width / 4, image->height / 4));
-    //     //
-    //     //      imwrite("/Users/coopermaira/Desktop/ff.png", flatfield);
-    //     //      imwrite("/Users/coopermaira/Desktop/pre_ff.png",image_Mat);
-    //
-    //
-    //     //divide(readMat, flatfield, image_Mat, 1, CV_32F);
-    //
-    //     //cv::pow(image_Mat, 1.1, image_Mat);
-    //
-    //     //image_Mat.convertTo(image_Mat, CV_8UC3);
-    //
-    //     //add subdir for png
-    //     auto r = outfile;
-    //
-    //     r.setFileName(image->get_ImageFile().getBaseName()+"_"+std::to_string(i));
-    //     r.setExtension("png");
-    //     imwrite(r.toString(), image_Mat);
-    //   }
-    //   //
-    //   // cvtColor(image_Mat,image_Mat, COLOR_BayerBG2RGB);
-    //   //        image_Mat = ConvertBGR2Bayer(image_Mat);
-    //   //
-    //   //        //save .Raw
-    //   //        auto name = std::stoi(image->get_ImageFile().getBaseName());
-    //   //        name += 250;
-    //   //
-    //   //
-    //   //        r.setFileName(std::to_string(name));
-    //   //        r.setExtension("Raw");
-    //   //        std::fstream file;
-    //   //        file = std::fstream(r.toString(), std::ios::out | std::ios::binary);
-    //   //        if (file.fail()) {
-    //   //          throw new std::exception;
-    //   //        }
-    //   //        file.write(reinterpret_cast<const char *>(image_Mat.data), image->width * image->height);
-    //
-    //   // } catch (cv::Exception &e) {
-    //   //   int k = 0;
-    //   // }
-     }
-    image->free_memory_RAW();
-    int k = 0;
-  }
 }

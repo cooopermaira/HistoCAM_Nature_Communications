@@ -163,27 +163,26 @@ namespace pathCam {
     return false;
   }
 
-  int Image::check_blur(bool _unifiedMemory) {
+  int Image::check_blur(bool _unifiedMemory,const Mat& img,bool downloadDFT) {
     auto start = std::chrono::high_resolution_clock::now();
-    if (!in_memory()) {
-      throw std::runtime_error("Image not in memory during blur check");
+    Mat grayHost;
+    if (!img.empty()) {
+      assert(img.rows == blurPatch && img.cols == blurPatch && img.channels() == 1);
+      grayHost = img;//.clone();
+    }else {
+      if (!in_memory()) {
+        throw std::runtime_error("Image not in memory during blur check");
+      }
+      const Mat raw(Size(width, height), CV_8U, raw_buffer);
+      const Rect roi(width / 2 - blurPatch / 2, height / 2 - blurPatch / 2, blurPatch, blurPatch);
+
+      //debayer and multiply by hanning window. if you dont, bright lines will corrupt borders and f up min max calc
+      cvtColor(raw(roi), grayHost, COLOR_BayerBG2GRAY);
     }
     cuda::Stream s;
-
-    Mat raw(Size(width, height), CV_8U, raw_buffer);
-
-    // for (int x = 0; x < width - blurPatch; x += blurPatch) {
-    //   for (int y = 0; y < height - blurPatch; y += blurPatch) {
-
-
-    const Rect roi(width / 2 - blurPatch / 2, height / 2 - blurPatch / 2, blurPatch, blurPatch);
-    //Rect roi(x,y,blurPatch,blurPatch);
-    Mat grayHost;
-
-    //debayer and multiply by hanning window. if you dont, bright lines will corrupt borders and f up min max calc
-    cvtColor(raw(roi), grayHost, COLOR_BayerBG2GRAY);
-
-    grayHost.convertTo(grayHost,CV_32F);
+    if (grayHost.depth() != CV_32F) {
+      grayHost.convertTo(grayHost,CV_32F);
+    }
     cuda::GpuMat gray(grayHost.rows, grayHost.cols,CV_32FC1, grayHost.data);
     cuda::multiply(gray, hannWindow, gray, 1, -1, s);
 
@@ -199,32 +198,24 @@ namespace pathCam {
     cuda::log(mag, mag, s);
 
     // blur the dft so noise doesnt interfere so bad. blur_once is quagmire because the box filter isnt thread safe
-    blur_once(mag, mag, s);
-    cuda::normalize(mag, mag, 0, 255, NORM_MINMAX,CV_8U, noArray(), s);
+    //blur_once(mag, mag, s);
+    //cuda::normalize(mag, mag, 0, 255, NORM_MINMAX,CV_8U, noArray(), s);
+    cuda::normalize(mag, mag, 0, 1, NORM_MINMAX,CV_32F, noArray(), s);
+
 
     s.waitForCompletion();
-
-    // //debug for viewing normalized 8U dft
-    // Mat temp;
-    // mag.download(temp);
-    // Mat m1(blurPatch,blurPatch,CV_8UC1,Scalar(255));
-    // circle(m1,Point(blurPatch/2,blurPatch/2),70,Scalar(0),-1);
-    // cuda::GpuMat m2;
-    // m2.upload(m1);
-
+    if (downloadDFT) {
+      mag.download(blurDFT);
+    }
 
     //calculate min max around specific region of dft. this region is uniform if clear and wavy if blurred
     double maxval, minval;
     Point maxLoc, minLoc;
-    mag.download(reg_image_uncropped);
     cuda::minMaxLoc(mag, &minval, &maxval, &minLoc, &maxLoc, blurMask);
     //motionBlur = int(maxval) - int(minval);
     motionBlur = int(minval);
-    // std::cout<<motionBlur<<" "<<x<<" "<<y<<std::endl;
-    //       }
-    //     }
-    blurTime = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).
-        count();
+
+    blurTime = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count();
     return motionBlur;
   }
 

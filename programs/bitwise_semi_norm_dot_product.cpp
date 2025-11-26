@@ -3,6 +3,7 @@
 //
 #include "Poco/DirectoryIterator.h"
 #include <regex>
+#include <fstream>
 #include <cstdio>
 #include <string>
 #include <opencv2/core/cuda.hpp>
@@ -14,6 +15,7 @@ extern "C" void thresholdAndPackToBits(const cv::cuda::GpuMat& gray8u,
                               double percentile,
                               cv::cuda::GpuMat& bitmaskBytes);
 
+Mat makeMotionKernel(int length, float angleDeg);
 
 bool loadRawToGpuGray(const std::string &path,
                              int width, int height,
@@ -35,10 +37,7 @@ int extractMagnification(const std::string &path) {
   return -1; // fallback if no match
 }
 
-float test_ratios(std::vector<cuda::GpuMat> files,std::vector<float> ratios) {
-  assert(files.size() == 2);
 
-}
 
 int main(int argc, char *argv[]) {
 
@@ -54,20 +53,23 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (true) {
-    std::sort(paths.begin(), paths.end(), [](const std::string &a, const std::string &b) {
-      return extractMagnification(a) < extractMagnification(b);
-    });
-  }
-  for (auto &p: paths) {
-    cuda::GpuMat im;
-    loadRawToGpuGray(p, 6464, 4852, im);
-    files.push_back(im);
-  }
+  Size image_size(6464,4852);
+  Mat img,raw;
+  char *bufHost = new char[image_size.width * image_size.height];
+  for (auto &path : paths) {
 
-  cuda::GpuMat bitmask;
-  thresholdAndPackToBits(files[0],70,bitmask);
-  int k = 0;
+    std::ifstream stream;
+    stream.open(path, std::ios::binary);
+    stream.read(bufHost, image_size.width * image_size.height);
+    stream.close();
+
+    raw = Mat(image_size,CV_8UC1,bufHost);
+    cvtColor(raw,img,COLOR_BayerBG2BGR);
+    Mat test;
+    resize(img,test,Size(image_size.width / 10,image_size.height/10));
+
+    int k = 0;
+  }
 
 
 
