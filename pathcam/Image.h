@@ -61,6 +61,7 @@ namespace pathCam {
 
     ~Image();
 
+
     void set_memory_pool(MemoryPool *mempool_in) {
       mempool = mempool_in;
     }
@@ -108,7 +109,7 @@ namespace pathCam {
 
     bool is_good();
 
-    int check_blur(bool _unifiedMemory, const cv::Mat& img = cv::Mat(),bool downloadDFT = false);
+    int check_blur(bool _unifiedMemory, const cv::Mat& img = cv::Mat(),bool downloadDFT = true);
 
     static cv::Point2f compute_sharpness(cv::Mat &_img);
 

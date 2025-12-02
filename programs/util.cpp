@@ -4,6 +4,7 @@
 
 //#include "pathCam.h"
 #include <cstdio>
+#include <thread>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -11,6 +12,645 @@
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/cudaarithm.hpp>
+
+using namespace cv;
+
+enum BayerPattern { RGGB, BGGR, GBRG, GRBG };
+// Return 0=R, 1=G, 2=R for given Bayer coordinate under BGGR
+inline int bayerColor_BGGR(int y, int x)
+{
+    bool er = (y % 2 == 0);
+    bool ec = (x % 2 == 0);
+    if (er && ec)       return 2; // B
+    if (er && !ec)      return 1; // G
+    if (!er && ec)      return 1; // G
+    return 0;                     // R
+}
+
+// Estimate a single kernel for one Bayer color (R/G/B) from a padded BGGR mosaic.
+// sharpBayer: CV_32F, 1-channel, BGGR mosaic, size: H_b = 2*Hd + ksize - 1, W_b = 2*Wd + ksize - 1
+// targetDense: CV_32F, 1-channel, dense output for that color, size Hd x Wd
+// colorChar: 'R','G','B' (which Bayer color this kernel predicts)
+// ksize: odd kernel size
+// pattern: currently only BGGR supported
+cv::Mat estimateKernelFromBayerSingleColor(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &targetDense,
+    int ksize,
+    char colorChar,
+    BayerPattern pattern = BGGR,
+    double lambda = 1e-6)
+{
+    CV_Assert(sharpBayer.type() == CV_32F && sharpBayer.channels() == 1);
+    CV_Assert(targetDense.type() == CV_32F && targetDense.channels() == 1);
+    CV_Assert(ksize > 0 && (ksize % 2 == 1));
+    CV_Assert(pattern == BGGR); // only BGGR implemented here
+
+    int Hb = sharpBayer.rows;
+    int Wb = sharpBayer.cols;
+
+    int Hd = targetDense.rows;
+    int Wd = targetDense.cols;
+
+    int half = ksize / 2;
+
+    // Enforce the padding relationship:
+    // sharpBayer must be "ksize-1" larger than 2x dense in both dims
+    CV_Assert(Hb == 2 * Hd + ksize - 1);
+    CV_Assert(Wb == 2 * Wd + ksize - 1);
+
+    int P = ksize * ksize; // number of kernel coefficients
+
+    // Normal equations: (A^T A) k = A^T y
+    cv::Mat AtA = cv::Mat::zeros(P, P, CV_64F);
+    cv::Mat Aty = cv::Mat::zeros(P, 1, CV_64F);
+
+    auto idx = [ksize](int u, int v) {
+        return u * ksize + v;
+    };
+
+    // Map requested colorChar to 0/1/2 (R/G/B)
+    int wantedColor;
+    switch (colorChar)
+    {
+        case 'R': case 'r': wantedColor = 0; break;
+        case 'G': case 'g': wantedColor = 1; break;
+        case 'B': case 'b': wantedColor = 2; break;
+        default:
+        {
+            std::cerr << "Unsupported color char, use R/G/B.\n";
+            cv::Mat k = cv::Mat::zeros(ksize, ksize, CV_32F);
+            k.at<float>(half, half) = 1.0f;
+            return k;
+        }
+    }
+
+    // Loop over every dense output pixel; each one defines a Bayer center
+    // with a fully valid ksize×ksize neighborhood:
+    //
+    // For BGGR:
+    //   B centers at (even,even)
+    //   R centers at (odd,odd)
+    //
+    // With padding, center coordinates are:
+    //   B: y = half + 2*yd, x = half + 2*xd
+    //   R: y = half + 2*yd + 1, x = half + 2*xd + 1 (if you choose that)
+    //
+    // Here we'll implement B and R as examples.
+
+    for (int yd = 0; yd < Hd; ++yd)
+    {
+        for (int xd = 0; xd < Wd; ++xd)
+        {
+            int y, x;
+
+            if (wantedColor == 2) // B in BGGR at (even,even)
+            {
+                y = half + 2 * yd;
+                x = half + 2 * xd;
+            }
+            else if (wantedColor == 0) // R in BGGR at (odd,odd)
+            {
+                y = half + 2 * yd + 1;
+                x = half + 2 * xd + 1;
+            }
+            else
+            {
+                // For G, you'd need to define how your denseG is packed.
+                // Right now, skip G:
+                continue;
+            }
+
+            // Just sanity check color (can be turned into an assert if you like)
+            int c = bayerColor_BGGR(y, x);
+            if (c != wantedColor)
+            {
+                // If the padding alignment is right, this should never happen.
+                continue;
+            }
+
+            float y_val = targetDense.at<float>(yd, xd);
+
+            // A^T y
+            for (int u = 0; u < ksize; ++u)
+            {
+                int yy = y + (u - half);
+                const float* rowSrc = sharpBayer.ptr<float>(yy);
+                for (int v = 0; v < ksize; ++v)
+                {
+                    int xx = x + (v - half);
+                    double a_p = static_cast<double>(rowSrc[xx]);
+                    int p = idx(u, v);
+                    Aty.at<double>(p, 0) += a_p * y_val;
+                }
+            }
+
+            // A^T A
+            for (int u1 = 0; u1 < ksize; ++u1)
+            {
+                int y1 = y + (u1 - half);
+                const float* row1 = sharpBayer.ptr<float>(y1);
+                for (int v1 = 0; v1 < ksize; ++v1)
+                {
+                    int x1 = x + (v1 - half);
+                    double a_p = static_cast<double>(row1[x1]);
+                    int p = idx(u1, v1);
+
+                    for (int u2 = 0; u2 < ksize; ++u2)
+                    {
+                        int y2 = y + (u2 - half);
+                        const float* row2 = sharpBayer.ptr<float>(y2);
+                        for (int v2 = 0; v2 < ksize; ++v2)
+                        {
+                            int x2 = x + (v2 - half);
+                            double a_q = static_cast<double>(row2[x2]);
+                            int q = idx(u2, v2);
+                            AtA.at<double>(p, q) += a_p * a_q;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Regularize
+    for (int p = 0; p < P; ++p)
+        AtA.at<double>(p, p) += lambda;
+
+    // Solve AtA * k = Aty
+    cv::Mat k_vec;
+    bool ok = cv::solve(AtA, Aty, k_vec, cv::DECOMP_CHOLESKY);
+    if (!ok)
+    {
+        std::cerr << "Warning: solve failed, returning delta kernel.\n";
+        cv::Mat k = cv::Mat::zeros(ksize, ksize, CV_32F);
+        k.at<float>(half, half) = 1.0f;
+        return k;
+    }
+
+    // Reshape into ksize×ksize
+    cv::Mat kernel(ksize, ksize, CV_32F);
+    for (int u = 0; u < ksize; ++u)
+    {
+        float* rowK = kernel.ptr<float>(u);
+        for (int v = 0; v < ksize; ++v)
+        {
+            int p = idx(u, v);
+            rowK[v] = static_cast<float>(k_vec.at<double>(p, 0));
+        }
+    }
+
+    return kernel;
+}
+
+std::vector<cv::Mat> extractDenseBayerChannels(const cv::Mat &bayer,
+                                               BayerPattern pattern)
+{
+    CV_Assert(bayer.channels() == 1);
+    CV_Assert(bayer.rows % 2 == 0 && bayer.cols % 2 == 0);
+
+    int H = bayer.rows;
+    int W = bayer.cols;
+
+    // Dense channel shapes
+    cv::Mat denseR(H/2, W/2, bayer.type(), cv::Scalar(0));
+    cv::Mat denseB(H/2, W/2, bayer.type(), cv::Scalar(0));
+    cv::Mat denseG(H,   W/2, bayer.type(), cv::Scalar(0));  // two green rows
+
+    // Functions to get color from CFA pattern
+    auto colorAt = [&](int y, int x) {
+        bool er = (y % 2 == 0);
+        bool ec = (x % 2 == 0);
+
+        switch(pattern)
+        {
+            case RGGB:
+                if (er && ec)       return 0; // R
+                if (er && !ec)      return 1; // G
+                if (!er && ec)      return 1; // G
+                return 2;                     // B
+
+            case BGGR:
+                if (er && ec)       return 2; // B
+                if (er && !ec)      return 1; // G
+                if (!er && ec)      return 1; // G
+                return 0;                     // R
+
+            case GRBG:
+                if (er && ec)       return 1; // G
+                if (er && !ec)      return 0; // R
+                if (!er && ec)      return 2; // B
+                return 1;                     // G
+
+            case GBRG:
+                if (er && ec)       return 1; // G
+                if (er && !ec)      return 2; // B
+                if (!er && ec)      return 0; // R
+                return 1;                     // G
+        }
+        return -1;
+    };
+
+    // Populate dense channels
+    for (int y = 0; y < H; ++y)
+    {
+        const uchar* srcRow = bayer.ptr<uchar>(y);
+        for (int x = 0; x < W; ++x)
+        {
+            int c = colorAt(y, x);
+            uchar v = srcRow[x];
+
+            if (c == 0) // R
+            {
+                denseR.at<uchar>(y/2, x/2) = v;
+            }
+            else if (c == 1) // G
+            {
+                denseG.at<uchar>(y, x/2) = v;  // full rows, half columns
+            }
+            else // B
+            {
+                denseB.at<uchar>(y/2, x/2) = v;
+            }
+        }
+    }
+
+    return { denseR, denseG, denseB };
+}
+cv::Mat apply_Ak(
+    const cv::Mat &sharpBayer,   // CV_32F, 1ch, padded
+    const cv::Mat &k,            // CV_64F, ksize×ksize
+    int ksize,
+    int half,
+    int wantedColor,             // 0=R,1=G,2=B
+    int Hd, int Wd
+) {
+    cv::Mat u(Hd, Wd, CV_64F, cv::Scalar(0));
+
+    for (int yd = 0; yd < Hd; ++yd) {
+        for (int xd = 0; xd < Wd; ++xd) {
+            int y, x;
+            if (wantedColor == 2) { // B at (even,even)
+                y = half + 2 * yd;
+                x = half + 2 * xd;
+            } else if (wantedColor == 0) { // R at (odd,odd)
+                y = half + 2 * yd + 1;
+                x = half + 2 * xd + 1;
+            } else {
+                // G not handled yet
+                continue;
+            }
+
+            // Optional safety: ensure CFA parity is what we expect
+            // CV_Assert(bayerColor_BGGR(y, x) == wantedColor);
+
+            double sum = 0.0;
+            for (int u0 = 0; u0 < ksize; ++u0) {
+                int yy = y + (u0 - half);
+                const float* srcRow = sharpBayer.ptr<float>(yy);
+                const double* kRow  = k.ptr<double>(u0);
+                for (int v0 = 0; v0 < ksize; ++v0) {
+                    int xx = x + (v0 - half);
+                    sum += kRow[v0] * static_cast<double>(srcRow[xx]);
+                }
+            }
+            u.at<double>(yd, xd) = sum;
+        }
+    }
+    return u;
+}
+
+// g = Aᵀ * r : from residual (Hd×Wd, CV_64F) to kernel gradient (ksize×ksize, CV_64F)
+cv::Mat apply_ATr(
+    const cv::Mat &sharpBayer,   // CV_32F
+    const cv::Mat &r,            // CV_64F, Hd×Wd
+    int ksize,
+    int half,
+    int wantedColor,
+    int Hd, int Wd
+) {
+    cv::Mat g(ksize, ksize, CV_64F, cv::Scalar(0));
+
+    for (int yd = 0; yd < Hd; ++yd) {
+        for (int xd = 0; xd < Wd; ++xd) {
+            double rr = r.at<double>(yd, xd);
+            if (rr == 0.0) continue;
+
+            int y, x;
+            if (wantedColor == 2) {
+                y = half + 2 * yd;
+                x = half + 2 * xd;
+            } else if (wantedColor == 0) {
+                y = half + 2 * yd + 1;
+                x = half + 2 * xd + 1;
+            } else {
+                continue;
+            }
+
+            for (int u0 = 0; u0 < ksize; ++u0) {
+                int yy = y + (u0 - half);
+                const float* srcRow = sharpBayer.ptr<float>(yy);
+                double* gRow        = g.ptr<double>(u0);
+                for (int v0 = 0; v0 < ksize; ++v0) {
+                    int xx = x + (v0 - half);
+                    gRow[v0] += rr * static_cast<double>(srcRow[xx]);
+                }
+            }
+        }
+    }
+
+    return g;
+}
+cv::Mat apply_M(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &p,        // CV_64F, ksize×ksize
+    int ksize,
+    int half,
+    int wantedColor,
+    int Hd, int Wd,
+    double lambda
+) {
+    cv::Mat Ap = apply_Ak(sharpBayer, p, ksize, half, wantedColor, Hd, Wd);
+    cv::Mat AtAp = apply_ATr(sharpBayer, Ap, ksize, half, wantedColor, Hd, Wd);
+    AtAp += lambda * p;
+    return AtAp;
+}
+cv::Mat estimateKernel_CGLS(
+    const cv::Mat &sharpBayer,   // CV_32F, 1ch, padded: Hb x Wb
+    const cv::Mat &targetDense,  // CV_32F, 1ch: Hd x Wd
+    int ksize,
+    char colorChar,
+    BayerPattern pattern = BGGR,
+    double lambda = 1e-6,
+    int maxIters = 50,
+    double tol = 1e-6
+) {
+    CV_Assert(sharpBayer.type() == CV_32F && sharpBayer.channels() == 1);
+    CV_Assert(targetDense.type() == CV_32F && targetDense.channels() == 1);
+    CV_Assert(ksize > 0 && (ksize % 2 == 1));
+    CV_Assert(pattern == BGGR);
+
+    int Hb = sharpBayer.rows;
+    int Wb = sharpBayer.cols;
+    int Hd = targetDense.rows;
+    int Wd = targetDense.cols;
+    int half = ksize / 2;
+
+    // Enforce padding relationship: Hb = 2*Hd + ksize - 1, same for W
+    CV_Assert(Hb == 2 * Hd + ksize - 1);
+    CV_Assert(Wb == 2 * Wd + ksize - 1);
+
+    int wantedColor;
+    switch (colorChar) {
+        case 'B': case 'b': wantedColor = 2; break;
+        case 'R': case 'r': wantedColor = 0; break;
+        default:
+            std::cerr << "Only R/B implemented in this solver.\n";
+            {
+                cv::Mat k = cv::Mat::zeros(ksize, ksize, CV_32F);
+                k.at<float>(half, half) = 1.0f;
+                return k;
+            }
+    }
+
+    // Convert target to double
+    cv::Mat y64;
+    targetDense.convertTo(y64, CV_64F);
+
+    // b = Aᵀ y
+    cv::Mat b = apply_ATr(sharpBayer, y64, ksize, half, wantedColor, Hd, Wd);
+
+    // Initialize k = 0 (or delta if you prefer)
+    cv::Mat k = cv::Mat::zeros(ksize, ksize, CV_64F);
+
+    // r = b - M k; since k=0, r = b
+    cv::Mat r = b.clone();
+    cv::Mat p = r.clone();
+
+    double rr_old = (double)cv::sum(r.mul(r))[0];
+    double rr0 = rr_old;
+
+    for (int it = 0; it < maxIters; ++it) {
+        // q = M p = Aᵀ(A p) + λ p
+        cv::Mat q = apply_M(sharpBayer, p, ksize, half, wantedColor, Hd, Wd, lambda);
+
+        double pq = (double)cv::sum(p.mul(q))[0];
+        if (std::abs(pq) < 1e-20) {
+            std::cerr << "CG: breakdown (p^T M p ~ 0)\n";
+            break;
+        }
+
+        double alpha = rr_old / pq;
+
+        // k_{n+1} = k_n + alpha p
+        k += alpha * p;
+
+        // r_{n+1} = r_n - alpha q
+        r -= alpha * q;
+
+        double rr_new = (double)cv::sum(r.mul(r))[0];
+
+        double rel = rr_new / rr0;
+        std::cout << "Iter " << it
+                  << "  ||r||^2 = " << rr_new
+                  << "  rel = " << rel << std::endl;
+
+        if (rel < tol) {
+            break;
+        }
+
+        double beta = rr_new / rr_old;
+
+        // p_{n+1} = r_{n+1} + beta p_n
+        p = r + beta * p;
+
+        rr_old = rr_new;
+    }
+
+    // Optional: check data-space residual ||y - A k||^2
+    {
+        cv::Mat Ak = apply_Ak(sharpBayer, k, ksize, half, wantedColor, Hd, Wd);
+        cv::Mat diff = y64 - Ak;
+        double dataRes = (double)cv::sum(diff.mul(diff))[0];
+        std::cout << "Final data residual ||y - A k||^2 = " << dataRes << std::endl;
+    }
+
+    // Optional: enforce sum(k) = 1 at the end
+    double sumK = (double)cv::sum(k)[0];
+    if (std::abs(sumK) > 1e-12) {
+        k /= sumK;
+    }
+
+    cv::Mat kf;
+    k.convertTo(kf, CV_32F);
+    return kf;
+}
+double pearsonCorrelation(const cv::Mat &a, const cv::Mat &b) {
+  CV_Assert(a.size() == b.size());
+  CV_Assert(a.channels() == 1 && b.channels() == 1);
+
+  cv::Mat af, bf;
+  a.convertTo(af, CV_32F);
+  b.convertTo(bf, CV_32F);
+
+  const int rows = af.rows;
+  const int cols = af.cols;
+  const int N = rows * cols;
+
+  double sumX = 0.0, sumY = 0.0;
+  double sumX2 = 0.0, sumY2 = 0.0, sumXY = 0.0;
+
+  for (int y = 0; y < rows; ++y) {
+    const float* px = af.ptr<float>(y);
+    const float* py = bf.ptr<float>(y);
+    for (int x = 0; x < cols; ++x) {
+      double vx = px[x];
+      double vy = py[x];
+
+      sumX  += vx;
+      sumY  += vy;
+      sumX2 += vx * vx;
+      sumY2 += vy * vy;
+      sumXY += vx * vy;
+    }
+  }
+
+  double num = N * sumXY - sumX * sumY;
+  double denX = N * sumX2 - sumX * sumX;
+  double denY = N * sumY2 - sumY * sumY;
+  double den = std::sqrt(denX * denY);
+
+  if (den <= 1e-12) {
+    return 0.0;  // degenerate case
+  }
+  return num / den;
+}
+
+void check_range(Mat& blurryPatch, Mat& sharpWhole,int patchSize, Point2i xRange, Point2i yRange,int id, std::vector<std::pair<double,Point2i>> *results) {
+  Size imageSize(sharpWhole.cols,sharpWhole.rows);
+
+  int xMin = xRange.x;
+  int xMax = xRange.y;
+  int yMin = yRange.x;
+  int yMax = yRange.y;
+
+  assert(xMin % 2 == 0 && yMin %2 == 0);
+  assert(xMax + patchSize <= imageSize.width);
+  assert(yMax + patchSize <= imageSize.height);
+  assert(results->size() > id);
+
+
+  double bestCorr = -2.0; // Pearson is in [-1, 1]
+  int bestX = 0, bestY = 0;
+
+  int totalChecks = (xMax - xMin)/2;
+  int tenth  = totalChecks / 10;
+
+  //search sharp image
+  int count = 0;
+  for (int x = xMin;x <= xMax; x += 2) {
+    for (int y = yMin; y <= yMax; y += 2) {
+      Rect sharpRoi(x,y,patchSize,patchSize);
+      auto res = pearsonCorrelation(blurryPatch,sharpWhole(sharpRoi));
+
+      if (res > bestCorr) {
+        bestCorr = res;
+        bestX = x;
+        bestY = y;
+      }
+
+    }
+    ++count;
+    if (id == 0 && count % tenth == 0){
+      std::cout<<"progress "<<count / tenth<<std::endl;
+    }
+  }
+  results->at(id) = {bestCorr,{bestX,bestY}};
+}
+
+void find_best_matching_roi(Mat &rawBlur, Mat &rawSharp,int patchSize) {
+  Size imageSize(rawBlur.cols,rawBlur.rows);
+  Rect blurRect((rawBlur.cols - patchSize) / 2,(rawBlur.rows - patchSize) / 2,patchSize,patchSize);
+  assert(blurRect.x % 2 == 0 && blurRect.y % 2 == 0);
+  Mat blurCrop = rawBlur(blurRect).clone();
+
+  std::string savePathBlur = "/home/pathcam/pcamdata/postProc/blur_test/train/misc/verificationPatches/blurPatch.png";
+  std::string savePathSharp = "/home/pathcam/pcamdata/postProc/blur_test/train/misc/verificationPatches/sharpPatch.png";
+
+  Mat blurPatchColor, sharpPatchColor;
+  cvtColor(blurCrop,blurPatchColor,COLOR_BayerBG2BGR);
+
+  imwrite(savePathBlur,blurPatchColor);
+
+
+  int xMin = blurRect.x - 500;
+  int xMax = blurRect.x + 500;
+  int yMin = blurRect.y - 200;
+  int yMax = blurRect.y + 200;
+  assert(xMin % 2 == 0 && yMin %2 == 0);
+  assert(xMax + patchSize <= imageSize.width);
+  assert(yMax + patchSize <= imageSize.height);
+
+
+  int nThreads = 20;
+
+  auto results = new std::vector<std::pair<double,Point2i>>(20,{-2,{0,0}});
+
+  int increment = (xMax - xMin) / nThreads;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < nThreads; ++i) {
+    int tMin = xMin + i * increment;
+    tMin -= tMin % 2;
+    int tMax = tMin + increment;
+    tMax += tMax % 2;
+    Point2i xRange(tMin,tMax);
+
+    std::cout<<"range "<<i<<" "<<xRange.x<<" "<<xRange.y<<std::endl;
+    Point2i yRange(yMin,yMax);
+    threads.emplace_back(check_range,std::ref(blurCrop),std::ref(rawSharp),patchSize,xRange,yRange,i,results);
+  }
+
+  for (auto &t : threads) {
+    t.join();
+  }
+
+  double bestCorr = -2.0; // Pearson is in [-1, 1]
+  int bestX = 0, bestY = 0;
+
+  for (auto &[score,loc] : *results) {
+    if (score > bestCorr) {
+      bestCorr = score;
+      bestX = loc.x;
+      bestY = loc.y;
+    }
+  }
+
+
+  std::cout << "Best match in sharp frame at ("
+          << bestX << ", " << bestY << ") with Pearson correlation = "
+          << bestCorr << "\n";
+
+  Rect bestSharpRoi(bestX,bestY,patchSize,patchSize);
+  cvtColor(rawSharp(bestSharpRoi),sharpPatchColor,COLOR_BayerBG2BGR);
+  imwrite(savePathSharp,sharpPatchColor);
+
+  int k = 0;
+}
+
+
+Mat load_raw(const std::string &path) {
+  Size image_size(6464,4852);
+
+  char *bufHost = new char[image_size.width * image_size.height];
+  std::ifstream stream;
+  stream.open(path, std::ios::binary);
+  stream.read(bufHost, image_size.width * image_size.height);
+  stream.close();
+
+  return {image_size,CV_8UC1,bufHost};
+}
+
+
 
 cv::Mat makeMotionKernel(int length, float angleDeg)
 {
@@ -45,6 +685,7 @@ cv::Mat makeMotionKernel(int length, float angleDeg)
 
   return rotated;
 }
+
 bool loadRawToGpuGray(const std::string &path,
                              int width, int height,
                              cv::cuda::GpuMat &outGray,

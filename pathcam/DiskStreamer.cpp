@@ -99,7 +99,7 @@ namespace pathCam {
 
   void applyMotionBlur(const cv::Mat &src, cv::Mat &dst,
                        int length, float angleDeg) {
-    cv::Mat kernel = makeSmoothMotionKernel(length, angleDeg);
+    cv::Mat kernel = makeMotionKernel(length, angleDeg);
 
     // Use BORDER_REPLICATE or REFLECT to avoid dark borders
     cv::filter2D(src, dst, -1, kernel, cv::Point(-1, -1),
@@ -223,16 +223,43 @@ namespace pathCam {
     auto r = outfile;
 
     image->load_raw_from_disk();
+    Mat img(image_size,CV_8U,image->get_Raw());
+
+    image->check_blur(true);
+    r.setFileName(image->get_ImageFile().getBaseName());
+    r.setExtension("png");
+    //imwrite(r.toString(),img);
+    return;
 
 
-    Mat img(image->height, image->width,CV_8UC1, image->get_Raw());
+    //cvtColor(img, img, COLOR_BayerBG2BGR);
+    //img.convertTo(img,CV_32F);
+    Mat rcv,gry,bgr,gry2;
+    applyMotionBlur(img,rcv,11,0);
+    cvtColor(rcv,bgr,COLOR_BayerBG2BGR);
+    cvtColor(rcv,gry,COLOR_BayerBG2GRAY);
+    cvtColor(img,gry2,COLOR_BayerBG2GRAY);
+    applyMotionBlur(gry,gry,3,0);
 
-    //cvtColor(img, img, COLOR_BayerBG2GRAY);
-    img.convertTo(img,CV_32F);
 
     int patchSize = image->blurPatch;
     Point center(image->width/2,image->height/2);
     Size patch(patchSize,patchSize);
+    Rect centerPatch((image->width - patchSize)/2,(image->height - patchSize)/2,patchSize,patchSize);
+
+    auto viewG = gry(centerPatch);
+    auto viewR = rcv(centerPatch);
+    auto viewBgr = bgr(centerPatch);
+
+
+    //image->check_blur(true,viewG,true);
+    image->check_blur(true,gry(centerPatch),true);
+    //image->check_blur(true);
+    auto v = r;
+    v.setFileName(image->get_ImageFile().getBaseName());
+    v.setExtension("png");
+    imwrite(v.toString(),image->blurDFT);
+
 
     Mat res;
     for (int i = 0; i < 180; i+=1) {
@@ -244,7 +271,7 @@ namespace pathCam {
       auto k = r;
       k.setFileName(image->get_ImageFile().getBaseName() + "_r" + std::to_string(i)+"r_s1s");
       //k.setFileName(image->get_ImageFile().getBaseName());
-      k.setExtension("tiff");
+      k.setExtension("png");
       imwrite(k.toString(),res);
     }
   }

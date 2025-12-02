@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     names->resize(5000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(1, 1);
+    auto jq = pathCam::JobQueue(15, 15);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
