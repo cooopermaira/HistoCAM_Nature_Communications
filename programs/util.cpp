@@ -26,7 +26,215 @@ inline int bayerColor_BGGR(int y, int x)
     if (!er && ec)      return 1; // G
     return 0;                     // R
 }
+inline int bayerColor_BGGR_ind(int y, int x)
+{
+    bool er = (y & 1) == 0;
+    bool ec = (x & 1) == 0;
+    if (er && ec)  return 0; // B  (index 0 in kernels vector)
+    if (er && !ec) return 1; // G  (index 1)
+    if (!er && ec) return 1; // G  (index 1)
+    return 2;                // R  (index 2)
+}
+cv::Vec3f computePerChannelScale_BGGR(const cv::Mat &imgA_in,
+                                      const cv::Mat &imgB_in)
+{
+    CV_Assert(imgA_in.size() == imgB_in.size());
+    CV_Assert(imgA_in.channels() == 1 && imgB_in.channels() == 1);
 
+    // Convert to CV_32F
+    cv::Mat A, B;
+    if (imgA_in.type() == CV_32F) {
+        A = imgA_in;
+    } else {
+        CV_Assert(imgA_in.type() == CV_8UC1);
+        imgA_in.convertTo(A, CV_32F);
+    }
+
+    if (imgB_in.type() == CV_32F) {
+        B = imgB_in;
+    } else {
+        CV_Assert(imgB_in.type() == CV_8UC1);
+        imgB_in.convertTo(B, CV_32F);
+    }
+
+    int H = A.rows;
+    int W = A.cols;
+
+    // For each color channel: accumulate numerator and denominator
+    // num[c] = sum A_i * B_i
+    // den[c] = sum A_i^2
+    double num[3] = {0.0, 0.0, 0.0};  // 0=R, 1=G, 2=B
+    double den[3] = {0.0, 0.0, 0.0};
+
+    for (int y = 0; y < H; ++y) {
+        const float* aRow = A.ptr<float>(y);
+        const float* bRow = B.ptr<float>(y);
+        for (int x = 0; x < W; ++x) {
+            int cIdx = bayerColor_BGGR(y, x);  // 0=R,1=G,2=B
+            float a = aRow[x];
+            float b = bRow[x];
+
+            num[cIdx] += static_cast<double>(a) * static_cast<double>(b);
+            den[cIdx] += static_cast<double>(a) * static_cast<double>(a);
+        }
+    }
+
+    // Compute alpha per channel; fall back to 1.0 if den ~ 0
+    float alphaR = 1.0f;
+    float alphaG = 1.0f;
+    float alphaB = 1.0f;
+
+    const double eps = 1e-12;
+
+    if (den[0] > eps) alphaR = static_cast<float>(num[0] / den[0]); // R
+    if (den[1] > eps) alphaG = static_cast<float>(num[1] / den[1]); // G
+    if (den[2] > eps) alphaB = static_cast<float>(num[2] / den[2]); // B
+
+    // Return in BGGR order: B, G, R
+    return {alphaB, alphaG, alphaR};
+}
+float computeGlobalAlpha(const cv::Mat &A_in, const cv::Mat &B_in)
+{
+    CV_Assert(A_in.size() == B_in.size());
+    CV_Assert(A_in.channels() == 1 && B_in.channels() == 1);
+
+    cv::Mat A, B;
+
+    // Convert both to CV_32F
+    if (A_in.type() == CV_32F) {
+        A = A_in;
+    } else {
+        CV_Assert(A_in.type() == CV_8UC1);
+        A_in.convertTo(A, CV_32F);
+    }
+
+    if (B_in.type() == CV_32F) {
+        B = B_in;
+    } else {
+        CV_Assert(B_in.type() == CV_8UC1);
+        B_in.convertTo(B, CV_32F);
+    }
+
+    int H = A.rows;
+    int W = A.cols;
+
+    double num = 0.0; // sum A_i * B_i
+    double den = 0.0; // sum A_i^2
+
+    for (int y = 0; y < H; ++y) {
+        const float* aRow = A.ptr<float>(y);
+        const float* bRow = B.ptr<float>(y);
+        for (int x = 0; x < W; ++x) {
+            float a = aRow[x];
+            float b = bRow[x];
+            num += static_cast<double>(a) * static_cast<double>(b);
+            den += static_cast<double>(a) * static_cast<double>(a);
+        }
+    }
+
+    const double eps = 1e-12;
+    if (den <= eps) {
+        // A is all zeros (or extremely small) – can't fit a scale reliably.
+        // Return 1.0f as a neutral fallback.
+        return 1.0f;
+    }
+
+    float alpha = static_cast<float>(num / den);
+    return alpha;
+}
+void applyAlphaToBayer_BGGR(cv::Mat& img32f, const cv::Vec3f& alphaBGR)
+{
+    CV_Assert(img32f.type() == CV_32F && img32f.channels() == 1);
+
+    int H = img32f.rows;
+    int W = img32f.cols;
+
+    float alphaB = alphaBGR[0];
+    float alphaG = alphaBGR[1];
+    float alphaR = alphaBGR[2];
+
+    for (int y = 0; y < H; ++y) {
+        float* row = img32f.ptr<float>(y);
+        for (int x = 0; x < W; ++x) {
+            int c = bayerColor_BGGR(y,x);   // 0=R,1=G,2=B
+
+            if (c == 0)      row[x] *= alphaR;
+            else if (c == 1) row[x] *= alphaG;
+            else             row[x] *= alphaB;
+        }
+    }
+}
+cv::Mat convolveBayerWithKernels_BGGR(
+    const cv::Mat &rawBayerIn,
+    const std::vector<cv::Mat> &kernels  // 3 kernels, CV_32F, same size
+)
+{
+    CV_Assert(kernels.size() == 3);
+    CV_Assert(kernels[0].type() == CV_32F &&
+              kernels[1].type() == CV_32F &&
+              kernels[2].type() == CV_32F);
+    CV_Assert(kernels[0].rows == kernels[0].cols);
+    CV_Assert(kernels[1].rows == kernels[0].rows &&
+              kernels[2].rows == kernels[0].rows &&
+              kernels[1].cols == kernels[0].cols &&
+              kernels[2].cols == kernels[0].cols);
+
+    int ksize = kernels[0].rows;
+    CV_Assert(ksize % 2 == 1);  // odd kernel size
+
+    // Convert raw Bayer to CV_32F if needed
+    cv::Mat raw32;
+    if (rawBayerIn.type() == CV_32F) {
+        raw32 = rawBayerIn;
+    } else {
+        CV_Assert(rawBayerIn.type() == CV_8UC1);
+        rawBayerIn.convertTo(raw32, CV_32F);
+    }
+
+    CV_Assert(raw32.channels() == 1);
+
+    int H = raw32.rows;
+    int W = raw32.cols;
+
+    int outH = H - ksize + 1;
+    int outW = W - ksize + 1;
+    CV_Assert(outH > 0 && outW > 0);
+
+    cv::Mat out(outH, outW, CV_32F, cv::Scalar(0));
+
+    int half = ksize / 2;
+
+    for (int yOut = 0; yOut < outH; ++yOut)
+    {
+        for (int xOut = 0; xOut < outW; ++xOut)
+        {
+            // Center pixel in the original Bayer image
+            int cy = yOut + half;
+            int cx = xOut + half;
+
+            int colorIdx = bayerColor_BGGR_ind(cy, cx); // 0=B,1=G,2=R
+            const cv::Mat &k = kernels[colorIdx];
+
+            float sum = 0.0f;
+
+            for (int ky = 0; ky < ksize; ++ky)
+            {
+                const float* srcRow = raw32.ptr<float>(yOut + ky);
+                const float* kRow   = k.ptr<float>(ky);
+
+                for (int kx = 0; kx < ksize; ++kx)
+                {
+                    sum += kRow[kx] * srcRow[xOut + kx];
+                }
+            }
+
+            out.at<float>(yOut, xOut) = sum;
+        }
+    }
+
+    //out.convertTo(out,CV_8U);
+    return out;  // CV_32F, BGGR mosaic, shrunk by ksize-1 in each dim
+}
 // Estimate a single kernel for one Bayer color (R/G/B) from a padded BGGR mosaic.
 // sharpBayer: CV_32F, 1-channel, BGGR mosaic, size: H_b = 2*Hd + ksize - 1, W_b = 2*Wd + ksize - 1
 // targetDense: CV_32F, 1-channel, dense output for that color, size Hd x Wd
@@ -277,53 +485,49 @@ std::vector<cv::Mat> extractDenseBayerChannels(const cv::Mat &bayer,
 
     return { denseR, denseG, denseB };
 }
-cv::Mat apply_Ak(
-    const cv::Mat &sharpBayer,   // CV_32F, 1ch, padded
-    const cv::Mat &k,            // CV_64F, ksize×ksize
+// Old, known-good forward operator for R/B
+cv::Mat apply_Ak_RB(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &k,
     int ksize,
     int half,
-    int wantedColor,             // 0=R,1=G,2=B
+    int wantedColor,  // 0=R, 2=B
     int Hd, int Wd
 ) {
     cv::Mat u(Hd, Wd, CV_64F, cv::Scalar(0));
 
     for (int yd = 0; yd < Hd; ++yd) {
         for (int xd = 0; xd < Wd; ++xd) {
-            int y, x;
-            if (wantedColor == 2) { // B at (even,even)
-                y = half + 2 * yd;
-                x = half + 2 * xd;
-            } else if (wantedColor == 0) { // R at (odd,odd)
-                y = half + 2 * yd + 1;
-                x = half + 2 * xd + 1;
-            } else {
-                // G not handled yet
-                continue;
+            int cy, cx;
+            if (wantedColor == 2) {      // B
+                cy = half + 2 * yd;
+                cx = half + 2 * xd;
+            } else {                     // R
+                cy = half + 2 * yd + 1;
+                cx = half + 2 * xd + 1;
             }
-
-            // Optional safety: ensure CFA parity is what we expect
-            // CV_Assert(bayerColor_BGGR(y, x) == wantedColor);
 
             double sum = 0.0;
             for (int u0 = 0; u0 < ksize; ++u0) {
-                int yy = y + (u0 - half);
+                int yy = cy + (u0 - half);
                 const float* srcRow = sharpBayer.ptr<float>(yy);
                 const double* kRow  = k.ptr<double>(u0);
                 for (int v0 = 0; v0 < ksize; ++v0) {
-                    int xx = x + (v0 - half);
+                    int xx = cx + (v0 - half);
                     sum += kRow[v0] * static_cast<double>(srcRow[xx]);
                 }
             }
+
             u.at<double>(yd, xd) = sum;
         }
     }
     return u;
 }
 
-// g = Aᵀ * r : from residual (Hd×Wd, CV_64F) to kernel gradient (ksize×ksize, CV_64F)
-cv::Mat apply_ATr(
-    const cv::Mat &sharpBayer,   // CV_32F
-    const cv::Mat &r,            // CV_64F, Hd×Wd
+// Old, known-good adjoint for R/B
+cv::Mat apply_ATr_RB(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &r,
     int ksize,
     int half,
     int wantedColor,
@@ -336,30 +540,130 @@ cv::Mat apply_ATr(
             double rr = r.at<double>(yd, xd);
             if (rr == 0.0) continue;
 
-            int y, x;
-            if (wantedColor == 2) {
-                y = half + 2 * yd;
-                x = half + 2 * xd;
-            } else if (wantedColor == 0) {
-                y = half + 2 * yd + 1;
-                x = half + 2 * xd + 1;
-            } else {
-                continue;
+            int cy, cx;
+            if (wantedColor == 2) {      // B
+                cy = half + 2 * yd;
+                cx = half + 2 * xd;
+            } else {                     // R
+                cy = half + 2 * yd + 1;
+                cx = half + 2 * xd + 1;
             }
 
             for (int u0 = 0; u0 < ksize; ++u0) {
-                int yy = y + (u0 - half);
+                int yy = cy + (u0 - half);
                 const float* srcRow = sharpBayer.ptr<float>(yy);
                 double* gRow        = g.ptr<double>(u0);
                 for (int v0 = 0; v0 < ksize; ++v0) {
-                    int xx = x + (v0 - half);
+                    int xx = cx + (v0 - half);
                     gRow[v0] += rr * static_cast<double>(srcRow[xx]);
                 }
             }
         }
     }
-
     return g;
+}
+// New forward operator only for G
+cv::Mat apply_Ak_G(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &k,
+    int ksize,
+    int half,
+    int Hd, int Wd
+) {
+    cv::Mat u(Hd, Wd, CV_64F, cv::Scalar(0));
+
+    for (int yd = 0; yd < Hd; ++yd) {
+        for (int xd = 0; xd < Wd; ++xd) {
+            int cy = half + yd;
+            int cx;
+            if ((cy & 1) == 0) {
+                // even row: G at x = 1,3,5,... => 2*xd+1
+                cx = half + 2 * xd + 1;
+            } else {
+                // odd row: G at x = 0,2,4,... => 2*xd
+                cx = half + 2 * xd;
+            }
+
+            double sum = 0.0;
+            for (int u0 = 0; u0 < ksize; ++u0) {
+                int yy = cy + (u0 - half);
+                const float* srcRow = sharpBayer.ptr<float>(yy);
+                const double* kRow  = k.ptr<double>(u0);
+                for (int v0 = 0; v0 < ksize; ++v0) {
+                    int xx = cx + (v0 - half);
+                    sum += kRow[v0] * static_cast<double>(srcRow[xx]);
+                }
+            }
+
+            u.at<double>(yd, xd) = sum;
+        }
+    }
+    return u;
+}
+
+cv::Mat apply_ATr_G(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &r,
+    int ksize,
+    int half,
+    int Hd, int Wd
+) {
+    cv::Mat g(ksize, ksize, CV_64F, cv::Scalar(0));
+
+    for (int yd = 0; yd < Hd; ++yd) {
+        for (int xd = 0; xd < Wd; ++xd) {
+            double rr = r.at<double>(yd, xd);
+            if (rr == 0.0) continue;
+
+            int cy = half + yd;
+            int cx;
+            if ((cy & 1) == 0) {
+                cx = half + 2 * xd + 1;
+            } else {
+                cx = half + 2 * xd;
+            }
+
+            for (int u0 = 0; u0 < ksize; ++u0) {
+                int yy = cy + (u0 - half);
+                const float* srcRow = sharpBayer.ptr<float>(yy);
+                double* gRow        = g.ptr<double>(u0);
+                for (int v0 = 0; v0 < ksize; ++v0) {
+                    int xx = cx + (v0 - half);
+                    gRow[v0] += rr * static_cast<double>(srcRow[xx]);
+                }
+            }
+        }
+    }
+    return g;
+}
+cv::Mat apply_Ak(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &k,
+    int ksize,
+    int half,
+    int wantedColor,
+    int Hd, int Wd
+) {
+    if (wantedColor == 1) {
+        return apply_Ak_G(sharpBayer, k, ksize, half, Hd, Wd);
+    } else {
+        return apply_Ak_RB(sharpBayer, k, ksize, half, wantedColor, Hd, Wd);
+    }
+}
+
+cv::Mat apply_ATr(
+    const cv::Mat &sharpBayer,
+    const cv::Mat &r,
+    int ksize,
+    int half,
+    int wantedColor,
+    int Hd, int Wd
+) {
+    if (wantedColor == 1) {
+        return apply_ATr_G(sharpBayer, r, ksize, half, Hd, Wd);
+    } else {
+        return apply_ATr_RB(sharpBayer, r, ksize, half, wantedColor, Hd, Wd);
+    }
 }
 cv::Mat apply_M(
     const cv::Mat &sharpBayer,
@@ -370,7 +674,7 @@ cv::Mat apply_M(
     int Hd, int Wd,
     double lambda
 ) {
-    cv::Mat Ap = apply_Ak(sharpBayer, p, ksize, half, wantedColor, Hd, Wd);
+    cv::Mat Ap   = apply_Ak (sharpBayer, p, ksize, half, wantedColor, Hd, Wd);
     cv::Mat AtAp = apply_ATr(sharpBayer, Ap, ksize, half, wantedColor, Hd, Wd);
     AtAp += lambda * p;
     return AtAp;
@@ -396,21 +700,31 @@ cv::Mat estimateKernel_CGLS(
     int Wd = targetDense.cols;
     int half = ksize / 2;
 
-    // Enforce padding relationship: Hb = 2*Hd + ksize - 1, same for W
-    CV_Assert(Hb == 2 * Hd + ksize - 1);
-    CV_Assert(Wb == 2 * Wd + ksize - 1);
-
     int wantedColor;
-    switch (colorChar) {
+    switch (colorChar)
+    {
         case 'B': case 'b': wantedColor = 2; break;
         case 'R': case 'r': wantedColor = 0; break;
+        case 'G': case 'g': wantedColor = 1; break;
         default:
-            std::cerr << "Only R/B implemented in this solver.\n";
-            {
-                cv::Mat k = cv::Mat::zeros(ksize, ksize, CV_32F);
-                k.at<float>(half, half) = 1.0f;
-                return k;
-            }
+        {
+            std::cerr << "Unsupported colorChar; use 'R','G','B'.\n";
+            cv::Mat k = cv::Mat::zeros(ksize, ksize, CV_32F);
+            k.at<float>(half, half) = 1.0f;
+            return k;
+        }
+    }
+
+    // Geometry constraints differ by color
+    if (wantedColor == 2 || wantedColor == 0) {
+        // B / R: centers every 2 px in both directions
+        CV_Assert(Hb == 2 * Hd + ksize - 1);
+        CV_Assert(Wb == 2 * Wd + ksize - 1);
+    } else {
+        // G: dense in rows, half columns
+        // Hd rows of centers, Wd greens per row
+        CV_Assert(Hb == Hd + ksize - 1);
+        CV_Assert(Wb == 2 * Wd + ksize - 1);
     }
 
     // Convert target to double
@@ -420,7 +734,7 @@ cv::Mat estimateKernel_CGLS(
     // b = Aᵀ y
     cv::Mat b = apply_ATr(sharpBayer, y64, ksize, half, wantedColor, Hd, Wd);
 
-    // Initialize k = 0 (or delta if you prefer)
+    // Initialize k
     cv::Mat k = cv::Mat::zeros(ksize, ksize, CV_64F);
 
     // r = b - M k; since k=0, r = b
@@ -428,9 +742,10 @@ cv::Mat estimateKernel_CGLS(
     cv::Mat p = r.clone();
 
     double rr_old = (double)cv::sum(r.mul(r))[0];
-    double rr0 = rr_old;
+    double rr0    = rr_old;
 
-    for (int it = 0; it < maxIters; ++it) {
+    for (int it = 0; it < maxIters; ++it)
+    {
         // q = M p = Aᵀ(A p) + λ p
         cv::Mat q = apply_M(sharpBayer, p, ksize, half, wantedColor, Hd, Wd, lambda);
 
@@ -449,11 +764,11 @@ cv::Mat estimateKernel_CGLS(
         r -= alpha * q;
 
         double rr_new = (double)cv::sum(r.mul(r))[0];
+        double rel    = rr_new / rr0;
 
-        double rel = rr_new / rr0;
         std::cout << "Iter " << it
                   << "  ||r||^2 = " << rr_new
-                  << "  rel = " << rel << std::endl;
+                  << "  rel = "   << rel << std::endl;
 
         if (rel < tol) {
             break;
