@@ -3,6 +3,7 @@
 //
 
 #include "pathCam.h"
+#include <unordered_map>
 
 namespace pathCam {
 
@@ -79,8 +80,8 @@ namespace pathCam {
   }
 
   void FeatureTrackGenerator::process_match(unsigned long _srcImgIdx, unsigned long _dstImgIdx, const DMatch &_match) {
-    ImageFeaturePair feat1{_srcImgIdx, _match.queryIdx};
-    ImageFeaturePair feat2{_dstImgIdx, _match.trainIdx};
+    ImageFeaturePair feat1{(long)_srcImgIdx, _match.queryIdx};
+    ImageFeaturePair feat2{(long)_dstImgIdx, _match.trainIdx};
 
     // Get or create indices for both features
     int idx1 = getOrCreateFeatureIndex(feat1);
@@ -98,8 +99,8 @@ namespace pathCam {
 
       for (const auto &match: match_info.matches) {
 
-        ImageFeaturePair feat1{match_info.src_img_idx, match.queryIdx};
-        ImageFeaturePair feat2{match_info.dst_img_idx, match.trainIdx};
+        ImageFeaturePair feat1{(long)match_info.src_img_idx, match.queryIdx};
+        ImageFeaturePair feat2{(long)match_info.dst_img_idx, match.trainIdx};
 
         auto it1 = feature_to_index.find(feat1);
         auto it2 = feature_to_index.find(feat2);
@@ -180,7 +181,7 @@ namespace pathCam {
         images_in_track.insert(pair.image_id);
 
         // Get feature coordinates
-        unordered_map<unsigned long, const Image *>::iterator img_it = image_lookup.find(pair.image_id);
+        std::unordered_map<unsigned long, const Image *>::iterator img_it = image_lookup.find(pair.image_id);
         if (img_it != image_lookup.end() && pair.feature_id < img_it->second->siftData.numPts) {
           const auto &pos = img_it->second->siftData.h_data[pair.feature_id];
           track.addObservation(FeatureObservation(pair.image_id, pair.feature_id, pos.xpos, pos.ypos,img_it->second));

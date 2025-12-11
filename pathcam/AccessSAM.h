@@ -137,7 +137,7 @@ namespace pathCam {
 
     void create_segmentation(std::vector<Point3f> &_clicks, int _segID);
 
-    void create_segmentation_course_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f>& _fov);
+    void create_segmentation_coarse_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f>& _fov);
 
     std::vector<int> get_tiles_covering_point(const Point2f &_p, int _stride = 768);
 

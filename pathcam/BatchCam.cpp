@@ -12,13 +12,13 @@ namespace pathCam {
   using Poco::Path;
   using Poco::Util::XMLConfiguration;
   using Poco::Util::LayeredConfiguration;
-  using Poco::Logger;
+  //using Poco::Logger;
   using Poco::LogStream;
   using Poco::Environment;
   using Poco::FileChannel;
 
   BatchCam::BatchCam(LayeredConfiguration::Ptr config) {
-    logger = &Logger::get("PathCamLogger");
+    logger = &Poco::Logger::get("PathCamLogger");
 
     logger->information(Poco::format("System OS: %s", Environment::osDisplayName()));
     logger->information(Poco::format("System Arch: %s", Environment::osArchitecture()));
@@ -117,6 +117,13 @@ namespace pathCam {
         return false;
       }
 
+      if (pConf->has("io.inferencing.noref_blur") && pConf->has("io.inferencing.maxBlurBatchSize")) {
+        no_ref_blur_model_path = Path(pConf->getString("io.inferencing.noref_blur"));
+        maxBlurBatchSize = pConf->getInt("io.inferencing.maxBlurBatchSize");
+      }else {
+        throw std::runtime_error("config missing metric model or max batch size");
+      }
+
       if (pConf->has(("io.inferencing.SAM_encoder"))) {
         segmentWithSAM = true;
         SAM_encoder_path = Path(pConf->getString("io.inferencing.SAM_encoder"));
@@ -204,7 +211,7 @@ namespace pathCam {
         }
 
         if (temp_log.toString() != "") {
-          results_logger = &Logger::get("ResultsLogger");
+          results_logger = &Poco::Logger::get("ResultsLogger");
           AutoPtr<FileChannel> pChannel(new FileChannel);
           pChannel->setProperty("path", temp_log.toString());
           pChannel->setProperty("rotateOnOpen", "true");

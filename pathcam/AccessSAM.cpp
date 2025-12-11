@@ -11,30 +11,8 @@
 namespace pathCam {
   using namespace nvinfer1;
 
-  class Logger : public ILogger {
-    void log(Severity s, const char *msg) noexcept override {
-      if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
-    }
-  } gLogger;
-
-
-  static std::vector<char> readFile(const std::string &p) {
-    std::ifstream f(p, std::ios::binary);
-    if (!f) {
-      std::cerr << "Open failed: " << p << "\n";
-      std::exit(1);
-    }
-    f.seekg(0, std::ios::end);
-    size_t sz = f.tellg();
-    f.seekg(0, std::ios::beg);
-    std::vector<char> buf(sz);
-    f.read(buf.data(), sz);
-    return buf;
-  }
-
-
-
-
+  nvLogger nvloger;
+  
   void AccessSAM::initialize() {
     cudaSetDevice(parent->compositorCudaDevice);
     int interval = (parent->SAMTileSize / parent->tileSize);
@@ -86,12 +64,10 @@ namespace pathCam {
   }
 
   void AccessSAM::load_model() {
-    //speedSam = new SpeedSam(parent->SAM_encoder_path.toString(), parent->SAM_decoder_path.toString());
-    //speedSam = new SpeedSam("/home/max/Downloads/sam2_hiera_large.encoder.engine","/home/max/Downloads/sam2_hiera_large.decoder.onnx");
 
     auto dBlob = readFile(parent->SAM_decoder_path.toString());
 
-    IRuntime *dRuntime = createInferRuntime(gLogger);
+    IRuntime *dRuntime = createInferRuntime(nvloger);
     decoderEngine = dRuntime->deserializeCudaEngine(dBlob.data(), dBlob.size());
     delete dRuntime;
 
@@ -103,7 +79,7 @@ namespace pathCam {
 
     auto eBlob = readFile(parent->SAM_encoder_path.toString());
 
-    IRuntime *eRuntime = createInferRuntime(gLogger);
+    IRuntime *eRuntime = createInferRuntime(nvloger);
     encoderEngine = eRuntime->deserializeCudaEngine(eBlob.data(), eBlob.size());
     delete eRuntime;
 
@@ -163,6 +139,7 @@ namespace pathCam {
 
       encoderCtx->enqueueV3(encoderStream);
 
+
       //std::vector buffer{tile->rawBuffer, tile->high_res_feats_1};
       //speedSam->mImageEncoder->mContext->enqueueV2(buffer.data(), speedSam->mImageEncoder->mCudaStream, nullptr);
       //cudaEventRecord(tile->embeddingCompleteCudaEvent,speedSam->mImageEncoder->mCudaStream);
@@ -183,7 +160,7 @@ namespace pathCam {
   }
 
 
-  void AccessSAM::create_segmentation_course_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f> &_fov) {
+  void AccessSAM::create_segmentation_coarse_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f> &_fov) {
     cudaSetDevice(parent->compositorCudaDevice);
     for (auto &p : _clicks) {
       assert(p.x >= _fov[0].x && p.y >= _fov[0].y && p.x <= _fov[1].x && p.y <= _fov[1].y);
@@ -624,7 +601,7 @@ namespace pathCam {
       parent->resize_mmatch_mutex->unlock();
       return {0,0};
     }
-    Point2d actualDistance = {myImage->absoluteCoords.x - theirImage->absoluteCoords.x,myImage->absoluteCoords.y - theirImage->absoluteCoords.y};
+    Point2d actualDistance(myImage->absoluteCoords.x - theirImage->absoluteCoords.x,myImage->absoluteCoords.y - theirImage->absoluteCoords.y);
     Point2d matchedDistance = {m1->t_x,m1->t_y};
     auto res = actualDistance - matchedDistance;
 /*

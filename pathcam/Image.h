@@ -22,9 +22,8 @@ namespace pathCam {
     std::atomic<unsigned int> reference_count;
 
     float reg_full_scale;
-    int motionBlur;
+    float motionBlur;
     int blurPatch = 1024;
-    int blurCheckRadius = 100;
     cv::Point2f sharpness;
     double reg_scale_initial,reg_scale_full;
     double reg_crop_initial,reg_crop_full;
@@ -101,15 +100,13 @@ namespace pathCam {
 
     bool is_4x();
 
-    void extract_features();
-
     bool decide_label_and_blur();
 
     void find_label();
 
     bool is_good();
 
-    int check_blur(bool _unifiedMemory, const cv::Mat& img = cv::Mat(),bool downloadDFT = true);
+    void check_blur_async(const cv::Mat &img = cv::Mat());
 
     static cv::Point2f compute_sharpness(cv::Mat &_img);
 

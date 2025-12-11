@@ -31,7 +31,7 @@ namespace pathCam {
 
 
     image->index = image_index;
-    image->check_blur(parent->unifiedMemory); //this is computationally very expensive even for small windows
+    image->check_blur_async(); //this is computationally very expensive even for small windows
 
 
     if (!image->is_mostly_black()) {

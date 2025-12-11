@@ -165,11 +165,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (renameFiles || makeInput) {
-      // try {
-      //   std::sort(images.begin(), images.end(), customComparator2);
-      // }catch(...){
-      //   std::sort(images.begin(), images.end(), customComparator);
-      // }
+      try {
+        std::sort(images.begin(), images.end(), customComparator2);
+      }catch(...){
+        std::sort(images.begin(), images.end(), customComparator);
+      }
     }
 
     auto outputfilepath = outFile;
@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
         Mat ff;
 
         ff = flat_field20x;
-        string of = outFile.toString();
+        std::string of = outFile.toString();
         auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
         jq.add_runnable(dr, i);
       }

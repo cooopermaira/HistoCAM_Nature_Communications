@@ -31,7 +31,7 @@ namespace std {
 }
 
 namespace pathCam {
-
+  using namespace nvinfer1;
   struct ScaleResult {
     double scale = 0.0;
     double response = -1.0;
@@ -41,6 +41,28 @@ namespace pathCam {
     cv::Size cropSize;
     bool valid = false;
   };
+
+  class nvLogger : public ILogger {
+    void log(Severity s, const char *msg) noexcept override {
+      if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
+    }
+  };
+
+  extern nvLogger nvloger;
+
+  static std::vector<char> readFile(const std::string &p) {
+    std::ifstream f(p, std::ios::binary);
+    if (!f) {
+      std::cerr << "Open failed: " << p << "\n";
+      std::exit(1);
+    }
+    f.seekg(0, std::ios::end);
+    size_t sz = f.tellg();
+    f.seekg(0, std::ios::beg);
+    std::vector<char> buf(sz);
+    f.read(buf.data(), sz);
+    return buf;
+  }
 
   inline void catch_ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh,
                 float lowestScale, bool scaleUp) {

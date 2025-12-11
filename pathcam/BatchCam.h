@@ -46,6 +46,7 @@ namespace pathCam {
     Poco::Path flat_field_file_10x_r;
     Poco::Path flat_field_file_20x_r;
 
+    Poco::Path no_ref_blur_model_path;
     Poco::Path tile_encoder_path;
     Poco::Path SAM_encoder_path;
     Poco::Path SAM_decoder_path;
@@ -75,6 +76,7 @@ namespace pathCam {
 
     std::string classes_title;
 
+    int maxBlurBatchSize;
     int initialLabel;
     int interpolation;
     int feature_type;

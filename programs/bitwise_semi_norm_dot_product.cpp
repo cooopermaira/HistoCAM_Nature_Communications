@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
   // size_t t = img.total(),e=img.elemSize();
   // assert(t * e == image.width * image.height);
   image.copy_in(img.data);
-  image.check_blur(true);
+  image.check_blur_async();
   imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft_sum1.png",image.blurDFT);
   //image.write_to_path();
   return 0;
@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
   Mat img2(image_size,CV_8U,image.get_Raw());
   //cvtColor(img2,img2,COLOR_BayerBG2BGR);
   //imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel.png",img2);
-  image.check_blur(true);
+  image.check_blur_async();
   auto m = image.blurDFT;
   imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft.png",m);
 

@@ -95,7 +95,7 @@ namespace pathCam {
   public:
     StreamCam(Poco::Util::LayeredConfiguration::Ptr config);
 
-    ~StreamCam() { delete buffer_mutex, delete image_mutex; }
+    ~StreamCam() { delete buffer_mutex, delete image_mutex; clean_up_blur_engine();}
 
     Poco::RWLock *image_mutex;
     Poco::RWLock *reg_results_mutex;
@@ -110,6 +110,7 @@ namespace pathCam {
     Poco::FastMutex *siftQMutex;
     Poco::FastMutex *pixelDistanceMutex;
     Poco::FastMutex pyramidQMutex;
+    Poco::FastMutex blurMutex;
 
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
@@ -171,6 +172,7 @@ namespace pathCam {
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;
+    std::queue<Image*> blurMeticQ;
     std::queue<std::pair<Point2i,unsigned>> pyramidBuilderQ;
 
     int windowWidth = 3;
@@ -191,9 +193,23 @@ namespace pathCam {
     Poco::Event inferenceWait;
     Poco::Event compositeWait;
 
+    ICudaEngine *blurEngine = nullptr;
+    IExecutionContext *blurCtx = nullptr;
+    cudaStream_t blurStream{};
+    char *blurInputs = nullptr;
+    float *blurOutputs = nullptr;
+
     bool run();
 
     bool spin_run();
+
+    void Q_blur_metric(Image* image);
+
+    void launch_blur_metric();
+
+    void load_blur_engine();
+
+    void clean_up_blur_engine() const;
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     int GPU_select_cuda_device(int _priority = 0);

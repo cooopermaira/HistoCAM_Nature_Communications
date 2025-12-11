@@ -15,9 +15,16 @@ namespace pathCam {
   void QManager::run() {
     auto jq = parent->JobQ;
     Poco::Thread::sleep(200);
-    int loaderJobsThru = 0;
+    int count = 1;
     while (parent->compositing) {
-      //jq->run_jobs(false);
+
+      if (count % 10 == 0) {
+        parent->launch_blur_metric();
+      }else if (count % 10 == 5) { //just gives a little time for it to run
+
+      }
+      ++count;
+
       if (jq->pool->available()) {
         if (!jq->is_empty()) {
           jq->queue_mutex->lock();
@@ -28,9 +35,6 @@ namespace pathCam {
         }
       }
 
-      //    else {
-      //      jq->pool->threadAvailableEvent->wait();
-      //    }
     }
   }
 }

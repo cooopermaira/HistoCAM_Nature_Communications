@@ -9,14 +9,9 @@
 
 
 namespace pathCam {
-    using Poco::AutoPtr;
-    using Poco::Path;
-    using Poco::Util::XMLConfiguration;
+
     using Poco::Util::LayeredConfiguration;
-    using Poco::Logger;
-    using Poco::LogStream;
-    using Poco::Environment;
-    using Poco::FileChannel;
+
 
 
     StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config), buffer_mutex(new Poco::FastMutex()),
@@ -57,6 +52,8 @@ namespace pathCam {
         // Mat circleMaskFtExt((image_height * crop_factor) * scale_factor,
         //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
         // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
+
+        load_blur_engine();
 
         int k = 0;
 #ifdef HAVE_OPENCV_CUDAARITHM
@@ -567,7 +564,7 @@ namespace pathCam {
                         std::vector<Point3f> inputClicks(_clicks.begin(), _clicks.end() - 2);
                         Point2i fovUL((_clicks.end() - 2)->x, (_clicks.end() - 2)->y);
                         Point2i fovLR(_clicks.back().x, _clicks.back().y);
-                        as->create_segmentation_course_to_fine(inputClicks, _segID, {fovUL, fovLR});
+                        as->create_segmentation_coarse_to_fine(inputClicks, _segID, {fovUL, fovLR});
                         return true;
                     } else {
                         throw std::runtime_error("one FOV point but not the other");
