@@ -20,8 +20,8 @@ namespace pathCam {
 
       if (count % 10 == 0) {
         parent->launch_blur_metric();
-      }else if (count % 10 == 5) { //just gives a little time for it to run
-
+      }else if (count % 10 == 9) { //just gives a little time for it to run
+        parent->receive_blur_metric();
       }
       ++count;
 

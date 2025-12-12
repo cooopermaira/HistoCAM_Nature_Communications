@@ -92,7 +92,8 @@ void MatchRunnable::run() {
     }
 
     if (!successful) {
-      //parent->JobQ->update_job_readiness(jobTypeFlag,image_idx);
+      std::unique_lock lock(image->blurMutex);
+      image->cudaBufferConVar.wait(lock, [&] { return image->blurSet; });
       parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
     }
     //parent->RegistrationConsecQ.add_index(image_idx);

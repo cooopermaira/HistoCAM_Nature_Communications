@@ -172,7 +172,6 @@ namespace pathCam {
     std::queue<std::string> disk_image;
     std::queue<char *> buffer;
     std::queue<Image *> spin_image_buffer;
-    std::queue<Image*> blurMeticQ;
     std::queue<std::pair<Point2i,unsigned>> pyramidBuilderQ;
 
     int windowWidth = 3;
@@ -198,6 +197,9 @@ namespace pathCam {
     cudaStream_t blurStream{};
     char *blurInputs = nullptr;
     float *blurOutputs = nullptr;
+    bool outstandingBlurInference = false;
+    std::queue<Image*> blurMeticQ;
+    std::vector<Image*> blurImagesInProcess;
 
     bool run();
 
@@ -206,6 +208,8 @@ namespace pathCam {
     void Q_blur_metric(Image* image);
 
     void launch_blur_metric();
+
+    void receive_blur_metric();
 
     void load_blur_engine();
 

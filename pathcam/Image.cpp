@@ -187,9 +187,9 @@ namespace pathCam {
     cuda::multiply(gray, hannWindow, gray, 1, -1, s);
 
     //compute the log magnitude of the dft
-    void* buff = malloc(blurPatch * blurPatch );
+    void* buff = malloc(blurPatch * blurPatch * sizeof(float));
     cuda::GpuMat planes[] = {gray, cuda::GpuMat(gray.rows, gray.cols,CV_32F, Scalar(0))};
-    cuda::GpuMat complexI, mag, rcv(blurPatch,blurPatch,CV_8UC1,buff);
+    cuda::GpuMat complexI, mag, rcv(blurPatch,blurPatch,CV_32FC1,buff);
     cuda::merge(planes, 2, complexI, s);
     cuda::dft(complexI, complexI, Size(gray.cols, gray.rows), 0, s);
 
@@ -201,12 +201,12 @@ namespace pathCam {
     // blur the dft so noise doesnt interfere so bad. blur_once is quagmire because the box filter isnt thread safe
 
     blur_once(mag, mag, s);
-    cuda::normalize(mag, rcv, 0, 255, NORM_MINMAX,CV_8U, noArray(), s);
-    //cuda::normalize(mag, mag, 0, 1, NORM_MINMAX,CV_32F, noArray(), s);
+    //cuda::normalize(mag, rcv, 0, 255, NORM_MINMAX,CV_8U, noArray(), s);
+    cuda::normalize(mag, rcv, 0, 1, NORM_MINMAX,CV_32F, noArray(), s);
 
     s.waitForCompletion();
 
-    blurDFT = Mat(blurPatch,blurPatch,CV_8UC1,buff);
+    blurDFT = Mat(blurPatch,blurPatch,CV_32FC1,buff);
     resize(blurDFT,blurDFT,Size(128,128));
     free(buff);
 

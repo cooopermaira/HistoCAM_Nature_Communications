@@ -36,9 +36,10 @@ namespace pathCam {
     cv::Point2f debugInitialGuess;
 
     Poco::FastMutex buffer_mutex;
-    std::mutex cudaBufferMutex;
-    std::condition_variable cudaBufferConVar;
+    std::mutex cudaBufferMutex, blurMutex;
+    std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
+    bool blurSet;
 
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::KeyPoint> keypointsMultilevel;
