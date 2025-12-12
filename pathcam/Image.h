@@ -106,7 +106,7 @@ namespace pathCam {
 
     bool is_good();
 
-    void check_blur_async(const cv::Mat &img = cv::Mat());
+    void check_blur_async(const cv::Mat &img = cv::Mat(), bool submitForInference = true);
 
     static cv::Point2f compute_sharpness(cv::Mat &_img);
 

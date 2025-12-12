@@ -89,24 +89,21 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
 ENDIF ()
 
-#link_directories(${Python3_INCLUDE_DIR})
-#include_directories(${Python3_INCLUDE_DIR})
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-#set(TORCH_CUDA_ARCH_LIST "12.1")
-#set(Torch_DIR  "${PROJECT_SOURCE_DIR}/libtorch/share/cmake/Torch")
 
 
-#find_package(Torch REQUIRED)
 
-link_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/lib)
+link_directories("/home/cm/src/onnxruntime/build_cuda/Release")
+#link_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/lib)
 link_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/lib)
 
-include_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/include)
+include_directories("/home/cm/src/onnxruntime/include")
+#include_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/include)
 include_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/include)
 
 add_subdirectory(CudaSift)

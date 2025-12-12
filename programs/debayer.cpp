@@ -10,6 +10,28 @@
 
 using Poco::DirectoryIterator;
 
+std::vector<std::string> load_label_names(const std::string& txt_path)
+{
+  std::vector<std::string> names;
+  std::ifstream in(txt_path);
+  if (!in.is_open()) {
+    throw std::runtime_error("Failed to open label file: " + txt_path);
+  }
+
+  std::string line;
+  while (std::getline(in, line)) {
+    // strip trailing \r or whitespace
+    line.erase(std::remove_if(line.begin(), line.end(), [](unsigned char c) {
+        return c == '\r' || c == ' ' || c == '\t';
+    }), line.end());
+
+    if (!line.empty()) {
+      names.push_back(line);  // e.g. "0.Raw" or "0"
+    }
+  }
+  return names;
+}
+
 unsigned long extractSortableValue(const std::string &str) {
   if (str.size() <= 4) {
     // Handle cases where the string is too short
@@ -137,13 +159,14 @@ int main(int argc, char *argv[]) {
 
   if (inFile.isDirectory()) {
     std::vector<int> *blur = new std::vector<int>;
-    std::vector<std::string> *names = new std::vector<std::string>;
+    //std::vector<std::string> *names = new std::vector<std::string>;
+    std::vector<std::string> names = load_label_names("/home/cm/Downloads/blur.txt");
 
     blur->resize(5000, 0);
-    names->resize(5000);
+    //names->resize(5000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(15, 15);
+    auto jq = pathCam::JobQueue(1, 1);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
@@ -201,7 +224,7 @@ int main(int argc, char *argv[]) {
 
         ff = flat_field20x;
         std::string of = outFile.toString();
-        auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, names, i);
+        auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, &names, i);
         jq.add_runnable(dr, i);
       }
     }
