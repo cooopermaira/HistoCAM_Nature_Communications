@@ -58,7 +58,7 @@ namespace pathCam {
           }
           pyrTileObj.status = el.second;
           immediateProcessingTiles.push_back(el.first);
-        } else if (el.second == TileObj::singleFrameCoverage && pyrTileObj.owner->motionBlur < img->motionBlur
+        } else if (el.second == TileObj::singleFrameCoverage && pyrTileObj.owner->motionBlur > img->motionBlur
                    || !pyrTileObj.owner) {
           waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(el.first);
         }
@@ -100,7 +100,7 @@ namespace pathCam {
                          if (tileObj.owner == img) {
                            return false;
                          }
-                         if (tileObj.motionBlur < img->motionBlur) {
+                         if (tileObj.motionBlur > img->motionBlur) {
                            tileObj.motionBlur = img->motionBlur;
                            tileObj.owner = img;
                            return false;
