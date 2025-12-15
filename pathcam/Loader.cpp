@@ -8,6 +8,17 @@
 #include "pathCam.h"
 
 namespace pathCam {
+  void LoaderLogicRunnable::self_cancel(int label) {
+    successful = true;
+    image->label = label;
+    --parent->loaderCount;
+    jobComplete.set();
+    image->release_reg_image();
+    parent->JobQ->cancel_job(2,image_index);
+    parent->JobQ->update_job_readiness(2,image_index);
+    image->free_memory_RAW();
+  }
+
   void LoaderLogicRunnable::run() {
 
 
@@ -31,10 +42,10 @@ namespace pathCam {
 
 
     image->index = image_index;
-    image->check_blur_async(); //this is computationally very expensive even for small windows
 
 
     if (!image->is_mostly_black()) {
+      image->check_blur_async(); //this is computationally very expensive even for small windows
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
@@ -43,7 +54,7 @@ namespace pathCam {
       image->reg_crop_initial = parent->crop_factor;
 
 
-      pathCam::FeatureDetector *detector = new pathCam::FeatureDetector(parent->feature_type, parent->use_FREAK);
+      auto *detector = new FeatureDetector(parent->feature_type, parent->use_FREAK);
 
       switch (parent->feature_type) {
         case _SIFT:
@@ -72,16 +83,7 @@ namespace pathCam {
       delete detector;
 
       if (image->keypoints.size() < 250) {
-        successful = true;
-        image->label = Image::_LOWFEAT;
-        parent->loaderCount--;
-        jobComplete.set();
-        image->release_reg_image();
-        //std::cout<<"Low Ft: "+std::to_string(image_index)<<std::endl;
-        //parent->mark_neighbors_as_underexposed(image_index);
-        parent->JobQ->cancel_job(2,image_index);
-        parent->JobQ->update_job_readiness(2,image_index);
-        image->free_memory_RAW();
+        self_cancel(Image::_LOWFEAT);
         return;
       }
 

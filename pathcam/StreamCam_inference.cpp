@@ -9,6 +9,13 @@ int maxBatchSize = 64;
 namespace pathCam {
   using namespace nvinfer1;
 
+  void StreamCam::process_blur_Q() {
+    while (compositing) {
+      launch_blur_metric();
+      receive_blur_metric();
+    }
+  }
+
   void StreamCam::clean_up_blur_engine() const {
     delete blurEngine;
     cudaStreamDestroy(blurStream);
@@ -37,6 +44,8 @@ namespace pathCam {
 
     blurCtx->setInputTensorAddress("input", blurInputs);
     blurCtx->setOutputTensorAddress("output", blurOutputs);
+
+    //std::thread([this] {process_blur_Q();}).detach();
   }
 
   void StreamCam::launch_blur_metric() {
@@ -45,7 +54,8 @@ namespace pathCam {
       blurMutex.unlock();
       return;
     }
-    outstandingBlurInference = true;
+    ++iters;
+
     blurImagesInProcess.clear();
 
     while (!blurMeticQ.empty() && blurImagesInProcess.size() < maxBlurBatchSize - 1) {
@@ -53,6 +63,7 @@ namespace pathCam {
       blurMeticQ.pop();
     }
     blurMutex.unlock();
+    frames+=blurImagesInProcess.size();
 
     const size_t step = 128 * 128 * sizeof(float);
     for (int i = 0; i < blurImagesInProcess.size(); ++i) {
@@ -79,9 +90,22 @@ namespace pathCam {
     assert(blurCtx->setInputShape("input", inDims));
 
     assert(blurCtx->enqueueV3(blurStream));
+    outstandingBlurInference = true;
+    // for (int i = 0; i < blurImagesInProcess.size(); ++i) {
+    //   if (blurImagesInProcess[i]->index == 0) {
+    //     int k = 0;
+    //   }
+    // }
   }
 
   void StreamCam::receive_blur_metric() {
+    if (!outstandingBlurInference){return;}
+    // for (int i = 0; i < blurImagesInProcess.size(); ++i) {
+    //   if (blurImagesInProcess[i]->index == 0) {
+    //     int k = 0;
+    //   }
+    // }
+
     CHECK_CUDA(cudaStreamSynchronize(blurStream));
 
     float logit;
@@ -93,5 +117,6 @@ namespace pathCam {
       blurImagesInProcess[i]->blurSet = true;
       blurImagesInProcess[i]->blurConVar.notify_one();
     }
+    outstandingBlurInference = false;
   }
 }

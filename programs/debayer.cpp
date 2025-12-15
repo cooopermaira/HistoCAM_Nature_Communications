@@ -199,6 +199,20 @@ int main(int argc, char *argv[]) {
     outputfilepath.makeParent().append("input.txt");
     std::ofstream outputFile(outputfilepath.toString());
 
+    auto parentDir = outFile.makeParent();
+    auto cropDir = parentDir, dftDir = parentDir, pngDir = parentDir;
+
+    pngDir.pushDirectory("png");
+    dftDir.pushDirectory("dft");
+    cropDir.pushDirectory("png_crop");
+
+    Poco::File dir(pngDir);
+    if (!dir.exists()){dir.createDirectories();}
+    dir = Poco::File(dftDir);
+    if (!dir.exists()){dir.createDirectories();}
+    dir = Poco::File(cropDir);
+    if (!dir.exists()){dir.createDirectories();}
+
     for (int i = 0; i < images.size(); i++) {
       if (renameFiles) {
         Poco::File currentFile(images[i]->image_file);

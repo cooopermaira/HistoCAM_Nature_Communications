@@ -183,6 +183,8 @@ namespace pathCam {
     };
 
     virtual void run();
+
+    void self_cancel(int label);
   };
 
 

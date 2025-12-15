@@ -200,6 +200,7 @@ namespace pathCam {
     bool outstandingBlurInference = false;
     std::queue<Image*> blurMeticQ;
     std::vector<Image*> blurImagesInProcess;
+    int frames = 0, iters = 0;
 
     bool run();
 
@@ -210,6 +211,8 @@ namespace pathCam {
     void launch_blur_metric();
 
     void receive_blur_metric();
+
+    void process_blur_Q();
 
     void load_blur_engine();
 

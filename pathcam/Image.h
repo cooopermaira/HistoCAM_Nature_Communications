@@ -28,7 +28,7 @@ namespace pathCam {
     double reg_scale_initial,reg_scale_full;
     double reg_crop_initial,reg_crop_full;
     enum {
-      _NOLABEL = 0, _2X, _4X, _10X, _20X, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _LENS_CHANGE
+      _NOLABEL = 0, _2X, _4X, _10X, _20X, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _MOTION_BLUR
     };
     unsigned int label;
     int vertexId;
@@ -39,7 +39,7 @@ namespace pathCam {
     std::mutex cudaBufferMutex, blurMutex;
     std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
-    bool blurSet;
+    bool blurSet = false;
 
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::KeyPoint> keypointsMultilevel;
@@ -148,8 +148,8 @@ namespace pathCam {
         case _BAD_FILE:
           return "Bad File";
           break;
-        case _LENS_CHANGE:
-          return "Lens Change";
+        case _MOTION_BLUR:
+          return "Motion blur";
       }
 
       return "No label";

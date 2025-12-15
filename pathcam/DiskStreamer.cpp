@@ -253,20 +253,22 @@ namespace pathCam {
 
     if (trainDft) {
       Point2f center(image->width / 2, image->height / 2);
-      cvtColor(img,gray,COLOR_BayerBG2GRAY);
+      cvtColor(img, gray, COLOR_BayerBG2GRAY);
       float step = 180 / trainSamples;
       r.pushDirectory("dft");
 
       for (float i = 0; i < trainSamples; ++i) {
         float angle = step * i;
-        auto roi = extractRotatedROI(gray,center, Size(image->blurPatch,image->blurPatch),angle);
-        image->check_blur_async(roi,false);
+        auto roi = extractRotatedROI(gray, center, Size(image->blurPatch, image->blurPatch), angle);
+        image->check_blur_async(roi, false);
 
 
-        std::string fn = image->image_file.getBaseName() + "r"+std::to_string(angle)+"r";
+        std::string fn = image->image_file.getBaseName() + "r" + std::to_string(angle) + "r";
         r.setFileName(fn);
         r.setExtension("png");
 
+        image->blurDFT *= 255;
+        image->blurDFT.convertTo(image->blurDFT,CV_8U);
         imwrite(r.toString(), image->blurDFT);
       }
     }
@@ -275,18 +277,9 @@ namespace pathCam {
 
   void DebayerRunnable::run() {
     image->index = image_index;
-    if (image_index > 254) {
-      return;
-    }
 
-    if (std::find(names->begin(),names->end(),image->get_ImageFile().getFileName())==names->end()) {
-      process_debayer(image, false, {2000, 2000},
-                    false, 0.125, true, 60);
-    }else {
-      process_debayer(image, true, {2000, 2000},
-                    true, 0.125, true, 180);
-    }
-
+    process_debayer(image, true, {2000, 2000},
+                    true, 0.125, true, 1);
   }
 
 

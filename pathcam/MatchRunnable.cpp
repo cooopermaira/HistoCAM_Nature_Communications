@@ -45,7 +45,7 @@ void MatchRunnable::run() {
       Match *m = new Match(previous, image);
       matcher->match(m,0);
 
-      int result = motion_est->findHomography(m, parent->estimator_type, 25, 0);
+      int result = motion_est->findHomography(m, parent->estimator_type, 10, 0);
 
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
@@ -92,8 +92,9 @@ void MatchRunnable::run() {
     }
 
     if (!successful) {
-      std::unique_lock lock(image->blurMutex);
-      image->cudaBufferConVar.wait(lock, [&] { return image->blurSet; });
+      // std::unique_lock lock(image->blurMutex);
+      // image->cudaBufferConVar.wait(lock, [&] { return image->blurSet; });
+
       parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
     }
     //parent->RegistrationConsecQ.add_index(image_idx);
