@@ -166,7 +166,7 @@ namespace pathCam {
   void Composite::establish_scale_at_root(Image *_rootImg) {
     //get my sift data
     if (!_rootImg->siftInitialized) {
-      if (!_rootImg->cudaBufferReady) {
+      if (!parent->unifiedMemory && !_rootImg->cudaBufferReady) {
         _rootImg->move_buffer_to_gpu(parent->compositorCudaDevice,true);
       }
       auto myGray = get_grayscale(_rootImg);
@@ -182,7 +182,7 @@ namespace pathCam {
 
     //get their sift data
     if (!parent->lastViewedFrame->siftInitialized) {
-      if (!parent->lastViewedFrame->cudaBufferReady) {
+      if (!parent->unifiedMemory && !parent->lastViewedFrame->cudaBufferReady) {
         parent->lastViewedFrame->move_buffer_to_gpu(parent->compositorCudaDevice,true);
       }
       auto theirGray = get_grayscale(parent->lastViewedFrame);

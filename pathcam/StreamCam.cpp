@@ -43,7 +43,7 @@ namespace pathCam {
             as = new AccessSAM(this);
         }
 
-        int threads = 10;
+        int threads = 1;
 
         minPixelDistanceBetweenFrames = 500;
         minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames, 2);

@@ -224,7 +224,7 @@ namespace pathCam {
       }
 
       contributingRegInfos.push_back(_newInfo[i]);
-      contributingImages.push_back(images[i]);
+      contributingImages.insert(images[i]);
 
       update = true;
       images[i]->vertexId = res;
@@ -342,8 +342,7 @@ namespace pathCam {
     cudaSetDevice(parent->compositorCudaDevice);
 
     //do this first so we have root and max offset determined ahead of time
-    for (int i = 0; i < contributingImages.size(); ++i) {
-      auto img = contributingImages[i];
+    for (auto &img: contributingImages) {
       Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
       std::vector<Point2i> face;
       if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
@@ -517,8 +516,7 @@ namespace pathCam {
     self_reset();
 
     //do this for all images first so we pull final voronoi face on reconstruct
-    for (int i = 0; i < contributingImages.size(); ++i) {
-      auto img = contributingImages[i];
+    for (auto &img: contributingImages) {
       Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
       std::vector<Point2i> face;
       if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
@@ -529,8 +527,7 @@ namespace pathCam {
       }
     }
 
-    for (int i = 0; i < contributingImages.size(); ++i) {
-      Image *img = contributingImages[i];
+    for (auto &img: contributingImages) {
       //get voronoi facets for only this face
       std::vector<std::vector<Point2f> > facets;
       std::vector<Point2f> centers;
@@ -684,14 +681,16 @@ namespace pathCam {
       if (componentMagLabel == Image::_2X) {
         if (pow(contributingRegInfos[i]->absoluteCoords.x - contributingRegInfos.back()->absoluteCoords.x, 2) +
             pow(contributingRegInfos[i]->absoluteCoords.y - contributingRegInfos.back()->absoluteCoords.y, 2) < radSq) {
-          newOverlaps.push_back({contributingImages[i], contributingImages.back()});
+          throw std::runtime_error("this logic path is no longer functional");
+          //newOverlaps.push_back({contributingImages[i], contributingImages.back()});
         }
       } else {
         if (abs(contributingRegInfos[i]->absoluteCoords.x - contributingRegInfos.back()->absoluteCoords.x) < 0.7 * image_size.
             width &&
             abs(contributingRegInfos[i]->absoluteCoords.y - contributingRegInfos.back()->absoluteCoords.y) < 0.7 * image_size.
             height) {
-          newOverlaps.emplace_back(contributingImages[i], contributingImages.back());
+          throw std::runtime_error("this logic path is no longer functional");
+          //newOverlaps.emplace_back(contributingImages[i], contributingImages.back());
         }
       }
     }

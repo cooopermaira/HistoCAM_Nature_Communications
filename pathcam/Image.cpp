@@ -460,6 +460,14 @@ namespace pathCam {
     return image_Mat;
   }
 
+  char *Image::get_raw_cuda() {
+    //assert(raw_buffer_cuda);
+    if (parent && parent->unifiedMemory) {
+      return raw_buffer;
+    }
+    return raw_buffer_cuda;
+  }
+
   void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real) {
     bool release = false;
     buffer_mutex.lock();

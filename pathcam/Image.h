@@ -3,6 +3,7 @@
 
 #include "pathCam.h"
 
+
 namespace pathCam {
 
   using Poco::MemoryPool;
@@ -165,10 +166,7 @@ namespace pathCam {
       return raw_buffer;
     }
 
-    inline char *get_raw_cuda() {
-      //assert(raw_buffer_cuda);
-      return raw_buffer_cuda;
-    }
+    char *get_raw_cuda();
 
     inline Poco::Path get_ImageFile() { return image_file; }
 

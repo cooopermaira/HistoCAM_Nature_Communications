@@ -59,7 +59,7 @@ struct TileObj {
 
   int status = noCoverage;
   pathCam::Image* owner = nullptr;
-  int motionBlur = 99999999;
+  float motionBlur = 99999999.f;
 
   int updateCount = 0;
   void* preferredObj;

@@ -89,7 +89,7 @@ namespace pathCam {
     Mat fourChannelPreallocated;
 
     std::vector<RegInfo *> contributingRegInfos;
-    std::vector<Image *> contributingImages;
+    std::set<Image *> contributingImages;
     std::map<int, unsigned long> delaunayMembers;
     std::queue<RegInfo*> staging;
 

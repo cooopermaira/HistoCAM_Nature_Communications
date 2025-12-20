@@ -32,7 +32,7 @@ namespace pathCam {
    * new frames coming in have the chance to suplant frames in the queue. This process prevents tiles from being updated
    * over and over again by a series of consequtive frames and substantially lowers computational cost
    */
-  void MetricComposite::update() {
+   void MetricComposite::update() {
     //make sure component is placed in MR image
     if (imagePyramid->scale == 0) {
       assert(!staging.empty());
@@ -45,29 +45,40 @@ namespace pathCam {
       auto ri = staging.front();
       auto img = ri->image;
       staging.pop();
+
       update_Bbox_no_composite({ri});
+
       mostRecentFrame = img;
+      waitingFrames[positionForNextWaitngFrame % frameDelay] = {img, {}};
+      std::vector<Point2i> immediateProcessingTiles;
+
 
       //grab affected tiles with their category of coverage
       auto affectedPyramidTilesWithStatus = calculate_affected_tiles_with_status(
         Point2f(ri->absoluteCoords.x, ri->absoluteCoords.y));
-      std::vector<Point2i> immediateProcessingTiles;
 
-      waitingFrames[positionForNextWaitngFrame % frameDelay] = {img, {}};
 
-      //find what tiles raise status category of pyramid tiles
+      //calculate: for which of the affected tiles is this frame an improvement?
       for (auto &el: affectedPyramidTilesWithStatus) {
+
         auto &pyrTileObj = compositeImage->getTile(el.first.x, el.first.y);
+
+        //check if frame improves status of tile, if so process immediately
         if (pyrTileObj.status < el.second) {
-          //this frame improves status of this pyramid tile and should fill the tile without delay
+
+          //if the tile is promoting to singleFrameCoverage, set owner and motionBlur from this frame
           if (el.second == TileObj::singleFrameCoverage) {
             pyrTileObj.owner = img;
             pyrTileObj.motionBlur = img->motionBlur;
           }
           pyrTileObj.status = el.second;
           immediateProcessingTiles.push_back(el.first);
-        } else if (el.second == TileObj::singleFrameCoverage && pyrTileObj.owner->motionBlur > img->motionBlur
+        }
+
+        // check if frame is less blurry than current source for tile (pyrTileObj)
+        else if (el.second == TileObj::singleFrameCoverage && pyrTileObj.owner->motionBlur > img->motionBlur
                    || !pyrTileObj.owner) {
+
           waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(el.first);
         }
       }
@@ -99,7 +110,9 @@ namespace pathCam {
     //this is an erase-remove_if implementation with a lambda function inside that updates tileObj if img should be owner,
     //otherwise it removes the tile from the img's list
     for (auto &[img,tiles]: waitingFrames) {
+
       if (!img) { continue; }
+
       tiles.erase(
         std::remove_if(tiles.begin(),
                        tiles.end(),
@@ -116,6 +129,7 @@ namespace pathCam {
                          return true;
                        }), tiles.end()
       );
+
       if (tiles.empty() && img != mostRecentFrame) {
         img->free_memory_RAW();
         img = nullptr;
@@ -125,7 +139,8 @@ namespace pathCam {
     //once delay is met, process frame
     auto &[img,tiles] = waitingFrames[positionForNextWaitngFrame % frameDelay];
     if (positionForNextWaitngFrame > frameDelay && !tiles.empty()) {
-      contributingImages.push_back(img);
+
+      contributingImages.insert(img);
       needsAlignment = true;
 
       assert(img && img->get_Raw());
@@ -248,7 +263,7 @@ namespace pathCam {
 
   std::vector<std::pair<Image *, Image *> > MetricComposite::calculate_member_overlaps(std::vector<Image *> images) {
     if (images.empty()) {
-      images = contributingImages;
+      images = std::vector(contributingImages.begin(),contributingImages.end());
     }
     std::vector<std::pair<Image *, Image *> > results;
 
