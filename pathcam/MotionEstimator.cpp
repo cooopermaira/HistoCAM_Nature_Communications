@@ -12,18 +12,16 @@ namespace pathCam {
 
   void RegInfo::attempt_absolute_reg(bool queue_for_compositing) {
     auto them = parent->get_reg_ref(matchedTo);
-    Vec2 theirAbCs;
+    Point2f theirAbCs;
     unsigned int componentMembership;
 
     if(them->get_abc(this, theirAbCs, componentMembership)){
-      Vec2 myAbCs;
-      myAbCs.x = relativeCoords.x + theirAbCs.x;
-      myAbCs.y = relativeCoords.y + theirAbCs.y;
+      Point2f myAbCs = relativeCoords + theirAbCs;
       set_abc(myAbCs, componentMembership, queue_for_compositing);
     }
   }
 
-  bool RegInfo::get_abc(pathCam::RegInfo *caller, pathCam::Vec2 &_absoluteCoords, unsigned int &_componentMembership) {
+  bool RegInfo::get_abc(pathCam::RegInfo *caller, Point2f &_absoluteCoords, unsigned int &_componentMembership) {
     accessMutex->lock();
 
     if (resolved) {
@@ -38,7 +36,7 @@ namespace pathCam {
     return false;
   }
 
-  void RegInfo::set_abc(pathCam::Vec2 _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing) {
+  void RegInfo::set_abc(Point2f _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing) {
 
     _absoluteCoords.x = std::round(_absoluteCoords.x);
     _absoluteCoords.y = std::round(_absoluteCoords.y);
@@ -62,7 +60,7 @@ namespace pathCam {
 
     for (auto cw: callersWaiting) {
       auto theirRelCoords = cw->relativeCoords;
-      Vec2 theirAbCs;
+      Point2f theirAbCs;
       theirAbCs.x = theirRelCoords.x + absoluteCoords.x;
       theirAbCs.y = theirRelCoords.y + absoluteCoords.y;
       cw->set_abc(theirAbCs, component_membership,queue_for_compositing);

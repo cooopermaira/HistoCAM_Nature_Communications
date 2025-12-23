@@ -36,9 +36,9 @@ public:
   bool successful,root,resolved,rootOfRoot;
   bool stayFixedDuringBundleAdjustment = false;
   bool tryComposite = false;
-  unsigned int component_membership;
-  Vec2 absoluteCoords;
-  Vec2 relativeCoords = Vec2(0.0, 0.0);
+  int component_membership;
+  Point2f absoluteCoords;
+  Point2f relativeCoords = Point2f(0.0, 0.0);
   Poco::FastMutex *accessMutex;
   Poco::Event waitOnResolve;
   std::vector<RegInfo*> callersWaiting;
@@ -48,16 +48,16 @@ public:
   int bestMatch;
   int numBestMatches = 0;
   
-  RegInfo(StreamCam* parent, bool successful=false, Vec2 absoluteCoords=Vec2(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
+  RegInfo(StreamCam* parent, bool successful=false, Point2f absoluteCoords=Point2f(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
   successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),accessMutex(new Poco::FastMutex), parent(parent),
   waitOnResolve(true),rootOfRoot(false) {
   };
 
   void attempt_absolute_reg(bool queue_for_compositing);
 
-  bool get_abc(RegInfo* caller, Vec2& _absoluteCoords, unsigned int& _componentMembership);
+  bool get_abc(RegInfo* caller, Point2f &_absoluteCoords, unsigned int& _componentMembership);
 
-  void set_abc(Vec2 _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing);
+  void set_abc(Point2f _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing);
 
   void set_waiting_component(unsigned int componentIndex, Match* m);
 
@@ -72,12 +72,12 @@ public:
     return component_membership < other.component_membership;
   }
   
-  std::string toString(){
-    std::stringstream ss;
-    ss << ((successful) ? "good" : "bad") << "\t";
-    ss << absoluteCoords.toString();
-    return ss.str();
-  }
+  // std::string toString(){
+  //   std::stringstream ss;
+  //   ss << ((successful) ? "good" : "bad") << "\t";
+  //   ss << absoluteCoords.toString();
+  //   return ss.str();
+  // }
   
 };
 

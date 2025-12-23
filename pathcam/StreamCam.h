@@ -218,6 +218,10 @@ namespace pathCam {
 
     void clean_up_blur_engine() const;
 
+    std::pair<Image*,bool> get_most_recent_resolved_frame(Image* _fromImage, bool _acceptRoot);
+
+    std::vector<std::pair<Image *,Rect>> get_overlapping_frames(Rect _regionInComponentSpace, int _componentIndex);
+
 #ifdef HAVE_OPENCV_CUDAARITHM
     int GPU_select_cuda_device(int _priority = 0);
 
@@ -242,7 +246,7 @@ namespace pathCam {
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index,
                            std::string _label);
 
-    void get_last_frame(cv::Rect_<float> &_rectInScale1Space, bool &showAsCircle, int &_lastComponentIndex,
+    void get_last_frame(cv::Rect_<float> &_rectInBaseSpace, bool &showAsCircle, int &_lastComponentIndex,
                         std::string &_magLabel);
 
     void pass_image(Image *, unsigned long _image_index = 0, bool saveImg = false);

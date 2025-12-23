@@ -91,7 +91,7 @@ namespace pathCam {
         imagePyramid->set_scale(scale);
         imagePyramid->set_offset(offset);
 
-        storedNewInfo->set_abc(Vec2(0, 0), componentIndex, true);
+        storedNewInfo->set_abc({0,0}, componentIndex, true);
         deduce_label();
       }
     }

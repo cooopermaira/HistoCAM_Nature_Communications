@@ -83,7 +83,6 @@ namespace pathCam {
       std::vector<int> iters(lv - fv + 1);
       std::iota(iters.begin(),iters.end(),fv);
 
-      //for (int i = max(0,int(image_idx) - windowWidth);i <= image_idx + windowWidth;i++) {
       for (auto i : iters){
 
         auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, i);

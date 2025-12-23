@@ -114,7 +114,13 @@ namespace pathCam {
 
     void establish_scale_at_root(Image *_rootImg);
 
+    bool establish_scale_between_pairs(Image *_rootImg, Image *_target);
+
     void set_scale(double _scale);
+
+    double get_scale() {
+      return imagePyramid->scale;
+    }
 
     void set_offset(const Point2f &_offset) const;
 
@@ -160,7 +166,7 @@ namespace pathCam {
 
 
     Subdiv2D subdiv;
-    cv::Size image_size;
+    Size image_size;
     std::vector<Mat> channels;
     std::vector<Point2i> imageBoundsAsPolygon;
     std::vector<double> blurVals;
@@ -183,30 +189,12 @@ namespace pathCam {
     static void ensure_clockwise(std::vector<Point2i> &_face);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    static std::pair<Point2d, double> phase_correlate_GPU(const cuda::GpuMat &A32F, const cuda::GpuMat &B32F,
-                                                          cudaStream_t stream = nullptr);
-
-    static ScaleResult estimate_cale_discrete_GPU(
-      const cuda::GpuMat &dLow_bgr,
-      const cuda::GpuMat &dHigh_bgr,
-      const std::vector<double> &scales,
-      cudaStream_t stream);
-
-
-
-
-    static cuda::GpuMat preprocess_GPU(const cuda::GpuMat& bgr_or_gray, cudaStream_t stream);
-
-
-
-    static void establish_scale_between_two_centered_Images(Image* img1, Image* img2, double &scale, Point2f &offset);
 
     void make_meshgrid();
 
     void GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add = false);
 
     std::vector<std::pair<Image *, Image *> > calculate_new_overlaps();
-
 
 
     void rebuild();
@@ -217,13 +205,10 @@ namespace pathCam {
 
     void ff_correct_and_brighten();
 
-    void populate_SAM_tile(SAMTile *_samTile);
 #endif
     int pixels_overlapping_between(Image *_img, Rect _rect);
 
     void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
-
-    void create_and_submit_rebuild_jobs();
 
     void calculate_effected_tiles(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result, Point2f absCoord,
                                   std::vector<Point2i> *additionalResult = {});

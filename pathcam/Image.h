@@ -12,7 +12,7 @@ namespace pathCam {
   class Image {
   public:
     StreamCam* parent;
-    RegInfo* regInfo;
+    RegInfo* regInfo = nullptr;
 
     long index;
     double blurTime = 0;

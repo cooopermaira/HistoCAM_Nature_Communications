@@ -33,6 +33,7 @@ void MatchRunnable::run() {
 
     auto tempReg = parent->get_reg_ref(image_idx);
 
+
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
 

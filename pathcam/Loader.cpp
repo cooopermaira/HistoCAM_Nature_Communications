@@ -82,14 +82,13 @@ namespace pathCam {
       }
       delete detector;
 
+
       if (image->keypoints.size() < 250) {
         self_cancel(Image::_LOWFEAT);
         return;
       }
 
-      if (image_index == 575) {
-        int k = 0;
-      }
+
       image->release_reg_image();
 
       //parent->add_image(image, image_index);
