@@ -316,23 +316,22 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
 
 void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y, cv::Point2f rootOffset,
                            cv::Rect_<float> image_box, cv::Rect_<float> tile_box) {
-  cv::Rect ROIrect((int) (image_box.x - rootOffset.x),
-                   (int) (image_box.y - rootOffset.y),
-                   (int) image_box.width,
-                   (int) image_box.height);
-  if (ROIrect.width * ROIrect.height > 0) {
-    Mat matROI;
-    Rect tileROI;
+  Rect ROIrect((int) (image_box.x - rootOffset.x), (int) (image_box.y - rootOffset.y),
+                   (int) image_box.width, (int) image_box.height);
 
-    matROI = mat(ROIrect);
+  if (ROIrect.width * ROIrect.height > 0) {
+
+    Mat matROI = mat(ROIrect);
 
     TileObj &tileObject = getTile(x, y);
-    ++tileObject.updateCount;
+    liveTiles.push_back(&tileObject);
     Mat temp(tileObject.image.rows,tileObject.image.cols,CV_8UC4,tileObject.image.data);
 
+    //profiling
+    ++tileObject.updateCount;
 
-    tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
-                       matROI.rows);
+
+    Rect tileROI = Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols, matROI.rows);
 
     tileObject.mutex->lock();
     if (!mask.empty()) {

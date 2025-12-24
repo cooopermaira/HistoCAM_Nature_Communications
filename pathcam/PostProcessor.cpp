@@ -58,7 +58,7 @@ namespace pathCam {
 
       size_t mostMutualMatches = 0,mostInliers = 0;
       for (auto mp: matchPairs) {
-        if (mp.first->component_membership == mp.second->component_membership) {
+        if (mp.first->regInfo->component_membership == mp.second->regInfo->component_membership) {
           //match with orb features
           Match m = Match(mp.first, mp.second);
           matcher->match(&m,0);
@@ -101,7 +101,7 @@ namespace pathCam {
         if (mutualMatches.size() > mostMutualMatches) {
           mostMutualMatches = mutualMatches.size();
         }
-        if (mutualMatches.size() > 200 || (mp.first->component_membership != mp.second->component_membership && mutualMatches.size() > 10)) {
+        if (mutualMatches.size() > 200 || (mp.first->regInfo->component_membership != mp.second->regInfo->component_membership && mutualMatches.size() > 10)) {
           H = findHomography(pts2, pts1, RANSAC, 3.0, inlierMask);
           numInliers = std::count(inlierMask.begin(), inlierMask.end(), 1);
 
@@ -109,13 +109,13 @@ namespace pathCam {
             mostInliers = numInliers;
           }
 
-          if (numInliers > 150|| (mp.first->component_membership != mp.second->component_membership && numInliers > 10)) {
+          if (numInliers > 150|| (mp.first->regInfo->component_membership != mp.second->regInfo->component_membership && numInliers > 10)) {
             for (size_t i = 0; i < mutualMatches.size(); ++i) {
               if (inlierMask[i]) {
                 matchesInfo.matches.push_back(mutualMatches[i]);
                 ftg->process_match(mp.first->index, mp.second->index, mutualMatches[i]);
 
-                if (mp.first->component_membership == mp.second->component_membership) {
+                if (mp.first->regInfo->component_membership == mp.second->regInfo->component_membership) {
                   auto m = new Match(mp.first,mp.second);
                   parent->set_match(mp.first->index,mp.second->index,m,false);
 

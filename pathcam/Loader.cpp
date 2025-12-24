@@ -84,6 +84,7 @@ namespace pathCam {
 
 
       if (image->keypoints.size() < 250) {
+        std::cout<<"LOW FT: "<<image_index<<std::endl;
         self_cancel(Image::_LOWFEAT);
         return;
       }

@@ -164,15 +164,19 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
   for (unsigned int i = 0; i < MRImage->images.size(); i++) {
     g.setColour(juce::Colours::white);
-    if (MRImage->images[i]->scale == 0) { continue; }
+
+    if (MRImage->images[i]->scale == 0 || MRImage->images[i]->suspended) { continue; }
+
+    //convert bounds from view space to image space
     auto imageview = *view;
     imageview *= 1.0 / MRImage->images[i]->scale;
     imageview -= fPoint(MRImage->images[i]->offset.x, MRImage->images[i]->offset.y);
+
+    //query tiles within image space bounds
     std::vector<TileQuery> tiles = MRImage->images[i]->
         getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
 
-    //std::cout<<tiles.size()<<std::endl;
-
+    //draw each tile
     for (unsigned int t = 0; t < tiles.size(); t++) {
       TileObj *tile = tiles[t].image;
       auto bounds = RectCtoJ<float>(tiles[t].bounds);
@@ -208,19 +212,21 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
             CHECK_CUDA(cudaMemcpy2D(bitmap_data.data,img.cols,img.data,img.step,img.cols,img.rows,cudaMemcpyDeviceToHost));
           }
         }
-
         g.setOpacity(1.f);
         g.drawImage(*im, bounds);
-        g.setColour(juce::Colours::greenyellow);
-        g.drawRect(bounds, 3);
 
-        std::string ij;
-        if (tile->owner) {
-          ij = Poco::format("(%ld,%i)", tile->owner->index, tile->motionBlur);
-        }
-        g.setFont(20);
-        g.drawText(ij, bounds.getCentreX() - 50,
-                   bounds.getCentreY() - 15, 100, 30, Justification::centred);
+        // //draw tile bounds with owner frame
+        // g.setColour(juce::Colours::greenyellow);
+        // g.drawRect(bounds, 3);
+        //
+        // std::string ij;
+        // if (tile->owner) {
+        //   ij = Poco::format("(%ld,%i)", tile->owner->index, tile->motionBlur);
+        // }
+        // g.setFont(20);
+        // g.drawText(ij, bounds.getCentreX() - 50,
+        //            bounds.getCentreY() - 15, 100, 30, Justification::centred);
+
         for (auto & mask : tile->SAMMasks) {
           auto jImg = static_cast<juce::Image*>(mask.second.second);
           g.saveState();

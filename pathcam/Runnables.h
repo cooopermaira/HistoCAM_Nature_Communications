@@ -121,29 +121,17 @@ namespace pathCam {
 
     CompositeManager(StreamCam *parent);
 
-    virtual void run();
+    void run() override;
 
-    void align_new_comp();
+    void stage(RegInfo* _regInfo) const;
 
     void perform_global_alignment();
-
-    void check_render_info();
 
     void debug_termination_check();
 
     void save_components_to_disk();
 
     void push_remaining_tiles_for_inference();
-
-    void decrement_rebuild_jobs_outstanding();
-
-    void build_match_pairs(std::vector<std::pair<Image *, Image *> > &_imagePairsToMatch,
-                           std::vector<RegInfo *> &_regs);
-
-    cv::detail::MatchesInfo compute_matches_info(SiftData &_sift1, SiftData &_sift2, unsigned long _img1_idx,
-                                                 unsigned long _img2_idx);
-
-    void perform_SIFT_multires_bundle_adjustment();
 
     void submit_outstanding_jobs();
   };

@@ -76,7 +76,7 @@ namespace pathCam {
         if (!indexes.empty()) {
           Image* lastViewedFrame = nullptr;
           for (auto index : indexes) {
-            parent->composites[index->component_membership]->stage(index);
+            stage(index);
             lastViewedFrame = index->image;
           }
 
@@ -110,6 +110,7 @@ namespace pathCam {
 
     //process delayed frames
     for (auto &comp: parent->composites) {
+      if (comp->suspended){continue;}
       auto mc = reinterpret_cast<MetricComposite*>(comp);
       for (int i = 0; i < mc->frameDelay; ++i) {
         mc->update();
@@ -223,9 +224,11 @@ namespace pathCam {
   }
 
 
-
-
-
-
-
+  void CompositeManager::stage(RegInfo *_regInfo) const {
+    _regInfo->accessMutex->lock();
+    assert(_regInfo->inCompositeQ);
+    _regInfo->inCompositeQ = false;
+    parent->composites[_regInfo->component_membership]->stage(_regInfo);
+    _regInfo->accessMutex->unlock();
+  }
 }

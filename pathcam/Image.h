@@ -19,7 +19,7 @@ namespace pathCam {
 
     int width, height;
     int scope_radius;
-    int component_membership;
+    //int component_membership;
     std::atomic<unsigned int> reference_count;
 
     float reg_full_scale;

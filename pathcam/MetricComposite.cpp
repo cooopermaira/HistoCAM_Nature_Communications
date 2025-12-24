@@ -24,7 +24,7 @@ namespace pathCam {
            -1);
   }
 
-  /* This function is pretty confusing but the jist is that when a new frame comes in, we find what pyramid tiles it
+  /* This function is pretty confusing but the gist is that when a new frame comes in, we find what pyramid tiles it
    * could cover. For each of those tiles, if it improves the coverage type (no coverage to partial coverage, partial
    * coverage to full coverage) its data is copied to that tile immediately so that the user sees updates whenever they
    * cover a new area. Otherwise, we see if the image has less motion blur than whatever frame filled that tile. If
@@ -33,10 +33,15 @@ namespace pathCam {
    * over and over again by a series of consequtive frames and substantially lowers computational cost
    */
    void MetricComposite::update() {
+    if (suspended){return;}
+
     //make sure component is placed in MR image
     if (imagePyramid->scale == 0) {
       assert(!staging.empty());
+
       establish_scale_at_root(staging.front()->image);
+      if (suspended){return;}
+
       assert(imagePyramid->scale > 0);
     }
 

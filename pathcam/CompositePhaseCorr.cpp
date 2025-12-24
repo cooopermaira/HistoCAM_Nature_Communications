@@ -13,7 +13,7 @@ namespace pathCam {
     return image_Mat;
   }
 
-  void shuffle_overlaps(std::vector<std::pair<Image *, Rect> > &_overlaps, const float &_targetScale) {
+  void sort_overlaps_by_likelihood(std::vector<std::pair<Image *, Rect> > &_overlaps, const float &_targetScale) {
     auto parent = _overlaps[0].first->parent;
 
     std::sort(_overlaps.begin(), _overlaps.end(), [_targetScale,parent](const auto &a, const auto &b) {
@@ -61,6 +61,8 @@ namespace pathCam {
   bool Composite::establish_scale_between_pairs(Image *_rootImg, Image *_target) {
     //get my sift data
     if (!_rootImg->siftInitialized) {
+      _rootImg->load_raw_from_disk();
+
       if (!parent->unifiedMemory && !_rootImg->cudaBufferReady) {
         _rootImg->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
@@ -70,13 +72,16 @@ namespace pathCam {
                        reinterpret_cast<float *>(myGray.data), nullptr);
 
       InitSiftData(_rootImg->siftData, 100000, true, true);
+      catch_ExtractSift(_rootImg->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
       _rootImg->siftInitialized = true;
 
-      catch_ExtractSift(_rootImg->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+      _rootImg->free_memory_RAW();
     }
 
     //get their sift data
     if (!_target->siftInitialized) {
+      _target->load_raw_from_disk();
+
       if (!parent->unifiedMemory && !_target->cudaBufferReady) {
         _target->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
@@ -86,28 +91,31 @@ namespace pathCam {
                        reinterpret_cast<float *>(theirGray.data), nullptr);
 
       InitSiftData(_target->siftData, 100000, true, true);
+      catch_ExtractSift(_target->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
       _target->siftInitialized = true;
 
-      catch_ExtractSift(_target->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+      _target->free_memory_RAW();
     }
 
     MatchSiftData(_rootImg->siftData, _target->siftData);
     std::vector<float> homography(9);
     int numMatches;
     bool validHomography = false;
-    int count = 0;
-    while (!validHomography && count < 20) {
+    int count = 0, maxAttempts = 20;
+    while (!validHomography && count < maxAttempts) {
       ++count;
       FindHomography(_rootImg->siftData, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
 
-      auto matchedComp = parent->composites[_target->regInfo->component_membership];
-      for (auto scale: matchedComp->candidateScaleRatios) {
-        scale = 1 / scale;
-        if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
-          validHomography = true;
+      if (numMatches > 0) {
+        auto matchedComp = parent->composites[_target->regInfo->component_membership];
+        for (auto scale: matchedComp->candidateScaleRatios) {
+          scale = 1 / scale;
+          if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
+            validHomography = true;
+          }
         }
       }
-      if (!validHomography) {
+      if (!validHomography && count < maxAttempts) {
         shuffle_sift_data(_rootImg->siftData);
       }
     }
@@ -117,13 +125,36 @@ namespace pathCam {
     }
     float relativeScale = (homography[0] + homography[4]) / 2;
 
-    auto queryComponent = _target->regInfo->component_membership;
-    Point2f theirAbC(_target->regInfo->absoluteCoords.x, _target->regInfo->absoluteCoords.y);
-    Point2f pairwiseDistance = Point2f(homography[2], homography[5]);
-    Point2f queryAbC = pairwiseDistance + theirAbC;
-    auto resultantPoint = parent->get_AbC_relative_from_relative(queryComponent, queryAbC, 0);
+    //get component of matched-to frame
+    auto theirComponentIndex = _target->regInfo->component_membership;
 
-    double scale = relativeScale * parent->composites[queryComponent]->imagePyramid->scale;
+    //get matched-to frames absolute coordinates
+    Point2f theirAbC(_target->regInfo->absoluteCoords.x, _target->regInfo->absoluteCoords.y);
+
+    //calculate absolute coordinates of _rootImg in their component space
+    Point2f pairwiseDistance = Point2f(homography[2], homography[5]);
+
+    if (abs(relativeScale - 1.f) < 0.05) {
+      //we're part of this component. suspend self, create a match and attempt registration.
+      suspended = true;
+      imagePyramid->suspended = true;
+
+      auto myRegInfo = _rootImg->regInfo;
+
+      myRegInfo->root = false;
+      myRegInfo->matchedTo = _target->index;
+      myRegInfo->relativeCoords = pairwiseDistance;
+      myRegInfo->attempt_absolute_reg(true);
+      return true;
+    }
+
+    Point2f queryAbC = pairwiseDistance + theirAbC;
+
+    //convert queryAbC to base component spce
+    auto resultantPoint = parent->get_AbC_relative_from_relative(theirComponentIndex, queryAbC, 0);
+
+    //
+    double scale = relativeScale * parent->composites[theirComponentIndex]->get_scale();
     _rootImg->regInfo->rootHomographies.emplace_back(resultantPoint, scale);
 
     assert(scale > 0);
@@ -159,7 +190,12 @@ namespace pathCam {
         }
         auto overlappingFrames = parent->get_overlapping_frames(regionInMySpace,
                                                                 mostRcntRslv->regInfo->component_membership);
-        shuffle_overlaps(overlappingFrames,parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
+        sort_overlaps_by_likelihood(overlappingFrames,parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
+
+        if (_rootImg->index == 813) {
+          int k = 0;
+        }
+
         int count = 0;
         for (auto & [img,roi] : overlappingFrames) {
           std::cout<<count++<<std::endl;
@@ -167,7 +203,7 @@ namespace pathCam {
             break;
           }
         }
-        int k = 0;
+
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
         success = establish_scale_between_pairs(_rootImg, mostRcntRslv);

@@ -260,7 +260,7 @@ namespace pathCam {
                   auto offset = get_AbC_relative_from_relative(
                     0, coords, img->regInfo->component_membership);
                   comp->set_offset(offset);
-                  composites[img->component_membership]->deduce_label();
+                  composites[img->regInfo->component_membership]->deduce_label();
 
                   Point2f pointInBaseSpace(-pv->t[0], -pv->t[1]);
                   auto val = img->debugInitialGuess - pointInBaseSpace;
@@ -745,9 +745,23 @@ namespace pathCam {
     return answer;
   }
 
-  void StreamCam::push_compositeQ(RegInfo *index) {
+  void StreamCam::push_compositeQ(RegInfo *_regInfo) {
+    /*_regInfo's component membership may have changed after being added to this Q. If it's already gone
+     * through the Q and been added to a suspended composite, it needs to be re-added to this Q with now
+     * corrected membership. This is the same behavior as adding it the first time. If it's still in the
+     * Q, the membership has already been corrected by this point so just do nothing, the problem is solved
+     * before it was noticed.
+     */
+    _regInfo->accessMutex->lock();
+    if (_regInfo->inCompositeQ) {
+      _regInfo->accessMutex->unlock();
+      return;
+    }
+    _regInfo->inCompositeQ = true;
+    _regInfo->accessMutex->unlock();
+
     compositeQ_mutex->lock();
-    compositeBatch.push({index});
+    compositeBatch.push({_regInfo});
     compositeQ_mutex->unlock();
   }
 

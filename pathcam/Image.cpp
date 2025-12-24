@@ -133,7 +133,7 @@ namespace pathCam {
   void Image::free_memory_RAW(bool force) {
     buffer_mutex.lock();
     if (raw_buffer != nullptr) {
-      reference_count--;
+      --reference_count;
       if (force || reference_count == 0) {
         if (mempool) {
           mempool->release(raw_buffer);
@@ -516,7 +516,7 @@ namespace pathCam {
     if (_reg_crop != 1.0) {
       Size old_image_size = image_size;
       image_size = Size(image_size.width * _reg_crop, image_size.height * _reg_crop);
-      cv::Rect myROI((old_image_size.width / 2) - (image_size.width / 2),
+      Rect myROI((old_image_size.width / 2) - (image_size.width / 2),
                      (old_image_size.height / 2) - image_size.height / 2,
                      image_size.width, image_size.height);
       reg_image = reg_image(myROI);
@@ -526,7 +526,7 @@ namespace pathCam {
 
   void Image::load_raw_from_disk() {
     buffer_mutex.lock();
-    if (raw_buffer == 0) {
+    if (!raw_buffer) {
       if (image_file.toString() != "") {
         std::ifstream stream;
         stream.open(image_file.toString(), std::ios::binary);
@@ -539,7 +539,7 @@ namespace pathCam {
         return;
       }
     }
-    reference_count++;
+    ++reference_count;
     buffer_mutex.unlock();
   }
 }

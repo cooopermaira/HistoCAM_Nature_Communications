@@ -49,6 +49,8 @@ namespace pathCam {
     Rect_<float> tiledImageBounds;
     Poco::FastMutex *update_mutex;
 
+    bool suspended = false;
+
     std::shared_ptr<MRTiledImage> imagePyramid;
 
     int minTilex = 1000;
@@ -118,9 +120,7 @@ namespace pathCam {
 
     void set_scale(double _scale);
 
-    double get_scale() {
-      return imagePyramid->scale;
-    }
+    double get_scale() const {return imagePyramid->scale;}
 
     void set_offset(const Point2f &_offset) const;
 

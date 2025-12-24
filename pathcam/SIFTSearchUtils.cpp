@@ -237,9 +237,7 @@ namespace pathCam {
         auto AbC = img->regInfo->get_AbC_relative_from_local(0);
         img->debugInitialGuess = AbC;
         if (img->regInfo->rootHomographies.size() > 2) {
-          if (img->component_membership  == 2) {
-            int k = 0;
-          }
+
           Point2f rootGuess;
           double scale;
           img->regInfo->average_from_homographies(rootGuess,scale);
@@ -248,7 +246,7 @@ namespace pathCam {
             int k = 0;
           }
         }
-        double scale = parent->composites[img->component_membership]->imagePyramid->scale;
+        double scale = parent->composites[img->regInfo->component_membership]->imagePyramid->scale;
         //translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
         translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), 10000 * scale);
       }

@@ -11,6 +11,7 @@
 namespace pathCam {
 
   void RegInfo::attempt_absolute_reg(bool queue_for_compositing) {
+
     auto them = parent->get_reg_ref(matchedTo);
     Point2f theirAbCs;
     unsigned int componentMembership;
@@ -25,6 +26,7 @@ namespace pathCam {
     accessMutex->lock();
 
     if (resolved) {
+      children.push_back(caller);
       _absoluteCoords = absoluteCoords;
       _componentMembership = component_membership;
       accessMutex->unlock();
@@ -36,7 +38,7 @@ namespace pathCam {
     return false;
   }
 
-  void RegInfo::set_abc(Point2f _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing) {
+  void RegInfo::set_abc(Point2f _absoluteCoords, int _componentMembership, bool queue_for_compositing) {
 
     _absoluteCoords.x = std::round(_absoluteCoords.x);
     _absoluteCoords.y = std::round(_absoluteCoords.y);
@@ -56,28 +58,21 @@ namespace pathCam {
     if (proceed) {
       tryComposite = true;
     }
+
     parent->push_compositeQ(this);
 
-    for (auto cw: callersWaiting) {
-      auto theirRelCoords = cw->relativeCoords;
+    for (auto & cw: callersWaiting) {
+      children.push_back(cw);
+    }
+    callersWaiting.clear();
+
+    for (auto & child : children) {
+      auto theirRelCoords = child->relativeCoords;
       Point2f theirAbCs;
       theirAbCs.x = theirRelCoords.x + absoluteCoords.x;
       theirAbCs.y = theirRelCoords.y + absoluteCoords.y;
-      cw->set_abc(theirAbCs, component_membership,queue_for_compositing);
+      child->set_abc(theirAbCs, component_membership,queue_for_compositing);
     }
-
-    // for (auto el: componentCallersWaiting) {
-    //   double myScale;
-    //   Point2f myOffset;
-    //   while (!parent->get_scale_and_offset(component_membership, myScale, myOffset)) {
-    //     Poco::Thread::sleep(50);
-    //   }
-    //
-    //   auto theirScale = (el.second->H.at<double>(0, 0) + el.second->H.at<double>(1, 1)) / 2.0;
-    //   auto theirOffset = Point2f((el.second->t_x / theirScale + absoluteCoords.x + myOffset.x) / theirScale,
-    //                              (el.second->t_y / theirScale + absoluteCoords.y + myOffset.y) / theirScale);
-    //   parent->set_scale_and_offset(el.first, theirScale * myScale, theirOffset);
-    // }
 
 
     if(!proceed){
@@ -103,7 +98,7 @@ namespace pathCam {
   }
 
   void RegInfo::set_waiting_component(unsigned int componentIndex, Match *m) {
-    componentCallersWaiting.push_back({componentIndex, m});
+    componentCallersWaiting.emplace_back(componentIndex, m);
   }
 
   void RegInfo::average_from_homographies(Point2f &_rootGuess, double &_scale) {

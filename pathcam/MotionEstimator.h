@@ -36,12 +36,13 @@ public:
   bool successful,root,resolved,rootOfRoot;
   bool stayFixedDuringBundleAdjustment = false;
   bool tryComposite = false;
+  bool inCompositeQ = false;
   int component_membership;
   Point2f absoluteCoords;
   Point2f relativeCoords = Point2f(0.0, 0.0);
   Poco::FastMutex *accessMutex;
   Poco::Event waitOnResolve;
-  std::vector<RegInfo*> callersWaiting;
+  std::vector<RegInfo*> callersWaiting, children;
   std::vector<std::pair<unsigned int, Match*>> componentCallersWaiting;
   std::vector<std::pair<Point2f,double>> rootHomographies;
 
@@ -57,7 +58,7 @@ public:
 
   bool get_abc(RegInfo* caller, Point2f &_absoluteCoords, unsigned int& _componentMembership);
 
-  void set_abc(Point2f _absoluteCoords, unsigned int _componentMembership, bool queue_for_compositing);
+  void set_abc(Point2f _absoluteCoords, int _componentMembership, bool queue_for_compositing);
 
   void set_waiting_component(unsigned int componentIndex, Match* m);
 

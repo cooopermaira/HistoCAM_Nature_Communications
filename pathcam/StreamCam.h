@@ -307,7 +307,7 @@ namespace pathCam {
 
     bool compositeQ_empty();
 
-    void push_compositeQ(RegInfo* index);
+    void push_compositeQ(RegInfo* _regInfo);
 
     void add_new_component(unsigned long image_index, cv::Size image_size, unsigned int component_index);
 

@@ -17,6 +17,7 @@ class MRTiledImage{
   friend class LoadingThread;
   
 public:
+  bool suspended = false;
   cv::Rect_<float> bounds;
   unsigned int tile_size,magLabel,componentIndex = 0;
   double scale;

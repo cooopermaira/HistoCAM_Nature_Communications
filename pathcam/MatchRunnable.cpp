@@ -11,12 +11,12 @@
 namespace pathCam {
   MatchRunnable::MatchRunnable(StreamCam *parent, unsigned long image_idx) : RunnableIntermediate(image_idx, 2),
                                                                              parent(parent),
-                                                                             image_idx(image_idx){};
+                                                                             image_idx(image_idx) {
+  };
 
 
-
-void MatchRunnable::run() {
-    pathCam::Image *image = parent->get_image_ref(image_idx);
+  void MatchRunnable::run() {
+    Image *image = parent->get_image_ref(image_idx);
 
 
     if (!image->is_good()) {
@@ -24,9 +24,8 @@ void MatchRunnable::run() {
     }
 
     //pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
-    pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(
-        parent->matcher_type);
-    pathCam::MotionEstimator *motion_est = new pathCam::MotionEstimator();
+    auto *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
+    MotionEstimator *motion_est = new pathCam::MotionEstimator();
     int mostMatches = 0;
     long bestMatch = -1;
     std::vector<unsigned int> skipComponents;
@@ -34,17 +33,18 @@ void MatchRunnable::run() {
     auto tempReg = parent->get_reg_ref(image_idx);
 
 
+
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
 
       if (previous == nullptr) {
-          continue;
+        continue;
       }
 
       if (!previous->is_good()) { continue; }
 
       Match *m = new Match(previous, image);
-      matcher->match(m,0);
+      matcher->match(m, 0);
 
       int result = motion_est->findHomography(m, parent->estimator_type, 10, 0);
 
@@ -56,9 +56,7 @@ void MatchRunnable::run() {
       }
 
       if (result == 1) {
-
         if (std::abs(m->t_x) < image->width / 1 && std::abs(m->t_y) < image->height / 1) {
-
           parent->set_match(image_idx, prev_idx, m);
 
           //this should all be in the damn constructor
@@ -87,15 +85,12 @@ void MatchRunnable::run() {
         parent->resize_mmatch_mutex->readLock();
         parent->matchM.match[prev_idx][image_idx] = nullptr;
         parent->resize_mmatch_mutex->unlock();
-
       }
+
       delete m;
     }
 
     if (!successful) {
-      // std::unique_lock lock(image->blurMutex);
-      // image->cudaBufferConVar.wait(lock, [&] { return image->blurSet; });
-
       parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
     }
     //parent->RegistrationConsecQ.add_index(image_idx);
@@ -103,16 +98,8 @@ void MatchRunnable::run() {
 
     delete matcher;
     delete motion_est;
-    parent->matchableCount--;
+    --parent->matchableCount;
     jobComplete.set();
     successful = true;
   } //end run
-
-
-
-
-
-
-
-
 }; //end namespace

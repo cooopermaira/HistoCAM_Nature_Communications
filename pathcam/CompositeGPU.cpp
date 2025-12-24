@@ -206,8 +206,8 @@ namespace pathCam {
     bool rootFound = false;
 
     for (int i = 0; i < images.size(); i++) {
-      images[i]->component_membership = this->componentIndex;
-      assert(images[i]->regInfo->component_membership == this->componentIndex);
+      //images[i]->component_membership = componentIndex;
+      assert(images[i]->regInfo->component_membership == componentIndex);
 
       if (images[i]->regInfo->root && !images[i]->regInfo->rootOfRoot) {
         rootFound = true;

@@ -91,12 +91,7 @@ struct TileQuery {
 public:
 
   int i, j;
-  cv::Rect_<float> bounds;
-// #ifdef HAVE_OPENCV_CUDAARITHM
-// cuda::GpuMat image;
-//   TileQuery(const cuda::GpuMat& image, int i, int j, cv::Rect_<float> bounds) :
-//       image(image), i(i), j(j), bounds(bounds) {};
-// #else
+  Rect_<float> bounds;
   TileObj* image;
 
   
@@ -104,7 +99,7 @@ public:
       image(image), i(i), j(j), bounds(bounds) {
 
   };
-//#endif
+
 };
 
 
@@ -117,14 +112,10 @@ private:
   float logicRatio;
 
 public:
-#ifdef HAVE_OPENCV_CUDAARITHM
   Dense2DArray<TileObj*> tiles;
-#else
-  Dense2DArray<Mat*> tiles;
-#endif
-  cv::Rect_<float> bounds;
+  Rect_<float> bounds;
 
-  std::vector<Point2i>liveTiles;
+  std::vector<TileObj*>liveTiles;
 
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
              unsigned int logic_size = 256, int levelWithinPyramid = 0);
