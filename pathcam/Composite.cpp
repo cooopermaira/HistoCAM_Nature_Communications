@@ -55,7 +55,7 @@ namespace pathCam {
   void CompositeVoronoi::update(std::vector<RegInfo *> new_info, bool _force_add) {
     if (new_info.empty()){return;}
 
-    update_mutex->lock();
+    update_mutex.lock();
 
     if (new_info.size() > 1) {
       // this shuffle is very important for reducing image count in the DT.
@@ -72,7 +72,7 @@ namespace pathCam {
 #else
     add_images_no_composite(new_info, _force_add);
 #endif
-    update_mutex->unlock();
+    update_mutex.unlock();
   }
 
   void CompositeVoronoi::store_new_info(pathCam::RegInfo *_new_info) {
@@ -97,14 +97,51 @@ namespace pathCam {
     }
   }
 
+  void Composite::ff_correct_existing_tiles() {
+    assert(flatfieldKnown);
+    cuda::GpuMat oneChannel32f,oneChannel8u;
+    std::vector<cuda::GpuMat> ffVec,bgraVec;
+    cuda::split(ffGPU,ffVec);
+
+    update_mutex.lock();
+    for (auto & p : imagePyramid->liveTiles) {
+      auto &tileObj = imagePyramid->level[0]->getTile(p.x,p.y);
+      if (!tileObj.owner){continue;}
+
+      auto abc = tileObj.owner->regInfo->absoluteCoords;
+      Rect imageRect(abc,imageSize);
+      Rect tileRect(p.x * imagePyramid->tile_size, p.y * imagePyramid->tile_size,
+        imagePyramid->tile_size, imagePyramid->tile_size);
+      auto ffRoi = imageRect & tileRect;
+
+      ffRoi.x -= abc.x;
+      ffRoi.y -= abc.y;
+
+      cuda::split(tileObj.image,bgraVec);
+      for (int i = 0; i < 3; ++i) {
+        bgraVec[i].convertTo(oneChannel32f,CV_32F);
+        cuda::divide(oneChannel32f,ffVec[i](ffRoi),bgraVec[i]);
+        oneChannel32f.convertTo(bgraVec[i],CV_8U);
+      }
+      cuda::merge(bgraVec,tileObj.image);
+      imagePyramid->level[0]->tileUpwards(p,tileRect,tileObj,
+        Rect(0, 0, imagePyramid->tile_size, imagePyramid->tile_size));
+    }
+
+    update_mutex.unlock();
+  }
+
   void Composite::set_offset(const Point2f &_offset) const {
     imagePyramid->set_offset(_offset);
   }
 
 
-  void Composite::set_scale(double _scale) {
+  void Composite::set_scale(double _scale, bool _ffCorrectExistingTiles) {
     imagePyramid->set_scale(_scale);
     deduce_label();
+    if (_ffCorrectExistingTiles) {
+
+    }
     imagePyramid->set_mag_label(componentMagLabel);
     parent->MRimage->sort_by_scale();
   }
@@ -152,6 +189,7 @@ namespace pathCam {
   void Composite::get_flatfield() {
     set_candidate_scale_ratios();
 
+    //get flatfield file name from parent and load from disk
     std::string filename = parent->get_flatfield(componentMagLabel);
     size_t nBytes = parent->image_height * parent->image_width;
     char *buffer = new char[nBytes];
@@ -160,7 +198,7 @@ namespace pathCam {
     stream.open(filename, std::ios::binary);
     stream.read(buffer, nBytes);
 
-#ifdef HAVE_OPENCV_CUDAARITHM
+    //allocate space on GPU and copy data up
     CHECK_CUDA(cudaMalloc(&bufferCuda, nBytes));
     CHECK_CUDA(cudaMemcpy(bufferCuda, buffer, nBytes, cudaMemcpyHostToDevice));
 
@@ -170,18 +208,8 @@ namespace pathCam {
     ffGPU.convertTo(ffGPU,CV_32F);
     double scale = 1 / 240.0;
     cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
-    // if (componentMagLabel == 2) {
-    //   Mat temp;
-    //   ffGPU.download(temp);
-    //   imwrite("/media/max/Data/4xff.png", temp);
-    //   int k = 0;
-    // }
-#else
-    ff = Mat(Size(6464, 4852), CV_8U, bufferCuda, Mat::AUTO_STEP);
-    cvtColor(ff,ff,COLOR_BayerBG2BGR);
-    ff.convertTo(ff,CV_32F);
-    ff *= 1/170.0;
-#endif
+
+    flatfieldKnown = true;
   }
 
   void Composite::set_candidate_scale_ratios() {
@@ -1121,7 +1149,7 @@ namespace pathCam {
   }
 
 
-  Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : update_mutex(new Poco::FastMutex()), parent(parent),componentIndex(_componentIndex),imageSize(image_size),
+  Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) :  parent(parent),componentIndex(_componentIndex),imageSize(image_size),
                                             root_offset(0.0, 0.0),
                                             max_offset(0.0, 0.0) {
     flat_field = parent->flat_field2X;

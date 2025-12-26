@@ -39,10 +39,13 @@ namespace pathCam {
     if (imagePyramid->scale == 0) {
       assert(!staging.empty());
 
-      establish_scale_at_root(staging.front()->image);
-      if (suspended){return;}
+      std::thread t([this, img = staging.front()->image]() {
+          establish_scale_at_root(img);
+      });
+      // establish_scale_at_root(staging.front()->image);
+      // if (suspended){return;}
 
-      assert(imagePyramid->scale > 0);
+      // assert(imagePyramid->scale > 0);
     }
 
 
@@ -200,6 +203,9 @@ namespace pathCam {
       img->load_raw_from_disk();
     }
 
+    //lock mutex against component wide flatfielding
+    update_mutex.lock();
+
     //put raw data into fourChannelPreallocated
     prepare_4CPA(img, tiles);
 
@@ -208,6 +214,7 @@ namespace pathCam {
     Mat mask = componentMagLabel == Image::_2X ? circleMask : rectMask;
 
     imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
+    update_mutex.unlock();
   }
 
 

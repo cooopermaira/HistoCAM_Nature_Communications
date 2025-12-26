@@ -163,7 +163,7 @@ namespace pathCam {
       cuda::GpuMat rawMat;
       rawMat = cuda::GpuMat(imageSize, CV_8U, img->get_raw_cuda());
       cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR,0,parent->cvCompositeStream);
-      return true;
+      wholeImage = true;
     }else {
       adjust_roi_for_debayer(roi_);
       Mat rawMat;
@@ -177,8 +177,9 @@ namespace pathCam {
       convertHoldingGPU = cuda::GpuMat(imageSize,CV_32FC3);
     }
     threeChannelPrealGPU(roi_).convertTo(convertHoldingGPU(roi_), CV_32F,parent->cvCompositeStream);
-    cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_), convertHoldingGPU(roi_), 1, CV_32F);//,parent->cvCompositeStream);
-
+    if (flatfieldKnown) {
+      cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_), convertHoldingGPU(roi_), 1, CV_32F,parent->cvCompositeStream);//,parent->cvCompositeStream);
+    }
     //brighten
     //cuda::pow(convertHoldingGPU(roi_), 1.05, convertHoldingGPU(roi_),parent->cvCompositeStream);
     convertHoldingGPU(roi_).convertTo(threeChannelPrealGPU(roi_), CV_8UC3,parent->cvCompositeStream);

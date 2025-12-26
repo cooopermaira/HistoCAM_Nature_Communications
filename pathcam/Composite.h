@@ -47,9 +47,10 @@ namespace pathCam {
     Mat4b composite;
     Point2i root_offset, max_offset;
     Rect_<float> tiledImageBounds;
-    Poco::FastMutex *update_mutex;
+    Poco::FastMutex update_mutex;
 
     bool suspended = false;
+    bool flatfieldKnown = false;
 
     std::shared_ptr<MRTiledImage> imagePyramid;
 
@@ -118,7 +119,9 @@ namespace pathCam {
 
     bool establish_scale_between_pairs(Image *_rootImg, Image *_target);
 
-    void set_scale(double _scale);
+    void set_scale(double _scale, bool _ffCorrectExistingTiles = false);
+
+    void ff_correct_existing_tiles();
 
     double get_scale() const {return imagePyramid->scale;}
 

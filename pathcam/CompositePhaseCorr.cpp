@@ -138,6 +138,7 @@ namespace pathCam {
       //we're part of this component. suspend self, create a match and attempt registration.
       suspended = true;
       imagePyramid->suspended = true;
+      //additionally go through and delete image pyramid TODO
 
       auto myRegInfo = _rootImg->regInfo;
 
@@ -165,7 +166,6 @@ namespace pathCam {
   }
 
   void Composite::establish_scale_at_root(Image *_rootImg) {
-    bool success = false;
 
     //find most recent resolved frame
     if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
@@ -192,10 +192,6 @@ namespace pathCam {
                                                                 mostRcntRslv->regInfo->component_membership);
         sort_overlaps_by_likelihood(overlappingFrames,parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
 
-        if (_rootImg->index == 813) {
-          int k = 0;
-        }
-
         int count = 0;
         for (auto & [img,roi] : overlappingFrames) {
           std::cout<<count++<<std::endl;
@@ -206,12 +202,8 @@ namespace pathCam {
 
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
-        success = establish_scale_between_pairs(_rootImg, mostRcntRslv);
+        establish_scale_between_pairs(_rootImg, mostRcntRslv);
       }
-    }
-
-    int k = 0;
-    if (!success) {
     }
   }
 }

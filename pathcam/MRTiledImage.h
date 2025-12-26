@@ -11,6 +11,12 @@
 #include "pathCam.h"
 #include "StreamCam.h"
 #include "TiledImage.h"
+struct Point2iLess {
+  bool operator()(const cv::Point2i& a,
+                  const cv::Point2i& b) const {
+    return (a.y < b.y) || (a.y == b.y && a.x < b.x);
+  }
+};
 
 class MRTiledImage{
   
@@ -24,7 +30,10 @@ public:
   Point2f offset;
   Poco::Event scaleSet;
   pathCam::StreamCam* parent;
- 
+
+  std::vector < std::shared_ptr< TiledImage > > level;
+  std::set<cv::Point2i, Point2iLess> liveTiles;
+
   
   MRTiledImage(pathCam::StreamCam* parent = nullptr,unsigned int _tile_size=0);
 
@@ -56,8 +65,6 @@ public:
   void set_offset(Point2f _offset){offset = _offset;}
   
   std::vector < TileQuery > getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen, bool pullFromBase = false);
-
-  std::vector < std::shared_ptr< TiledImage > > level;
 
 private:
 

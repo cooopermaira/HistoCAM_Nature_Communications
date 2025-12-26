@@ -324,7 +324,7 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
     Mat matROI = mat(ROIrect);
 
     TileObj &tileObject = getTile(x, y);
-    liveTiles.push_back(&tileObject);
+    parent->liveTiles.insert({x,y});
     Mat temp(tileObject.image.rows,tileObject.image.cols,CV_8UC4,tileObject.image.data);
 
     //profiling

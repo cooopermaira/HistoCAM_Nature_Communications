@@ -56,6 +56,7 @@ struct TileObj {
   enum {
     noCoverage = 0, partialCoverage, singleFrameCoverage
   };
+  Point2i index;
 
   int status = noCoverage;
   pathCam::Image* owner = nullptr;
@@ -75,9 +76,10 @@ struct TileObj {
   std::map<int,std::pair<cuda::GpuMat,void*>> SAMMasks;
 
   TileObj(int _tileSize) {
-    char* buf;
-    cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
-    cudaMemset(buf,0,_tileSize * _tileSize * 4);
+    char* buf = new char[_tileSize * _tileSize * 4]();
+
+    //cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
+    //cudaMemset(buf,0,_tileSize * _tileSize * 4);
     image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4,buf);
     preferredBuffer = nullptr;
     preferredObj = nullptr;
@@ -115,8 +117,6 @@ public:
   Dense2DArray<TileObj*> tiles;
   Rect_<float> bounds;
 
-  std::vector<TileObj*>liveTiles;
-
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
              unsigned int logic_size = 256, int levelWithinPyramid = 0);
 
@@ -153,7 +153,7 @@ public:
 
 
 
-  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &mat, Rect theirRoi, int _segID = -1);
+  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &myTileObj, Rect cvRoi, int _segID = -1);
 
   TileObj &getTile(int x, int y);
 #else

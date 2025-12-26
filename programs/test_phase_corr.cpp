@@ -14,6 +14,7 @@
 using Poco::DirectoryIterator;
 
 std::ofstream logFile("/home/max/Documents/siftTune.log", std::ios::out | std::ios::app);
+
 float mag_ratio_lookup(int i, int j) {
   float mags[] = {2.f, 4.f, 10.f, 20.f, 40.f};
   return mags[j] / mags[i];
@@ -33,13 +34,13 @@ inline int magIndex(int mag) {
 }
 
 struct Group {
-  std::string subdir;                 // the subfolder where the group was found
-  int caseId;                         // 1, 2, or 3
-  std::array<std::string,5> paths;    // ordered by {2,4,10,20,40}
+  std::string subdir; // the subfolder where the group was found
+  int caseId; // 1, 2, or 3
+  std::array<std::string, 5> paths; // ordered by {2,4,10,20,40}
   std::vector<cuda::GpuMat> images;
 };
 
-std::vector<Group> collectGroups(const std::string& rootDir, bool onlyComplete = true) {
+std::vector<Group> collectGroups(const std::string &rootDir, bool onlyComplete = true) {
   // File name pattern: <CapitalLetter><[1|2|3]>_(2|4|10|20|40)x.raw
   // e.g., A1_20x.raw, Z3_4x.raw
   const std::regex pat(R"(^([A-Z])([123])_(2|4|10|20|40)x\.raw$)");
@@ -60,7 +61,7 @@ std::vector<Group> collectGroups(const std::string& rootDir, bool onlyComplete =
 
     // For each subfolder, group by the first number (caseId: 1,2,3)
     // Each entry holds 5 paths ordered by magnification indices {2,4,10,20,40}
-    std::unordered_map<int, std::array<std::string,5>> groups;
+    std::unordered_map<int, std::array<std::string, 5> > groups;
 
     for (Poco::DirectoryIterator jt(subDirPath), jend; jt != jend; ++jt) {
       if (!jt->isFile()) continue;
@@ -70,32 +71,36 @@ std::vector<Group> collectGroups(const std::string& rootDir, bool onlyComplete =
       if (!std::regex_match(fname, m, pat)) continue;
 
       int caseId = std::stoi(m[2].str()); // 1..3
-      int mag    = std::stoi(m[3].str()); // 2,4,10,20,40
-      int idx    = magIndex(mag);
+      int mag = std::stoi(m[3].str()); // 2,4,10,20,40
+      int idx = magIndex(mag);
       if (idx < 0) continue;
 
-      auto& arr = groups[caseId];
+      auto &arr = groups[caseId];
       arr[idx] = jt->path();
     }
 
     // Push groups
-    for (auto& kv : groups) {
+    for (auto &kv: groups) {
       const int caseId = kv.first;
-      const auto& arr  = kv.second;
+      const auto &arr = kv.second;
 
       bool complete = true;
-      for (const auto& p : arr) {
-        if (p.empty()) { complete = false; break; }
+      for (const auto &p: arr) {
+        if (p.empty()) {
+          complete = false;
+          break;
+        }
       }
 
       if (!onlyComplete || complete) {
-        out.push_back(Group{ subDirPath, caseId, arr });
+        out.push_back(Group{subDirPath, caseId, arr});
       }
     }
   }
 
   return out;
 }
+
 void groupMagnificationsPerCase(const std::string &rootDir, const GroupCallback &onGroup) {
   // File name pattern: <CapitalLetter><[1|2|3]>_<[2|4|10|20|40]>x.raw
   // e.g., A1_20x.raw, Z3_4x.raw
@@ -335,7 +340,7 @@ SiftData get_sift_data_from_gry(cuda::GpuMat &_img, float initBlur, float thresh
   int n = numPts;
   InitSiftData(siftData, n, true, true);
 
-  ExtractSift(siftData, cImgGry, 1, initBlur, thresh, lowestScale, false);
+  ExtractSift(siftData, cImgGry, 5, initBlur, thresh, lowestScale, false);
 
   return siftData;
 }
@@ -692,68 +697,63 @@ void min_inliers4(std::vector<cuda::GpuMat> files, float initBlur, float thresh,
   int k = 0;
 }
 
-bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale, float ambiguityMin,
+bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale,
+                               float ambiguityMin,
                                float ambiguityMax, float scoreMin, int numPts) {
   std::vector<SiftData> siftData;
 
   for (int i = 0; i < files.size(); ++i) {
-    if (i==2) {
-      siftData.push_back(SiftData());
-      continue;;
-    }
-    cuda::GpuMat tempImg;
-    float scale = i>2?0.1:1;
-    cuda::resize(files[i],tempImg,Size(files[i].cols * scale,files[i].rows * scale),0,0,INTER_CUBIC);
-    siftData.push_back(get_sift_data_from_gry(tempImg, initBlur, thresh, lowestScale, numPts));
+    siftData.push_back(get_sift_data_from_gry(files[i], initBlur, thresh, lowestScale, numPts));
   }
-  bool failure;
-  for (float amb = ambiguityMin; amb <= ambiguityMax; amb+=0.02) {
-    failure = false;
-    for (int i = 0; i < files.size() - 1; ++i) {
-      for (int j = i + 1; j < files.size(); ++j) {
-        //if (j - i >= 4) { continue; }
-        if (j - i != 3){continue;}
 
-        MatchSiftData(siftData[i], siftData[j]);
+  long fhTime = 0;
+  for (int i = 0; i < files.size() - 1; ++i) {
+    for (int j = i + 1; j < files.size(); ++j) {
+      bool failure = true;
+      MatchSiftData(siftData[i], siftData[j]);
 
-        float correctRatio = mag_ratio_lookup(i, j);
-        int iters = 5;
-        for (int z = 0; z < iters; ++z) {
-          float homography[9];
-          int numMatches;
-          FindHomography(siftData[i], homography, &numMatches, 10000, scoreMin, ambiguityMax, 5.0);
-          if (fabs(homography[0] - 1) > 0.1 * homography[0]) {
-            failure = true;
+      float correctRatio = mag_ratio_lookup(i, j);
+      int iters = 20;
+      for (int z = 0; z < iters; ++z) {
+        float homography[9];
+        int numMatches;
+        auto start = std::chrono::high_resolution_clock::now();
+        FindHomography(siftData[i], homography, &numMatches, 100000, scoreMin, ambiguityMax, 5.0);
+        fhTime += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+        float scale = (homography[0] + homography[4]) / 2.f;
+        if (fabs(scale - correctRatio) < 0.05 * homography[0]) {
+          failure = false;
 
-            std::cout<<"i="<<i<<" j="<<j<<std::endl;
-            break;
-          }
-          if (z < iters - 1) {
-            shuffle_sift_data(siftData[i]);
-          }
-        }
-        if (failure) {
+          std::cout << "i=" << i << " j=" << j << " correct in " << z << " iters" << std::endl;
           break;
+        }
+        if (z < iters - 1) {
+          auto start1 = std::chrono::high_resolution_clock::now();
+          shuffle_sift_data(siftData[i]);
+          fhTime += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start1).count();
         }
       }
       if (failure) {
-        break;
+        std::cout << "i=" << i << " j=" << j << " failed" << std::endl;
       }
     }
-    if (!failure) {
-      for (auto &sd : siftData) {
-        FreeSiftData(sd);
-      }
-      return true;
-    }
   }
-  for (auto &sd : siftData) {
-    FreeSiftData(sd);
-  }
-  return false;
+  std::cout << "fhTime "<<fhTime << std::endl;
+  int k = 0;
+  return true;
 }
 
-int main(int argc, char** argv) {
-
+void onGroupCallbackTest(const std::string &dir, const std::array<std::string, 5> &files) {
+  std::vector<cuda::GpuMat> gpuMats(5);
+  std::vector<SiftData> siftDatas;
+  for (int i = 0; i < files.size(); ++i) {
+    loadRawToGpuGray(files[i], 6464, 4852, gpuMats[i]);
+  }
+  verify_group_given_params(gpuMats, 0.0, 0.4f, 0.1f, 0.9, 0.96, 0.8, 100000);
+  int k = 0;
 }
 
+int main(int argc, char **argv) {
+  std::string dir = argv[1];
+  groupMagnificationsPerCase(dir, onGroupCallbackTest);
+}
