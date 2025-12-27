@@ -37,8 +37,8 @@ namespace pathCam {
 
     //place component in MR image
     if (imagePyramid->scale == 0 && !xcMatchInitiated) {
+      if (staging.empty()){return;}
       xcMatchInitiated = true;
-      assert(!staging.empty());
 
       std::thread t([this, img = staging.front()->image]() {
         std::lock_guard lock(s_mutex);

@@ -90,8 +90,8 @@ namespace pathCam {
     std::vector<cuda::GpuMat> ffVec, bgraVec;
     cuda::split(ffGPU, ffVec);
 
-    update_mutex.lock();
     for (auto &p: imagePyramid->liveTiles) {
+
       auto tileObj = imagePyramid->level[0]->getTile(p.x, p.y);
       if (!tileObj->owner) {
         tileObj.reset();
@@ -118,7 +118,6 @@ namespace pathCam {
       }
     }
 
-    update_mutex.unlock();
     parent->update_observers();
   }
 
@@ -129,12 +128,14 @@ namespace pathCam {
 
   void Composite::set_scale(double _scale, bool _ffCorrectExistingTiles) {
     imagePyramid->set_scale(_scale);
+    update_mutex.lock();
     deduce_label();
     if (_ffCorrectExistingTiles) {
       ff_correct_existing_tiles();
     }
     imagePyramid->set_mag_label(componentMagLabel);
     parent->MRimage->sort_by_scale();
+    update_mutex.unlock();
   }
 
 

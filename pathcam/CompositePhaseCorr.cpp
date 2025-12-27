@@ -165,7 +165,7 @@ namespace pathCam {
     _rootImg->regInfo->rootHomographies.emplace_back(resultantPoint, scale);
 
     assert(scale > 0);
-    set_scale(scale);
+    set_scale(scale,true);
     set_offset(resultantPoint / scale);
 
     std::cout<<"component "<<componentIndex<<" XC registered"<<std::endl;
