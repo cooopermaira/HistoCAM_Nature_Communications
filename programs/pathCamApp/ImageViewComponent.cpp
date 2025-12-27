@@ -178,7 +178,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
     //draw each tile
     for (unsigned int t = 0; t < tiles.size(); t++) {
-      TileObj *tile = tiles[t].image;
+      auto tile = tiles[t].image;
       auto bounds = RectCtoJ<float>(tiles[t].bounds);
       bounds *= view2screenScale(imageview) * scale;
       bounds.expand(0.5, 0.5);
@@ -188,11 +188,14 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         if (!tile->usingPreferred) {
           juce::Image *im = new juce::Image(juce::Image::ARGB, tile->image.cols, tile->image.rows, true);
           tile->preferredObj = im;
+          tile->destroyPreferredObj = [](void* p) {
+            delete static_cast<juce::Image*>(p);
+          };
           tile->usingPreferred = true;
         }
 
         auto im = static_cast<juce::Image *>(tile->preferredObj);
-        tile->mutex->lock();
+        tile->mutex.lock();
 
         if (tile->newData) {
           auto img = tile->image;
@@ -215,17 +218,17 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         g.setOpacity(1.f);
         g.drawImage(*im, bounds);
 
-        // //draw tile bounds with owner frame
-        // g.setColour(juce::Colours::greenyellow);
-        // g.drawRect(bounds, 3);
-        //
-        // std::string ij;
-        // if (tile->owner) {
-        //   ij = Poco::format("(%ld,%i)", tile->owner->index, tile->motionBlur);
-        // }
-        // g.setFont(20);
-        // g.drawText(ij, bounds.getCentreX() - 50,
-        //            bounds.getCentreY() - 15, 100, 30, Justification::centred);
+        //draw tile bounds with owner frame
+        g.setColour(juce::Colours::greenyellow);
+        g.drawRect(bounds, 3);
+
+        std::string ij;
+        if (tile->owner) {
+          ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->motionBlur));
+        }
+        g.setFont(20);
+        g.drawText(ij, bounds.getCentreX() - 250,
+                   bounds.getCentreY() - 15, 500, 30, Justification::centred);
 
         for (auto & mask : tile->SAMMasks) {
           auto jImg = static_cast<juce::Image*>(mask.second.second);
@@ -246,7 +249,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
           g.restoreState();
         }
 
-        tile->mutex->unlock();
+        tile->mutex.unlock();
 
         if (shadeLevels) {
           Graphics::ScopedSaveState save(g);
@@ -311,7 +314,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     //       std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
     //       g.setFont(20);
     //       g.drawText(ij, bounds.getCentreX() - 50,
-    //                  bounds.getCentreY() - 15, 100, 30, Justification::centred);
+    //                  bounds.getCentreY() - 45, 100, 30, Justification::centred);
     //    }
   }
   //Define buffer space from the edges

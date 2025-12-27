@@ -11,7 +11,7 @@
 namespace pathCam {
   CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size,
                                      unsigned int component_index) : Composite(
-                                                                       parent,image_size,component_index),
+                                                                       parent, image_size, component_index),
                                                                      wakeEvent(true) {
     minPixelDistanceBetweenFrames = 200;
 
@@ -28,12 +28,12 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
     circleMaskGPU.upload(circleMask);
     circleMaskGPU255 = cuda::GpuMat(image_size,CV_8U);
-    cuda::multiply(circleMaskGPU,Scalar(255),circleMaskGPU255);
+    cuda::multiply(circleMaskGPU, Scalar(255), circleMaskGPU255);
     rectMaskGPU.upload(rectMask);
     channelsGPU.resize(4);
     threeChannelPrealGPU = cuda::GpuMat(image_size, CV_8UC3);
     fourChannelPreallocated = Mat::zeros(image_size, CV_8UC4);
-    fourChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC4,fourChannelPreallocated.data);
+    fourChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC4, fourChannelPreallocated.data);
 
     //make_meshgrid();
 #endif
@@ -53,7 +53,7 @@ namespace pathCam {
 
 
   void CompositeVoronoi::update(std::vector<RegInfo *> new_info, bool _force_add) {
-    if (new_info.empty()){return;}
+    if (new_info.empty()) { return; }
 
     update_mutex.lock();
 
@@ -83,52 +83,43 @@ namespace pathCam {
     update({storedNewInfo});
   }
 
-  void CompositeVoronoi::check_set_render_info() {
-    if (imagePyramid->scale == 0) {
-      double scale;
-      Point2f offset;
-      if (parent->get_scale_and_offset(componentIndex, scale, offset)) {
-        imagePyramid->set_scale(scale);
-        imagePyramid->set_offset(offset);
-
-        storedNewInfo->set_abc({0,0}, componentIndex, true);
-        deduce_label();
-      }
-    }
-  }
 
   void Composite::ff_correct_existing_tiles() {
     assert(flatfieldKnown);
-    cuda::GpuMat oneChannel32f,oneChannel8u;
-    std::vector<cuda::GpuMat> ffVec,bgraVec;
-    cuda::split(ffGPU,ffVec);
+    cuda::GpuMat oneChannel32f, oneChannel8u;
+    std::vector<cuda::GpuMat> ffVec, bgraVec;
+    cuda::split(ffGPU, ffVec);
 
     update_mutex.lock();
-    for (auto & p : imagePyramid->liveTiles) {
-      auto &tileObj = imagePyramid->level[0]->getTile(p.x,p.y);
-      if (!tileObj.owner){continue;}
+    for (auto &p: imagePyramid->liveTiles) {
+      auto tileObj = imagePyramid->level[0]->getTile(p.x, p.y);
+      if (!tileObj->owner) {
+        tileObj.reset();
+      } else {
+        auto abc = tileObj->owner->regInfo->absoluteCoords;
+        Rect imageRect(abc, imageSize);
+        Rect tileRect(p.x * imagePyramid->tile_size, p.y * imagePyramid->tile_size,
+                      imagePyramid->tile_size, imagePyramid->tile_size);
+        auto ffRoi = imageRect & tileRect;
 
-      auto abc = tileObj.owner->regInfo->absoluteCoords;
-      Rect imageRect(abc,imageSize);
-      Rect tileRect(p.x * imagePyramid->tile_size, p.y * imagePyramid->tile_size,
-        imagePyramid->tile_size, imagePyramid->tile_size);
-      auto ffRoi = imageRect & tileRect;
+        ffRoi.x -= abc.x;
+        ffRoi.y -= abc.y;
 
-      ffRoi.x -= abc.x;
-      ffRoi.y -= abc.y;
 
-      cuda::split(tileObj.image,bgraVec);
-      for (int i = 0; i < 3; ++i) {
-        bgraVec[i].convertTo(oneChannel32f,CV_32F);
-        cuda::divide(oneChannel32f,ffVec[i](ffRoi),bgraVec[i]);
-        oneChannel32f.convertTo(bgraVec[i],CV_8U);
+        cuda::split(tileObj->image, bgraVec);
+        for (int i = 0; i < 3; ++i) {
+          bgraVec[i].convertTo(oneChannel32f,CV_32F);
+          cuda::divide(oneChannel32f, ffVec[i](ffRoi), oneChannel32f);
+          oneChannel32f.convertTo(bgraVec[i],CV_8U);
+        }
+        cuda::merge(bgraVec, tileObj->image);
+        imagePyramid->level[0]->tileUpwards(p, tileRect, tileObj,
+                                            Rect(0, 0, imagePyramid->tile_size, imagePyramid->tile_size));
       }
-      cuda::merge(bgraVec,tileObj.image);
-      imagePyramid->level[0]->tileUpwards(p,tileRect,tileObj,
-        Rect(0, 0, imagePyramid->tile_size, imagePyramid->tile_size));
     }
 
     update_mutex.unlock();
+    parent->update_observers();
   }
 
   void Composite::set_offset(const Point2f &_offset) const {
@@ -140,7 +131,7 @@ namespace pathCam {
     imagePyramid->set_scale(_scale);
     deduce_label();
     if (_ffCorrectExistingTiles) {
-
+      ff_correct_existing_tiles();
     }
     imagePyramid->set_mag_label(componentMagLabel);
     parent->MRimage->sort_by_scale();
@@ -183,7 +174,6 @@ namespace pathCam {
     }
     componentMagLabel = parent->labelScales.size() - 1;
     get_flatfield();
-
   }
 
   void Composite::get_flatfield() {
@@ -295,7 +285,7 @@ namespace pathCam {
       std::vector<Point2i> face;
       auto fShift = Point2f(ni->absoluteCoords.x, ni->absoluteCoords.y);
       auto img = parent->get_image_ref((*ni).index);
-      img->absoluteCoords = Point2i(ni->absoluteCoords.x,ni->absoluteCoords.y);
+      img->absoluteCoords = Point2i(ni->absoluteCoords.x, ni->absoluteCoords.y);
       auto res = add_point_to_delaunay_triangulation(fShift, img, face, forceAdd);
 
       update_Bbox_no_composite({ni});
@@ -426,7 +416,7 @@ namespace pathCam {
     // imwrite("/media/max/Data/ccmm.png", temp);
 
 #else
-        cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
+    cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
 #endif
 
     //test for exclusion of frame via rollback
@@ -528,11 +518,11 @@ namespace pathCam {
       } else {
         calculate_effected_tiles(face, effectedTiles, images[i]->absoluteCoords, &effectedTilesNoMask);
 #ifndef HAVE_OPENCV_CUDAARITHM
-                imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
+        imagePyramid->insertTilesAtBase(fourChannelPreallocated, Mat(), imageBox, effectedTilesNoMask);
 #endif
       }
 #ifndef HAVE_OPENCV_CUDAARITHM
-            imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
 #endif
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
@@ -680,7 +670,7 @@ namespace pathCam {
         float firstPoint_y = *std::min_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
         float lastPoint_y = *std::max_element(tilesByColumn[x].begin(), tilesByColumn[x].end());
 
-        firstPoint_y = std::max( firstPoint_y, absCoord.y);
+        firstPoint_y = std::max(firstPoint_y, absCoord.y);
         lastPoint_y = std::min(lastPoint_y, absCoord.y + parent->image_height);
 
         lastTile = imagePyramid->level[0]->getIJ(
@@ -962,8 +952,8 @@ namespace pathCam {
 
 
   void Composite::save_pyramid_as_image(std::string _fileName, bool _withGrid, bool _withGridAndIndexes,
-                                               bool _withEffectedTiles, bool _outline,
-                                               std::vector<Point2i> effectedTiles) {
+                                        bool _withEffectedTiles, bool _outline,
+                                        std::vector<Point2i> effectedTiles) {
     int lineThickness = 40;
     auto level = imagePyramid->level[0];
 
@@ -998,9 +988,9 @@ namespace pathCam {
               tile = Mat(Size(tile_size, tile_size), CV_8UC4, Scalar(0, 0, 0, 0));
             } else {
 #ifdef HAVE_OPENCV_CUDAARITHM
-              level->getTile(x, y).image.download(tile);
+              level->getTile(x, y)->image.download(tile);
 #else
-                            tile = level->getTile(x, y).clone();
+              tile = level->getTile(x, y).clone();
 #endif
             }
             auto searchForTile = Point2i(x, y);
@@ -1010,9 +1000,9 @@ namespace pathCam {
             }
           } else {
 #ifdef HAVE_OPENCV_CUDAARITHM
-            level->getTile(x, y).image.download(tile);
+            level->getTile(x, y)->image.download(tile);
 #else
-                        tile = level->getTile(x, y).clone();
+            tile = level->getTile(x, y).clone();
 #endif
           }
 
@@ -1134,7 +1124,8 @@ namespace pathCam {
       images[i]->free_memory_RAW();
 
       //calculate effected tiles
-      calculate_effected_tiles(face, effectedTiles, Point2f(new_info[i]->absoluteCoords.x,new_info[i]->absoluteCoords.y));
+      calculate_effected_tiles(face, effectedTiles,
+                               Point2f(new_info[i]->absoluteCoords.x, new_info[i]->absoluteCoords.y));
     }
     std::sort(effectedTiles.begin(), effectedTiles.end(), PointCompare<Point2i>());
     effectedTiles.erase(std::unique(effectedTiles.begin(), effectedTiles.end(), PointEquality<Point2i>()),
@@ -1149,9 +1140,10 @@ namespace pathCam {
   }
 
 
-  Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) :  parent(parent),componentIndex(_componentIndex),imageSize(image_size),
-                                            root_offset(0.0, 0.0),
-                                            max_offset(0.0, 0.0) {
+  Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : parent(parent),
+    componentIndex(_componentIndex), imageSize(image_size),
+    root_offset(0.0, 0.0),
+    max_offset(0.0, 0.0) {
     flat_field = parent->flat_field2X;
 
     imagePyramid.reset(new MRTiledImage(parent));
@@ -1218,7 +1210,8 @@ namespace pathCam {
               auto myLevelRegion = cv::Rect_<float>(tile.x * tile_size, tile.y * tile_size, tile_size,
                                                     tile_size);
               topLevelBeforeAdding->tileUpwards(tile, myLevelRegion,
-                                                *topLevelBeforeAdding->tiles(tile.x, tile.y), Rect(0,0,tile_size,tile_size));
+                                                topLevelBeforeAdding->getTile(tile.x, tile.y),
+                                                Rect(0, 0, tile_size, tile_size));
             }
           }
         }
@@ -1351,14 +1344,13 @@ namespace pathCam {
   }
 
   void Composite::update() {
-    std::vector<RegInfo*> new_info;
+    std::vector<RegInfo *> new_info;
     while (!staging.empty()) {
       new_info.push_back(staging.front());
       staging.pop();
     }
     update_Bbox(new_info);
     add_images(new_info);
-
   }
 
   Mat Composite::get_composite() {
@@ -1371,7 +1363,6 @@ namespace pathCam {
     imageBoundsAsPolygon[2] = Point2i(image_size.width, image_size.height);
     imageBoundsAsPolygon[3] = Point2i(0, image_size.height);
   }
-
 
 
   void CompositeVoronoi::remove_duplicates_without_sort(std::vector<Point2i> &vec) {

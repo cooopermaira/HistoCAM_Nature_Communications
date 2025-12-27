@@ -21,16 +21,10 @@ class Dense2DArray {
 public:
   Dense2DArray(int minX = -2048, int maxX = 2048, int minY = -2048, int maxY = 2048)
       : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
-    data.resize(width * height,nullptr);
+    data.resize(width * height);
   }
 
-  ~Dense2DArray() {
-    /*
-    for (auto i = 0; i < data.size(); i++) {
-      delete data[i];
-    }
-     */
-  }
+  ~Dense2DArray() = default;
 
   T &operator()(int x, int y) {
     return data[getIndex(x, y)];
@@ -64,28 +58,40 @@ struct TileObj {
 
   int updateCount = 0;
   void* preferredObj;
-  void* preferredBuffer;
+  void (*destroyPreferredObj)(void*) = nullptr;
 
   bool usingPreferred;
   bool newData;
   bool newAnnoData;
 
-  Poco::FastMutex* mutex;
+  Poco::FastMutex mutex;
   cuda::GpuMat image;
 
   std::map<int,std::pair<cuda::GpuMat,void*>> SAMMasks;
 
   TileObj(int _tileSize) {
-    char* buf = new char[_tileSize * _tileSize * 4]();
+    auto buf = new char[_tileSize * _tileSize * 4]();
 
     //cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
     //cudaMemset(buf,0,_tileSize * _tileSize * 4);
     image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4,buf);
-    preferredBuffer = nullptr;
     preferredObj = nullptr;
     usingPreferred = false;
     newData = false;
-    mutex = new Poco::FastMutex;
+  }
+  ~TileObj() {
+    mutex.lock();
+    if (usingPreferred && preferredObj) {
+      if (destroyPreferredObj) {
+        destroyPreferredObj(preferredObj);
+      }
+      preferredObj = nullptr;
+      destroyPreferredObj = nullptr;
+      usingPreferred = false;
+    }
+    mutex.unlock();
+    delete image.data;
+    image.release();
   }
 };
 
@@ -94,10 +100,10 @@ public:
 
   int i, j;
   Rect_<float> bounds;
-  TileObj* image;
+  std::shared_ptr<TileObj> image;
 
   
-  TileQuery(TileObj* image, int i, int j, cv::Rect_<float> bounds) :
+  TileQuery(std::shared_ptr<TileObj> image, int i, int j, cv::Rect_<float> bounds) :
       image(image), i(i), j(j), bounds(bounds) {
 
   };
@@ -114,7 +120,7 @@ private:
   float logicRatio;
 
 public:
-  Dense2DArray<TileObj*> tiles;
+  Dense2DArray<std::shared_ptr<TileObj>> tiles;
   Rect_<float> bounds;
 
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
@@ -153,9 +159,9 @@ public:
 
 
 
-  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, TileObj &myTileObj, Rect cvRoi, int _segID = -1);
+  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, std::shared_ptr<TileObj> &myTileObj, Rect cvRoi, int _segID = -1);
 
-  TileObj &getTile(int x, int y);
+  std::shared_ptr<TileObj> &getTile(int x, int y);
 #else
 
 

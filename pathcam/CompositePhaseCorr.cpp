@@ -138,7 +138,11 @@ namespace pathCam {
       //we're part of this component. suspend self, create a match and attempt registration.
       suspended = true;
       imagePyramid->suspended = true;
-      //additionally go through and delete image pyramid TODO
+
+      for (auto &p: imagePyramid->liveTiles) {
+        auto tObj = imagePyramid->level[0]->getTile(p.x, p.y);
+        tObj.reset();
+      }
 
       auto myRegInfo = _rootImg->regInfo;
 
@@ -146,6 +150,8 @@ namespace pathCam {
       myRegInfo->matchedTo = _target->index;
       myRegInfo->relativeCoords = pairwiseDistance;
       myRegInfo->attempt_absolute_reg(true);
+      std::cout << "component " << componentIndex << " suspended and joined to component "
+          << _target->regInfo->component_membership << std::endl;
       return true;
     }
 
@@ -162,15 +168,16 @@ namespace pathCam {
     set_scale(scale);
     set_offset(resultantPoint / scale);
 
+    std::cout<<"component "<<componentIndex<<" XC registered"<<std::endl;
     return true;
   }
 
   void Composite::establish_scale_at_root(Image *_rootImg) {
-
     //find most recent resolved frame
     if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
       mostRcntRslv) {
       if (!objChange) {
+        std::cout << "no objective change detected for component " << componentIndex << std::endl;
         //were probably still in the same component and couldn't match in matchRunnable due to blurry sequence.
         //_rootImg may overlap with a different component. Find this region and calculate overlaps
 
@@ -190,16 +197,16 @@ namespace pathCam {
         }
         auto overlappingFrames = parent->get_overlapping_frames(regionInMySpace,
                                                                 mostRcntRslv->regInfo->component_membership);
-        sort_overlaps_by_likelihood(overlappingFrames,parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
+        sort_overlaps_by_likelihood(overlappingFrames,
+                                    parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
 
         int count = 0;
-        for (auto & [img,roi] : overlappingFrames) {
-          std::cout<<count++<<std::endl;
-          if (establish_scale_between_pairs(_rootImg,img)) {
+        for (auto &[img,roi]: overlappingFrames) {
+          std::cout << count++ << std::endl;
+          if (establish_scale_between_pairs(_rootImg, img)) {
             break;
           }
         }
-
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
         establish_scale_between_pairs(_rootImg, mostRcntRslv);

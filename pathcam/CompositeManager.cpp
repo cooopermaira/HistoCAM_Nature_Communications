@@ -94,8 +94,6 @@ namespace pathCam {
 
       }
 
-      //check_render_info();
-
       if (!parent->microscopeInput && parent->loaderCount == 0) {
         submit_outstanding_jobs();
       }
@@ -116,6 +114,8 @@ namespace pathCam {
         mc->update();
       }
       mc->mostRecentFrame->free_memory_RAW();
+      // comp->get_flatfield();
+      // comp->ff_correct_existing_tiles();
     }
 
 

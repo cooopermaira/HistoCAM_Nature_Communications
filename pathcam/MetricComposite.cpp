@@ -29,23 +29,23 @@ namespace pathCam {
    * coverage to full coverage) its data is copied to that tile immediately so that the user sees updates whenever they
    * cover a new area. Otherwise, we see if the image has less motion blur than whatever frame filled that tile. If
    * it does, we put it in a queue and wait 10 iterations before putting that frame's data into the tile. In that time,
-   * new frames coming in have the chance to suplant frames in the queue. This process prevents tiles from being updated
-   * over and over again by a series of consequtive frames and substantially lowers computational cost
+   * new frames coming in have the chance to supplant frames in the queue. This process prevents tiles from being updated
+   * over and over again by a series of consecutive frames and substantially lowers computational cost
    */
-   void MetricComposite::update() {
-    if (suspended){return;}
+  void MetricComposite::update() {
+    if (suspended) { return; }
 
-    //make sure component is placed in MR image
-    if (imagePyramid->scale == 0) {
+    //place component in MR image
+    if (imagePyramid->scale == 0 && !xcMatchInitiated) {
+      xcMatchInitiated = true;
       assert(!staging.empty());
 
       std::thread t([this, img = staging.front()->image]() {
-          establish_scale_at_root(img);
+        std::lock_guard lock(s_mutex);
+        std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
+        establish_scale_at_root(img);
       });
-      // establish_scale_at_root(staging.front()->image);
-      // if (suspended){return;}
-
-      // assert(imagePyramid->scale > 0);
+      t.detach();
     }
 
 
@@ -68,25 +68,23 @@ namespace pathCam {
 
       //calculate: for which of the affected tiles is this frame an improvement?
       for (auto &el: affectedPyramidTilesWithStatus) {
-
-        auto &pyrTileObj = compositeImage->getTile(el.first.x, el.first.y);
+        auto pyrTileObj = compositeImage->getTile(el.first.x, el.first.y);
 
         //check if frame improves status of tile, if so process immediately
-        if (pyrTileObj.status < el.second) {
-
+        if (pyrTileObj->status < el.second) {
           //if the tile is promoting to singleFrameCoverage, set owner and motionBlur from this frame
           if (el.second == TileObj::singleFrameCoverage) {
-            pyrTileObj.owner = img;
-            pyrTileObj.motionBlur = img->motionBlur;
+            pyrTileObj->owner = img;
+            pyrTileObj->motionBlur = img->motionBlur;
+            pyrTileObj->status = el.second;
+            immediateProcessingTiles.push_back(el.first);
           }
-          pyrTileObj.status = el.second;
-          immediateProcessingTiles.push_back(el.first);
+          // pyrTileObj->status = el.second;
+          // immediateProcessingTiles.push_back(el.first);
         }
 
         // check if frame is less blurry than current source for tile (pyrTileObj)
-        else if (el.second == TileObj::singleFrameCoverage && pyrTileObj.owner->motionBlur > img->motionBlur
-                   || !pyrTileObj.owner) {
-
+        else if (el.second == TileObj::singleFrameCoverage && pyrTileObj->owner->motionBlur > img->motionBlur) {
           waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(el.first);
         }
       }
@@ -118,20 +116,19 @@ namespace pathCam {
     //this is an erase-remove_if implementation with a lambda function inside that updates tileObj if img should be owner,
     //otherwise it removes the tile from the img's list
     for (auto &[img,tiles]: waitingFrames) {
-
       if (!img) { continue; }
 
       tiles.erase(
         std::remove_if(tiles.begin(),
                        tiles.end(),
                        [&](Point2i &tile) {
-                         auto &tileObj = compositeImage->getTile(tile.x, tile.y);
-                         if (tileObj.owner == img) {
+                         auto tileObj = compositeImage->getTile(tile.x, tile.y);
+                         if (tileObj->owner == img) {
                            return false;
                          }
-                         if (tileObj.motionBlur > img->motionBlur) {
-                           tileObj.motionBlur = img->motionBlur;
-                           tileObj.owner = img;
+                         if (tileObj->motionBlur > img->motionBlur) {
+                           tileObj->motionBlur = img->motionBlur;
+                           tileObj->owner = img;
                            return false;
                          }
                          return true;
@@ -147,7 +144,6 @@ namespace pathCam {
     //once delay is met, process frame
     auto &[img,tiles] = waitingFrames[positionForNextWaitngFrame % frameDelay];
     if (positionForNextWaitngFrame > frameDelay && !tiles.empty()) {
-
       contributingImages.insert(img);
       needsAlignment = true;
 
@@ -168,33 +164,34 @@ namespace pathCam {
   void MetricComposite::align_and_rebuild() {
     auto start = std::chrono::high_resolution_clock::now();
     auto members = find_contributing_images();
-    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
 
     start = std::chrono::high_resolution_clock::now();
     auto overlaps = calculate_member_overlaps(members);
-    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
 
     start = std::chrono::high_resolution_clock::now();
     auto matcher = pathCam::DescriptorMatcher(parent->matcher_type);
-    auto motion_est =  pathCam::MotionEstimator();
-    int res1 = 0,good = 0;
-    for (auto &[img1,img2] : overlaps) {
-      Match m(img1,img2);
-      matcher.match(&m,0);
+    auto motion_est = pathCam::MotionEstimator();
+    int res1 = 0, good = 0;
+    for (auto &[img1,img2]: overlaps) {
+      Match m(img1, img2);
+      matcher.match(&m, 0);
       int result = motion_est.findHomography(&m, parent->estimator_type, 10, 0);
       if (result == 1) {
         ++res1;
         if (abs(m.scale - 1) < .05) {
           ++good;
-        }else {
-          std::cout<<abs(m.scale - 1)<<std::endl;
+        } else {
+          std::cout << abs(m.scale - 1) << std::endl;
         }
       }
-
     }
-    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
     int k = 0;
-
   }
 
   void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles) {
@@ -275,7 +272,7 @@ namespace pathCam {
 
   std::vector<std::pair<Image *, Image *> > MetricComposite::calculate_member_overlaps(std::vector<Image *> images) {
     if (images.empty()) {
-      images = std::vector(contributingImages.begin(),contributingImages.end());
+      images = std::vector(contributingImages.begin(), contributingImages.end());
     }
     std::vector<std::pair<Image *, Image *> > results;
 
@@ -283,18 +280,16 @@ namespace pathCam {
     int sqScopeRad = parent->scope_radius * parent->scope_radius * 0.7;
     for (int i = 0; i < images.size() - 1; ++i) {
       for (int j = i + 1; j < images.size(); ++j) {
-
         mDistance = images[i]->absoluteCoords - images[j]->absoluteCoords;
 
         if (componentMagLabel == Image::_2X) {
-          if (pow(mDistance.x,2) + pow(mDistance.y,2) < sqScopeRad) {
-            results.emplace_back(images[i],images[j]);
+          if (pow(mDistance.x, 2) + pow(mDistance.y, 2) < sqScopeRad) {
+            results.emplace_back(images[i], images[j]);
           }
-
-        }else{
+        } else {
           if (abs(mDistance.x) < (1 - parent->crop_factor) * 0.9 * imageSize.width &&
-            abs(mDistance.y) < (1 - parent->crop_factor) * 0.9 * imageSize.height) {
-            results.emplace_back(images[i],images[j]);
+              abs(mDistance.y) < (1 - parent->crop_factor) * 0.9 * imageSize.height) {
+            results.emplace_back(images[i], images[j]);
           }
         }
       }
@@ -303,26 +298,24 @@ namespace pathCam {
   }
 
   std::vector<Image *> MetricComposite::find_contributing_images() const {
-    std::vector<Image*> members;
+    std::vector<Image *> members;
 
     auto ulInd = parent->composites[0]->imagePyramid->level[0]->getIJ(parent->composites[0]->root_offset);
     auto lrInd = parent->composites[0]->imagePyramid->level[0]->getIJ(parent->composites[0]->max_offset);
     bool found;
-    for (auto &img : contributingImages) {
+    for (auto &img: contributingImages) {
       found = false;
-      for (int x = ulInd.x; x<=lrInd.x; ++x) {
+      for (int x = ulInd.x; x <= lrInd.x; ++x) {
         for (int y = ulInd.y; y <= lrInd.y; ++y) {
-
-          if (auto tileObj = compositeImage->tiles(x,y); tileObj && tileObj->owner == img) {
-            members.push_back(img);
-            found = true;
-            break;
-          }
+          // if (auto tileObj = compositeImage->tiles(x,y); tileObj && tileObj->owner == img) {
+          //   members.push_back(img);
+          //   found = true;
+          //   break;
+          // }
         }
-        if (found){break;}
+        if (found) { break; }
       }
     }
     return members;
   }
-
 }

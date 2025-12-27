@@ -196,7 +196,7 @@ namespace pathCam {
         fovMatROI.y -= fovRect.y;
 
         auto tileObj = ipBase->getTile(x,y);
-        tileObj.image(tileROI).copyTo(fovMat(fovMatROI));
+        tileObj->image(tileROI).copyTo(fovMat(fovMatROI));
       }
     }
 
@@ -556,21 +556,21 @@ namespace pathCam {
   void AccessSAM::push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask,
                                         int _segID, bool _unionWithExistingMask) {
     auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
-    TileObj &tileObj = pyrBase->getTile(_tileCoord.x, _tileCoord.y);
+    auto tileObj = pyrBase->getTile(_tileCoord.x, _tileCoord.y);
 
     //if no display object exists, initialize one
-    if (tileObj.SAMMasks.find(_segID) == tileObj.SAMMasks.end()) {
-      tileObj.SAMMasks[_segID] = {cuda::GpuMat(parent->tileSize, parent->tileSize,CV_8U, Scalar(0)), nullptr};
+    if (tileObj->SAMMasks.find(_segID) == tileObj->SAMMasks.end()) {
+      tileObj->SAMMasks[_segID] = {cuda::GpuMat(parent->tileSize, parent->tileSize,CV_8U, Scalar(0)), nullptr};
     }
 
     //combine with current mask by taking max at each pixel
     //parent->composites[0]->imagePyramid->imgPyramidMutex->lock();
     if (_unionWithExistingMask) {
-      cuda::max(_mask, tileObj.SAMMasks[_segID].first, tileObj.SAMMasks[_segID].first);
+      cuda::max(_mask, tileObj->SAMMasks[_segID].first, tileObj->SAMMasks[_segID].first);
     }else {
-      tileObj.SAMMasks[_segID].first = _mask.clone();
+      tileObj->SAMMasks[_segID].first = _mask.clone();
     }
-    tileObj.newAnnoData = true;
+    tileObj->newAnnoData = true;
 
     //pick level region as own bounds and roi as entire tile
     Rect levelRegion(_tileCoord.x * parent->tileSize, _tileCoord.y * parent->tileSize, parent->tileSize,

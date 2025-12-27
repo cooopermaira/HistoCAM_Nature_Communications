@@ -181,8 +181,6 @@ namespace pathCam {
 
     std::vector<Point2i> push_for_inferencing(std::vector<Point2i> &_tiles);
 
-    void check_set_render_info();
-
     void add_images_with_composite(std::vector<RegInfo *> new_info);
 
     void add_images_no_composite(std::vector<RegInfo *> new_info, bool _force_add = false);

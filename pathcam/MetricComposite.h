@@ -33,11 +33,13 @@ namespace pathCam {
         int debugFrameCount = 0;
         int debugTileCount1 = 0,debugTileCount2 = 0;
 
+        bool xcMatchInitiated = false;
+
         std::shared_ptr<TiledImage> compositeImage;
 
         Image* mostRecentFrame = nullptr;
 
-
+        inline static std::mutex s_mutex;
 
 
     };

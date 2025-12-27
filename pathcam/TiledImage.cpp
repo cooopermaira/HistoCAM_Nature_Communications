@@ -70,7 +70,7 @@ void TiledImage::matToImage4Channel(const cv::Mat &mat, int x, int y, Point2f ro
     //prepare to tile upward
     auto tileROI = cv::Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                             matROI.rows);
-    matROI.copyTo(tile.image(tileROI));
+    matROI.copyTo(tile->image(tileROI));
 
     tileUpwards(Point2i(x, y), tile_box, tile, Rect(0, 0, tile_size, tile_size));
   }
@@ -108,7 +108,7 @@ void TiledImage::resetEdges(Point2i topLeft, Point2i bottomRight) {
 
         Point_ loc = Point2i(x, y);
         Rect levelRegion = cv::Rect(x * tile_size, y * tile_size, tile_size, tile_size);
-        tileUpwards(loc, levelRegion, *tiles(x, y), Rect(0, 0, tile_size, tile_size));
+        tileUpwards(loc, levelRegion, getTile(x, y), Rect(0, 0, tile_size, tile_size));
       }
       /*
       //create vector of all 4 channes R, G, B and alpha
@@ -215,7 +215,7 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
         //Mat temp(tile_size, tile_size,CV_8UC4);
         //tiles(i, j)->image.download(temp);
 
-        box_tiles.emplace_back(&getTile(i, j), i, j, rect);
+        box_tiles.emplace_back(getTile(i, j), i, j, rect);
 #else
                 box_tiles.emplace_back(*tiles(i, j), i, j, rect);
 #endif
@@ -287,21 +287,21 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
 
       matROI = mat(ROIrect);
 
-      TileObj &tileObject = getTile(x, y);
-      ++tileObject.updateCount;
+      auto tileObject = getTile(x, y);
+      ++tileObject->updateCount;
 
       tileROI = Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols,
                          matROI.rows);
 
 
-      tileObject.mutex->lock();
+      tileObject->mutex.lock();
       if (mask.data) {
-        matROI.copyTo(tileObject.image(tileROI), mask(ROIrect));
+        matROI.copyTo(tileObject->image(tileROI), mask(ROIrect));
       } else {
-        matROI.copyTo(tileObject.image(tileROI));
+        matROI.copyTo(tileObject->image(tileROI));
       }
-      tileObject.newData = true;
-      tileObject.mutex->unlock();
+      tileObject->newData = true;
+      tileObject->mutex.unlock();
 
       assert(tiles(x, y)->image.rows == tile_size && tiles(x, y)->image.cols == tile_size);
 
@@ -310,7 +310,7 @@ void TiledImage::matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, in
       std::cout << e.what() << std::endl;
       throw std::exception();
     }
-    tileUpwards(Point2i(x, y), tile_box, *tiles(x, y), Rect(0, 0, tile_size, tile_size));
+    tileUpwards(Point2i(x, y), tile_box, getTile(x, y), Rect(0, 0, tile_size, tile_size));
   }
 }
 
@@ -323,29 +323,30 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
 
     Mat matROI = mat(ROIrect);
 
-    TileObj &tileObject = getTile(x, y);
+    auto tileObject = getTile(x, y);
     parent->liveTiles.insert({x,y});
-    Mat temp(tileObject.image.rows,tileObject.image.cols,CV_8UC4,tileObject.image.data);
+    Mat temp(tileObject->image.rows,tileObject->image.cols,CV_8UC4,tileObject->image.data);
 
     //profiling
-    ++tileObject.updateCount;
+    ++tileObject->updateCount;
 
 
     Rect tileROI = Rect(image_box.x - tile_box.x, image_box.y - tile_box.y, matROI.cols, matROI.rows);
 
-    tileObject.mutex->lock();
+    tileObject->mutex.lock();
     if (!mask.empty()) {
       matROI.copyTo(temp(tileROI), mask(ROIrect));
     } else {
       matROI.copyTo(temp(tileROI));
     }
-    tileObject.newData = true;
-    tileObject.mutex->unlock();
+
+    tileObject->newData = true;
+    tileObject->mutex.unlock();
 
     assert(tiles(x, y)->image.rows == tile_size && tiles(x, y)->image.cols == tile_size);
 
     //parent->parent->push_pyramid_builder_Q(Point2i(x,y),parent->componentIndex);
-    tileUpwards(Point2i(x, y), tile_box, *tiles(x, y), Rect(0, 0, tile_size, tile_size));
+    tileUpwards(Point2i(x, y), tile_box, getTile(x, y), Rect(0, 0, tile_size, tile_size));
   }
 }
 
@@ -421,7 +422,7 @@ void TiledImage::insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<f
 
 
 
-void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, TileObj &myTileObj, Rect cvRoi,
+void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, std::shared_ptr<TileObj> &myTileObj, Rect cvRoi,
                              int _segID) {
   //this function takes a tiles data at a lower level of the pyramid and resizes it into the tile directly above it in the pyramid
   try {
@@ -445,33 +446,33 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 
     //calculate theirROI and grab tile
     cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
-    TileObj &theirTileObj = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
+    auto theirTileObj = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
 
     //resize self cv image into their cv image ROI
-    auto newSize = Size(theirTileObj.image(theirROI).cols, theirTileObj.image(theirROI).rows);
-    theirTileObj.mutex->lock();
+    auto newSize = Size(theirTileObj->image(theirROI).cols, theirTileObj->image(theirROI).rows);
+    theirTileObj->mutex.lock();
 
     if (_segID < 0) {
       assert(
-        theirTileObj.image(theirROI).rows == myTileObj.image(cvRoi).rows / 2 && theirTileObj.image(theirROI).cols ==
-        myTileObj.image(cvRoi).cols / 2);
-      Mat mine(myTileObj.image.rows,myTileObj.image.cols,CV_8UC4,myTileObj.image.data);
-      Mat theirs(theirTileObj.image.rows,theirTileObj.image.cols,CV_8UC4,theirTileObj.image.data);
+        theirTileObj->image(theirROI).rows == myTileObj->image(cvRoi).rows / 2 && theirTileObj->image(theirROI).cols ==
+        myTileObj->image(cvRoi).cols / 2);
+      Mat mine(myTileObj->image.rows,myTileObj->image.cols,CV_8UC4,myTileObj->image.data);
+      Mat theirs(theirTileObj->image.rows,theirTileObj->image.cols,CV_8UC4,theirTileObj->image.data);
       resize(mine(cvRoi), theirs(theirROI), newSize);
-      theirTileObj.newData = true;
+      theirTileObj->newData = true;
     } else {
-      if (theirTileObj.SAMMasks.find(_segID) == theirTileObj.SAMMasks.end()) {
-        theirTileObj.SAMMasks[_segID] = {cuda::GpuMat(parent->tile_size, parent->tile_size,CV_8U, Scalar(0)), nullptr};
+      if (theirTileObj->SAMMasks.find(_segID) == theirTileObj->SAMMasks.end()) {
+        theirTileObj->SAMMasks[_segID] = {cuda::GpuMat(parent->tile_size, parent->tile_size,CV_8U, Scalar(0)), nullptr};
       }
 
-      assert(theirTileObj.SAMMasks[_segID].first(theirROI).rows == myTileObj.SAMMasks[_segID].first(cvRoi).rows / 2
-        && theirTileObj.SAMMasks[_segID].first(theirROI).cols == myTileObj.SAMMasks[_segID].first(cvRoi).cols / 2);
+      assert(theirTileObj->SAMMasks[_segID].first(theirROI).rows == myTileObj->SAMMasks[_segID].first(cvRoi).rows / 2
+        && theirTileObj->SAMMasks[_segID].first(theirROI).cols == myTileObj->SAMMasks[_segID].first(cvRoi).cols / 2);
 
-      cuda::resize(myTileObj.SAMMasks[_segID].first(cvRoi), theirTileObj.SAMMasks[_segID].first(theirROI), newSize);
-      theirTileObj.newAnnoData = true;
+      cuda::resize(myTileObj->SAMMasks[_segID].first(cvRoi), theirTileObj->SAMMasks[_segID].first(theirROI), newSize);
+      theirTileObj->newAnnoData = true;
     }
 
-    theirTileObj.mutex->unlock();
+    theirTileObj->mutex.unlock();
 
     //continue up pyramid
     if (levelWithinPyramid + 1 < parent->level.size() - 1) {
@@ -486,9 +487,11 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 }
 
 
-TileObj &TiledImage::getTile(int x, int y) {
-  makeTile(x, y);
-  return *tiles(x, y);
+std::shared_ptr<TileObj> &TiledImage::getTile(int x, int y) {
+  if (!tiles(x, y)) {
+    tiles(x, y) = std::make_shared<TileObj>(tile_size);
+  }
+  return tiles(x, y);
 }
 #else
 
@@ -547,10 +550,10 @@ Mat TiledImage::getTile(int x, int y) {
 #endif
 
 void TiledImage::makeTile(int x, int y) {
-  if (tiles(x, y) == nullptr) {
+  if (!tiles(x, y)) {
 #ifdef HAVE_OPENCV_CUDAARITHM
     //tiles(x, y) = new cuda::GpuMat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
-    tiles(x, y) = new TileObj(tile_size);
+    tiles(x, y) = std::make_unique<TileObj>(tile_size);
 #else
         tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
 #endif
