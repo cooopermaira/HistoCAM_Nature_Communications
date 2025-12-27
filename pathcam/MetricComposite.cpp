@@ -37,7 +37,7 @@ namespace pathCam {
 
     //place component in MR image
     if (imagePyramid->scale == 0 && !xcMatchInitiated) {
-      if (staging.empty()){return;}
+      if (staging.empty()) { return; }
       xcMatchInitiated = true;
 
       std::thread t([this, img = staging.front()->image]() {
@@ -75,7 +75,6 @@ namespace pathCam {
           //if the tile is promoting to singleFrameCoverage, set owner and motionBlur from this frame
           if (el.second == TileObj::singleFrameCoverage) {
             pyrTileObj->owner = img;
-            pyrTileObj->motionBlur = img->motionBlur;
             pyrTileObj->status = el.second;
             immediateProcessingTiles.push_back(el.first);
           }
@@ -84,7 +83,7 @@ namespace pathCam {
         }
 
         // check if frame is less blurry than current source for tile (pyrTileObj)
-        else if (el.second == TileObj::singleFrameCoverage && pyrTileObj->owner->motionBlur > img->motionBlur) {
+        else if (el.second == TileObj::singleFrameCoverage && image_improves_tile(pyrTileObj, img)) {
           waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(el.first);
         }
       }
@@ -126,8 +125,7 @@ namespace pathCam {
                          if (tileObj->owner == img) {
                            return false;
                          }
-                         if (tileObj->motionBlur > img->motionBlur) {
-                           tileObj->motionBlur = img->motionBlur;
+                         if (image_improves_tile(tileObj, img)) {
                            tileObj->owner = img;
                            return false;
                          }
@@ -270,6 +268,13 @@ namespace pathCam {
     return results;
   }
 
+  int MetricComposite::get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) {
+    auto p1 = _imgAbC + Point2i(imageSize.width / 2, imageSize.height / 2);
+    auto p2 = _tileCoord * parent->tileSize + Point2i(parent->tileSize / 2, parent->tileSize / 2);
+
+    return pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2);
+  }
+
   std::vector<std::pair<Image *, Image *> > MetricComposite::calculate_member_overlaps(std::vector<Image *> images) {
     if (images.empty()) {
       images = std::vector(contributingImages.begin(), contributingImages.end());
@@ -295,6 +300,14 @@ namespace pathCam {
       }
     }
     return results;
+  }
+
+  bool MetricComposite::image_improves_tile(std::shared_ptr<TileObj> _to, Image *_img) {
+    if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.1f) {
+      return get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index) >
+             get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index);
+    }
+    return _to->owner->motionBlur > _img->motionBlur;
   }
 
   std::vector<Image *> MetricComposite::find_contributing_images() const {

@@ -489,7 +489,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 
 std::shared_ptr<TileObj> &TiledImage::getTile(int x, int y) {
   if (!tiles(x, y)) {
-    tiles(x, y) = std::make_shared<TileObj>(tile_size);
+    tiles(x, y) = std::make_shared<TileObj>(tile_size,Point2i(x,y));
   }
   return tiles(x, y);
 }

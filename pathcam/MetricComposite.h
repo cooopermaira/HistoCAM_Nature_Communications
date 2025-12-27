@@ -17,9 +17,13 @@ namespace pathCam {
 
         std::vector<std::pair<Point2i,int>> calculate_affected_tiles_with_status(Point2f AbC);
 
+        int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord);
+
         void process_tiles(Image *img, std::vector<Point2i> &tiles);
 
         void align_and_rebuild() override;
+
+        bool image_improves_tile(std::shared_ptr<TileObj> _to, Image* _img);
 
         std::vector<Image*> find_contributing_images() const;
 
@@ -40,7 +44,6 @@ namespace pathCam {
         Image* mostRecentFrame = nullptr;
 
         inline static std::mutex s_mutex;
-
 
     };
 

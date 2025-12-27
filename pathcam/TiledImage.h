@@ -46,6 +46,8 @@ public:
     return (x - minX) + (y - minY) * width;
   }
 };
+
+
 struct TileObj {
   enum {
     noCoverage = 0, partialCoverage, singleFrameCoverage
@@ -54,22 +56,21 @@ struct TileObj {
 
   int status = noCoverage;
   pathCam::Image* owner = nullptr;
-  float motionBlur = 99999999.f;
 
   int updateCount = 0;
   void* preferredObj;
   void (*destroyPreferredObj)(void*) = nullptr;
 
-  bool usingPreferred;
-  bool newData;
-  bool newAnnoData;
+  bool usingPreferred = false;
+  bool newData = false;
+  bool newAnnoData = false;
 
   Poco::FastMutex mutex;
   cuda::GpuMat image;
 
   std::map<int,std::pair<cuda::GpuMat,void*>> SAMMasks;
 
-  TileObj(int _tileSize) {
+  TileObj(int _tileSize, Point2i _index = {}) : index(_index) {
     auto buf = new char[_tileSize * _tileSize * 4]();
 
     //cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
