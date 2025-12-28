@@ -218,17 +218,17 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         g.setOpacity(1.f);
         g.drawImage(*im, bounds);
 
-        //draw tile bounds with owner frame
-        g.setColour(juce::Colours::greenyellow);
-        g.drawRect(bounds, 3);
-
-        std::string ij;
-        if (tile->owner) {
-          ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->motionBlur));
-        }
-        g.setFont(20);
-        g.drawText(ij, bounds.getCentreX() - 250,
-                   bounds.getCentreY() - 15, 500, 30, Justification::centred);
+        // //draw tile bounds with owner frame
+        // g.setColour(juce::Colours::greenyellow);
+        // g.drawRect(bounds, 3);
+        //
+        // std::string ij;
+        // if (tile->owner) {
+        //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
+        // }
+        // g.setFont(20);
+        // g.drawText(ij, bounds.getCentreX() - 250,
+        //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
 
         for (auto & mask : tile->SAMMasks) {
           auto jImg = static_cast<juce::Image*>(mask.second.second);
@@ -306,16 +306,16 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     }
 
 
-    //draws grid on image with indexes
-      for (unsigned int t = 0; t < tiles.size(); t++) {
-          auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
-          g.setColour(juce::Colours::greenyellow);
-          g.drawRect(bounds, 3);
-          std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-          g.setFont(20);
-          g.drawText(ij, bounds.getCentreX() - 50,
-                     bounds.getCentreY() - 45, 100, 30, Justification::centred);
-       }
+    // //draws grid on image with indexes
+    //   for (unsigned int t = 0; t < tiles.size(); t++) {
+    //       auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
+    //       g.setColour(juce::Colours::greenyellow);
+    //       g.drawRect(bounds, 3);
+    //       std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+    //       g.setFont(20);
+    //       g.drawText(ij, bounds.getCentreX() - 50,
+    //                  bounds.getCentreY() - 45, 100, 30, Justification::centred);
+    //    }
   }
   //Define buffer space from the edges
   if (MRImage->images.size() > 0 && shadeClasses) {

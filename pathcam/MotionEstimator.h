@@ -17,10 +17,10 @@ class MotionEstimator{
 public:
   
   MotionEstimator(){};
-  
-  int findHomography(pathCam::Match *m, int estimator_type, int requiredGoodMatches, int flag,
-                     double ransacReprojThreshold = 3, int maxIters = 2000,
-                     double confidence = 0.995);
+
+  static int findHomography(pathCam::Match *m, int estimator_type, int requiredGoodMatches,
+                            double ransacReprojThreshold = 3, int maxIters = 2000,
+                            double confidence = 0.995);
   
   void phaseCorrelate(pathCam::Match *m, Image *image_1, Image *image_2);
   

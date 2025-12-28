@@ -27,7 +27,7 @@ public:
 
   
   
-  void match(Match *match, int flag = 0);
+  void match(Match *match) const;
   
   
   

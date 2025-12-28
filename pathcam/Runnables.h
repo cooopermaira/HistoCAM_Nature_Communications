@@ -40,18 +40,18 @@ namespace pathCam {
 
   class RunnableIntermediate : public Poco::Runnable {
   public:
-    RunnableIntermediate(unsigned long image_index, int jobTypeFlag) : image_index(image_index),
-                                                                       jobTypeFlag(jobTypeFlag), jobComplete(false),
-                                                                       someoneWaitingOnJobCompleteEvent(false),
-                                                                       unprocessed(true),
-                                                                       precedingJobCount(0) {
+    RunnableIntermediate(long image_index, int jobTypeFlag) : image_index(image_index),
+                                                              jobTypeFlag(jobTypeFlag), jobComplete(false),
+                                                              someoneWaitingOnJobCompleteEvent(false),
+                                                              unprocessed(true),
+                                                              precedingJobCount(0) {
     }
 
     Poco::Event jobComplete;
     bool someoneWaitingOnJobCompleteEvent;
     bool unprocessed;
-    unsigned long sort_order = 0;
-    unsigned long image_index;
+    long sort_order = 0;
+    long image_index;
     std::atomic<int> precedingJobCount;
     int jobTypeFlag = 0;
     int jobRefNumber = 0;
@@ -63,13 +63,13 @@ namespace pathCam {
   class RebuildRunnable : public RunnableIntermediate {
   public:
     int dtVertex;
-    unsigned long imageIndex;
+    long imageIndex;
     CompositeVoronoi *composite;
     CompositeManager *cm;
     Mat polyMaskOutput;
     std::vector<Point2i> rebuildTiles;
 
-    RebuildRunnable(CompositeVoronoi *_composite, int _dtVertex, unsigned long _imageIndex,
+    RebuildRunnable(CompositeVoronoi *_composite, int _dtVertex, long _imageIndex,
                     std::vector<Point2i> _rebuildTiles, Mat _polyMaskOutput);
 
     virtual void run();
@@ -78,7 +78,7 @@ namespace pathCam {
   class DebayerRunnable : public pathCam::RunnableIntermediate {
   public:
     explicit DebayerRunnable(pathCam::Image *image, Mat flat_field, Poco::Path outfile, std::vector<int> *_blur,
-                             std::vector<std::string> *_names, unsigned long _sort_order) : image(image),
+                             std::vector<std::string> *_names, long _sort_order) : image(image),
       flatfield(flat_field),
       outfile(outfile),
       RunnableIntermediate(
@@ -99,7 +99,7 @@ namespace pathCam {
 
   class PostProcessManager : public Poco::Runnable {
   public:
-    PostProcessManager(StreamCam *_parent): parent(_parent) {
+    PostProcessManager(StreamCam *_parent) : parent(_parent) {
     }
 
     void run() override;
@@ -123,7 +123,7 @@ namespace pathCam {
 
     void run() override;
 
-    void stage(RegInfo* _regInfo) const;
+    void stage(RegInfo *_regInfo) const;
 
     void perform_global_alignment();
 
@@ -147,10 +147,7 @@ namespace pathCam {
                                                                 RunnableIntermediate(regInfo->index, 3) {
     };
 
-    virtual void run();
-
-
-    std::pair<bool, Vec2> trace_to_root(unsigned long index);
+    void run() override;
   };
 
 
@@ -227,7 +224,9 @@ namespace pathCam {
     StreamCam *parent;
 
   public:
-    QManager(StreamCam *parent);
+    QManager(StreamCam *parent) : parent(parent) {
+    };
+    long workTime = 0, totalTime = 0;
 
     virtual void run();
   };
@@ -321,6 +320,17 @@ namespace pathCam {
     MatchRunnable(StreamCam *parent, unsigned long image_idx);
 
     virtual void run();
+  };
+
+  class ComponentMatchSearch : public RunnableIntermediate {
+  public:
+    StreamCam *parent;
+    Image *image;
+
+    ComponentMatchSearch(StreamCam *_parent, Image *_image) : parent(_parent),
+                                                              image(_image),
+                                                              RunnableIntermediate(_image->index, 0) {};
+    void run() override;
   };
 }
 #endif /* Runnables_h */

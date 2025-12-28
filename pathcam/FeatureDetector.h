@@ -268,7 +268,7 @@ public:
   }
 
   
-  bool detect_and_compute(Image *image,int flag);
+  bool detect_and_compute(Image *image);
 
 
 

@@ -41,6 +41,10 @@ namespace pathCam {
 
   class SiftFeatureMatcher;
 
+  class FeatureTrackGenerator;
+
+  class BundleAdjustmentIntegrator;
+
   class AccessSAM;
 
 
@@ -157,7 +161,9 @@ namespace pathCam {
     PostProcessManager* ppm;
     SiftFeatureMatcher* sfm;
     AccessSAM *as;
-    JobQueue *JobQ;
+    JobQueue *JobQ,*jqSecondary;
+    FeatureTrackGenerator *ftg;
+    BundleAdjustmentIntegrator* bai;
 
     //std::vector < double > variancesForDebug;
     //std::vector<CompositeVoronoi *> composites;
@@ -202,7 +208,7 @@ namespace pathCam {
     std::vector<Image*> blurImagesInProcess;
     int frames = 0, iters = 0;
 
-    bool run();
+    bool run() override;
 
     bool spin_run();
 
@@ -227,15 +233,13 @@ namespace pathCam {
 
     void align_and_rebuild();
 
-    void align_and_rebuild2();
-
     void load_delaunay_images_to_GPU(int _componentIndex);
 
     void push_SIFT_matches(std::vector<std::pair<Image*,Image*>>& _newOverlaps, Image *_image);
 #endif
     Point2f get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC, unsigned int _requestedCompIdx);
 
-    void push_pyramid_builder_Q(Point2i _index, unsigned _componentIndex);
+    // void push_pyramid_builder_Q(Point2i _index, unsigned _componentIndex);
 
     bool has_flatfield(int label);
 

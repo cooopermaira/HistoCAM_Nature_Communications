@@ -61,7 +61,7 @@ namespace pathCam {
         if (mp.first->regInfo->component_membership == mp.second->regInfo->component_membership) {
           //match with orb features
           Match m = Match(mp.first, mp.second);
-          matcher->match(&m,0);
+          matcher->match(&m);
         }
         ++numMatchesProcessed;
         // Run matching in both directions

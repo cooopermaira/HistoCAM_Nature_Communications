@@ -6,7 +6,7 @@
 
 namespace pathCam {
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
-    parent, image_size, _componentIndex) {
+      parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
     frameDelay = 10;
     waitingFrames.resize(frameDelay, {nullptr, {}});
     compositeImage = imagePyramid->level[0];
@@ -41,7 +41,7 @@ namespace pathCam {
       xcMatchInitiated = true;
 
       std::thread t([this, img = staging.front()->image]() {
-        std::lock_guard lock(s_mutex);
+        std::lock_guard lock(EstRoot_mutex);
         std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
         establish_scale_at_root(img);
       });
@@ -112,8 +112,9 @@ namespace pathCam {
 
 
     //process delayed frames, allowing them to blur correct if necessary
-    //this is an erase-remove_if implementation with a lambda function inside that updates tileObj if img should be owner,
-    //otherwise it removes the tile from the img's list
+    //this is an erase-remove_if implementation with a lambda function inside that updates tileObj
+    //if img should be owner, otherwise it removes the tile from the img's list
+
     for (auto &[img,tiles]: waitingFrames) {
       if (!img) { continue; }
 
@@ -161,34 +162,37 @@ namespace pathCam {
 
   void MetricComposite::align_and_rebuild() {
     auto start = std::chrono::high_resolution_clock::now();
+
     auto members = find_contributing_images();
-    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-        count();
+    members.insert(root);
 
-    start = std::chrono::high_resolution_clock::now();
-    auto overlaps = calculate_member_overlaps(members);
-    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-        count();
+    auto matches = ftg->matches;
+    std::vector<Match *> memberMatches;
 
-    start = std::chrono::high_resolution_clock::now();
-    auto matcher = pathCam::DescriptorMatcher(parent->matcher_type);
-    auto motion_est = pathCam::MotionEstimator();
-    int res1 = 0, good = 0;
-    for (auto &[img1,img2]: overlaps) {
-      Match m(img1, img2);
-      matcher.match(&m, 0);
-      int result = motion_est.findHomography(&m, parent->estimator_type, 10, 0);
-      if (result == 1) {
-        ++res1;
-        if (abs(m.scale - 1) < .05) {
-          ++good;
-        } else {
-          std::cout << abs(m.scale - 1) << std::endl;
+    for (auto m: matches) {
+      if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
+        memberMatches.push_back(m);
+        for (int i = 0; i < m->good_matches.size(); ++i) {
+          if (m->inliers[i]) {
+            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
+          }
         }
       }
     }
-    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-        count();
+
+    const std::vector memberImages(members.begin(),members.end());
+    auto tracks = ftg->generateCurrentTracks(memberImages);
+    parent->bai->run_bundle_adjustment(tracks,memberImages);
+
+    for (auto img : memberImages) {
+      if (!img->regInfo->stayFixedDuringBundleAdjustment) {
+        auto pv = parent->bai->optimizer->poseVertex(img->index);
+        //assert(abs(pv->t[2]/10000 - 1) < 0.03);
+        std::cout<<pv->t[2]<<" "<<img->index<<std::endl;
+      }
+    }
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start).count();
     int k = 0;
   }
 
@@ -210,10 +214,13 @@ namespace pathCam {
 
     imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
     update_mutex.unlock();
+
+    auto cms = new ComponentMatchSearch(parent, img);
+    parent->jqSecondary->add_runnable(cms);
   }
 
 
-  std::vector<std::pair<Point2i, int> > MetricComposite::calculate_affected_tiles_with_status(Point2f AbC) {
+  std::vector<std::pair<Point2i, int> > MetricComposite::calculate_affected_tiles_with_status(Point2f AbC) const {
     std::vector<std::pair<Point2i, int> > results;
 
     if (componentMagLabel == Image::_2X) {
@@ -225,17 +232,20 @@ namespace pathCam {
       Point2f ulP(center.x - distance, center.y - distance);
       Point2f lrP(center.x + distance, center.y + distance);
 
-      auto ulTileInd = imagePyramid->level[0]->getIJ(ulP);
-      auto lrTileInd = imagePyramid->level[0]->getIJ(lrP);
+      const auto ulTileInd = imagePyramid->level[0]->getIJ(ulP);
+      const auto lrTileInd = imagePyramid->level[0]->getIJ(lrP);
 
-      int inlierCorners;
       for (int x = ulTileInd.x; x <= lrTileInd.x; ++x) {
         for (int y = ulTileInd.y; y <= lrTileInd.y; ++y) {
-          inlierCorners = 0;
+          int inlierCorners = 0;
           for (int i = 0; i < 4; ++i) {
             int locX = parent->tileSize * (x + i % 2);
-            int locy = parent->tileSize * (y + i / 2);
-            if (pow(locX - center.x, 2) + pow(locy - center.y, 2) < distSq) {
+            int locY = parent->tileSize * (y + i / 2);
+
+            int dx = locX - center.x;
+            int dy = locY - center.y;
+
+            if (dx * dx + dy * dy < distSq) {
               ++inlierCorners;
             }
           }
@@ -310,24 +320,12 @@ namespace pathCam {
     return _to->owner->motionBlur > _img->motionBlur;
   }
 
-  std::vector<Image *> MetricComposite::find_contributing_images() const {
-    std::vector<Image *> members;
+  std::unordered_set<Image *> MetricComposite::find_contributing_images() const {
+    std::unordered_set<Image *> members;
 
-    auto ulInd = parent->composites[0]->imagePyramid->level[0]->getIJ(parent->composites[0]->root_offset);
-    auto lrInd = parent->composites[0]->imagePyramid->level[0]->getIJ(parent->composites[0]->max_offset);
-    bool found;
-    for (auto &img: contributingImages) {
-      found = false;
-      for (int x = ulInd.x; x <= lrInd.x; ++x) {
-        for (int y = ulInd.y; y <= lrInd.y; ++y) {
-          // if (auto tileObj = compositeImage->tiles(x,y); tileObj && tileObj->owner == img) {
-          //   members.push_back(img);
-          //   found = true;
-          //   break;
-          // }
-        }
-        if (found) { break; }
-      }
+    for (auto &tile: imagePyramid->liveTiles) {
+      auto to = imagePyramid->level[0]->getTile(tile.x, tile.y);
+      members.insert(to->owner);
     }
     return members;
   }

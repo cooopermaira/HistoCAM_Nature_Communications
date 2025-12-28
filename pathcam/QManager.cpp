@@ -9,13 +9,14 @@
 #include <pathCam.h>
 
 namespace pathCam {
-  QManager::QManager(StreamCam *parent): parent(parent) {
-  };
 
   void QManager::run() {
     auto jq = parent->JobQ;
+    auto jq2 = parent->jqSecondary;
     Poco::Thread::sleep(200);
     int count = 1;
+    auto start = std::chrono::high_resolution_clock::now();
+
     while (parent->compositing) {
 
       if (count % 10 == 0) {
@@ -25,14 +26,17 @@ namespace pathCam {
       }
       ++count;
 
-      if (jq->pool->available()) {
-        if (!jq->is_empty()) {
+      if (jq->pool->available() && !jq->is_empty()) {
           jq->queue_mutex->lock();
-          auto j = jq->jobQueue.top();
           jq->pool->start(*jq->jobQueue.top());
           jq->jobQueue.pop();
           jq->queue_mutex->unlock();
-        }
+      }
+      if (jq2->pool->available() && !jq2->is_empty()) {
+        jq2->queue_mutex->lock();
+        jq2->pool->start(*jq2->jobQueue.top());
+        jq2->jobQueue.pop();
+        jq2->queue_mutex->unlock();
       }
 
     }

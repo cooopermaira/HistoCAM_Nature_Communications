@@ -19,6 +19,7 @@ namespace pathCam{
   public:
     static bool comp_sort_order(const RunnableIntermediate *a, const RunnableIntermediate *b);
     std::vector<RunnableIntermediate*> jobRefs;
+    std::vector<RunnableIntermediate*> jobRefsZeroFlag;
     std::vector<int> jobsReadiness;
     std::vector<bool> cancelJob;
     Poco::Event *pathCamEvent;

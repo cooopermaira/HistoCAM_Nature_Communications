@@ -65,11 +65,10 @@ namespace pathCam {
         cancelJob.resize(job->jobRefNumber + 400,false);
       }
       jobRefs[job->jobRefNumber] = job;
-    }
-    if (job->jobTypeFlag == 0) {
-      jobQueue.push(job);
-    } else {
       update_job_readiness(job->jobTypeFlag, job->image_index);
+    }else {
+      jobRefsZeroFlag.push_back(job);
+      jobQueue.push(job);
     }
     queue_mutex->unlock();
 

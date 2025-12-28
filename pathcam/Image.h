@@ -43,11 +43,7 @@ namespace pathCam {
     bool blurSet = false;
 
     std::vector<cv::KeyPoint> keypoints;
-    std::vector<cv::KeyPoint> keypointsMultilevel;
-    std::vector<cv::KeyPoint> keypointsFull;
     cv::Mat descriptors;
-    cv::Mat descriptorsMultilevel;
-    cv::Mat descriptorsFull;
 
     static cv::cuda::GpuMat hannWindow, blurMask;
 #ifdef HAVE_OPENCV_CUDAFEATURES2D

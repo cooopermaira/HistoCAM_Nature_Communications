@@ -31,7 +31,7 @@ struct pMatch;
 class SiftFeatureMatcher : public PostProcessorBase {
   public:
   SiftFeatureMatcher(StreamCam *_parent);
-  ~SiftFeatureMatcher(){};
+  //~SiftFeatureMatcher(){};
 
   void run() override;
 

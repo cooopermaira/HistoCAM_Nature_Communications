@@ -6,7 +6,6 @@
 #include <unordered_map>
 
 namespace pathCam {
-
   int FeatureTrackGenerator::getOrCreateFeatureIndex(const ImageFeaturePair &_pair) {
     auto it = feature_to_index.find(_pair);
     if (it != feature_to_index.end()) {
@@ -31,7 +30,7 @@ namespace pathCam {
 
 
   // Generate tracks from current state
-  std::vector<FeatureTrack> FeatureTrackGenerator::generateCurrentTracks(const std::vector<Image*>& images) {
+  std::vector<FeatureTrack> FeatureTrackGenerator::generateCurrentTracks(const std::vector<Image *> &images) {
     if (!uf_ptr || index_to_feature.empty()) {
       return {};
     }
@@ -79,9 +78,9 @@ namespace pathCam {
     return ans;
   }
 
-  void FeatureTrackGenerator::process_match(unsigned long _srcImgIdx, unsigned long _dstImgIdx, const DMatch &_match) {
-    ImageFeaturePair feat1{(long)_srcImgIdx, _match.queryIdx};
-    ImageFeaturePair feat2{(long)_dstImgIdx, _match.trainIdx};
+  void FeatureTrackGenerator::process_match(long _srcImgIdx, long _dstImgIdx, const DMatch &_match) {
+    ImageFeaturePair feat1{(long) _srcImgIdx, _match.queryIdx};
+    ImageFeaturePair feat2{(long) _dstImgIdx, _match.trainIdx};
 
     // Get or create indices for both features
     int idx1 = getOrCreateFeatureIndex(feat1);
@@ -92,15 +91,12 @@ namespace pathCam {
   }
 
 
-
   void FeatureTrackGenerator::buildConnectionGraph(const std::vector<pMatch> &all_matches,
                                                    UnionFind &uf) {
     for (const auto &match_info: all_matches) {
-
       for (const auto &match: match_info.matches) {
-
-        ImageFeaturePair feat1{(long)match_info.src_img_idx, match.queryIdx};
-        ImageFeaturePair feat2{(long)match_info.dst_img_idx, match.trainIdx};
+        ImageFeaturePair feat1{(long) match_info.src_img_idx, match.queryIdx};
+        ImageFeaturePair feat2{(long) match_info.dst_img_idx, match.trainIdx};
 
         auto it1 = feature_to_index.find(feat1);
         auto it2 = feature_to_index.find(feat2);
@@ -112,31 +108,31 @@ namespace pathCam {
     }
   }
 
-  std::vector<FeatureTrack> FeatureTrackGenerator::generateTracks(const std::vector<Image *> &images,
-                                                                  const std::vector<pMatch> &all_matches) {
-    // Step 1: Create global indexing for all features
-    createGlobalFeatureIndex(images);
+  // std::vector<FeatureTrack> FeatureTrackGenerator::generateTracks(const std::vector<Image *> &images,
+  //                                                                 const std::vector<pMatch> &all_matches) {
+  //   // Step 1: Create global indexing for all features
+  //   createGlobalFeatureIndex(images);
+  //
+  //   // Step 2: Build connection graph using Union-Find
+  //   UnionFind uf(index_to_feature.size());
+  //   buildConnectionGraph(all_matches, uf);
+  //
+  //   // Step 3: Group connected features into tracks
+  //   return createTracksFromConnections(images, uf);
+  // }
 
-    // Step 2: Build connection graph using Union-Find
-    UnionFind uf(index_to_feature.size());
-    buildConnectionGraph(all_matches, uf);
-
-    // Step 3: Group connected features into tracks
-    return createTracksFromConnections(images, uf);
-  }
-
-  void FeatureTrackGenerator::createGlobalFeatureIndex(const std::vector<Image *> &images) {
-    int global_index = 0;
-
-    for (const auto &img: images) {
-      for (int feat_id = 0; feat_id < img->siftData.numPts; feat_id++) {
-        ImageFeaturePair pair{img->index, feat_id};
-        feature_to_index[pair] = global_index;
-        index_to_feature.push_back(pair);
-        global_index++;
-      }
-    }
-  }
+  // void FeatureTrackGenerator::createGlobalFeatureIndex(const std::vector<Image *> &images) {
+  //   int global_index = 0;
+  //
+  //   for (const auto &img: images) {
+  //     for (int feat_id = 0; feat_id < img->siftData.numPts; feat_id++) {
+  //       ImageFeaturePair pair{img->index, feat_id};
+  //       feature_to_index[pair] = global_index;
+  //       index_to_feature.push_back(pair);
+  //       global_index++;
+  //     }
+  //   }
+  // }
 
 
   std::vector<FeatureTrack> FeatureTrackGenerator::createTracksFromConnections(
@@ -151,7 +147,7 @@ namespace pathCam {
     }
 
     // Create image lookup for coordinates
-    std::unordered_map<unsigned long, const Image *> image_lookup;
+    std::unordered_map<long, const Image *> image_lookup;
     for (auto img: images) {
       image_lookup[img->index] = img;
     }
@@ -162,7 +158,7 @@ namespace pathCam {
 
     for (const auto &[root, feature_indices]: root_to_features) {
       // Skip single-image tracks (not useful for bundle adjustment)
-      if (feature_indices.size() < 3) continue;
+      if (feature_indices.size() < 2) continue;
 
       FeatureTrack track(track_id++);
 
@@ -181,16 +177,22 @@ namespace pathCam {
         images_in_track.insert(pair.image_id);
 
         // Get feature coordinates
-        std::unordered_map<unsigned long, const Image *>::iterator img_it = image_lookup.find(pair.image_id);
-        if (img_it != image_lookup.end() && pair.feature_id < img_it->second->siftData.numPts) {
-          const auto &pos = img_it->second->siftData.h_data[pair.feature_id];
-          track.addObservation(FeatureObservation(pair.image_id, pair.feature_id, pos.xpos, pos.ypos,img_it->second));
-          track.world_x += pos.xpos + img_it->second->absoluteCoords.x;
-          track.world_y += pos.ypos + img_it->second->absoluteCoords.y;
+        auto img_it = image_lookup.find(pair.image_id);
+        if (img_it != image_lookup.end() && pair.feature_id < img_it->second->keypoints.size()) {
+          const auto &pos = img_it->second->keypoints[pair.feature_id];
+
+
+          auto fo = FeatureObservation(int(pair.image_id), pair.feature_id,
+            pos.pt.x, pos.pt.y, img_it->second);
+          track.addObservation(fo);
+          track.world_x += pos.pt.x + img_it->second->regInfo->absoluteCoords.x;
+          track.world_y += pos.pt.y + img_it->second->regInfo->absoluteCoords.y;
+        }else {
+          int k = 0;
         }
       }
 
-      if (valid_track && track.observations.size() >= 3) {
+      if (valid_track && track.observations.size() >= 2) {
         //average out world location;
         track.world_x /= track.observations.size();
         track.world_y /= track.observations.size();
@@ -203,57 +205,63 @@ namespace pathCam {
   }
 
 
-  void BundleAdjustmentIntegrator::run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images) {
-
+  void BundleAdjustmentIntegrator::run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks,
+                                                         const std::vector<Image *> &_images) {
+    optimizer->clear();
     //camera poses represent absolute coordinates of images
-    for (const auto &img : _images) {
+    int stayFixedCount = 0;
+    for (const auto &img: _images) {
       cuba::CameraParams camParams;
 
       //10000 is for numerical stability.
       camParams.fx = 10000;
       camParams.fy = 10000;
 
-      //this is essentially "where the camera sits relevant to the image it took" ie the middle
-      camParams.cx = 0;//parent->image_width / 2;
-      camParams.cy = 0;//parent->image_height / 2;
+      //this is essentially "where the camera sits relative to the image it took" ie the middle (generally)
+      //but for simplicity we say the camera was at the image origin (upper left corner)
+      camParams.cx = 0; //parent->image_width / 2;
+      camParams.cy = 0; //parent->image_height / 2;
 
       //bf only used for stereo photos - not relevant. this is actually set in the constructor as well.
       camParams.bf = 0;
 
       //images have no rotation
+      auto AbC = img->regInfo->absoluteCoords;
+      double scale = parent->composites[img->regInfo->component_membership]->imagePyramid->scale;
+
       auto camRotation = Eigen::Quaterniond::Identity();
-      cuba::Array<double,3> translation;
-      //translation should be our current absolute coordinates -> essentially a first guess
-      if (img->regInfo->root && !img->regInfo->rootOfRoot && !img->regInfo->stayFixedDuringBundleAdjustment) {
-        Point2f rootGuess;
-        double scale;
-        img->regInfo->average_from_homographies(rootGuess,scale);
+      cuba::Array<double, 3> translation(-AbC.x,-AbC.y,10000);// * scale);
 
-        translation = cuba::Array<double,3>(-rootGuess.x,-rootGuess.y, 10000 * scale);
-
-        img->debugInitialGuess = rootGuess;
-
-      }else {
-        auto AbC = img->regInfo->get_AbC_relative_from_local(0);
-        img->debugInitialGuess = AbC;
-        if (img->regInfo->rootHomographies.size() > 2) {
-
-          Point2f rootGuess;
-          double scale;
-          img->regInfo->average_from_homographies(rootGuess,scale);
-          auto diffPoint = AbC - rootGuess;
-          if (abs(diffPoint.x) > 300 || abs(diffPoint.y) > 300) {
-            int k = 0;
-          }
-        }
-        double scale = parent->composites[img->regInfo->component_membership]->imagePyramid->scale;
-        //translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
-        translation = cuba::Array<double,3>(-(AbC.x), -(AbC.y), 10000 * scale);
-      }
+      // //translation should be our current absolute coordinates -> essentially a first guess
+      // if (img->regInfo->root && !img->regInfo->rootOfRoot && !img->regInfo->stayFixedDuringBundleAdjustment) {
+      //   Point2f rootGuess;
+      //   double scale;
+      //   img->regInfo->average_from_homographies(rootGuess, scale);
+      //
+      //   translation = cuba::Array<double, 3>(-rootGuess.x, -rootGuess.y, 10000 * scale);
+      //
+      //   img->debugInitialGuess = rootGuess;
+      // } else {
+      //   auto AbC = img->regInfo->get_AbC_relative_from_local(0);
+      //   img->debugInitialGuess = AbC;
+      //   if (img->regInfo->rootHomographies.size() > 2) {
+      //     Point2f rootGuess;
+      //     double scale;
+      //     img->regInfo->average_from_homographies(rootGuess, scale);
+      //     auto diffPoint = AbC - rootGuess;
+      //     if (abs(diffPoint.x) > 300 || abs(diffPoint.y) > 300) {
+      //       int k = 0;
+      //     }
+      //   }
+      //   double scale = parent->composites[img->regInfo->component_membership]->imagePyramid->scale;
+      //   //translation = cuba::Array<double,3>(-(img->absoluteCoords.x), -(img->absoluteCoords.y), 10000);
+      //   translation = cuba::Array<double, 3>(-(AbC.x), -(AbC.y), 10000 * scale);
+      // }
       //only fix the root image of the first component, everything else is based on that
       bool fixed = img->regInfo->rootOfRoot || img->regInfo->stayFixedDuringBundleAdjustment;
+      if (fixed){++stayFixedCount;}
 
-      auto poseVertex = new cuba::PoseVertex(img->index,camRotation, translation, camParams,fixed);
+      auto poseVertex = new cuba::PoseVertex(img->index, camRotation, translation, camParams, fixed);
 
       //add it to the optimizer
       optimizer->addPoseVertex(poseVertex);
@@ -261,47 +269,40 @@ namespace pathCam {
       //keep possession of it
       poseVertices[img->index] = std::move(poseVertex);
     }
+    assert(stayFixedCount == 1);
 
 
     //landmark vertexes are feature points placed in world/composite pixel coordinates
-    for (const auto &track : _tracks) {
-      cuba::Array<double, 3> featurePositionInComposite = {track.world_x,track.world_y,0};
+    for (const auto &track: _tracks) {
+      cuba::Array<double, 3> featurePositionInComposite = {track.world_x, track.world_y, 0};
 
-      auto landmarkVertex = new cuba::LandmarkVertex(track.track_id,featurePositionInComposite,false);
+      auto landmarkVertex = new cuba::LandmarkVertex(track.track_id, featurePositionInComposite, false);
 
       optimizer->addLandmarkVertex(landmarkVertex);
 
       landmarkVertices[track.track_id] = landmarkVertex;
 
       //add edges (observations) for this track
-      for (const auto &obs : track.observations) {
+      for (const auto &obs: track.observations) {
         //get the pose (image) associated with the obervation
         auto poseVertex = optimizer->poseVertex(obs.image_id);
 
-        cuba::Array<double,2> landmarkPositionInFrame = {obs.x, obs.y};
+        cuba::Array<double, 2> landmarkPositionInFrame = {obs.x, obs.y};
 
-        auto edge = new cuba::MonoEdge(landmarkPositionInFrame,1.0,poseVertex,landmarkVertex);
+        auto edge = new cuba::MonoEdge(landmarkPositionInFrame, 1.0, poseVertex, landmarkVertex);
 
         optimizer->addMonocularEdge(edge);
 
         monoEdges.push_back(edge);
-
-
       }
-
     }
-    const cuba::RobustKernelType robustKernelType = cuba::RobustKernelType::HUBER;
-    const double deltaMono = sqrt(1.5);
+    constexpr auto robustKernelType = cuba::RobustKernelType::HUBER;
+    const double deltaMono = sqrt(5.9);
 
     optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 
     optimizer->initialize();
 
     optimizer->optimize(50);
-
   }
-
-
-
-
 }

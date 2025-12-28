@@ -139,12 +139,7 @@ namespace pathCam {
     std::vector<ImageFeaturePair> index_to_feature;
     std::unique_ptr<UnionFind> uf_ptr;
 
-    // Your SIFT data structure - adapt as needed
-    struct ImageData {
-      int index;
-      // Add your SiftData structure here
-      std::vector<cv::Point2f> feature_positions; // x,y coordinates of features
-    };
+
 
   public:
     std::vector<FeatureTrack> generateTracks(const std::vector<Image *> &images,
@@ -156,9 +151,16 @@ namespace pathCam {
       uf_ptr.reset();
     }
 
-    void process_match(unsigned long _srcImgIdx, unsigned long _dstImgIdx, const DMatch& _match);
+
+    void process_match(long _srcImgIdx, long _dstImgIdx, const DMatch& _match);
+
+    void store_match(Match* _match){matches.push_back(_match);}
 
     std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image*>& images);
+
+    Poco::FastMutex accessMutex;
+
+    std::vector<Match*> matches;
 
   private:
     int getOrCreateFeatureIndex(const ImageFeaturePair &_pair);

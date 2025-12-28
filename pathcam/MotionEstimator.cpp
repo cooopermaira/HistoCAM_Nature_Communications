@@ -161,7 +161,7 @@ namespace pathCam {
 
 
 
-  int MotionEstimator::findHomography(pathCam::Match *m, int estimator_type, int requiredGoodMatches, int flag,
+  int MotionEstimator::findHomography(Match *m, int estimator_type, int requiredGoodMatches,
                                       double ransacReprojThreshold,
                                       int maxIters, double confidence) {
 
@@ -169,29 +169,12 @@ namespace pathCam {
     //-- Localize the object
     std::vector<Point2f> image_1_pts;
     std::vector<Point2f> image_2_pts;
-    switch (flag) {
-      case 0:
+
         for (size_t i = 0; i < m->good_matches.size(); i++) {
           //-- Get the keypoints from the good matches
           image_1_pts.push_back(m->image_1->keypoints[m->good_matches[i].queryIdx].pt);
           image_2_pts.push_back(m->image_2->keypoints[m->good_matches[i].trainIdx].pt);
         }
-        break;
-      case 1:
-        for (size_t i = 0; i < m->good_matches.size(); i++) {
-          //-- Get the keypoints from the good matches
-          image_1_pts.push_back(m->image_1->keypointsMultilevel[m->good_matches[i].queryIdx].pt);
-          image_2_pts.push_back(m->image_2->keypointsMultilevel[m->good_matches[i].trainIdx].pt);
-        }
-        break;
-      case 2:
-        for (size_t i = 0; i < m->good_matches.size(); i++) {
-          //-- Get the keypoints from the good matches
-          image_1_pts.push_back(m->image_1->keypointsFull[m->good_matches[i].queryIdx].pt);
-          image_2_pts.push_back(m->image_2->keypointsFull[m->good_matches[i].trainIdx].pt);
-        }
-        break;
-    }
 
     if (image_1_pts.size() < requiredGoodMatches || image_2_pts.size() < requiredGoodMatches) {
       return -1;
@@ -205,15 +188,7 @@ namespace pathCam {
     if (m->H.empty()) {
       return -2;
     }
-    if (flag == 1) {
 
-      for (int i = 0; i < m->H.rows; i++) {
-        for (int j = 0; j < m->H.cols; j++) {
-          std::cout << std::to_string(i) + " " + std::to_string(j) + " " + std::to_string(m->H.at<double>(i, j))
-                    << std::endl;
-        }
-      }
-    }
     auto a = m->H.at<double>(0, 0);
     auto d = m->H.at<double>(1, 1);
     auto a2 = m->H.at<double>(0, 2);
@@ -225,13 +200,7 @@ namespace pathCam {
       //multiresolution matches are not handled here. reject and allow this to be found elsewhere
       return -1;
     }
-    if(flag == 1){
-      m->t_x *= a;
-      m->t_x += (m->image_2->reg_crop_initial / 4.0) * (1 - a) * m->image_2->width;
 
-      m->t_y *= d;
-      m->t_y += (m->image_2->reg_crop_initial / 4.0) * (1 - d) * m->image_2->height;
-    }
     return 1;
   }
 

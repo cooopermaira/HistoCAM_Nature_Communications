@@ -42,6 +42,7 @@ namespace pathCam {
 
   public:
     StreamCam *parent;
+    Image* root;
     Mat local_quality_score, composite_z_buffer, flat_field;
     Mat3f flat_field_composite;
     Mat4b composite;

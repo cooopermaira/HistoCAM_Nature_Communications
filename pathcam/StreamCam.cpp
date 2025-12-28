@@ -26,8 +26,10 @@ namespace pathCam {
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
-                                                           ppm(new PostProcessManager(this)),
-                                                           sfm(new SiftFeatureMatcher(this)),
+                                                           //ppm(new PostProcessManager(this)),
+                                                           //sfm(new SiftFeatureMatcher(this)),
+                                                           //ftg(new FeatureTrackGenerator),
+                                                           bai(new BundleAdjustmentIntegrator(this)),
                                                            inferenceWait(true),
                                                            compositeWait(true),
                                                            microscopeInput(true) {
@@ -66,6 +68,7 @@ namespace pathCam {
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(threads, threads, windowWidth);
     JobQ->parent = this;
+    jqSecondary = new JobQueue(4, 4, 0);
 
 
     //lastFrame = Rect(0,0,image_width,image_height);
@@ -81,7 +84,7 @@ namespace pathCam {
     disk_thread.start(dr);
     Q_thread.start(qm);
     composite_thread.start(cm);
-    postprocessor_thread.start(ppm);
+    //postprocessor_thread.start(ppm);
     if (inferencing) {
       inference_thread.start(*im);
     }
@@ -89,7 +92,7 @@ namespace pathCam {
     disk_thread.join();
     Q_thread.join();
     composite_thread.join();
-    postprocessor_thread.join();
+    //postprocessor_thread.join();
     if (inferencing) {
       //im->thread.join();
       inference_thread.join();
@@ -108,14 +111,14 @@ namespace pathCam {
 
     Q_thread.start(qm);
     composite_thread.start(cm);
-    postprocessor_thread.start(ppm);
+    //postprocessor_thread.start(ppm);
     if (inferencing) {
       inference_thread.start(*im);
     }
 
     Q_thread.join();
     composite_thread.join();
-    postprocessor_thread.join();
+    //postprocessor_thread.join();
     if (inferencing) {
       //im->thread.join();
       inference_thread.join();
@@ -168,27 +171,28 @@ namespace pathCam {
     return {mostRecentResolved, objChange};
   }
 
-  std::vector<std::pair<Image *,Rect>> StreamCam::get_overlapping_frames(Rect _regionInComponentSpace, int _componentIndex) {
-    std::vector<std::pair<Image *,Rect>> result;
+  std::vector<std::pair<Image *, Rect> > StreamCam::get_overlapping_frames(
+    Rect _regionInComponentSpace, int _componentIndex) {
+    std::vector<std::pair<Image *, Rect> > result;
 
     auto myTL = get_AbC_relative_from_relative(_componentIndex, _regionInComponentSpace.tl(), 0);
-    Point p2 = _regionInComponentSpace.tl() + Point2i(image_width,image_height);
-    auto myBR = get_AbC_relative_from_relative(_componentIndex,p2,0);
-    Rect myRect(myTL,myBR);
+    Point p2 = _regionInComponentSpace.tl() + Point2i(image_width, image_height);
+    auto myBR = get_AbC_relative_from_relative(_componentIndex, p2, 0);
+    Rect myRect(myTL, myBR);
 
     image_mutex->readLock();
-    for (auto &img : images) {
-      if (!(img && img->regInfo)){continue;}
-      if (composites[img->regInfo->component_membership]->imagePyramid->scale == 0){continue;};
+    for (auto &img: images) {
+      if (!(img && img->regInfo)) { continue; }
+      if (composites[img->regInfo->component_membership]->imagePyramid->scale == 0) { continue; };
       auto theirTL = get_AbC_relative_from_relative(img->regInfo->component_membership,
-        img->regInfo->absoluteCoords,0);
-      auto p = img->regInfo->absoluteCoords + Point2f(image_width,image_height);
-      auto theirBR = get_AbC_relative_from_relative(img->regInfo->component_membership,p,0);
-      Rect theirRect(theirTL,theirBR);
+                                                    img->regInfo->absoluteCoords, 0);
+      auto p = img->regInfo->absoluteCoords + Point2f(image_width, image_height);
+      auto theirBR = get_AbC_relative_from_relative(img->regInfo->component_membership, p, 0);
+      Rect theirRect(theirTL, theirBR);
 
       auto intersect = theirRect & myRect;
       if (!intersect.empty()) {
-        result.push_back({img,intersect});
+        result.push_back({img, intersect});
       }
     }
     image_mutex->unlock();
@@ -222,10 +226,6 @@ namespace pathCam {
     });
 
     return devices[std::min(_priority, (int) devices.size() - 1)].index;
-  }
-
-  void StreamCam::align_and_rebuild2() {
-    if (composites.empty()) { return; }
   }
 
 
@@ -357,11 +357,11 @@ namespace pathCam {
 
 #endif
 
-  void StreamCam::push_pyramid_builder_Q(Point2i _index, unsigned _componentIndex) {
-    pyramidQMutex.lock();
-    pyramidBuilderQ.push({_index, _componentIndex});
-    pyramidQMutex.unlock();
-  }
+  // void StreamCam::push_pyramid_builder_Q(Point2i _index, unsigned _componentIndex) {
+  //   pyramidQMutex.lock();
+  //   pyramidBuilderQ.push({_index, _componentIndex});
+  //   pyramidQMutex.unlock();
+  // }
 
   void StreamCam::set_match(unsigned long _image_idx, unsigned long _prev_idx, Match *_m, bool _invert) {
     resize_mmatch_mutex->writeLock();
@@ -541,7 +541,7 @@ namespace pathCam {
   void StreamCam::add_new_component_Q(unsigned long image_index, Size image_size) {
     auto component_index = increment_and_get_components();
     newComponentQ.push({image_index, image_size, component_index});
-    std::cout<<"component "<<component_index<<" spawning from frame "<<image_index<<std::endl;
+    std::cout << "component " << component_index << " spawning from frame " << image_index << std::endl;
   }
 
 
@@ -550,24 +550,28 @@ namespace pathCam {
     ri->component_membership = component_index;
     ri->index = image_index;
     ri->matchedTo = image_index; //this is a root image, it has no match
+    ri->stayFixedDuringBundleAdjustment = true;
 
     //auto *temp = new CompositeVoronoi(this, image_size, component_index);
-    auto temp = new MetricComposite(this, image_size, component_index);
+    auto component = new MetricComposite(this, image_size, component_index);
     component_mutex->lock();
-    composites.push_back(temp);
+    composites.push_back(component);
 
     if (composites.size() == 1) {
       //first component added
       ri->rootOfRoot = true;
       //this becomes the base scale
-      temp->set_scale(1);
+      component->set_scale(1);
     } else {
       //this is saying "unknown scale" - will be determined later
-      temp->set_scale(0);
+      component->set_scale(0);
     }
-    temp->set_offset(Point2f(0, 0));
     ri->image = get_image_ref(ri->index);
+    component->root = ri->image;
+    component->set_offset(Point2f(0, 0));
+
     ri->set_abc({0, 0}, component_index, true);
+
     component_mutex->unlock();
   }
 

@@ -14,6 +14,41 @@ namespace pathCam {
                                                                              image_idx(image_idx) {
   };
 
+  void ComponentMatchSearch::run() {
+    auto myComp = reinterpret_cast<MetricComposite*>(parent->composites[image->regInfo->component_membership]);
+    auto matcher = DescriptorMatcher(parent->matcher_type);
+    std::vector<Match*> matches;
+
+    for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
+      Image *previous = parent->get_image_ref(prev_idx);
+
+      if (previous == nullptr) {
+        continue;
+      }
+
+      if (!previous->is_good()) { continue; }
+
+      Match *m = new Match(previous, image);
+      matcher.match(m);
+
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
+        //forward match to feature track generator (ftg)
+        matches.push_back(m);
+      }else {
+        delete m;
+      }
+    }
+
+    myComp->ftg->accessMutex.lock();
+    for (auto &match : matches) {
+      if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
+        //these two components should actually be the same component. we will suspend one and join to the other
+        int k = 0;
+      }
+      myComp->ftg->store_match(match);
+    }
+    myComp->ftg->accessMutex.unlock();
+  }
 
   void MatchRunnable::run() {
     Image *image = parent->get_image_ref(image_idx);
@@ -24,15 +59,11 @@ namespace pathCam {
     }
 
     //pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
-    auto *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
-    MotionEstimator *motion_est = new pathCam::MotionEstimator();
+    auto matcher = DescriptorMatcher(parent->matcher_type);
     int mostMatches = 0;
     long bestMatch = -1;
-    std::vector<unsigned int> skipComponents;
 
     auto tempReg = parent->get_reg_ref(image_idx);
-
-
 
     for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
@@ -44,9 +75,9 @@ namespace pathCam {
       if (!previous->is_good()) { continue; }
 
       Match *m = new Match(previous, image);
-      matcher->match(m, 0);
+      matcher.match(m);
 
-      int result = motion_est->findHomography(m, parent->estimator_type, 10, 0);
+      int result = MotionEstimator::findHomography(m, parent->estimator_type, 10);
 
       if (m->good_matches.size() > mostMatches) {
         mostMatches = m->good_matches.size();
@@ -95,11 +126,10 @@ namespace pathCam {
     }
     //parent->RegistrationConsecQ.add_index(image_idx);
 
-
-    delete matcher;
-    delete motion_est;
     --parent->matchableCount;
     jobComplete.set();
     successful = true;
   } //end run
+
+
 }; //end namespace

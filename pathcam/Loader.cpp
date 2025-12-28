@@ -74,11 +74,11 @@ namespace pathCam {
           break;
       }
 
-      detector->detect_and_compute(image,0);
+      detector->detect_and_compute(image);
 
       if (image->keypoints.size() < 250) {
         detector->set_ORB_params();
-        detector->detect_and_compute(image,0);
+        detector->detect_and_compute(image);
       }
       delete detector;
 
@@ -112,51 +112,25 @@ namespace pathCam {
 
   }
 
-  bool FeatureDetector::detect_and_compute(pathCam::Image *image, int flag) {
+  bool FeatureDetector::detect_and_compute(pathCam::Image *image) {
 
-    std::vector<cv::KeyPoint> *points;
-    Mat reg_image;
-    Mat descriptors;
-    switch (flag){
-      case 0:
-        points = &image->keypoints;
-        reg_image = image->get_reg_image();
-        break;
-      case 1:
-        points = &image->keypointsMultilevel;
-        reg_image = image->get_reg_image();
-        break;
-      case 2:
-        points = &image->keypointsFull;
-        break;
-    }
 
     if(use_FREAK){
-      detector->detect(reg_image, *points);
-      extractor->compute( reg_image, *points, descriptors  );
+      detector->detect(image->get_reg_image(), image->keypoints);
+      extractor->compute( image->get_reg_image(), image->keypoints, image->descriptors  );
     }else{
       if(image->label == Image::_2X){
 
-        detector->detectAndCompute(reg_image,
-                                   image->parent->regCircleMask, *points,
-                                   descriptors );
+        detector->detectAndCompute(image->get_reg_image(),
+                                   image->parent->regCircleMask, image->keypoints,
+                                   image->descriptors );
       }
-      detector->detectAndCompute(reg_image,
-                                 noArray(), *points,
-                                 descriptors );
+      detector->detectAndCompute(image->get_reg_image(),
+                                 noArray(), image->keypoints,
+                                 image->descriptors );
     }
-    switch (flag){
-      case 0:
-        image->descriptors = descriptors;
-        break;
-      case 1:
-        image->descriptorsMultilevel = descriptors;
-        break;
-      case 2:
-        image->descriptorsFull = descriptors;
-        break;
-    }
-    return (points->size() > 0);
+
+    return (image->keypoints.size() > 0);
 
   }
 }

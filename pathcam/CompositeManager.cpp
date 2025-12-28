@@ -113,14 +113,19 @@ namespace pathCam {
       for (int i = 0; i < mc->frameDelay; ++i) {
         mc->update();
       }
+      while (mc->outstandingCMS_jobs > 0) {
+        Poco::Thread::sleep(100);
+      }
       mc->mostRecentFrame->free_memory_RAW();
+      mc->align_and_rebuild();
       // comp->get_flatfield();
       // comp->ff_correct_existing_tiles();
     }
 
 
     //parent->composites[0]->align_and_rebuild();
-    // std::cout<<"calc blur time: "<<val<<std::endl;
+    auto myC = reinterpret_cast<MetricComposite*>(parent->composites[0]);
+    std::cout<<"fh time: "<<myC->fhTime<<std::endl;
 
     std::cout << "CM duration: " + std::to_string(duration) << std::endl;
 
@@ -128,24 +133,24 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
-    std::cout<<"here: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugFrameCount<<std::endl;
-    std::cout<<"immediate: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount1<<std::endl;
-    std::cout<<"later: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount2<<std::endl;
+    std::cout<<"debug frame count: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugFrameCount<<std::endl;
+    std::cout<<"tiles processed (immediate): "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount1<<std::endl;
+    std::cout<<"tiles processed (later): "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount2<<std::endl;
 
 
 
     //save_components_to_disk();
 
-    if (parent->recordingMode) {
-      long totalTime = 0;
-      int totalImages = 0;
-      for (auto &img:parent->images) {
-        if (!img){continue;}
-        totalTime += img->blurTime;
-        ++totalImages;
-      }
-      std::cout<<"write time: "<<totalTime<<"   total images: "<<totalImages<<std::endl;
-    }
+    // if (parent->recordingMode) {
+    //   long totalTime = 0;
+    //   int totalImages = 0;
+    //   for (auto &img:parent->images) {
+    //     if (!img){continue;}
+    //     totalTime += img->blurTime;
+    //     ++totalImages;
+    //   }
+    //   std::cout<<"write time: "<<totalTime<<"   total images: "<<totalImages<<std::endl;
+    // }
 
     if (parent->segmentWithSAM) {
       auto start = std::chrono::high_resolution_clock::now();
