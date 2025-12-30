@@ -7,7 +7,6 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
 
 
-
   void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
     _face.push_back(_face[0]);
     int i = 1;
@@ -111,7 +110,7 @@ namespace pathCam {
   }
 
   void adjust_roi_for_debayer(Rect &roi_) {
-    if (roi_.x%2 > 0) {
+    if (roi_.x % 2 > 0) {
       --roi_.x;
       ++roi_.width;
     }
@@ -127,65 +126,68 @@ namespace pathCam {
     }
   }
 
-  bool Composite::prepare_4CPA(Image *img, std::vector<Point2i> &affectedTiles) {
-    if (affectedTiles.size() < 100) {
+  bool Composite::prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, const bool forceFullImage) {
+    if (affectedTiles.size() < 100 && !forceFullImage) {
       bool ans = false;
-      Rect imageBoxCompositeSpace(img->absoluteCoords.x,img->absoluteCoords.y,imageSize.width,imageSize.height);
-      for (auto &tile : affectedTiles) {
-        Rect tileBoxCompositeSpace(parent->tileSize * tile.x, parent->tileSize * tile.y, parent->tileSize, parent->tileSize);
+      Rect imageBoxCompositeSpace(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, imageSize.width,
+                                  imageSize.height);
+      for (auto &tile: affectedTiles) {
+        Rect tileBoxCompositeSpace(parent->tileSize * tile.x, parent->tileSize * tile.y, parent->tileSize,
+                                   parent->tileSize);
         auto intersectionInCompositeSpace = tileBoxCompositeSpace & imageBoxCompositeSpace;
 
-        if (intersectionInCompositeSpace.empty()){continue;}
+        if (intersectionInCompositeSpace.empty()) { continue; }
 
-        intersectionInCompositeSpace -= img->absoluteCoords;
-        ans = ans || prepare_4CPA(img,intersectionInCompositeSpace);
+        intersectionInCompositeSpace -= img->regInfo->absoluteCoords;
+        ans = ans || prepare_4CPA(img, intersectionInCompositeSpace);
       }
       return ans;
-    }else {
-      return prepare_4CPA(img);
     }
+
+    return prepare_4CPA(img);
   }
 
 
   bool Composite::prepare_4CPA(Image *img, Rect roi_) {
     bool wholeImage = false;
     if (roi_.width * roi_.height == 0) {
-      roi_ = Rect(0,0,imageSize.width,imageSize.height);
+      roi_ = Rect(0, 0, imageSize.width, imageSize.height);
       wholeImage = true;
     }
 
-    if (!parent->unifiedMemory){
+    if (!parent->unifiedMemory) {
       //wait for buffer to be on gpu
       std::unique_lock lock(img->cudaBufferMutex);
       img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
 
       //build and debayer with gpumat objects
       cuda::GpuMat rawMat(imageSize, CV_8U, img->get_raw_cuda());
-      cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR,0,parent->cvCompositeStream);
+      cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
       wholeImage = true;
-    }else {
+    } else {
       adjust_roi_for_debayer(roi_);
       Mat rawMat(imageSize, CV_8U, img->get_Raw());
-      cvtColor(rawMat(roi_),threeChannelPreallocated(roi_),COLOR_BayerBG2BGR);
-      threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3,threeChannelPreallocated.data);
+      cvtColor(rawMat(roi_), threeChannelPreallocated(roi_), COLOR_BayerBG2BGR);
+      threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChannelPreallocated.data);
     }
 
     //ff correct
     if (convertHoldingGPU.empty()) {
       convertHoldingGPU = cuda::GpuMat(imageSize,CV_32FC3);
     }
-    threeChannelPrealGPU(roi_).convertTo(convertHoldingGPU(roi_), CV_32F,parent->cvCompositeStream);
+    threeChannelPrealGPU(roi_).convertTo(convertHoldingGPU(roi_), CV_32F, parent->cvCompositeStream);
     if (flatfieldKnown) {
-      cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_), convertHoldingGPU(roi_), 1, CV_32F,parent->cvCompositeStream);//,parent->cvCompositeStream);
+      cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_),
+                   convertHoldingGPU(roi_), 1, CV_32F, parent->cvCompositeStream);
     }
-    //brighten
+    //brighten (now done by scaling flatfield image instead
     //cuda::pow(convertHoldingGPU(roi_), 1.05, convertHoldingGPU(roi_),parent->cvCompositeStream);
-    convertHoldingGPU(roi_).convertTo(threeChannelPrealGPU(roi_), CV_8UC3,parent->cvCompositeStream);
+    convertHoldingGPU(roi_).convertTo(threeChannelPrealGPU(roi_), CV_8UC3, parent->cvCompositeStream);
 
     //add alpha channel
-    cuda::split(threeChannelPrealGPU(roi_), channelsGPU,parent->cvCompositeStream);
+    cuda::split(threeChannelPrealGPU(roi_), channelsGPU, parent->cvCompositeStream);
     channelsGPU.push_back(rectMaskGPU(roi_));
-    cuda::merge(channelsGPU, fourChannelPrealGPU(roi_),parent->cvCompositeStream);
+    cuda::merge(channelsGPU, fourChannelPrealGPU(roi_), parent->cvCompositeStream);
 
     parent->cvCompositeStream.waitForCompletion();
     return wholeImage;
@@ -229,17 +231,16 @@ namespace pathCam {
       images[i]->vertexId = res;
 
       if (parent->unifiedMemory) {
-        polyMaskGPU = cuda::GpuMat(polyMaskOutput.rows,polyMaskOutput.cols,CV_8U,polyMaskOutput.data);
-      }else {
-        polyMaskGPU.upload(polyMaskOutput,parent->cvCompositeStream);
+        polyMaskGPU = cuda::GpuMat(polyMaskOutput.rows, polyMaskOutput.cols,CV_8U, polyMaskOutput.data);
+      } else {
+        polyMaskGPU.upload(polyMaskOutput, parent->cvCompositeStream);
       }
 
       //indicate that a new image has been added since last global alignment
       needsAlignment = true;
 
 
-
-      if (!parent->unifiedMemory){
+      if (!parent->unifiedMemory) {
         //wait for buffer to be on gpu
         std::unique_lock lock(images[i]->cudaBufferMutex);
         images[i]->cudaBufferConVar.wait(lock, [&] { return images[i]->cudaBufferReady; });
@@ -247,12 +248,12 @@ namespace pathCam {
         //build and debayer with gpumat objects
         cuda::GpuMat rawMat;
         rawMat = cuda::GpuMat(image_size, CV_8U, images[i]->get_raw_cuda());
-        cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR,0,parent->cvCompositeStream);
-      }else {
+        cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
+      } else {
         Mat rawMat;
         rawMat = Mat(image_size, CV_8U, images[i]->get_Raw());
-        cvtColor(rawMat,threeChannelPreallocated,COLOR_BayerBG2BGR);
-        threeChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC3,threeChannelPreallocated.data);
+        cvtColor(rawMat, threeChannelPreallocated, COLOR_BayerBG2BGR);
+        threeChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC3, threeChannelPreallocated.data);
       }
 
       if (rootFound) {
@@ -274,9 +275,9 @@ namespace pathCam {
       // }
 
       //add alpha channel
-      cuda::split(threeChannelPrealGPU, channelsGPU,parent->cvCompositeStream);
+      cuda::split(threeChannelPrealGPU, channelsGPU, parent->cvCompositeStream);
       channelsGPU.push_back(rectMaskGPU);
-      cuda::merge(channelsGPU, fourChannelPrealGPU,parent->cvCompositeStream);
+      cuda::merge(channelsGPU, fourChannelPrealGPU, parent->cvCompositeStream);
 
 
       //calculate effected tiles
@@ -299,7 +300,8 @@ namespace pathCam {
       // imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);
 
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-      tileupwardsTime += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t1).count();
+      tileupwardsTime += std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - t1).
+          count();
 
       if (parent->inferencing) {
         std::vector<Point2i> tiles;
@@ -460,11 +462,11 @@ namespace pathCam {
         //add alpha channel
         cuda::split(threeChannelPrealGPU, channelsGPU);
         if (componentMagLabel == Image::_2X) {
-          for (auto & channel : channelsGPU) {
-            cuda::multiply(channel,circleMaskGPU,channel);
+          for (auto &channel: channelsGPU) {
+            cuda::multiply(channel, circleMaskGPU, channel);
           }
           channelsGPU.push_back(circleMaskGPU255);
-        }else {
+        } else {
           channelsGPU.push_back(rectMaskGPU);
         }
         cuda::merge(channelsGPU, fourChannelPrealGPU);
@@ -495,15 +497,15 @@ namespace pathCam {
       std::vector<Point2i> retileIndices(9);
       for (int xx = 0; xx < 4; ++xx) {
         for (int yy = 0; yy < 4; ++yy) {
-          Point2i sublocation(xx,yy);
+          Point2i sublocation(xx, yy);
           Point2i tileID(samTile->location.x + xx, samTile->location.y + yy);
-          samTile->componentTiles.emplace_back(sublocation,tileID);
+          samTile->componentTiles.emplace_back(sublocation, tileID);
           if (xx < 3 && yy < 3) {
             retileIndices[3 * xx + yy] = tileID;
           }
         }
       }
-      imagePyramid->insertTilesAtBase(fourChannelPrealGPU,rectMaskGPU,imageRect,retileIndices);
+      imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageRect, retileIndices);
     }
   }
 
@@ -577,11 +579,11 @@ namespace pathCam {
       //add alpha channel
       cuda::split(threeChannelPrealGPU, channelsGPU);
       if (componentMagLabel == Image::_2X) {
-        for (auto & channel : channelsGPU) {
-          cuda::multiply(channel,circleMaskGPU,channel);
+        for (auto &channel: channelsGPU) {
+          cuda::multiply(channel, circleMaskGPU, channel);
         }
         channelsGPU.push_back(circleMaskGPU255);
-      }else {
+      } else {
         channelsGPU.push_back(rectMaskGPU);
       }
       cuda::merge(channelsGPU, fourChannelPrealGPU);
@@ -637,38 +639,35 @@ namespace pathCam {
 
   SiftData Composite::GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts) {
     SiftData siftData;
-    try{
-    if (_img.channels() == 1) {
-      cuda::cvtColor(_img, gry, COLOR_BayerBG2GRAY);
-    } else if (_img.channels() == 3) {
-      cuda::cvtColor(_img, gry, COLOR_BGR2GRAY);
-    } else {
-      throw std::runtime_error("Unsupported image format in GPU_extract_SIFT");
-    }
+    try {
+      if (_img.channels() == 1) {
+        cuda::cvtColor(_img, gry, COLOR_BayerBG2GRAY);
+      } else if (_img.channels() == 3) {
+        cuda::cvtColor(_img, gry, COLOR_BGR2GRAY);
+      } else {
+        throw std::runtime_error("Unsupported image format in GPU_extract_SIFT");
+      }
 
-    if (componentMagLabel == Image::_2X) {
-      cuda::multiply(circleMaskGPU, gry, gry);
-    }
+      if (componentMagLabel == Image::_2X) {
+        cuda::multiply(circleMaskGPU, gry, gry);
+      }
 
-    gry.convertTo(gry2,CV_32FC1);
+      gry.convertTo(gry2,CV_32FC1);
 
-    CudaImage cImgGry;
-    cImgGry.Allocate(imageSize.width, imageSize.height, gry2.step / sizeof(float), false,
-                     reinterpret_cast<float *>(gry2.data), nullptr);
+      CudaImage cImgGry;
+      cImgGry.Allocate(imageSize.width, imageSize.height, gry2.step / sizeof(float), false,
+                       reinterpret_cast<float *>(gry2.data), nullptr);
 
 
       InitSiftData(siftData, 100000, true, true);
       catch_ExtractSift(siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
-
-  }catch (cv::Exception &e) {
-    int k = 0;
-  }
+    } catch (cv::Exception &e) {
+      int k = 0;
+    }
     return siftData;
 
     //int k = 0;
   }
-
-
 
 
   std::vector<std::pair<Image *, Image *> > CompositeVoronoi::calculate_new_overlaps() {
@@ -684,53 +683,55 @@ namespace pathCam {
           //newOverlaps.push_back({contributingImages[i], contributingImages.back()});
         }
       } else {
-        if (abs(contributingRegInfos[i]->absoluteCoords.x - contributingRegInfos.back()->absoluteCoords.x) < 0.7 * image_size.
+        if (abs(contributingRegInfos[i]->absoluteCoords.x - contributingRegInfos.back()->absoluteCoords.x) < 0.7 *
+            image_size.
             width &&
-            abs(contributingRegInfos[i]->absoluteCoords.y - contributingRegInfos.back()->absoluteCoords.y) < 0.7 * image_size.
+            abs(contributingRegInfos[i]->absoluteCoords.y - contributingRegInfos.back()->absoluteCoords.y) < 0.7 *
+            image_size.
             height) {
           throw std::runtime_error("this logic path is no longer functional");
           //newOverlaps.emplace_back(contributingImages[i], contributingImages.back());
         }
       }
     }
-/*
-    //overlaps between this and other components
-    for (auto comp: parent->composites) {
+    /*
+        //overlaps between this and other components
+        for (auto comp: parent->composites) {
 
-      if (comp != this) {
-        for (auto di: comp->delaunayImages) {
-          if (delaunayRegInfos.back()->root) {
-            newOverlaps.emplace_back(di, delaunayImages.back());
-          } else {
-            assert(imagePyramid->scale != 0);
-            //calculate my position in base space
-            auto myBaseAbC = delaunayRegInfos.back()->get_AbC_relative_from_local(0);
-            auto theirBaseAbC = di->regInfo->get_AbC_relative_from_local(0);
+          if (comp != this) {
+            for (auto di: comp->delaunayImages) {
+              if (delaunayRegInfos.back()->root) {
+                newOverlaps.emplace_back(di, delaunayImages.back());
+              } else {
+                assert(imagePyramid->scale != 0);
+                //calculate my position in base space
+                auto myBaseAbC = delaunayRegInfos.back()->get_AbC_relative_from_local(0);
+                auto theirBaseAbC = di->regInfo->get_AbC_relative_from_local(0);
 
-            double myScale = imagePyramid->scale;
-            double theirScale = comp->imagePyramid->scale;
+                double myScale = imagePyramid->scale;
+                double theirScale = comp->imagePyramid->scale;
 
-            myBaseAbC.x += myScale * 0.5 * parent->image_width;
-            myBaseAbC.y += myScale * 0.5 * parent->image_height;
+                myBaseAbC.x += myScale * 0.5 * parent->image_width;
+                myBaseAbC.y += myScale * 0.5 * parent->image_height;
 
-            theirBaseAbC.x += theirScale * 0.5 * parent->image_width;
-            theirBaseAbC.y += theirScale * 0.5 * parent->image_height;
+                theirBaseAbC.x += theirScale * 0.5 * parent->image_width;
+                theirBaseAbC.y += theirScale * 0.5 * parent->image_height;
 
-            double allowableDiffX = theirScale + myScale * 0.5 * parent->image_width;
-            double allowableDiffY = theirScale + myScale * 0.5 * parent->image_height;
+                double allowableDiffX = theirScale + myScale * 0.5 * parent->image_width;
+                double allowableDiffY = theirScale + myScale * 0.5 * parent->image_height;
 
-            auto centerDiff = theirBaseAbC - myBaseAbC;
-            centerDiff.x = abs(centerDiff.x);
-            centerDiff.y = abs(centerDiff.y);
+                auto centerDiff = theirBaseAbC - myBaseAbC;
+                centerDiff.x = abs(centerDiff.x);
+                centerDiff.y = abs(centerDiff.y);
 
-            if (centerDiff.x <= 0.7 * allowableDiffX && centerDiff.y <= 0.7 * allowableDiffY) {
-              newOverlaps.emplace_back(di, delaunayImages.back());
+                if (centerDiff.x <= 0.7 * allowableDiffX && centerDiff.y <= 0.7 * allowableDiffY) {
+                  newOverlaps.emplace_back(di, delaunayImages.back());
+                }
+              }
             }
           }
         }
-      }
-    }
-*/
+    */
     std::reverse(newOverlaps.begin(), newOverlaps.end());
     return newOverlaps;
   }
@@ -738,11 +739,11 @@ namespace pathCam {
   void CompositeVoronoi::ff_correct_and_brighten() {
     if (componentMagLabel != 0) {
       //flatfield correct
-      threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F,parent->cvCompositeStream);
-      cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F,parent->cvCompositeStream);
+      threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F, parent->cvCompositeStream);
+      cuda::divide(convertHoldingGPU, ffGPU, convertHoldingGPU, 1, CV_32F, parent->cvCompositeStream);
       //brighten
-      cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU,parent->cvCompositeStream);
-      convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3,parent->cvCompositeStream);
+      cuda::pow(convertHoldingGPU, 1.1, convertHoldingGPU, parent->cvCompositeStream);
+      convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3, parent->cvCompositeStream);
     }
   }
 

@@ -422,7 +422,7 @@ void TiledImage::insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<f
 
 
 
-void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, std::shared_ptr<TileObj> &myTileObj, Rect cvRoi,
+void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, std::shared_ptr<TileObj> myTileObj, Rect cvRoi,
                              int _segID) {
   //this function takes a tiles data at a lower level of the pyramid and resizes it into the tile directly above it in the pyramid
   try {
@@ -487,11 +487,18 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 }
 
 
-std::shared_ptr<TileObj> &TiledImage::getTile(int x, int y) {
+std::shared_ptr<TileObj> TiledImage::getTile(int x, int y) {
   if (!tiles(x, y)) {
     tiles(x, y) = std::make_shared<TileObj>(tile_size,Point2i(x,y));
   }
   return tiles(x, y);
+}
+
+std::shared_ptr<TileObj> TiledImage::getTile(Point2i _index) {
+  if (!tiles(_index.x,_index.y)) {
+    tiles(_index.x, _index.y) = std::make_shared<TileObj>(tile_size,_index);
+  }
+  return tiles(_index.x, _index.y);
 }
 #else
 

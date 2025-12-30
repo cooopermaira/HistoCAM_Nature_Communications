@@ -340,7 +340,7 @@ SiftData get_sift_data_from_gry(cuda::GpuMat &_img, float initBlur, float thresh
   int n = numPts;
   InitSiftData(siftData, n, true, true);
 
-  ExtractSift(siftData, cImgGry, 5, initBlur, thresh, lowestScale, false);
+  ExtractSift(siftData, cImgGry, 1, initBlur, thresh, lowestScale, false);
 
   return siftData;
 }
@@ -702,9 +702,12 @@ bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, 
                                float ambiguityMax, float scoreMin, int numPts) {
   std::vector<SiftData> siftData;
 
-  for (int i = 0; i < files.size(); ++i) {
-    siftData.push_back(get_sift_data_from_gry(files[i], initBlur, thresh, lowestScale, numPts));
+  auto start5 = std::chrono::high_resolution_clock::now();
+
+  for (int i = 0; i < 100; ++i) {
+    siftData.push_back(get_sift_data_from_gry(files[i%files.size()], initBlur, thresh, lowestScale, numPts));
   }
+auto t5 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start5).count();
 
   long fhTime = 0;
   for (int i = 0; i < files.size() - 1; ++i) {
@@ -718,7 +721,7 @@ bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, 
         float homography[9];
         int numMatches;
         auto start = std::chrono::high_resolution_clock::now();
-        FindHomography(siftData[i], homography, &numMatches, 100000, scoreMin, ambiguityMax, 5.0);
+        FindHomography(siftData[i], homography, &numMatches, 10000, scoreMin, ambiguityMax, 5.0);
         fhTime += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
         float scale = (homography[0] + homography[4]) / 2.f;
         if (fabs(scale - correctRatio) < 0.05 * homography[0]) {
@@ -749,7 +752,8 @@ void onGroupCallbackTest(const std::string &dir, const std::array<std::string, 5
   for (int i = 0; i < files.size(); ++i) {
     loadRawToGpuGray(files[i], 6464, 4852, gpuMats[i]);
   }
-  verify_group_given_params(gpuMats, 0.0, 0.4f, 0.1f, 0.9, 0.96, 0.8, 100000);
+  verify_group_given_params(gpuMats, 0.0, 0.4f,
+    0.1f, 0.9, 0.96, 0.8, 10000);
   int k = 0;
 }
 

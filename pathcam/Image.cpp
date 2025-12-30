@@ -187,9 +187,9 @@ namespace pathCam {
     cuda::multiply(gray, hannWindow, gray, 1, -1, s);
 
     //compute the log magnitude of the dft
-    void* buff = malloc(blurPatch * blurPatch * sizeof(float));
+    void *buff = malloc(blurPatch * blurPatch * sizeof(float));
     cuda::GpuMat planes[] = {gray, cuda::GpuMat(gray.rows, gray.cols,CV_32F, Scalar(0))};
-    cuda::GpuMat complexI, mag, rcv(blurPatch,blurPatch,CV_32FC1,buff);
+    cuda::GpuMat complexI, mag, rcv(blurPatch, blurPatch,CV_32FC1, buff);
     cuda::merge(planes, 2, complexI, s);
     cuda::dft(complexI, complexI, Size(gray.cols, gray.rows), 0, s);
 
@@ -206,8 +206,8 @@ namespace pathCam {
 
     s.waitForCompletion();
 
-    blurDFT = Mat(blurPatch,blurPatch,CV_32FC1,buff);
-    resize(blurDFT,blurDFT,Size(128,128));
+    blurDFT = Mat(blurPatch, blurPatch,CV_32FC1, buff);
+    resize(blurDFT, blurDFT, Size(128, 128));
     free(buff);
 
     if (submitForInference) {
@@ -236,55 +236,22 @@ namespace pathCam {
   }
 
 
-  void Image::correct_registration(std::vector<unsigned long> adjacentVerts) {
-    /*
-    if (adjacentVerts.size() > 0) {
-      //pulling parent reference from odd place, could be passed as parameter
-      auto parent = regInfo->parent;
-      for (int i = 0; i < adjacentVerts.size(); i++) {
-        parent->composites[component_membership]->matchableCount++;
-        parent->composites[component_membership]->matchedEdges.resize(adjacentVerts.size(), {-1, -1});
-        auto sm = new SingleMatchRunnable(parent, index, adjacentVerts[i], component_membership, i, 0);
-        parent->JobQ->add_runnable(sm);
-      }
-      //wait until these jobs have completed
-      while (parent->composites[component_membership]->matchableCount > 0) {
-        Poco::Thread::sleep(40);
-      }
-      auto adjustedAbC = Vec2(0, 0);
-      std::vector<Vec2> calcedAbC, calcedOffset, calcedReg;
-      std::vector<unsigned long> adjacentVertsKeep;
-      int count = 0;
-      for (auto i: parent->composites[component_membership]->matchedEdges) {
-        if (i.first > -1) {
-          auto pwr = parent->matchM.match[i.first][i.second];
-          auto theirReg = parent->get_reg_ref(i.second);
-          adjustedAbC.x += pwr->t_x + theirReg->absoluteCoords.x;
-          adjustedAbC.y += pwr->t_y + theirReg->absoluteCoords.y;
+  void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
+                           float lowestScale, float ambiguity, bool async, cuda::GpuMat &buffer) {
+    InitSiftData(siftData, numPts, true, true);
 
-          //debug vectors
-          adjacentVertsKeep.push_back(i.second);
-          calcedReg.push_back(Vec2(theirReg->absoluteCoords.x, theirReg->absoluteCoords.y));
-          calcedOffset.push_back(Vec2(pwr->t_x, pwr->t_y));
-          calcedAbC.push_back(Vec2(pwr->t_x + theirReg->absoluteCoords.x, pwr->t_y + theirReg->absoluteCoords.y));
-          count++;
-        }
-      }
-      if (count == 0) { return; }
-      adjustedAbC.x /= double(count);
-      adjustedAbC.y /= double(count);
-      if (adjacentVerts.size() > 24) {
-        int k = 0;
-      }
-      if (abs(adjustedAbC.x - regInfo->absoluteCoords.x) > 50 || abs(adjustedAbC.y - regInfo->absoluteCoords.y) > 100) {
-        int k = 0;
-      }
-      parent->composites[component_membership]->matchedEdges.clear();
-      regInfo->set_abc(adjustedAbC, component_membership, false);
-    } else {
-      regInfo->attempt_absolute_reg(false);
-    }
-    */
+    cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
+
+    raw.convertTo(buffer,CV_32F);
+
+
+    CudaImage cImgRaw;
+     cImgRaw.Allocate(width, height, buffer.step / sizeof(float), false,
+                      reinterpret_cast<float *>(buffer.data), nullptr);
+
+    ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+
+    siftInitialized = true;
   }
 
 
@@ -517,12 +484,16 @@ namespace pathCam {
       Size old_image_size = image_size;
       image_size = Size(image_size.width * _reg_crop, image_size.height * _reg_crop);
       Rect myROI((old_image_size.width / 2) - (image_size.width / 2),
-                     (old_image_size.height / 2) - image_size.height / 2,
-                     image_size.width, image_size.height);
+                 (old_image_size.height / 2) - image_size.height / 2,
+                 image_size.width, image_size.height);
       reg_image = reg_image(myROI);
     }
     int k = 0;
   };
+
+  double Image::get_reg_scale() const {
+    return parent->scale_factor;
+  }
 
   void Image::load_raw_from_disk() {
     buffer_mutex.lock();

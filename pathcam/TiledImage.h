@@ -160,9 +160,11 @@ public:
 
 
 
-  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, std::shared_ptr<TileObj> &myTileObj, Rect cvRoi, int _segID = -1);
+  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, std::shared_ptr<TileObj> myTileObj, Rect cvRoi, int _segID = -1);
 
-  std::shared_ptr<TileObj> &getTile(int x, int y);
+  std::shared_ptr<TileObj> getTile(int x, int y);
+
+  std::shared_ptr<TileObj> getTile(Point2i);
 #else
 
 

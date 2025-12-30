@@ -303,7 +303,7 @@ namespace pathCam {
     Subdiv2D tempSubdiv(subdiv);
 
     //correct registration in case matchedTo was corrected at composite time
-    _image->correct_registration({});
+    //_image->correct_registration({});
     auto point = cv::Point2f(_image->regInfo->absoluteCoords.x, _image->regInfo->absoluteCoords.y);
     //add new point
     int vertxId = subdiv.insert(point);
@@ -322,7 +322,7 @@ namespace pathCam {
           adjacentVerts.push_back(val->second);
         }
       } while (nextEdge != firstEdge);
-      _image->correct_registration(adjacentVerts);
+      //_image->correct_registration(adjacentVerts);
       subdiv = tempSubdiv;
       point = cv::Point2f(_image->regInfo->absoluteCoords.x, _image->regInfo->absoluteCoords.y);
       vertxId = subdiv.insert(point);

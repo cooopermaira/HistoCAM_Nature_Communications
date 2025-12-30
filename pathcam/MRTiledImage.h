@@ -32,7 +32,7 @@ public:
   pathCam::StreamCam* parent;
 
   std::vector < std::shared_ptr< TiledImage > > level;
-  std::set<cv::Point2i, Point2iLess> liveTiles;
+  std::set<Point2i, Point2iLess> liveTiles;
 
   
   MRTiledImage(pathCam::StreamCam* parent = nullptr,unsigned int _tile_size=0);
@@ -40,6 +40,14 @@ public:
   ~MRTiledImage(){ level.clear(); };
     
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
+
+  std::shared_ptr<TileObj> get_base_tile(int x, int y) {
+    return level[0]->getTile(x,y);
+  }
+
+  std::shared_ptr<TileObj> get_base_tile(Point2i _index) {
+    return level[0]->getTile(_index);
+  }
 
 // #ifdef HAVE_OPENCV_CUDAARITHM
   void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, std::vector<Point2i> &retileIndices) {

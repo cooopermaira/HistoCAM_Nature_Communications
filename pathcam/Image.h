@@ -19,15 +19,12 @@ namespace pathCam {
 
     int width, height;
     int scope_radius;
-    //int component_membership;
     std::atomic<unsigned int> reference_count;
 
     float reg_full_scale;
     float motionBlur;
     int blurPatch = 1024;
-    cv::Point2f sharpness;
-    double reg_scale_initial,reg_scale_full;
-    double reg_crop_initial,reg_crop_full;
+
     enum {
       _NOLABEL = 0, _2X, _4X, _10X, _20X, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _MOTION_BLUR
     };
@@ -42,7 +39,9 @@ namespace pathCam {
     bool cudaBufferReady;
     bool blurSet = false;
 
-    std::vector<cv::KeyPoint> keypoints;
+    bool subsequentMatchLaunched = false;
+
+    std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
     cv::Mat descriptors;
 
     static cv::cuda::GpuMat hannWindow, blurMask;
@@ -58,6 +57,8 @@ namespace pathCam {
 
     ~Image();
 
+    void extract_sift(int numPts, int octaves, float initBlur, float thresh,
+                      float lowestScale, float ambiguity, bool async, cv::cuda::GpuMat &buffer);
 
     void set_memory_pool(MemoryPool *mempool_in) {
       mempool = mempool_in;
@@ -66,8 +67,6 @@ namespace pathCam {
     void set_disk_file(Poco::Path _image_file) {
       image_file = _image_file;
     }
-
-    void correct_registration(std::vector<unsigned long> adjacentVerts);
 
     void load_raw_from_disk();
 
@@ -174,7 +173,7 @@ namespace pathCam {
 
     inline bool in_memory() { return (raw_buffer != 0); }
 
-    inline double get_reg_scale() { return reg_scale_initial; }
+    double get_reg_scale() const;
 
     inline void release_reg_image() { reg_image.release(); }
 

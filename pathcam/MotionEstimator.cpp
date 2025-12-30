@@ -13,16 +13,16 @@ namespace pathCam {
   void RegInfo::attempt_absolute_reg(bool queue_for_compositing) {
 
     auto them = parent->get_reg_ref(matchedTo);
-    Point2f theirAbCs;
+    Point2i theirAbCs;
     unsigned int componentMembership;
 
     if(them->get_abc(this, theirAbCs, componentMembership)){
-      Point2f myAbCs = relativeCoords + theirAbCs;
+      Point2i myAbCs = relativeCoords + theirAbCs;
       set_abc(myAbCs, componentMembership, queue_for_compositing);
     }
   }
 
-  bool RegInfo::get_abc(pathCam::RegInfo *caller, Point2f &_absoluteCoords, unsigned int &_componentMembership) {
+  bool RegInfo::get_abc(pathCam::RegInfo *caller, Point2i &_absoluteCoords, unsigned int &_componentMembership) {
     accessMutex->lock();
 
     if (resolved) {

@@ -178,8 +178,8 @@ namespace pathCam {
 
         // Get feature coordinates
         auto img_it = image_lookup.find(pair.image_id);
-        if (img_it != image_lookup.end() && pair.feature_id < img_it->second->keypoints.size()) {
-          const auto &pos = img_it->second->keypoints[pair.feature_id];
+        if (img_it != image_lookup.end() && pair.feature_id < img_it->second->keypointsImageSpace.size()) {
+          const auto &pos = img_it->second->keypointsImageSpace[pair.feature_id];
 
 
           auto fo = FeatureObservation(int(pair.image_id), pair.feature_id,
@@ -302,6 +302,7 @@ namespace pathCam {
     optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 
     optimizer->initialize();
+    optimizer->setPoseUpdateAllowance(false, true);
 
     optimizer->optimize(50);
   }

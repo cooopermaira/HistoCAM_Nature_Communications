@@ -38,8 +38,8 @@ public:
   bool tryComposite = false;
   bool inCompositeQ = false;
   int component_membership;
-  Point2f absoluteCoords;
-  Point2f relativeCoords = Point2f(0.0, 0.0);
+  Point2i absoluteCoords;
+  Point2i relativeCoords = Point2i(0.0, 0.0);
   Poco::FastMutex *accessMutex;
   Poco::Event waitOnResolve;
   std::vector<RegInfo*> callersWaiting, children;
@@ -56,7 +56,7 @@ public:
 
   void attempt_absolute_reg(bool queue_for_compositing);
 
-  bool get_abc(RegInfo* caller, Point2f &_absoluteCoords, unsigned int& _componentMembership);
+  bool get_abc(RegInfo* caller, Point2i &_absoluteCoords, unsigned int& _componentMembership);
 
   void set_abc(Point2f _absoluteCoords, int _componentMembership, bool queue_for_compositing);
 

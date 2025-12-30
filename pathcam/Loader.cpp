@@ -50,9 +50,6 @@ namespace pathCam {
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
 
-      image->reg_scale_initial = parent->scale_factor;
-      image->reg_crop_initial = parent->crop_factor;
-
 
       auto *detector = new FeatureDetector(parent->feature_type, parent->use_FREAK);
 
@@ -89,7 +86,6 @@ namespace pathCam {
         return;
       }
 
-
       image->release_reg_image();
 
       //parent->add_image(image, image_index);
@@ -112,19 +108,13 @@ namespace pathCam {
 
   }
 
-  bool FeatureDetector::detect_and_compute(pathCam::Image *image) {
+  bool FeatureDetector::detect_and_compute(pathCam::Image *image) const {
 
 
     if(use_FREAK){
       detector->detect(image->get_reg_image(), image->keypoints);
       extractor->compute( image->get_reg_image(), image->keypoints, image->descriptors  );
     }else{
-      if(image->label == Image::_2X){
-
-        detector->detectAndCompute(image->get_reg_image(),
-                                   image->parent->regCircleMask, image->keypoints,
-                                   image->descriptors );
-      }
       detector->detectAndCompute(image->get_reg_image(),
                                  noArray(), image->keypoints,
                                  image->descriptors );

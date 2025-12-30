@@ -100,7 +100,7 @@ namespace pathCam {
 
     SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
 
-    bool prepare_4CPA(Image *img, std::vector<Point2i> &affectedTiles);
+    bool prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
     bool prepare_4CPA(Image*img, Rect roi = Rect());
 
     Size imageSize;

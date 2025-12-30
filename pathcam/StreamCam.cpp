@@ -186,7 +186,7 @@ namespace pathCam {
       if (composites[img->regInfo->component_membership]->imagePyramid->scale == 0) { continue; };
       auto theirTL = get_AbC_relative_from_relative(img->regInfo->component_membership,
                                                     img->regInfo->absoluteCoords, 0);
-      auto p = img->regInfo->absoluteCoords + Point2f(image_width, image_height);
+      auto p = img->regInfo->absoluteCoords + Point2i(image_width, image_height);
       auto theirBR = get_AbC_relative_from_relative(img->regInfo->component_membership, p, 0);
       Rect theirRect(theirTL, theirBR);
 

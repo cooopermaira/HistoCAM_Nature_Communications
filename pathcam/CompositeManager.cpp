@@ -107,6 +107,7 @@ namespace pathCam {
     // }
 
     //process delayed frames
+    auto t1 = std::chrono::high_resolution_clock::now();
     for (auto &comp: parent->composites) {
       if (comp->suspended){continue;}
       auto mc = reinterpret_cast<MetricComposite*>(comp);
@@ -121,7 +122,8 @@ namespace pathCam {
       // comp->get_flatfield();
       // comp->ff_correct_existing_tiles();
     }
-
+    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
+    std::cout<<"wait time "<<t2<<std::endl;
 
     //parent->composites[0]->align_and_rebuild();
     auto myC = reinterpret_cast<MetricComposite*>(parent->composites[0]);
