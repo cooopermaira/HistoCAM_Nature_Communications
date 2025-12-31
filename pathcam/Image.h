@@ -40,6 +40,7 @@ namespace pathCam {
     bool blurSet = false;
 
     bool subsequentMatchLaunched = false;
+    bool fullKeyPoints = false;
 
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
     cv::Mat descriptors;

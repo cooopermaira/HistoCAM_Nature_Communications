@@ -22,7 +22,6 @@ namespace pathCam {
     circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
            Scalar(255),
            -1);
-
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in, we find what pyramid tiles it
@@ -57,7 +56,6 @@ namespace pathCam {
 
       update_Bbox_no_composite({ri});
 
-      mostRecentFrame = img;
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {img, {}};
       std::vector<Point2i> immediateProcessingTiles;
 
@@ -135,7 +133,7 @@ namespace pathCam {
                        }), tiles.end()
       );
 
-      if (tiles.empty() && img != mostRecentFrame) {
+      if (tiles.empty()) {
         img->free_memory_RAW();
         img = nullptr;
       }
@@ -149,21 +147,13 @@ namespace pathCam {
 
       assert(img && img->get_Raw());
 
-      process_tiles(img, tiles, true);
-      //
-      // cvtColor(threeChannelPreallocated,img->reg_image,COLOR_BGR2GRAY);
-      //
-      // FeatureDetector fd(parent->feature_type, parent->use_FREAK);
-      // fd.set_ORB_params();
-      // fd.detect_and_compute(img);
+      process_tiles(img, tiles);
 
       debugTileCount2 += tiles.size();
       ++debugFrameCount;
 
       tiles.clear();
-      if (img != mostRecentFrame) {
-        img->free_memory_RAW();
-      }
+      img->free_memory_RAW();
       img = nullptr;
     }
   }
@@ -174,7 +164,7 @@ namespace pathCam {
     auto members = find_contributing_images();
     members.insert(root);
 
-    for (auto & img : members) {
+    for (auto &img: members) {
       img->keypointsImageSpace.resize(img->keypoints.size());
       for (int i = 0; i < img->keypoints.size(); ++i) {
         auto pt = img->keypoints[i].pt;
@@ -197,15 +187,15 @@ namespace pathCam {
       }
     }
 
-    const std::vector memberImages(members.begin(),members.end());
+    const std::vector memberImages(members.begin(), members.end());
     auto tracks = ftg->generateCurrentTracks(memberImages);
-    parent->bai->run_bundle_adjustment(tracks,memberImages);
+    parent->bai->run_bundle_adjustment(tracks, memberImages);
 
-    float maxDev = 0,avgDev = 0;
-    for (auto img : memberImages) {
+    float maxDev = 0, avgDev = 0;
+    for (auto img: memberImages) {
       if (!img->regInfo->stayFixedDuringBundleAdjustment) {
         auto pv = parent->bai->optimizer->poseVertex(img->index);
-        Point2i coords(-pv->t[0],-pv->t[1]);
+        Point2i coords(-pv->t[0], -pv->t[1]);
         Point2i diff = img->regInfo->absoluteCoords - coords;
 
         img->regInfo->absoluteCoords = coords;
@@ -231,23 +221,24 @@ namespace pathCam {
   void MetricComposite::rebuild(std::vector<Image *> members) {
     auto start = std::chrono::high_resolution_clock::now();
 
-    Mat blank(parent->tileSize,parent->tileSize,CV_8UC4,Scalar(0,0,0,0));
-    Mat mask(parent->tileSize,parent->tileSize,CV_8UC1,Scalar(255));
-    for (auto &tileIdx : imagePyramid->liveTiles) {
+    Mat blank(parent->tileSize, parent->tileSize,CV_8UC4, Scalar(0, 0, 0, 0));
+    Mat mask(parent->tileSize, parent->tileSize,CV_8UC1, Scalar(255));
+    for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
-      auto box = Rect_<float>(tileIdx.x*parent->tileSize,tileIdx.y*parent->tileSize,parent->tileSize,parent->tileSize);
+      auto box = Rect_<float>(tileIdx.x * parent->tileSize, tileIdx.y * parent->tileSize, parent->tileSize,
+                              parent->tileSize);
       std::vector v = {tileIdx};
-      imagePyramid->insertTilesAtBase(blank,mask,box,v);
+      imagePyramid->insertTilesAtBase(blank, mask, box, v);
     }
     imagePyramid->liveTiles.clear();
 
-    for (auto &img : members) {
+    for (auto &img: members) {
       auto affectedTilesWithStatus = calculate_affected_tiles_with_status(img->regInfo->absoluteCoords);
-      for (auto & p : affectedTilesWithStatus) {
-        if (p.second == TileObj::singleFrameCoverage){
+      for (auto &p: affectedTilesWithStatus) {
+        if (p.second == TileObj::singleFrameCoverage) {
           auto tileObj = imagePyramid->get_base_tile(p.first);
-          if (image_improves_tile(tileObj,img)) {
+          if (image_improves_tile(tileObj, img)) {
             tileObj->owner = img;
             imagePyramid->liveTiles.insert(p.first);
           }
@@ -255,68 +246,102 @@ namespace pathCam {
       }
     }
 
-    for (auto &img : members) {
+    for (auto &img: members) {
       std::vector<Point2i> tiles;
-      for (auto &tileIdx : imagePyramid->liveTiles) {
+      for (auto &tileIdx: imagePyramid->liveTiles) {
         auto tileObj = imagePyramid->get_base_tile(tileIdx);
         if (tileObj->owner == img) {
           tiles.push_back(tileIdx);
         }
       }
-      process_tiles(img,tiles);
+      process_tiles(img, tiles);
     }
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
-    (std::chrono::high_resolution_clock::now() - start).count();
-    int k = 0;
-return;
-    //visualize differences
-    std::vector inds = {-1,0,1,0};
-    for (auto &tileIdx : imagePyramid->liveTiles) {
-      auto myTileObj = imagePyramid->get_base_tile(tileIdx);
+        (std::chrono::high_resolution_clock::now() - start).count();
+    std::cout << "cuda bundle adjustment solve time " << t3 << std::endl;
 
-      for (int i = 0; i < 4; ++i) {
-        int x = inds[i];
-        int y = inds[(i + 1) % 4];
-        Point2i neighborPt = tileIdx + Point2i(x,y);
+    /*
+        //visualize differences
+        int failCount = 0;
+        parent->ORB_params.nfeatures = 10000;
+        std::vector inds = {-1,0,1,0};
+        for (auto &tileIdx : imagePyramid->liveTiles) {
+          auto myTileObj = imagePyramid->get_base_tile(tileIdx);
 
-        if (imagePyramid->liveTiles.find(neighborPt) != imagePyramid->liveTiles.end()) {
-          auto neighborObj = imagePyramid->get_base_tile(neighborPt);
+          for (int i = 0; i < 4; ++i) {
+            int x = inds[i];
+            int y = inds[(i + 1) % 4];
+            Point2i neighborPt = tileIdx + Point2i(x,y);
 
-          if (neighborObj->owner != myTileObj->owner) {
-            //find this match
-            bool found = false;
-            Match* thisMatch = nullptr;
-            for (auto m : ftg->matches) {
-              if ((m->image_1 == neighborObj->owner && m->image_2 == myTileObj->owner) ||
-                (m->image_2 == neighborObj->owner && m->image_1 == myTileObj->owner)) {
-                found = true;
-                thisMatch = m;
-                break;
-              }
-            }
-            if (!found) {
-              auto matcher = DescriptorMatcher(parent->matcher_type);
+            if (imagePyramid->liveTiles.find(neighborPt) != imagePyramid->liveTiles.end()) {
+              auto neighborObj = imagePyramid->get_base_tile(neighborPt);
 
-              Match *m = new Match(neighborObj->owner, myTileObj->owner);
-              matcher.match(m);
+              if (neighborObj->owner != myTileObj->owner) {
+                //find this match
+                bool found = false;
+                Match* thisMatch = nullptr;
+                for (auto m : ftg->matches) {
+                  if ((m->image_1 == neighborObj->owner && m->image_2 == myTileObj->owner) ||
+                    (m->image_2 == neighborObj->owner && m->image_1 == myTileObj->owner)) {
+                    found = true;
+                    thisMatch = m;
+                    break;
+                  }
+                }
+                if (!found) {
 
-              if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 4)) {
-                //forward match to feature track generator (ftg)
+                  auto myImg = myTileObj->owner;
+                  if (!myImg->fullKeyPoints) {
+                    myImg->load_raw_from_disk();
+                    cuda::GpuMat rawMat(imageSize, CV_8U, myImg->get_raw_cuda());
+                    cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
+                    threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F, parent->cvCompositeStream);
+                    cuda::divide(convertHoldingGPU, ffGPU,
+                       convertHoldingGPU, 1, CV_32F, parent->cvCompositeStream);
+                    convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3, parent->cvCompositeStream);
+                    cvtColor(threeChannelPreallocated,myImg->reg_image,COLOR_BGR2GRAY);
 
-                //MatchSiftData(image->siftData,previous->siftData);
-                // for (int i = 0; i < image->siftData.numPts; ++i) {
-                //   if (image->siftData.d_data[i].ambiguity > 0.9) {
-                //     int k = 0;
-                //   }
-                // }
-              } else {
-                int k=0;
+                    auto detector = FeatureDetector(parent->feature_type, parent->use_FREAK);
+                    detector.set_ORB_params(parent->ORB_params);
+                    detector.detect_and_compute(myImg);
+                    myImg->fullKeyPoints = true;
+                  }
+
+                  myImg = neighborObj->owner;
+                  if (!myImg->fullKeyPoints) {
+                    myImg->load_raw_from_disk();
+                    cuda::GpuMat rawMat(imageSize, CV_8U, myImg->get_raw_cuda());
+                    cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
+                    threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F, parent->cvCompositeStream);
+                    cuda::divide(convertHoldingGPU, ffGPU,
+                       convertHoldingGPU, 1, CV_32F, parent->cvCompositeStream);
+                    convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3, parent->cvCompositeStream);
+                    cvtColor(threeChannelPreallocated,myImg->reg_image,COLOR_BGR2GRAY);
+
+                    auto detector = FeatureDetector(parent->feature_type, parent->use_FREAK);
+                    detector.set_ORB_params();
+                    detector.detect_and_compute(myImg);
+                    myImg->fullKeyPoints = true;
+                  }
+
+
+                  auto matcher = DescriptorMatcher(parent->matcher_type);
+                  Match *m = new Match(neighborObj->owner, myTileObj->owner);
+                  matcher.match(m);
+
+                  if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 4)) {
+
+                  } else {
+                    MotionEstimator::findHomography(m, parent->estimator_type, 4);
+                    ++failCount;
+                  }
+                }
               }
             }
           }
         }
-      }
-    }
+        std::cout<<"fail count "<<failCount<<std::endl;
+        */
   }
 
 
@@ -326,7 +351,11 @@ return;
       img->load_raw_from_disk();
     }
 
-
+    if (!img->subsequentMatchLaunched) {
+      ++outstandingCMS_jobs;
+      auto cms = new ComponentMatchSearch(parent, img);
+      parent->jqSecondary->add_runnable(cms);
+    }
     //lock mutex against component wide flatfielding
     update_mutex.lock();
 
@@ -334,7 +363,8 @@ return;
     prepare_4CPA(img, tiles, forceFullImage);
 
     //calculate region of pyramid for data placement
-    auto imageBox = cv::Rect_<float>(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->width, img->height);
+    auto imageBox = cv::Rect_<float>(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->width,
+                                     img->height);
     Mat mask = componentMagLabel == Image::_2X ? circleMask : rectMask;
 
     imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);

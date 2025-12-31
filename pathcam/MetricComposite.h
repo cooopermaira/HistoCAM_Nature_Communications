@@ -48,8 +48,6 @@ namespace pathCam {
 
         std::shared_ptr<TiledImage> compositeImage;
 
-        Image* mostRecentFrame = nullptr;
-
         cuda::GpuMat cvtBuffer;
 
         inline static std::mutex EstRoot_mutex;

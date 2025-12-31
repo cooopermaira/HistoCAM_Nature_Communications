@@ -14,14 +14,12 @@ namespace pathCam {
     --parent->loaderCount;
     jobComplete.set();
     image->release_reg_image();
-    parent->JobQ->cancel_job(2,image_index);
-    parent->JobQ->update_job_readiness(2,image_index);
+    parent->JobQ->cancel_job(2, image_index);
+    parent->JobQ->update_job_readiness(2, image_index);
     image->free_memory_RAW();
   }
 
   void LoaderLogicRunnable::run() {
-
-
     image->parent = parent;
     if (!image->in_memory()) {
       image->load_raw_from_disk();
@@ -36,7 +34,7 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
-    if(parent->recordingMode){
+    if (parent->recordingMode) {
       image->write_to_path(true);
     }
 
@@ -81,7 +79,7 @@ namespace pathCam {
 
 
       if (image->keypoints.size() < 250) {
-        std::cout<<"LOW FT: "<<image_index<<std::endl;
+        std::cout << "LOW FT: " << image_index << std::endl;
         self_cancel(Image::_LOWFEAT);
         return;
       }
@@ -93,34 +91,34 @@ namespace pathCam {
       ++parent->matchableCount;
       parent->JobQ->add_runnable(matchjob);
       successful = true;
-
     } else {
-
       //std::cout<<"Too Black: "+std::to_string(image_index)<<std::endl;
       parent->mark_neighbors_as_underexposed(image_index);
       image->free_memory_RAW();
-
     }
 
     parent->loaderCount--;
     jobComplete.set();
     successful = true;
-
   }
 
   bool FeatureDetector::detect_and_compute(pathCam::Image *image) const {
-
-
-    if(use_FREAK){
+    if (use_FREAK) {
       detector->detect(image->get_reg_image(), image->keypoints);
-      extractor->compute( image->get_reg_image(), image->keypoints, image->descriptors  );
-    }else{
-      detector->detectAndCompute(image->get_reg_image(),
-                                 noArray(), image->keypoints,
-                                 image->descriptors );
+      extractor->compute(image->get_reg_image(), image->keypoints, image->descriptors);
+    } else {
+      //if (image->label == Image::_2X) {
+      if (false){
+        detector->detectAndCompute(image->get_reg_image(),
+                                   image->parent->circleMask, image->keypoints,
+                                   image->descriptors);
+      } else {
+        detector->detectAndCompute(image->get_reg_image(),
+                                   noArray(), image->keypoints,
+                                   image->descriptors);
+      }
     }
 
     return (image->keypoints.size() > 0);
-
   }
 }

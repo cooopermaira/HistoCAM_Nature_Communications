@@ -117,8 +117,8 @@ namespace pathCam {
       while (mc->outstandingCMS_jobs > 0) {
         Poco::Thread::sleep(100);
       }
-      mc->mostRecentFrame->free_memory_RAW();
-      mc->align_and_rebuild();
+
+      //mc->align_and_rebuild();
       // comp->get_flatfield();
       // comp->ff_correct_existing_tiles();
     }

@@ -129,17 +129,22 @@ namespace pathCam {
   bool Composite::prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, const bool forceFullImage) {
     if (affectedTiles.size() < 100 && !forceFullImage) {
       bool ans = false;
-      Rect imageBoxCompositeSpace(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, imageSize.width,
-                                  imageSize.height);
+
+      img->regInfo->accessMutex->lock();
+      auto AbC = img->regInfo->absoluteCoords;
+      img->regInfo->accessMutex->unlock();
+
+      Rect imageBoxCompSpace(AbC, imageSize);
       for (auto &tile: affectedTiles) {
-        Rect tileBoxCompositeSpace(parent->tileSize * tile.x, parent->tileSize * tile.y, parent->tileSize,
-                                   parent->tileSize);
-        auto intersectionInCompositeSpace = tileBoxCompositeSpace & imageBoxCompositeSpace;
+        Rect tileBoxCompSpace(parent->tileSize * tile, Size(parent->tileSize, parent->tileSize));
 
-        if (intersectionInCompositeSpace.empty()) { continue; }
+        auto intersectionInCompSpace = tileBoxCompSpace & imageBoxCompSpace;
 
-        intersectionInCompositeSpace -= img->regInfo->absoluteCoords;
-        ans = ans || prepare_4CPA(img, intersectionInCompositeSpace);
+        if (intersectionInCompSpace.empty()) { continue; }
+
+        auto intersectionInImageSpace = intersectionInCompSpace - AbC;
+        
+        ans = ans || prepare_4CPA(img, intersectionInImageSpace);
       }
       return ans;
     }
@@ -149,47 +154,55 @@ namespace pathCam {
 
 
   bool Composite::prepare_4CPA(Image *img, Rect roi_) {
+    if (roi_.x < 0 || roi_.y < 0) {
+      int k = 0;
+    }
     bool wholeImage = false;
-    if (roi_.width * roi_.height == 0) {
-      roi_ = Rect(0, 0, imageSize.width, imageSize.height);
-      wholeImage = true;
+
+    try {
+      if (roi_.width * roi_.height == 0) {
+        roi_ = Rect(0, 0, imageSize.width, imageSize.height);
+        wholeImage = true;
+      }
+
+      if (!parent->unifiedMemory) {
+        //wait for buffer to be on gpu
+        std::unique_lock lock(img->cudaBufferMutex);
+        img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
+
+        //build and debayer with gpumat objects
+        cuda::GpuMat rawMat(imageSize, CV_8U, img->get_raw_cuda());
+        cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
+        wholeImage = true;
+      } else {
+        adjust_roi_for_debayer(roi_);
+        Mat rawMat(imageSize, CV_8U, img->get_Raw());
+        cvtColor(rawMat(roi_), threeChannelPreallocated(roi_), COLOR_BayerBG2BGR);
+        threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChannelPreallocated.data);
+      }
+
+      //ff correct
+      if (convertHoldingGPU.empty()) {
+        convertHoldingGPU = cuda::GpuMat(imageSize,CV_32FC3);
+      }
+      threeChannelPrealGPU(roi_).convertTo(convertHoldingGPU(roi_), CV_32F, parent->cvCompositeStream);
+      if (flatfieldKnown) {
+        cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_),
+                     convertHoldingGPU(roi_), 1, CV_32F, parent->cvCompositeStream);
+      }
+      //brighten (now done by scaling flatfield image instead
+      //cuda::pow(convertHoldingGPU(roi_), 1.05, convertHoldingGPU(roi_),parent->cvCompositeStream);
+      convertHoldingGPU(roi_).convertTo(threeChannelPrealGPU(roi_), CV_8UC3, parent->cvCompositeStream);
+
+      //add alpha channel
+      cuda::split(threeChannelPrealGPU(roi_), channelsGPU, parent->cvCompositeStream);
+      channelsGPU.push_back(rectMaskGPU(roi_));
+      cuda::merge(channelsGPU, fourChannelPrealGPU(roi_), parent->cvCompositeStream);
+
+      parent->cvCompositeStream.waitForCompletion();
+    }catch (...) {
+      int k = 0;
     }
-
-    if (!parent->unifiedMemory) {
-      //wait for buffer to be on gpu
-      std::unique_lock lock(img->cudaBufferMutex);
-      img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
-
-      //build and debayer with gpumat objects
-      cuda::GpuMat rawMat(imageSize, CV_8U, img->get_raw_cuda());
-      cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
-      wholeImage = true;
-    } else {
-      adjust_roi_for_debayer(roi_);
-      Mat rawMat(imageSize, CV_8U, img->get_Raw());
-      cvtColor(rawMat(roi_), threeChannelPreallocated(roi_), COLOR_BayerBG2BGR);
-      threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChannelPreallocated.data);
-    }
-
-    //ff correct
-    if (convertHoldingGPU.empty()) {
-      convertHoldingGPU = cuda::GpuMat(imageSize,CV_32FC3);
-    }
-    threeChannelPrealGPU(roi_).convertTo(convertHoldingGPU(roi_), CV_32F, parent->cvCompositeStream);
-    if (flatfieldKnown) {
-      cuda::divide(convertHoldingGPU(roi_), ffGPU(roi_),
-                   convertHoldingGPU(roi_), 1, CV_32F, parent->cvCompositeStream);
-    }
-    //brighten (now done by scaling flatfield image instead
-    //cuda::pow(convertHoldingGPU(roi_), 1.05, convertHoldingGPU(roi_),parent->cvCompositeStream);
-    convertHoldingGPU(roi_).convertTo(threeChannelPrealGPU(roi_), CV_8UC3, parent->cvCompositeStream);
-
-    //add alpha channel
-    cuda::split(threeChannelPrealGPU(roi_), channelsGPU, parent->cvCompositeStream);
-    channelsGPU.push_back(rectMaskGPU(roi_));
-    cuda::merge(channelsGPU, fourChannelPrealGPU(roi_), parent->cvCompositeStream);
-
-    parent->cvCompositeStream.waitForCompletion();
     return wholeImage;
   }
 

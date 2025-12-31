@@ -14,11 +14,11 @@ namespace pathCam {
                                                                              image_idx(image_idx) {
   };
 
-  cuda::GpuMat& getThreadConvertSpace(int width, int height){
+  cuda::GpuMat &getThreadConvertSpace(int width, int height) {
     static thread_local cuda::GpuMat buffer;
 
     if (buffer.empty()) {
-      buffer.create(height,width,CV_32FC1);
+      buffer.create(height, width,CV_32FC1);
     }
     return buffer;
   }
@@ -28,13 +28,7 @@ namespace pathCam {
     auto matcher = DescriptorMatcher(parent->matcher_type);
     std::vector<Match *> matches;
 
-    // assert(image->raw_buffer);
-    //
-    // image->extract_sift(10000, 1, 0.f, 0.4f,0.1f, 0.9f,
-    //                     false, getThreadConvertSpace(image->width,image->height));
-    // image->free_memory_RAW();
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
-
       Image *previous = parent->get_image_ref(prev_idx);
 
       if (previous == nullptr) {
@@ -49,12 +43,6 @@ namespace pathCam {
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
         //forward match to feature track generator (ftg)
         matches.push_back(m);
-        //MatchSiftData(image->siftData,previous->siftData);
-        // for (int i = 0; i < image->siftData.numPts; ++i) {
-        //   if (image->siftData.d_data[i].ambiguity > 0.9) {
-        //     int k = 0;
-        //   }
-        // }
       } else {
         delete m;
       }
@@ -63,12 +51,22 @@ namespace pathCam {
     myComp->ftg->accessMutex.lock();
     for (auto &match: matches) {
       if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
-        //these two components should actually be the same component. we will suspend one and join to the other
-        int k = 0;
+        auto theirComp = reinterpret_cast<MetricComposite *>
+            (parent->composites[match->image_1->regInfo->component_membership]);
+
+        if (myComp->componentMagLabel == theirComp->componentMagLabel) {
+          //these two components should actually be the same component. we will suspend one and join to the other
+          myComp->componentJoinMatches.push_back(match);
+          theirComp->componentJoinMatches.push_back(match);
+        }else {
+          delete match;
+        }
+      } else {
+        myComp->ftg->store_match(match);
       }
-      myComp->ftg->store_match(match);
     }
     myComp->ftg->accessMutex.unlock();
+    --myComp->outstandingCMS_jobs;
   }
 
   void MatchRunnable::run() {

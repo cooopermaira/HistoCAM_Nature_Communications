@@ -304,6 +304,6 @@ namespace pathCam {
     optimizer->initialize();
     optimizer->setPoseUpdateAllowance(false, true);
 
-    optimizer->optimize(50);
+    optimizer->optimize(100);
   }
 }

@@ -196,7 +196,7 @@ namespace pathCam {
     m->t_x = a2 * (1.0 / m->image_2->get_reg_scale());
     m->t_y = d2 * (1.0 / m->image_2->get_reg_scale());
     m->scale = (a + d) / 2;
-    if (std::abs(m->scale - 1.0) > 0.05) {
+    if (std::abs(m->scale - 1.0) > 0.02) {
       //multiresolution matches are not handled here. reject and allow this to be found elsewhere
       return -1;
     }
