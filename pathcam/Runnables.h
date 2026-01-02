@@ -316,8 +316,9 @@ namespace pathCam {
     StreamCam *parent;
     unsigned long image_idx;
 
-
-    MatchRunnable(StreamCam *parent, unsigned long image_idx);
+    MatchRunnable(StreamCam *parent, unsigned long image_idx) : RunnableIntermediate(image_idx, 2),
+                                                                               parent(parent),
+                                                                               image_idx(image_idx) {};
 
     virtual void run();
   };

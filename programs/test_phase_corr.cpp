@@ -318,29 +318,33 @@ static bool loadRawToGpuGray(const std::string &path,
   dRaw.upload(raw);
 
   // Debayer on GPU -> grayscale
-  cv::cuda::cvtColor(dRaw, dGray, bayerCode);
+  //cv::cuda::cvtColor(dRaw, dGray, bayerCode);
 
   // Return
-  outGray = dGray; // shallow copy of GpuMat header (data stays on GPU)
+  //outGray = dGray; // shallow copy of GpuMat header (data stays on GPU)
+  outGray = dRaw;
   return true;
 }
 
 
 SiftData get_sift_data_from_gry(cuda::GpuMat &_img, float initBlur, float thresh, float lowestScale,
                                 int numPts = 200000) {
+  int roiSize = 1024;
   SiftData siftData;
-  cuda::GpuMat gry, gry2;
+  cuda::GpuMat gry;
+  Rect roi((_img.cols - roiSize)/2, (_img.rows - roiSize)/2,roiSize,roiSize);
+  assert(roi.x%2 == 0 && roi.y%2 == 0);
 
-  _img.convertTo(gry2,CV_32FC1);
+  _img(roi).convertTo(gry,CV_32FC1);
 
   CudaImage cImgGry;
-  cImgGry.Allocate(_img.cols, _img.rows, gry2.step / sizeof(float), false,
-                   reinterpret_cast<float *>(gry2.data), nullptr);
+  cImgGry.Allocate(gry.cols, gry.rows, gry.step / sizeof(float), false,
+                   reinterpret_cast<float *>(gry.data), nullptr);
 
   int n = numPts;
   InitSiftData(siftData, n, true, true);
 
-  ExtractSift(siftData, cImgGry, 1, initBlur, thresh, lowestScale, false);
+  ExtractSift(siftData, cImgGry, 4, initBlur, thresh, lowestScale, false);
 
   return siftData;
 }
@@ -540,7 +544,7 @@ int min_inliers(std::vector<cuda::GpuMat> files, float initBlur, float thresh, f
   }
   return minInliers;
 }
-
+/*
 void tune_sift(const std::string &dirPath, int width, int height, bool _sort) {
   // 1) Collect .Raw file paths
   std::vector<cuda::GpuMat> files;
@@ -696,7 +700,7 @@ void min_inliers4(std::vector<cuda::GpuMat> files, float initBlur, float thresh,
   compareSiftPoints(sdi.h_data, siftData[x].h_data, siftData[x].numPts, siftData[x].numPts);
   int k = 0;
 }
-
+*/
 bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, float thresh, float lowestScale,
                                float ambiguityMin,
                                float ambiguityMax, float scoreMin, int numPts) {
@@ -707,7 +711,8 @@ bool verify_group_given_params(std::vector<cuda::GpuMat> files, float initBlur, 
   for (int i = 0; i < 100; ++i) {
     siftData.push_back(get_sift_data_from_gry(files[i%files.size()], initBlur, thresh, lowestScale, numPts));
   }
-auto t5 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start5).count();
+  auto t5 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start5).count();
+  std::cout<<"extract time "<<t5<<std::endl;
 
   long fhTime = 0;
   for (int i = 0; i < files.size() - 1; ++i) {
@@ -753,7 +758,7 @@ void onGroupCallbackTest(const std::string &dir, const std::array<std::string, 5
     loadRawToGpuGray(files[i], 6464, 4852, gpuMats[i]);
   }
   verify_group_given_params(gpuMats, 0.0, 0.4f,
-    0.1f, 0.9, 0.96, 0.8, 10000);
+    0.1f, 0.9, 0.9, 0.8, 60000);
   int k = 0;
 }
 

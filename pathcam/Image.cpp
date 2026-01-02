@@ -7,39 +7,22 @@ namespace pathCam {
   static Ptr<cuda::Filter> g_gauss;
   static std::once_flag g_gauss_once;
 
-  void Image::prepare_blur_check_statics() {
-    static std::once_flag flag;
-    std::call_once(flag, [&] {
-      Mat m1(blurPatch, blurPatch,CV_8UC1, Scalar(255));
-      circle(m1, Point(blurPatch / 2, blurPatch / 2), 70, Scalar(0), -1);
-      blurMask.upload(m1);
 
-      Mat temp(blurPatch, blurPatch,CV_8U, Scalar(0));
-      // circle(temp, Point(0, 0), blurCheckRadius, Scalar(255), 1);
-      // circle(temp, Point(0, blurPatch), blurCheckRadius, Scalar(255), 1);
-      // circle(temp, Point(blurPatch, 0), blurCheckRadius, Scalar(255), 1);
-      // circle(temp, Point(blurPatch, blurPatch), blurCheckRadius, Scalar(255), 1);
-      // blurMask.upload(temp);
+  inline void sortSiftDataByX(SiftData& sd) {
+    assert(sd.h_data);
+    assert(sd.numPts <= sd.maxPts);
 
-      createHanningWindow(temp, Size(blurPatch, blurPatch),CV_32F);
-      hannWindow.upload(temp);
+    std::sort(sd.h_data, sd.h_data + sd.numPts,
+              [](const SiftPoint& a, const SiftPoint& b) {
+                return a.xpos < b.xpos;
+              });
 
-      const cv::Size ksize{5, 5};
-      const double sigma = 3;
-      g_gauss = cv::cuda::createGaussianFilter(CV_32F, CV_32F, ksize, sigma, sigma,
-                                               BORDER_DEFAULT);
-    });
+    cudaMemcpy(sd.d_data,
+           sd.h_data,
+           sd.numPts * sizeof(SiftPoint),
+           cudaMemcpyHostToDevice);
   }
 
-
-  inline void ensureGauss(int type) {
-    std::call_once(g_gauss_once, [type] {
-      const cv::Size ksize{5, 5};
-      const double sigma = 3;
-      g_gauss = cv::cuda::createGaussianFilter(type, type, ksize, sigma, sigma,
-                                               cv::BORDER_DEFAULT);
-    });
-  }
 
   static std::mutex g_gauss_mtx;
 
@@ -50,6 +33,27 @@ namespace pathCam {
     g_gauss->apply(src, dst, s);
   }
 
+
+
+  void Image::prepare_blur_check_statics() {
+    static std::once_flag flag;
+    std::call_once(flag, [&] {
+      Mat m1(blurPatch, blurPatch,CV_8UC1, Scalar(255));
+      circle(m1, Point(blurPatch / 2, blurPatch / 2), 70, Scalar(0), -1);
+      blurMask.upload(m1);
+
+      Mat temp(blurPatch, blurPatch,CV_8U, Scalar(0));
+
+
+      createHanningWindow(temp, Size(blurPatch, blurPatch),CV_32F);
+      hannWindow.upload(temp);
+
+      const cv::Size ksize{5, 5};
+      const double sigma = 3;
+      g_gauss = cv::cuda::createGaussianFilter(CV_32F, CV_32F, ksize, sigma, sigma,
+                                               BORDER_DEFAULT);
+    });
+  }
 
   Image::Image(unsigned int width, unsigned int height, unsigned int scope_radius,
                MemoryPool *mempool) : width(width),
@@ -237,23 +241,47 @@ namespace pathCam {
 
 
   void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                           float lowestScale, float ambiguity, bool async, cuda::GpuMat &buffer) {
+                           float lowestScale, cuda::GpuMat &buffer) {
+    if (siftInitialized){return;}
+
+    Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
     InitSiftData(siftData, numPts, true, true);
 
     cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
 
-    raw.convertTo(buffer,CV_32F);
+    raw(roi).convertTo(buffer,CV_32F);
 
 
     CudaImage cImgRaw;
-     cImgRaw.Allocate(width, height, buffer.step / sizeof(float), false,
-                      reinterpret_cast<float *>(buffer.data), nullptr);
+    cImgRaw.Allocate(buffer.cols, buffer.rows, buffer.step / sizeof(float), false,
+                         reinterpret_cast<float *>(buffer.data), nullptr);
+
+    ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+    sortSiftDataByX(siftData);
+
+    siftInitialized = true;
+  }
+
+  void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
+                         float lowestScale) {
+    InitSiftData(siftData, numPts, true, true);
+
+    cuda::GpuMat buffer(2048,2048,CV_32FC1);
+    Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
+
+    assert(get_Raw());
+    cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
+
+    raw(roi).convertTo(buffer,CV_32F);
+
+    CudaImage cImgRaw;
+    cImgRaw.Allocate(buffer.cols, buffer.rows, buffer.step / sizeof(float), false,
+                     reinterpret_cast<float *>(buffer.data), nullptr);
 
     ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
 
     siftInitialized = true;
   }
-
 
   bool Image::is_mostly_white(Mat ROI) {
     unsigned int threshold_value = 225;
@@ -430,6 +458,7 @@ namespace pathCam {
   char *Image::get_raw_cuda() {
     //assert(raw_buffer_cuda);
     if (parent && parent->unifiedMemory) {
+      assert(raw_buffer);
       return raw_buffer;
     }
     return raw_buffer_cuda;

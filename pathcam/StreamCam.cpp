@@ -29,7 +29,6 @@ namespace pathCam {
                                                            //ppm(new PostProcessManager(this)),
                                                            //sfm(new SiftFeatureMatcher(this)),
                                                            //ftg(new FeatureTrackGenerator),
-                                                           bai(new BundleAdjustmentIntegrator(this)),
                                                            inferenceWait(true),
                                                            compositeWait(true),
                                                            microscopeInput(true) {

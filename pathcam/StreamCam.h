@@ -130,8 +130,11 @@ namespace pathCam {
 
     cuda::Stream cvCompositeStream;
 
+    int siftWindow = 1024;
+    int siftPoints = 60000;
+
     int lastActiveComponent = 0;
-        int maxTilesPerBatch = 512;
+    int maxTilesPerBatch = 512;
     int maxMatchesPerPull = 50;
     int minPixelDistanceBetweenFrames;
     std::vector<Vec2> lastAcceptedCoords;
@@ -163,7 +166,6 @@ namespace pathCam {
     AccessSAM *as;
     JobQueue *JobQ,*jqSecondary;
     FeatureTrackGenerator *ftg;
-    BundleAdjustmentIntegrator* bai;
 
     //std::vector < double > variancesForDebug;
     //std::vector<CompositeVoronoi *> composites;

@@ -331,6 +331,9 @@ namespace pathCam {
     std::ifstream infile(parent->input_images.toString().c_str());
     std::string imageFile;
     unsigned long image_index = 0;
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+
     while (infile >> imageFile) {
       Image *image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
       image->set_disk_file(imageFile);
@@ -338,7 +341,9 @@ namespace pathCam {
       image_index++;
       Poco::Thread::sleep(1000 / 21);
     }
+    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
+
     parent->microscopeInput = false;
-    std::cout << "disk images set " << std::endl;
+    std::cout << "disk images set in " << t2<<std::endl;
   }
 }

@@ -31,6 +31,7 @@ namespace std {
 }
 
 namespace pathCam {
+
   using namespace nvinfer1;
   struct ScaleResult {
     double scale = 0.0;

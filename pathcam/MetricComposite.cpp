@@ -24,8 +24,8 @@ namespace pathCam {
            -1);
   }
 
-  /* This function is pretty confusing but the gist is that when a new frame comes in, we find what pyramid tiles it
-   * could cover. For each of those tiles, if it improves the coverage type (no coverage to partial coverage, partial
+  /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
+   * could cover. For each of those tiles, if the frame improves the coverage type (no coverage to partial coverage, partial
    * coverage to full coverage) its data is copied to that tile immediately so that the user sees updates whenever they
    * cover a new area. Otherwise, we see if the image has less motion blur than whatever frame filled that tile. If
    * it does, we put it in a queue and wait 10 iterations before putting that frame's data into the tile. In that time,
@@ -48,7 +48,7 @@ namespace pathCam {
       t.detach();
     }
 
-
+// PROCESS NEW FRAMES BEGIN
     if (!staging.empty()) {
       auto ri = staging.front();
       auto img = ri->image;
@@ -62,7 +62,7 @@ namespace pathCam {
 
       //grab affected tiles with their category of coverage
       auto affectedPyramidTilesWithStatus = calculate_affected_tiles_with_status(
-        Point2f(ri->absoluteCoords.x, ri->absoluteCoords.y));
+        Point2f(ri->absoluteCoords));
 
 
       //calculate: for which of the affected tiles is this frame an improvement?
@@ -77,6 +77,7 @@ namespace pathCam {
             pyrTileObj->status = el.second;
             immediateProcessingTiles.push_back(el.first);
           }
+          // //this if you want edge tiles. not very functional
           // pyrTileObj->status = el.second;
           // immediateProcessingTiles.push_back(el.first);
         }
@@ -108,7 +109,10 @@ namespace pathCam {
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
       ++positionForNextWaitngFrame;
     }
+// PROCESS NEW FRAMES END
 
+
+//PROCESS OLD FRAMES BEGIN
 
     //process delayed frames, allowing them to blur correct if necessary
     //this is an erase-remove_if implementation with a lambda function inside that updates tileObj
@@ -156,9 +160,12 @@ namespace pathCam {
       img->free_memory_RAW();
       img = nullptr;
     }
+// PROCESS OLD FRAMES END
   }
 
   void MetricComposite::align_and_rebuild() {
+    bai = new BundleAdjustmentIntegrator();
+
     auto start = std::chrono::high_resolution_clock::now();
 
     auto members = find_contributing_images();
@@ -189,47 +196,47 @@ namespace pathCam {
 
     const std::vector memberImages(members.begin(), members.end());
     auto tracks = ftg->generateCurrentTracks(memberImages);
-    parent->bai->run_bundle_adjustment(tracks, memberImages);
+    bai->run_bundle_adjustment(tracks, memberImages);
 
     float maxDev = 0, avgDev = 0;
     for (auto img: memberImages) {
       if (!img->regInfo->stayFixedDuringBundleAdjustment) {
-        auto pv = parent->bai->optimizer->poseVertex(img->index);
+        auto pv = bai->optimizer->poseVertex(img->index);
         Point2i coords(-pv->t[0], -pv->t[1]);
         Point2i diff = img->regInfo->absoluteCoords - coords;
 
         img->regInfo->absoluteCoords = coords;
 
         //assert(abs(pv->t[2]/10000 - 1) < 0.03);
-        if (abs(diff.x) > maxDev) {
-          maxDev = abs(diff.x);
-        }
-        if (abs(diff.y) > maxDev) {
-          maxDev = abs(diff.y);
-        }
-        avgDev += abs(diff.x) + abs(diff.y);
+        // if (abs(diff.x) > maxDev) {
+        //   maxDev = abs(diff.x);
+        // }
+        // if (abs(diff.y) > maxDev) {
+        //   maxDev = abs(diff.y);
+        // }
+        // avgDev += abs(diff.x) + abs(diff.y);
       }
     }
-    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start).count();
-    avgDev /= (2 * memberImages.size());
-    int k = 0;
+
 
     rebuild(memberImages);
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start).count();
+    std::cout<<"total align time comp "<<componentIndex<<": "<<t3<<std::endl;
   }
 
   void MetricComposite::rebuild(std::vector<Image *> members) {
     auto start = std::chrono::high_resolution_clock::now();
 
-    Mat blank(parent->tileSize, parent->tileSize,CV_8UC4, Scalar(0, 0, 0, 0));
-    Mat mask(parent->tileSize, parent->tileSize,CV_8UC1, Scalar(255));
+    // Mat blank(parent->tileSize, parent->tileSize,CV_8UC4, Scalar(0, 0, 0, 0));
+    // Mat mask(parent->tileSize, parent->tileSize,CV_8UC1, Scalar(255));
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
-      auto box = Rect_<float>(tileIdx.x * parent->tileSize, tileIdx.y * parent->tileSize, parent->tileSize,
-                              parent->tileSize);
-      std::vector v = {tileIdx};
-      imagePyramid->insertTilesAtBase(blank, mask, box, v);
+      // auto box = Rect_<float>(tileIdx.x * parent->tileSize, tileIdx.y * parent->tileSize, parent->tileSize,
+      //                         parent->tileSize);
+      // std::vector v = {tileIdx};
+      // imagePyramid->insertTilesAtBase(blank, mask, box, v);
     }
     imagePyramid->liveTiles.clear();
 
@@ -345,13 +352,16 @@ namespace pathCam {
   }
 
 
-  void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool forceFullImage) {
+  void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, const bool forceFullImage) {
     assert(parent->unifiedMemory); //change this to a fix later
+
     if (!img->in_memory()) {
       img->load_raw_from_disk();
     }
+    img->load_raw_from_disk(); //not a mistake. we have two process that need the raw, second call increments the counter
 
     if (!img->subsequentMatchLaunched) {
+      img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       auto cms = new ComponentMatchSearch(parent, img);
       parent->jqSecondary->add_runnable(cms);
@@ -372,7 +382,7 @@ namespace pathCam {
   }
 
 
-  std::vector<std::pair<Point2i, int> > MetricComposite::calculate_affected_tiles_with_status(Point2f AbC) const {
+  std::vector<std::pair<Point2i, int> > MetricComposite::calculate_affected_tiles_with_status(const Point2f AbC) const {
     std::vector<std::pair<Point2i, int> > results;
 
     if (componentMagLabel == Image::_2X) {
@@ -430,11 +440,11 @@ namespace pathCam {
     return results;
   }
 
-  int MetricComposite::get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) {
+  int MetricComposite::get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) const {
     auto p1 = _imgAbC + Point2i(imageSize.width / 2, imageSize.height / 2);
     auto p2 = _tileCoord * parent->tileSize + Point2i(parent->tileSize / 2, parent->tileSize / 2);
 
-    return pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2);
+    return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y);
   }
 
   std::vector<std::pair<Image *, Image *> > MetricComposite::calculate_member_overlaps(std::vector<Image *> images) {
@@ -464,7 +474,7 @@ namespace pathCam {
     return results;
   }
 
-  bool MetricComposite::image_improves_tile(std::shared_ptr<TileObj> _to, Image *_img) {
+  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image *_img) const {
     //tile has no owner, candidate frame wins by default
     if (!_to->owner) {
       return true;

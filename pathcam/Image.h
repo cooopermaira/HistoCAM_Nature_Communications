@@ -33,7 +33,7 @@ namespace pathCam {
     cv::Point2i absoluteCoords;
     cv::Point2f debugInitialGuess;
 
-    Poco::FastMutex buffer_mutex;
+    Poco::FastMutex buffer_mutex,siftMutex;
     std::mutex cudaBufferMutex, blurMutex;
     std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
@@ -59,7 +59,10 @@ namespace pathCam {
     ~Image();
 
     void extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                      float lowestScale, float ambiguity, bool async, cv::cuda::GpuMat &buffer);
+                      float lowestScale, cv::cuda::GpuMat &buffer);
+
+    void extract_sift(int numPts, int octaves, float initBlur, float thresh,
+                  float lowestScale);
 
     void set_memory_pool(MemoryPool *mempool_in) {
       mempool = mempool_in;

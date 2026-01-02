@@ -10,6 +10,7 @@
 
 namespace pathCam {
     class FeatureTrackGenerator;
+    class BundleAdjustmentIntegrator;
     class MetricComposite : public Composite {
     public:
         MetricComposite(StreamCam *parent, Size image_size, int componentIndex);
@@ -20,21 +21,22 @@ namespace pathCam {
 
         std::vector<std::pair<Point2i,int>> calculate_affected_tiles_with_status(Point2f AbC) const;
 
-        int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord);
+        int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) const;
 
         void process_tiles(Image *img, std::vector<Point2i> &tiles, bool forceFullImage = false);
 
         void align_and_rebuild() override;
 
-        bool image_improves_tile(std::shared_ptr<TileObj> _to, Image* _img);
+        bool image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image* _img) const;
 
-        std::unordered_set<Image *> find_contributing_images() const;
+        [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const;
 
         std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});
 
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
 
         FeatureTrackGenerator* ftg;
+        BundleAdjustmentIntegrator* bai;
 
         int frameDelay;
         int positionForNextWaitngFrame = 0;

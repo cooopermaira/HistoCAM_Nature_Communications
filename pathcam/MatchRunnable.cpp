@@ -9,15 +9,12 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  MatchRunnable::MatchRunnable(StreamCam *parent, unsigned long image_idx) : RunnableIntermediate(image_idx, 2),
-                                                                             parent(parent),
-                                                                             image_idx(image_idx) {
-  };
+
 
   cuda::GpuMat &getThreadConvertSpace(int width, int height) {
-    static thread_local cuda::GpuMat buffer;
+    thread_local cuda::GpuMat buffer;
 
-    if (buffer.empty()) {
+    if (buffer.size().area() < height * width) {
       buffer.create(height, width,CV_32FC1);
     }
     return buffer;
@@ -27,6 +24,12 @@ namespace pathCam {
     auto myComp = reinterpret_cast<MetricComposite *>(parent->composites[image->regInfo->component_membership]);
     auto matcher = DescriptorMatcher(parent->matcher_type);
     std::vector<Match *> matches;
+
+    image->siftMutex.lock();
+    image->extract_sift(parent->siftPoints,4,0,0.4f,0.1f,
+      getThreadConvertSpace(parent->siftWindow,parent->siftWindow));
+    image->siftMutex.unlock();
+    image->free_memory_RAW();
 
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);

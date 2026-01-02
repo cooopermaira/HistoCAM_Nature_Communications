@@ -29,7 +29,6 @@ namespace pathCam {
 
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
-
       //debug_termination_check();
 
       //pull new components that might need to be processed
@@ -43,7 +42,6 @@ namespace pathCam {
       //if nothing in the Q but termination condition not met, wait
       if (parent->compositeQ_empty()) {
         if (isNewComp) {
-
           if (parent->inferencing) {
             push_remaining_tiles_for_inference();
 
@@ -74,14 +72,14 @@ namespace pathCam {
         }
 
         if (!indexes.empty()) {
-          Image* lastViewedFrame = nullptr;
-          for (auto index : indexes) {
+          Image *lastViewedFrame = nullptr;
+          for (auto index: indexes) {
             stage(index);
             lastViewedFrame = index->image;
           }
 
           auto start = std::chrono::high_resolution_clock::now();
-          for (auto &comp : parent->composites) {
+          for (auto &comp: parent->composites) {
             comp->update();
           }
           auto stop = std::chrono::high_resolution_clock::now();
@@ -90,55 +88,74 @@ namespace pathCam {
           parent->notify_observers();
           parent->lastViewedFrame = lastViewedFrame;
         }
-
-
       }
 
       if (!parent->microscopeInput && parent->loaderCount == 0) {
         submit_outstanding_jobs();
       }
     }
+    std::cout << "CM duration: " + std::to_string(duration) << std::endl;
 
-    // double val = 0;
-    // for (auto &img : parent->images) {
-    //   if (img) {
-    //     val += img->blurTime;
-    //   }
-    // }
 
     //process delayed frames
-    auto t1 = std::chrono::high_resolution_clock::now();
-    for (auto &comp: parent->composites) {
-      if (comp->suspended){continue;}
-      auto mc = reinterpret_cast<MetricComposite*>(comp);
-      for (int i = 0; i < mc->frameDelay; ++i) {
-        mc->update();
-      }
-      while (mc->outstandingCMS_jobs > 0) {
-        Poco::Thread::sleep(100);
-      }
 
-      //mc->align_and_rebuild();
-      // comp->get_flatfield();
-      // comp->ff_correct_existing_tiles();
+    std::vector<std::thread> threads;
+
+    for (auto &comp: parent->composites) {
+      if (comp->suspended) { continue; }
+      auto mc = reinterpret_cast<MetricComposite *>(comp);
+
+      threads.emplace_back([mc]() {
+        for (int i = 0; i < mc->frameDelay; ++i) {
+          mc->update();
+        }
+      });
     }
-    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
-    std::cout<<"wait time "<<t2<<std::endl;
+
+    for (auto &t: threads) {
+      t.join();
+    }
+    threads.clear();
+
+    auto tAlign = std::chrono::high_resolution_clock::now();
+
+    for (auto &comp: parent->composites) {
+      if (comp->suspended) { continue; }
+      auto mc = reinterpret_cast<MetricComposite *>(comp);
+
+      threads.emplace_back([mc]() {
+        auto t1 = std::chrono::high_resolution_clock::now();
+        while (mc->outstandingCMS_jobs > 0) {
+          Poco::Thread::sleep(100);
+        }
+        auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
+        std::cout << "wait time " << t2 << std::endl;
+
+        mc->align_and_rebuild();
+      });
+
+    }
+    for (auto &t: threads) {
+      t.join();
+    }
+    auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
+    std::cout << "total align time " << tAlignEnd << std::endl;
 
     //parent->composites[0]->align_and_rebuild();
-    auto myC = reinterpret_cast<MetricComposite*>(parent->composites[0]);
-    std::cout<<"fh time: "<<myC->fhTime<<std::endl;
+    auto myC = reinterpret_cast<MetricComposite *>(parent->composites[0]);
+    auto v = myC->imagePyramid->liveTiles.size();
 
-    std::cout << "CM duration: " + std::to_string(duration) << std::endl;
 
 
 
     push_remaining_tiles_for_inference();
 
-    std::cout<<"debug frame count: "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugFrameCount<<std::endl;
-    std::cout<<"tiles processed (immediate): "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount1<<std::endl;
-    std::cout<<"tiles processed (later): "<<reinterpret_cast<MetricComposite*>(parent->composites[0])->debugTileCount2<<std::endl;
-
+    std::cout << "debug frame count: " << reinterpret_cast<MetricComposite *>(parent->composites[0])->debugFrameCount <<
+        std::endl;
+    std::cout << "tiles processed (immediate): " << reinterpret_cast<MetricComposite *>(parent->composites[0])->
+        debugTileCount1 << std::endl;
+    std::cout << "tiles processed (later): " << reinterpret_cast<MetricComposite *>(parent->composites[0])->
+        debugTileCount2 << std::endl;
 
 
     //save_components_to_disk();
@@ -163,7 +180,8 @@ namespace pathCam {
 
 
       auto stop = std::chrono::high_resolution_clock::now();
-      std::cout<<"SAM initialization runtime: "+std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count())<<std::endl;;
+      std::cout << "SAM initialization runtime: " + std::to_string(
+        std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count()) << std::endl;;
     }
 
     parent->compositing = false;
@@ -197,7 +215,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/home/pathcam/pyr.png",true,true);
+      i->save_pyramid_as_image("/home/pathcam/pyr.png", true, true);
     }
   }
 
@@ -208,9 +226,9 @@ namespace pathCam {
     std::vector<unsigned long> emptyList;
     auto ans = parent->get_image_ref(emptyList);
 
-    std::vector<RunnableIntermediate*> somehowOutstandingMatchables;
-    for (auto &img : ans) {
-      auto sojr = parent->JobQ->get_job_ref_index_and_sort_order(2,img->index);
+    std::vector<RunnableIntermediate *> somehowOutstandingMatchables;
+    for (auto &img: ans) {
+      auto sojr = parent->JobQ->get_job_ref_index_and_sort_order(2, img->index);
       if (parent->JobQ->jobRefs.size() <= sojr.first) {
         return;
       }
@@ -219,11 +237,11 @@ namespace pathCam {
         somehowOutstandingMatchables.push_back(job);
       }
     }
-    std::vector<RunnableIntermediate*> unprocessedJobs,canceledJobs;
-    for (auto &job : somehowOutstandingMatchables) {
+    std::vector<RunnableIntermediate *> unprocessedJobs, canceledJobs;
+    for (auto &job: somehowOutstandingMatchables) {
       if (job->unprocessed) {
         unprocessedJobs.push_back(job);
-      }else {
+      } else {
         canceledJobs.push_back(job);
       }
     }

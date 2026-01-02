@@ -27,7 +27,7 @@ namespace pathCam {
   }
 
   SiftFeatureMatcher::SiftFeatureMatcher(StreamCam *parent) : PostProcessorBase(parent),
-                                                              bai(new BundleAdjustmentIntegrator(parent)),
+                                                              bai(new BundleAdjustmentIntegrator()),
                                                               ftg(new FeatureTrackGenerator),
                                                               queueMutex(new Poco::FastMutex),
                                                               loopMutex(new Poco::FastMutex),

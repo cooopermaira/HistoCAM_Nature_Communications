@@ -174,13 +174,12 @@ namespace pathCam {
 
   class BundleAdjustmentIntegrator {
   public:
-    BundleAdjustmentIntegrator(StreamCam *_parent) : parent(_parent) {
+    BundleAdjustmentIntegrator(){
       optimizer = cuba::CudaBundleAdjustment::create();
     };
 
     cuba::CudaBundleAdjustment::Ptr optimizer;
 
-    StreamCam *parent;
 
     void run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images);
 

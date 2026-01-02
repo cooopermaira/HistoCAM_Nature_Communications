@@ -4,13 +4,21 @@
 #include <pathCam.h>
 
 namespace pathCam {
+  cuda::GpuMat &getThreadConvertSpace(int width, int height);// {
+  //   thread_local cuda::GpuMat buffer;
+  //
+  //   if (buffer.size().area() < height * width) {
+  //     buffer.create(height, width,CV_32FC1);
+  //   }
+  //   return buffer;
+  // }
+
   static cuda::GpuMat get_grayscale(Image * &_img) {
-    cuda::GpuMat temp;
+    cuda::GpuMat temp = getThreadConvertSpace(_img->width, _img->height);
     Size size(_img->width, _img->height);
     cuda::GpuMat image_Mat(size, CV_8U, _img->get_raw_cuda());
-    cuda::cvtColor(image_Mat, temp, COLOR_BayerBG2GRAY);
-    temp.convertTo(image_Mat,CV_32FC1);
-    return image_Mat;
+    image_Mat.convertTo(temp,CV_32FC1);
+    return temp;
   }
 
   void sort_overlaps_by_likelihood(std::vector<std::pair<Image *, Rect> > &_overlaps, const float &_targetScale) {
@@ -60,42 +68,32 @@ namespace pathCam {
 
   bool Composite::establish_scale_between_pairs(Image *_rootImg, Image *_target) {
     //get my sift data
+    _rootImg->siftMutex.lock();
     if (!_rootImg->siftInitialized) {
       _rootImg->load_raw_from_disk();
 
       if (!parent->unifiedMemory && !_rootImg->cudaBufferReady) {
         _rootImg->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
-      auto myGray = get_grayscale(_rootImg);
-      CudaImage cImgGry;
-      cImgGry.Allocate(imageSize.width, imageSize.height, myGray.step / sizeof(float), false,
-                       reinterpret_cast<float *>(myGray.data), nullptr);
 
-      InitSiftData(_rootImg->siftData, 100000, true, true);
-      catch_ExtractSift(_rootImg->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
-      _rootImg->siftInitialized = true;
-
+      _rootImg->extract_sift(60000,4,0,0.4f,0.1f,getThreadConvertSpace(parent->siftWindow,parent->siftWindow));
       _rootImg->free_memory_RAW();
     }
+    _rootImg->siftMutex.unlock();
 
     //get their sift data
+    _target->siftMutex.lock();
     if (!_target->siftInitialized) {
       _target->load_raw_from_disk();
 
       if (!parent->unifiedMemory && !_target->cudaBufferReady) {
         _target->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
-      auto theirGray = get_grayscale(_target);
-      CudaImage cImgGry;
-      cImgGry.Allocate(imageSize.width, imageSize.height, theirGray.step / sizeof(float), false,
-                       reinterpret_cast<float *>(theirGray.data), nullptr);
 
-      InitSiftData(_target->siftData, 100000, true, true);
-      catch_ExtractSift(_target->siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
-      _target->siftInitialized = true;
-
+      _target->extract_sift(60000,4,0,0.4,0.1f,getThreadConvertSpace(parent->siftWindow,parent->siftWindow));
       _target->free_memory_RAW();
     }
+    _target->siftMutex.unlock();
 
     MatchSiftData(_rootImg->siftData, _target->siftData);
     std::vector<float> homography(9);
@@ -154,6 +152,7 @@ namespace pathCam {
           << _target->regInfo->component_membership << std::endl;
       return true;
     }
+    pairwiseDistance += (1 - relativeScale) * Point2f(float(imageSize.width - parent->siftWindow) / 2.f, float(imageSize.height - parent->siftWindow) / 2.f);
 
     Point2f queryAbC = pairwiseDistance + theirAbC;
 
@@ -166,6 +165,7 @@ namespace pathCam {
 
     assert(scale > 0);
     set_scale(scale,true);
+    auto p = resultantPoint / scale;
     set_offset(resultantPoint / scale);
 
     std::cout<<"component "<<componentIndex<<" XC registered"<<std::endl;

@@ -39,125 +39,6 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
 ImageViewComponent::~ImageViewComponent() {
 }
 
-void ImageViewComponent::refreshImage() {
-  const ScopedLock lock(mutex);
-  zoomAndCenter();
-  repaint();
-}
-
-void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
-  const ScopedLock lock(mutex);
-
-  MRImage = image;
-
-  horizontalScrollBar.setRangeLimits(MRImage->bounds.x, MRImage->bounds.width);
-  verticalScrollBar.setRangeLimits(MRImage->bounds.y, MRImage->bounds.height);
-
-  horizontalScrollBar.setVisible(true);
-  verticalScrollBar.setVisible(true);
-
-  zoomAndCenter();
-  repaint();
-}
-
-void ImageViewComponent::mouseDown(const juce::MouseEvent &event) {
-  if (event.mods.isLeftButtonDown()) {
-    lastMousePosition = event.getPosition();
-  }
-}
-
-/*
-void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
-  if (event.mods.isLeftButtonDown()) {
-    juce::Point<int> idelta = event.getPosition() - lastMousePosition;
-    fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
-    translate(-delta);
-    lastMousePosition = event.getPosition();
-    repaint();
-  }
-}
-*/
-
-void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
-  if (event.mods.isLeftButtonDown()) {
-    juce::Point<int> idelta = event.getPosition() - lastMousePosition;
-    fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
-    translate(-delta);
-    lastMousePosition = event.getPosition();
-
-    // FRAME RATE LIMITING HERE
-    auto now = juce::Time::getCurrentTime();
-    if ((now - lastRepaintTime).inMilliseconds() >= MIN_REPAINT_INTERVAL_MS) {
-      repaint();
-      lastRepaintTime = now;
-    }
-    // Mouse position is still updated, just fewer repaints
-  }
-}
-
-
-void ImageViewComponent::mouseWheelMove(const MouseEvent &event, const MouseWheelDetails &wheel) {
-  scaleCenter(fPoint(1.0 - wheel.deltaY, 1.0 - wheel.deltaY));
-  repaint();
-}
-
-void ImageViewComponent::mouseMagnify(const MouseEvent &, float magnifyAmmount) {
-  scaleCenter(fPoint(1.0 / magnifyAmmount, 1.0 / magnifyAmmount));
-  repaint();
-}
-
-
-bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) {
-  if (key == juce::KeyPress::createFromDescription("-")) {
-    scaleCenter(fPoint(2.0, 2.0));
-    repaint();
-    return true; // Key press handled
-  }
-  if (key == juce::KeyPress::createFromDescription("=")) {
-    //Really "+"
-    scaleCenter(fPoint(0.5, 0.5));
-    repaint();
-    return true; // Key press handled
-  }
-  if (key == juce::KeyPress::createFromDescription("a")) {
-    shadeClasses = !shadeClasses;
-    repaint();
-    return true;
-  }
-  if (key == juce::KeyPress::createFromDescription("s")) {
-    shadeLevels = !shadeLevels;
-    repaint();
-    return true; // Key press handled
-  }
-  if (key==juce::KeyPress::createFromDescription("q")) {
-    if (!MRImage->images.empty()) {
-      //MRImage->images[0]->parent->as->create_segmentation()
-    }
-  }
-  if (key.getKeyCode() == KeyPress::escapeKey) {
-    JUCEApplication::getInstance()->systemRequestedQuit();
-  }
-  return false; // Key press not handled
-}
-
-void ImageViewComponent::updateScrollbar() {
-  if (!view->isEmpty()) {
-    horizontalScrollBar.setCurrentRangeStart(view->getCentreX());
-    verticalScrollBar.setCurrentRangeStart(view->getCentreY());
-  }
-}
-
-
-void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRangeStart) {
-  // This method is called when the scroll bar is moved
-  if (scrollBar == &horizontalScrollBar) {
-    if (isVisible()) { view->setCentre(newRangeStart, view->getCentreY()); }
-    repaint();
-  } else if (scrollBar == &verticalScrollBar) {
-    if (isVisible()) { view->setCentre(view->getCentreX(), newRangeStart); }
-    repaint();
-  }
-}
 
 void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
   bool canShadeClasses = false;
@@ -363,6 +244,128 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     g.drawText(sCam->classes_title, xPosition + squareSize + textPadding, yPosition, 100,
                squareSize,
                Justification::centredLeft, true);
+  }
+}
+
+
+
+void ImageViewComponent::refreshImage() {
+  const ScopedLock lock(mutex);
+  zoomAndCenter();
+  repaint();
+}
+
+void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
+  const ScopedLock lock(mutex);
+
+  MRImage = image;
+
+  horizontalScrollBar.setRangeLimits(MRImage->bounds.x, MRImage->bounds.width);
+  verticalScrollBar.setRangeLimits(MRImage->bounds.y, MRImage->bounds.height);
+
+  horizontalScrollBar.setVisible(true);
+  verticalScrollBar.setVisible(true);
+
+  zoomAndCenter();
+  repaint();
+}
+
+void ImageViewComponent::mouseDown(const juce::MouseEvent &event) {
+  if (event.mods.isLeftButtonDown()) {
+    lastMousePosition = event.getPosition();
+  }
+}
+
+/*
+void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
+  if (event.mods.isLeftButtonDown()) {
+    juce::Point<int> idelta = event.getPosition() - lastMousePosition;
+    fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
+    translate(-delta);
+    lastMousePosition = event.getPosition();
+    repaint();
+  }
+}
+*/
+
+void ImageViewComponent::mouseDrag(const juce::MouseEvent &event) {
+  if (event.mods.isLeftButtonDown()) {
+    juce::Point<int> idelta = event.getPosition() - lastMousePosition;
+    fPoint delta = fPoint(idelta.x, idelta.y) * screen2viewScale(*view);
+    translate(-delta);
+    lastMousePosition = event.getPosition();
+
+    // FRAME RATE LIMITING HERE
+    auto now = juce::Time::getCurrentTime();
+    if ((now - lastRepaintTime).inMilliseconds() >= MIN_REPAINT_INTERVAL_MS) {
+      repaint();
+      lastRepaintTime = now;
+    }
+    // Mouse position is still updated, just fewer repaints
+  }
+}
+
+
+void ImageViewComponent::mouseWheelMove(const MouseEvent &event, const MouseWheelDetails &wheel) {
+  scaleCenter(fPoint(1.0 - wheel.deltaY, 1.0 - wheel.deltaY));
+  repaint();
+}
+
+void ImageViewComponent::mouseMagnify(const MouseEvent &, float magnifyAmmount) {
+  scaleCenter(fPoint(1.0 / magnifyAmmount, 1.0 / magnifyAmmount));
+  repaint();
+}
+
+
+bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) {
+  if (key == juce::KeyPress::createFromDescription("-")) {
+    scaleCenter(fPoint(2.0, 2.0));
+    repaint();
+    return true; // Key press handled
+  }
+  if (key == juce::KeyPress::createFromDescription("=")) {
+    //Really "+"
+    scaleCenter(fPoint(0.5, 0.5));
+    repaint();
+    return true; // Key press handled
+  }
+  if (key == juce::KeyPress::createFromDescription("a")) {
+    shadeClasses = !shadeClasses;
+    repaint();
+    return true;
+  }
+  if (key == juce::KeyPress::createFromDescription("s")) {
+    shadeLevels = !shadeLevels;
+    repaint();
+    return true; // Key press handled
+  }
+  if (key==juce::KeyPress::createFromDescription("q")) {
+    if (!MRImage->images.empty()) {
+      //MRImage->images[0]->parent->as->create_segmentation()
+    }
+  }
+  if (key.getKeyCode() == KeyPress::escapeKey) {
+    JUCEApplication::getInstance()->systemRequestedQuit();
+  }
+  return false; // Key press not handled
+}
+
+void ImageViewComponent::updateScrollbar() {
+  if (!view->isEmpty()) {
+    horizontalScrollBar.setCurrentRangeStart(view->getCentreX());
+    verticalScrollBar.setCurrentRangeStart(view->getCentreY());
+  }
+}
+
+
+void ImageViewComponent::scrollBarMoved(juce::ScrollBar *scrollBar, double newRangeStart) {
+  // This method is called when the scroll bar is moved
+  if (scrollBar == &horizontalScrollBar) {
+    if (isVisible()) { view->setCentre(newRangeStart, view->getCentreY()); }
+    repaint();
+  } else if (scrollBar == &verticalScrollBar) {
+    if (isVisible()) { view->setCentre(view->getCentreX(), newRangeStart); }
+    repaint();
   }
 }
 
