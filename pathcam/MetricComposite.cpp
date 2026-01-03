@@ -5,7 +5,39 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  inline size_t querySiftRect_sortedByX_append(
+  inline SiftData collect_SiftData(const std::vector<std::pair<Image*,std::vector<const SiftPoint*>>> &_inVec, int _subsample) {
+    SiftData siftData;
+    int totalPoints = 0;
+    for (auto &[img,vec] : _inVec) {
+      totalPoints += vec.size();
+    }
+    totalPoints /= _subsample;
+
+    InitSiftData(siftData,totalPoints,true,true);
+
+
+    int startPos = 0;
+    for (auto &[img,vec] : _inVec) {
+      Point2f shift((img->width - img->parent->siftWindow) / 2 + img->regInfo->absoluteCoords.x,
+        (img->height - img->parent->siftWindow) / 2 + img->regInfo->absoluteCoords.y);
+      for (int i = 0; i < static_cast<int>(vec.size())/_subsample; ++i) {
+        const SiftPoint* src = vec[i * _subsample];            // take every 10th input
+        siftData.h_data[startPos + i] = *src;          // pack output contiguously
+        siftData.h_data[startPos + i].xpos += shift.x;
+        siftData.h_data[startPos + i].ypos += shift.y;
+      }
+      startPos += static_cast<int>(vec.size())/_subsample;
+    }
+
+    cudaMemcpy(siftData.d_data, siftData.h_data,
+               static_cast<size_t>(startPos) * sizeof(SiftPoint),
+               cudaMemcpyHostToDevice);
+
+    siftData.numPts = startPos;
+    return siftData;
+  }
+
+  inline void querySiftRect_sortedByX(
     const SiftData& sd,
     float xmin, float xmax,
     float ymin, float ymax,
@@ -13,9 +45,9 @@ namespace pathCam {
   {
     assert(sd.h_data);
     assert(sd.numPts >= 0 && sd.numPts <= sd.maxPts);
-
     if (sd.numPts == 0 || xmin > xmax || ymin > ymax) {
-      return 0;
+      out.clear();
+      return;
     }
 
     const SiftPoint* begin = sd.h_data;
@@ -33,26 +65,14 @@ namespace pathCam {
                                  return v < p.xpos;
                                });
 
-    // Worst-case number we might append this call (before y-filter)
-    const size_t maxNew = static_cast<size_t>(hi - lo);
-    if (maxNew == 0) return 0;
-
-    // Reserve only what we might need additionally.
-    // This avoids reallocations while still letting the vector grow across tiles.
-    const size_t needed = out.size() + maxNew;
-    if (out.capacity() < needed) {
-      out.reserve(needed);
-    }
-
-    const size_t before = out.size();
+    out.clear();
+    out.reserve(static_cast<size_t>(hi - lo)); // upper bound on hits
 
     for (auto it = lo; it != hi; ++it) {
       if (it->ypos >= ymin && it->ypos <= ymax) {
         out.push_back(it); // pointers into sd.h_data
       }
     }
-
-    return out.size() - before;
   }
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
@@ -69,7 +89,7 @@ namespace pathCam {
     fourChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC4, fourChannelPreallocated.data);
 
     circleMask = Mat::zeros(image_size, CV_8U);
-    circle(circleMask, cv::Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
+    circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
            Scalar(255),
            -1);
   }
@@ -295,6 +315,8 @@ namespace pathCam {
 
     int noFtCount = 0, ftCount = 0,tileIntersects = 0,tileNoIntersect = 0;
     long totalFtQTime = 0;
+    std::vector<std::pair<Image*,std::vector<const SiftPoint*>>> componentFeatures;
+
     for (auto &img: members) {
       std::vector<Point2i> tileIndexes;
       for (auto &tileIdx: imagePyramid->liveTiles) {
@@ -309,44 +331,54 @@ namespace pathCam {
       }
       process_tiles(img, tileIndexes);
 
-      std::vector<const SiftPoint*> componentFeatures;
+
 
       auto start = std::chrono::high_resolution_clock::now();
       Point2i siftWindowCorner((imageSize.width - parent->siftWindow)/2,(imageSize.height - parent->siftWindow)/2);
       Rect imgSiftWindow(img->regInfo->absoluteCoords + siftWindowCorner,Size(parent->siftWindow,parent->siftWindow));
+
       for (auto &tileInd : tileIndexes) {
         auto lowerQueryPt = tileInd * parent->tileSize - img->regInfo->absoluteCoords - siftWindowCorner;
         auto upperQueryPt = lowerQueryPt + Point2i(parent->tileSize,parent->tileSize);
         assert(img->siftInitialized);
-        auto added = querySiftRect_sortedByX_append(img->siftData,
-          lowerQueryPt.x,upperQueryPt.x,lowerQueryPt.y,upperQueryPt.y,componentFeatures);
-        for (auto &sp : componentFeatures) {
-          sp->xpos += img->regInfo->absoluteCoords.x + siftWindowCorner.x;
-          sp->ypos += img->regInfo->absoluteCoords.y + siftWindowCorner.y;
+        std::vector<const SiftPoint*> fts;
+        auto start = std::chrono::high_resolution_clock::now();
+        querySiftRect_sortedByX(img->siftData,
+          lowerQueryPt.x,upperQueryPt.x,lowerQueryPt.y,upperQueryPt.y,fts);
+        totalFtQTime += std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start).count();
+        if (!fts.empty()) {
+          componentFeatures.emplace_back(img,fts);
         }
+        // for (auto &sp : componentFeatures) {
+        //   sp->xpos += img->regInfo->absoluteCoords.x + siftWindowCorner.x;
+        //   sp->ypos += img->regInfo->absoluteCoords.y + siftWindowCorner.y;
+        // }
 
-        if (added == 0) {
-          ++noFtCount;
-        }else {
-          ++ftCount;
-        }
+        // if (added == 0) {
+        //   ++noFtCount;
+        // }else {
+        //   ++ftCount;
+        // }
 
         auto r1 = Rect(tileInd * parent->tileSize,Size(parent->tileSize,parent->tileSize));
         auto intersect = r1 & imgSiftWindow;
+
         if (intersect.empty()) {
           ++tileNoIntersect;
         }else {
+          //int expectedPts = float(img->siftData.numPts)*float(intersect.area())/float(1024 * 1024);
           ++tileIntersects;
-        }
-        if (intersect.empty() && added > 0) {
-          int k = 0;
+          //std::cout<<expectedPts<<" "<<added<<std::endl;
         }
       }
-      totalFtQTime += std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start).count();
-    }
-    std::cout<<"noFtCount: "<<noFtCount<<" ftCount: "<<ftCount<<" total pt query time: "<<totalFtQTime<<" insct, no insct "<<tileIntersects<<" "<<tileNoIntersect<<std::endl;
 
+
+    }
+
+    compSiftData = collect_SiftData(componentFeatures,10);
+
+    std::cout<<"noFtCount: "<<noFtCount<<" ftCount: "<<ftCount<<" total pt query time: "<<totalFtQTime<<" insct, no insct "<<tileIntersects<<" "<<tileNoIntersect<<std::endl;
   }
 
 

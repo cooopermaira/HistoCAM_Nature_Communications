@@ -38,6 +38,8 @@ namespace pathCam {
         FeatureTrackGenerator* ftg;
         BundleAdjustmentIntegrator* bai;
 
+        SiftData compSiftData;
+
         int frameDelay;
         int positionForNextWaitngFrame = 0;
         int debugFrameCount = 0;
