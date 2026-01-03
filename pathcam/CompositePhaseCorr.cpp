@@ -100,7 +100,7 @@ namespace pathCam {
     int numMatches;
     bool validHomography = false;
     int count = 0, maxAttempts = 20;
-    while (!validHomography && count < maxAttempts) {
+    while (!validHomography && count < maxAttempts && xcMatchShouldContinue) {
       ++count;
       FindHomography(_rootImg->siftData, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
 
@@ -113,7 +113,7 @@ namespace pathCam {
           }
         }
       }
-      if (!validHomography && count < maxAttempts) {
+      if (!validHomography && count < maxAttempts && xcMatchShouldContinue) {
         shuffle_sift_data(_rootImg->siftData);
       }
     }
@@ -203,7 +203,7 @@ namespace pathCam {
         int count = 0;
         for (auto &[img,roi]: overlappingFrames) {
           std::cout << count++ << std::endl;
-          if (establish_scale_between_pairs(_rootImg, img)) {
+          if (establish_scale_between_pairs(_rootImg, img) || !xcMatchShouldContinue) {
             break;
           }
         }

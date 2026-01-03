@@ -5,6 +5,56 @@
 #include "pathCam.h"
 
 namespace pathCam {
+  inline size_t querySiftRect_sortedByX_append(
+    const SiftData& sd,
+    float xmin, float xmax,
+    float ymin, float ymax,
+    std::vector<const SiftPoint*>& out)
+  {
+    assert(sd.h_data);
+    assert(sd.numPts >= 0 && sd.numPts <= sd.maxPts);
+
+    if (sd.numPts == 0 || xmin > xmax || ymin > ymax) {
+      return 0;
+    }
+
+    const SiftPoint* begin = sd.h_data;
+    const SiftPoint* end   = sd.h_data + sd.numPts;
+
+    // First point with xpos >= xmin
+    auto lo = std::lower_bound(begin, end, xmin,
+                               [](const SiftPoint& p, float v) {
+                                 return p.xpos < v;
+                               });
+
+    // First point with xpos > xmax
+    auto hi = std::upper_bound(lo, end, xmax,
+                               [](float v, const SiftPoint& p) {
+                                 return v < p.xpos;
+                               });
+
+    // Worst-case number we might append this call (before y-filter)
+    const size_t maxNew = static_cast<size_t>(hi - lo);
+    if (maxNew == 0) return 0;
+
+    // Reserve only what we might need additionally.
+    // This avoids reallocations while still letting the vector grow across tiles.
+    const size_t needed = out.size() + maxNew;
+    if (out.capacity() < needed) {
+      out.reserve(needed);
+    }
+
+    const size_t before = out.size();
+
+    for (auto it = lo; it != hi; ++it) {
+      if (it->ypos >= ymin && it->ypos <= ymax) {
+        out.push_back(it); // pointers into sd.h_data
+      }
+    }
+
+    return out.size() - before;
+  }
+
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
       parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
     frameDelay = 10;
@@ -164,9 +214,9 @@ namespace pathCam {
   }
 
   void MetricComposite::align_and_rebuild() {
-    bai = new BundleAdjustmentIntegrator();
-
     auto start = std::chrono::high_resolution_clock::now();
+
+    bai = new BundleAdjustmentIntegrator();
 
     auto members = find_contributing_images();
     members.insert(root);
@@ -206,37 +256,23 @@ namespace pathCam {
         Point2i diff = img->regInfo->absoluteCoords - coords;
 
         img->regInfo->absoluteCoords = coords;
-
-        //assert(abs(pv->t[2]/10000 - 1) < 0.03);
-        // if (abs(diff.x) > maxDev) {
-        //   maxDev = abs(diff.x);
-        // }
-        // if (abs(diff.y) > maxDev) {
-        //   maxDev = abs(diff.y);
-        // }
-        // avgDev += abs(diff.x) + abs(diff.y);
       }
     }
 
-
     rebuild(memberImages);
+
+
+
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start).count();
     std::cout<<"total align time comp "<<componentIndex<<": "<<t3<<std::endl;
   }
 
   void MetricComposite::rebuild(std::vector<Image *> members) {
-    auto start = std::chrono::high_resolution_clock::now();
 
-    // Mat blank(parent->tileSize, parent->tileSize,CV_8UC4, Scalar(0, 0, 0, 0));
-    // Mat mask(parent->tileSize, parent->tileSize,CV_8UC1, Scalar(255));
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
-      // auto box = Rect_<float>(tileIdx.x * parent->tileSize, tileIdx.y * parent->tileSize, parent->tileSize,
-      //                         parent->tileSize);
-      // std::vector v = {tileIdx};
-      // imagePyramid->insertTilesAtBase(blank, mask, box, v);
     }
     imagePyramid->liveTiles.clear();
 
@@ -244,6 +280,10 @@ namespace pathCam {
       auto affectedTilesWithStatus = calculate_affected_tiles_with_status(img->regInfo->absoluteCoords);
       for (auto &p: affectedTilesWithStatus) {
         if (p.second == TileObj::singleFrameCoverage) {
+          auto ul = p.first * parent->tileSize;
+          assert(img->regInfo->absoluteCoords.x <= ul.x && img->regInfo->absoluteCoords.y <= ul.y &&
+            img->regInfo->absoluteCoords.x + imageSize.width >= ul.x + parent->tileSize &&
+            img->regInfo->absoluteCoords.y + imageSize.height >= ul.y + parent->tileSize);
           auto tileObj = imagePyramid->get_base_tile(p.first);
           if (image_improves_tile(tileObj, img)) {
             tileObj->owner = img;
@@ -253,102 +293,60 @@ namespace pathCam {
       }
     }
 
+    int noFtCount = 0, ftCount = 0,tileIntersects = 0,tileNoIntersect = 0;
+    long totalFtQTime = 0;
     for (auto &img: members) {
-      std::vector<Point2i> tiles;
+      std::vector<Point2i> tileIndexes;
       for (auto &tileIdx: imagePyramid->liveTiles) {
         auto tileObj = imagePyramid->get_base_tile(tileIdx);
         if (tileObj->owner == img) {
-          tiles.push_back(tileIdx);
+          tileIndexes.push_back(tileIdx);
+          auto ul = tileIdx * parent->tileSize;
+          assert(img->regInfo->absoluteCoords.x <= ul.x && img->regInfo->absoluteCoords.y <= ul.y &&
+            img->regInfo->absoluteCoords.x + imageSize.width >= ul.x + parent->tileSize &&
+            img->regInfo->absoluteCoords.y + imageSize.height >= ul.y + parent->tileSize);
         }
       }
-      process_tiles(img, tiles);
-    }
-    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start).count();
-    std::cout << "cuda bundle adjustment solve time " << t3 << std::endl;
+      process_tiles(img, tileIndexes);
 
-    /*
-        //visualize differences
-        int failCount = 0;
-        parent->ORB_params.nfeatures = 10000;
-        std::vector inds = {-1,0,1,0};
-        for (auto &tileIdx : imagePyramid->liveTiles) {
-          auto myTileObj = imagePyramid->get_base_tile(tileIdx);
+      std::vector<const SiftPoint*> componentFeatures;
 
-          for (int i = 0; i < 4; ++i) {
-            int x = inds[i];
-            int y = inds[(i + 1) % 4];
-            Point2i neighborPt = tileIdx + Point2i(x,y);
-
-            if (imagePyramid->liveTiles.find(neighborPt) != imagePyramid->liveTiles.end()) {
-              auto neighborObj = imagePyramid->get_base_tile(neighborPt);
-
-              if (neighborObj->owner != myTileObj->owner) {
-                //find this match
-                bool found = false;
-                Match* thisMatch = nullptr;
-                for (auto m : ftg->matches) {
-                  if ((m->image_1 == neighborObj->owner && m->image_2 == myTileObj->owner) ||
-                    (m->image_2 == neighborObj->owner && m->image_1 == myTileObj->owner)) {
-                    found = true;
-                    thisMatch = m;
-                    break;
-                  }
-                }
-                if (!found) {
-
-                  auto myImg = myTileObj->owner;
-                  if (!myImg->fullKeyPoints) {
-                    myImg->load_raw_from_disk();
-                    cuda::GpuMat rawMat(imageSize, CV_8U, myImg->get_raw_cuda());
-                    cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
-                    threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F, parent->cvCompositeStream);
-                    cuda::divide(convertHoldingGPU, ffGPU,
-                       convertHoldingGPU, 1, CV_32F, parent->cvCompositeStream);
-                    convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3, parent->cvCompositeStream);
-                    cvtColor(threeChannelPreallocated,myImg->reg_image,COLOR_BGR2GRAY);
-
-                    auto detector = FeatureDetector(parent->feature_type, parent->use_FREAK);
-                    detector.set_ORB_params(parent->ORB_params);
-                    detector.detect_and_compute(myImg);
-                    myImg->fullKeyPoints = true;
-                  }
-
-                  myImg = neighborObj->owner;
-                  if (!myImg->fullKeyPoints) {
-                    myImg->load_raw_from_disk();
-                    cuda::GpuMat rawMat(imageSize, CV_8U, myImg->get_raw_cuda());
-                    cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
-                    threeChannelPrealGPU.convertTo(convertHoldingGPU, CV_32F, parent->cvCompositeStream);
-                    cuda::divide(convertHoldingGPU, ffGPU,
-                       convertHoldingGPU, 1, CV_32F, parent->cvCompositeStream);
-                    convertHoldingGPU.convertTo(threeChannelPrealGPU, CV_8UC3, parent->cvCompositeStream);
-                    cvtColor(threeChannelPreallocated,myImg->reg_image,COLOR_BGR2GRAY);
-
-                    auto detector = FeatureDetector(parent->feature_type, parent->use_FREAK);
-                    detector.set_ORB_params();
-                    detector.detect_and_compute(myImg);
-                    myImg->fullKeyPoints = true;
-                  }
-
-
-                  auto matcher = DescriptorMatcher(parent->matcher_type);
-                  Match *m = new Match(neighborObj->owner, myTileObj->owner);
-                  matcher.match(m);
-
-                  if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 4)) {
-
-                  } else {
-                    MotionEstimator::findHomography(m, parent->estimator_type, 4);
-                    ++failCount;
-                  }
-                }
-              }
-            }
-          }
+      auto start = std::chrono::high_resolution_clock::now();
+      Point2i siftWindowCorner((imageSize.width - parent->siftWindow)/2,(imageSize.height - parent->siftWindow)/2);
+      Rect imgSiftWindow(img->regInfo->absoluteCoords + siftWindowCorner,Size(parent->siftWindow,parent->siftWindow));
+      for (auto &tileInd : tileIndexes) {
+        auto lowerQueryPt = tileInd * parent->tileSize - img->regInfo->absoluteCoords - siftWindowCorner;
+        auto upperQueryPt = lowerQueryPt + Point2i(parent->tileSize,parent->tileSize);
+        assert(img->siftInitialized);
+        auto added = querySiftRect_sortedByX_append(img->siftData,
+          lowerQueryPt.x,upperQueryPt.x,lowerQueryPt.y,upperQueryPt.y,componentFeatures);
+        for (auto &sp : componentFeatures) {
+          sp->xpos += img->regInfo->absoluteCoords.x + siftWindowCorner.x;
+          sp->ypos += img->regInfo->absoluteCoords.y + siftWindowCorner.y;
         }
-        std::cout<<"fail count "<<failCount<<std::endl;
-        */
+
+        if (added == 0) {
+          ++noFtCount;
+        }else {
+          ++ftCount;
+        }
+
+        auto r1 = Rect(tileInd * parent->tileSize,Size(parent->tileSize,parent->tileSize));
+        auto intersect = r1 & imgSiftWindow;
+        if (intersect.empty()) {
+          ++tileNoIntersect;
+        }else {
+          ++tileIntersects;
+        }
+        if (intersect.empty() && added > 0) {
+          int k = 0;
+        }
+      }
+      totalFtQTime += std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start).count();
+    }
+    std::cout<<"noFtCount: "<<noFtCount<<" ftCount: "<<ftCount<<" total pt query time: "<<totalFtQTime<<" insct, no insct "<<tileIntersects<<" "<<tileNoIntersect<<std::endl;
+
   }
 
 

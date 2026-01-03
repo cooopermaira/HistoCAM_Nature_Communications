@@ -46,7 +46,6 @@ namespace pathCam {
 
         std::atomic<int> outstandingCMS_jobs = 0;
 
-        bool xcMatchInitiated = false;
 
         std::shared_ptr<TiledImage> compositeImage;
 

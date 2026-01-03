@@ -107,6 +107,7 @@ namespace pathCam {
 
       threads.emplace_back([mc]() {
         for (int i = 0; i < mc->frameDelay; ++i) {
+          mc->xcMatchShouldContinue = false;
           mc->update();
         }
       });
@@ -138,13 +139,9 @@ namespace pathCam {
     for (auto &t: threads) {
       t.join();
     }
+
     auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
     std::cout << "total align time " << tAlignEnd << std::endl;
-
-    //parent->composites[0]->align_and_rebuild();
-    auto myC = reinterpret_cast<MetricComposite *>(parent->composites[0]);
-    auto v = myC->imagePyramid->liveTiles.size();
-
 
 
 

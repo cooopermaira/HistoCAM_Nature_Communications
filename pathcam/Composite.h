@@ -50,9 +50,11 @@ namespace pathCam {
     Rect_<float> tiledImageBounds;
     Poco::FastMutex update_mutex;
 
-    int joinedToo;
+    int joinedTo;
     bool suspended = false;
     bool flatfieldKnown = false;
+    bool xcMatchInitiated = false;
+    bool xcMatchShouldContinue = true;
     std::vector<Match*> componentJoinMatches;
 
 
