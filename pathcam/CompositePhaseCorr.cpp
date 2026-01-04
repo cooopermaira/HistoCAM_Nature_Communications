@@ -76,14 +76,18 @@ namespace pathCam {
         _rootImg->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
 
-      int bufW, bufH;
+      int bufW, bufH,octaves,pts;
       if (_fullImageFtExtract) {
         bufW = _rootImg->width;
         bufH = _rootImg->height;
+        octaves = 4;
+        pts = 60000;
       }else {
         bufW = bufH = parent->siftWindow;
+        octaves = 5;
+        pts = 100000;
       }
-      _rootImg->extract_sift(60000,4,0,0.4f,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
+      _rootImg->extract_sift(pts,octaves,0,0.4f,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
       _rootImg->free_memory_RAW();
     }
     if (_fullImageFtExtract) {
@@ -103,14 +107,18 @@ namespace pathCam {
         _target->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
 
-      int bufW, bufH;
+      int bufW, bufH,octaves,pts;
       if (_fullImageFtExtract) {
         bufW = _target->width;
         bufH = _target->height;
+        octaves = 4;
+        pts = 60000;
       }else {
         bufW = bufH = parent->siftWindow;
+        octaves = 5;
+        pts = 100000;
       }
-      _target->extract_sift(60000,4,0,0.4,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
+      _target->extract_sift(pts,octaves,0,0.4,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
       _target->free_memory_RAW();
     }
     if (_fullImageFtExtract) {
