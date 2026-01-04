@@ -313,8 +313,6 @@ namespace pathCam {
       }
     }
 
-    int noFtCount = 0, ftCount = 0,tileIntersects = 0,tileNoIntersect = 0;
-    long totalFtQTime = 0;
     std::vector<std::pair<Image*,std::vector<const SiftPoint*>>> componentFeatures;
 
     for (auto &img: members) {
@@ -331,54 +329,39 @@ namespace pathCam {
       }
       process_tiles(img, tileIndexes);
 
-
-
-      auto start = std::chrono::high_resolution_clock::now();
       Point2i siftWindowCorner((imageSize.width - parent->siftWindow)/2,(imageSize.height - parent->siftWindow)/2);
-      Rect imgSiftWindow(img->regInfo->absoluteCoords + siftWindowCorner,Size(parent->siftWindow,parent->siftWindow));
 
       for (auto &tileInd : tileIndexes) {
         auto lowerQueryPt = tileInd * parent->tileSize - img->regInfo->absoluteCoords - siftWindowCorner;
         auto upperQueryPt = lowerQueryPt + Point2i(parent->tileSize,parent->tileSize);
         assert(img->siftInitialized);
         std::vector<const SiftPoint*> fts;
-        auto start = std::chrono::high_resolution_clock::now();
         querySiftRect_sortedByX(img->siftData,
           lowerQueryPt.x,upperQueryPt.x,lowerQueryPt.y,upperQueryPt.y,fts);
-        totalFtQTime += std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start).count();
+
         if (!fts.empty()) {
           componentFeatures.emplace_back(img,fts);
         }
-        // for (auto &sp : componentFeatures) {
-        //   sp->xpos += img->regInfo->absoluteCoords.x + siftWindowCorner.x;
-        //   sp->ypos += img->regInfo->absoluteCoords.y + siftWindowCorner.y;
-        // }
-
-        // if (added == 0) {
-        //   ++noFtCount;
-        // }else {
-        //   ++ftCount;
-        // }
-
-        auto r1 = Rect(tileInd * parent->tileSize,Size(parent->tileSize,parent->tileSize));
-        auto intersect = r1 & imgSiftWindow;
-
-        if (intersect.empty()) {
-          ++tileNoIntersect;
-        }else {
-          //int expectedPts = float(img->siftData.numPts)*float(intersect.area())/float(1024 * 1024);
-          ++tileIntersects;
-          //std::cout<<expectedPts<<" "<<added<<std::endl;
-        }
       }
-
-
     }
 
-    compSiftData = collect_SiftData(componentFeatures,10);
+    compSiftData = collect_SiftData(componentFeatures,5);
+  }
 
-    std::cout<<"noFtCount: "<<noFtCount<<" ftCount: "<<ftCount<<" total pt query time: "<<totalFtQTime<<" insct, no insct "<<tileIntersects<<" "<<tileNoIntersect<<std::endl;
+  void MetricComposite::search_and_absorb_other_components() {
+    for (auto &m : componentJoinMatches) {
+      Image *myMember, *theirMember;
+      if (m->image_1->regInfo->component_membership == componentIndex) {
+        myMember = m->image_1;
+        theirMember = m->image_2;
+      }else {
+        myMember = m->image_2;
+        theirMember = m->image_1;
+      }
+      if (theirMember->regInfo->component_membership != componentIndex) {
+
+      }
+    }
   }
 
 

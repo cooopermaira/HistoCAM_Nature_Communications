@@ -5,13 +5,12 @@
 
 namespace pathCam {
   cuda::GpuMat &getThreadConvertSpace(int width, int height);// {
-  //   thread_local cuda::GpuMat buffer;
-  //
-  //   if (buffer.size().area() < height * width) {
-  //     buffer.create(height, width,CV_32FC1);
-  //   }
-  //   return buffer;
-  // }
+
+  void copy_sift_data(SiftData &dst,const SiftData& src) {
+    InitSiftData(dst,src.numPts,true,true);
+    cudaMemcpy(dst.d_data,src.d_data,src.numPts * sizeof(SiftPoint),cudaMemcpyDeviceToDevice);
+    memcpy(dst.h_data,dst.h_data,src.numPts * sizeof(SiftPoint));
+  }
 
   static cuda::GpuMat get_grayscale(Image * &_img) {
     cuda::GpuMat temp = getThreadConvertSpace(_img->width, _img->height);
@@ -66,20 +65,34 @@ namespace pathCam {
   }
 
 
-  bool Composite::establish_scale_between_pairs(Image *_rootImg, Image *_target) {
+  bool Composite::establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract) {
     //get my sift data
+    SiftData rootCopy,compareCopy;
     _rootImg->siftMutex.lock();
-    if (!_rootImg->siftInitialized) {
+    if ((!_rootImg->siftInitialized && !_fullImageFtExtract) || (!_rootImg->siftFullInitialized && _fullImageFtExtract)) {
       _rootImg->load_raw_from_disk();
 
       if (!parent->unifiedMemory && !_rootImg->cudaBufferReady) {
         _rootImg->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
 
-      _rootImg->extract_sift(60000,4,0,0.4f,0.1f,getThreadConvertSpace(parent->siftWindow,parent->siftWindow));
+      int bufW, bufH;
+      if (_fullImageFtExtract) {
+        bufW = _rootImg->width;
+        bufH = _rootImg->height;
+      }else {
+        bufW = bufH = parent->siftWindow;
+      }
+      _rootImg->extract_sift(60000,4,0,0.4f,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
       _rootImg->free_memory_RAW();
     }
+    if (_fullImageFtExtract) {
+      rootCopy = _rootImg->siftDataFull;
+    }else {
+      copy_sift_data(rootCopy,_rootImg->siftData); //avoids shuffling a sorted data order needed later
+    }
     _rootImg->siftMutex.unlock();
+
 
     //get their sift data
     _target->siftMutex.lock();
@@ -90,19 +103,31 @@ namespace pathCam {
         _target->move_buffer_to_gpu(parent->compositorCudaDevice, true);
       }
 
-      _target->extract_sift(60000,4,0,0.4,0.1f,getThreadConvertSpace(parent->siftWindow,parent->siftWindow));
+      int bufW, bufH;
+      if (_fullImageFtExtract) {
+        bufW = _target->width;
+        bufH = _target->height;
+      }else {
+        bufW = bufH = parent->siftWindow;
+      }
+      _target->extract_sift(60000,4,0,0.4,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
       _target->free_memory_RAW();
+    }
+    if (_fullImageFtExtract) {
+      compareCopy = _target->siftDataFull;
+    }else {
+      copy_sift_data(compareCopy,_target->siftData); //avoids shuffling a sorted data order needed later
     }
     _target->siftMutex.unlock();
 
-    MatchSiftData(_rootImg->siftData, _target->siftData);
+    MatchSiftData(rootCopy, compareCopy);
     std::vector<float> homography(9);
     int numMatches;
     bool validHomography = false;
     int count = 0, maxAttempts = 20;
     while (!validHomography && count < maxAttempts && xcMatchShouldContinue) {
       ++count;
-      FindHomography(_rootImg->siftData, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
+      FindHomography(rootCopy, homography.data(), &numMatches, 10000, 0.8, 0.9, 5.0);
 
       if (numMatches > 0) {
         auto matchedComp = parent->composites[_target->regInfo->component_membership];
@@ -114,7 +139,7 @@ namespace pathCam {
         }
       }
       if (!validHomography && count < maxAttempts && xcMatchShouldContinue) {
-        shuffle_sift_data(_rootImg->siftData);
+        shuffle_sift_data(rootCopy);
       }
     }
 
@@ -201,15 +226,17 @@ namespace pathCam {
                                     parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
 
         int count = 0;
-        for (auto &[img,roi]: overlappingFrames) {
+        //for (auto &[img,roi]: overlappingFrames) {
+        for (int i = 0; i < min(10,int(overlappingFrames.size())); ++i){
+          auto img = overlappingFrames[i].first;
           std::cout << count++ << std::endl;
-          if (establish_scale_between_pairs(_rootImg, img) || !xcMatchShouldContinue) {
+          if (establish_scale_between_pairs(_rootImg, img, true) || !xcMatchShouldContinue) {
             break;
           }
         }
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
-        establish_scale_between_pairs(_rootImg, mostRcntRslv);
+        establish_scale_between_pairs(_rootImg, mostRcntRslv, false);
       }
     }
   }

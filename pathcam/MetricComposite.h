@@ -29,6 +29,8 @@ namespace pathCam {
 
         bool image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image* _img) const;
 
+        void search_and_absorb_other_components();
+
         [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const;
 
         std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});

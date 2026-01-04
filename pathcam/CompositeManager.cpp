@@ -142,14 +142,14 @@ namespace pathCam {
 
     auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
     std::cout << "total align time " << tAlignEnd << std::endl;
-
-    tAlign = std::chrono::high_resolution_clock::now();
-    MatchSiftData(reinterpret_cast<MetricComposite *>(parent->composites[0])->compSiftData,reinterpret_cast<MetricComposite *>(parent->composites[1])->compSiftData);
-    std::vector<float> homography(9);
-    int numMatches;
-    FindHomography(reinterpret_cast<MetricComposite *>(parent->composites[0])->compSiftData,homography.data(),&numMatches,10000,0.8,0.9,5);
-    tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
-    std::cout << "xc homography time " << tAlignEnd << std::endl;
+    //
+    // tAlign = std::chrono::high_resolution_clock::now();
+    // MatchSiftData(reinterpret_cast<MetricComposite *>(parent->composites[0])->compSiftData,reinterpret_cast<MetricComposite *>(parent->composites[1])->compSiftData);
+    // std::vector<float> homography(9);
+    // int numMatches;
+    // FindHomography(reinterpret_cast<MetricComposite *>(parent->composites[0])->compSiftData,homography.data(),&numMatches,10000,0.8,0.9,5);
+    // tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
+    // std::cout << "xc homography time " << tAlignEnd << std::endl;
 
     push_remaining_tiles_for_inference();
 

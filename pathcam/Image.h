@@ -47,10 +47,9 @@ namespace pathCam {
 
     static cv::cuda::GpuMat hannWindow, blurMask;
 #ifdef HAVE_OPENCV_CUDAFEATURES2D
-    cv::cuda::GpuMat SIFTDescriptors;
-    cv::cuda::GpuMat SIFTKeypoints;
-    SiftData siftData;
+    SiftData siftData, siftDataFull;
     bool siftInitialized = false;
+    bool siftFullInitialized = false;
 #endif
 
 
@@ -59,10 +58,8 @@ namespace pathCam {
     ~Image();
 
     void extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                      float lowestScale, cv::cuda::GpuMat &buffer);
+                      float lowestScale, cv::cuda::GpuMat &buffer, bool siftWindow, float downScaleFactor = 1);
 
-    void extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                  float lowestScale);
 
     void set_memory_pool(MemoryPool *mempool_in) {
       mempool = mempool_in;

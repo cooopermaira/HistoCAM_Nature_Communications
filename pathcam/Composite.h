@@ -123,7 +123,7 @@ namespace pathCam {
 
     void establish_scale_at_root(Image *_rootImg);
 
-    bool establish_scale_between_pairs(Image *_rootImg, Image *_target);
+    bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
 
     void set_scale(double _scale, bool _ffCorrectExistingTiles = false);
 

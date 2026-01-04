@@ -14,7 +14,7 @@ namespace pathCam {
   cuda::GpuMat &getThreadConvertSpace(int width, int height) {
     thread_local cuda::GpuMat buffer;
 
-    if (buffer.size().area() < height * width) {
+    if (buffer.cols != width || buffer.rows != height) {
       buffer.create(height, width,CV_32FC1);
     }
     return buffer;
@@ -27,7 +27,7 @@ namespace pathCam {
 
     image->siftMutex.lock();
     image->extract_sift(parent->siftPoints,4,0,0.4f,0.1f,
-      getThreadConvertSpace(parent->siftWindow,parent->siftWindow));
+                        getThreadConvertSpace(parent->siftWindow,parent->siftWindow), true);
     image->siftMutex.unlock();
     image->free_memory_RAW();
 

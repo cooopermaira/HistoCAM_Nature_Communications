@@ -241,47 +241,31 @@ namespace pathCam {
 
 
   void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                           float lowestScale, cuda::GpuMat &buffer) {
-    if (siftInitialized){return;}
+                           float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float downScaleFactor) {
+    if ((siftInitialized && siftWindow) || (siftFullInitialized && !siftWindow)){return;}
+    //assert(buffer.cols == width * downScaleFactor && buffer.rows == height * downScaleFactor);
 
     Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
-    InitSiftData(siftData, numPts, true, true);
-
     cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
-
     raw(roi).convertTo(buffer,CV_32F);
-
 
     CudaImage cImgRaw;
     cImgRaw.Allocate(buffer.cols, buffer.rows, buffer.step / sizeof(float), false,
                          reinterpret_cast<float *>(buffer.data), nullptr);
 
-    ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
-    sortSiftDataByX(siftData);
-
-    siftInitialized = true;
+    if (siftWindow) {
+      InitSiftData(siftData, numPts, true, true);
+      ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      sortSiftDataByX(siftData);
+      siftInitialized = true;
+    }else {
+      InitSiftData(siftDataFull,numPts,true,true);
+      ExtractSift(siftDataFull,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      siftFullInitialized = true;
+    }
   }
 
-  void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                         float lowestScale) {
-    InitSiftData(siftData, numPts, true, true);
 
-    cuda::GpuMat buffer(2048,2048,CV_32FC1);
-    Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
-
-    assert(get_Raw());
-    cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
-
-    raw(roi).convertTo(buffer,CV_32F);
-
-    CudaImage cImgRaw;
-    cImgRaw.Allocate(buffer.cols, buffer.rows, buffer.step / sizeof(float), false,
-                     reinterpret_cast<float *>(buffer.data), nullptr);
-
-    ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
-
-    siftInitialized = true;
-  }
 
   bool Image::is_mostly_white(Mat ROI) {
     unsigned int threshold_value = 225;
