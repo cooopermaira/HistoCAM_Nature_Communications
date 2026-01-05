@@ -88,6 +88,8 @@ namespace pathCam {
     cuda::GpuMat fourChannelPrealGPU;
     cuda::GpuMat gry;
     cuda::GpuMat gry2;
+    cuda::GpuMat cvtBuffer;
+
 
 
 #endif
@@ -124,6 +126,10 @@ namespace pathCam {
     void establish_scale_at_root(Image *_rootImg);
 
     bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
+
+    static void sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,
+                                const std::vector<uint8_t> &inlierMask, std::vector<
+                                  KeyPoint> &keypoints1, std::vector<KeyPoint> &keypoints2);
 
     void set_scale(double _scale, bool _ffCorrectExistingTiles = false);
 
@@ -281,8 +287,6 @@ namespace pathCam {
     void update_from_stored_info();
 
     void update(std::vector<RegInfo *> _new_info, bool _force_add = false);
-
-    void perform_global_alignment(unsigned int flag, double closenessFactor);
 
     void build_system_from_DT(std::map<long, long> &systemIndexToFrameIndex,
                               std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,

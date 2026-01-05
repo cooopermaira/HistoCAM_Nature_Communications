@@ -145,6 +145,7 @@ namespace pathCam {
           free(raw_buffer);
         }
         raw_buffer = nullptr;
+        reference_count = 0;
       }
     }
     buffer_mutex.unlock();
@@ -243,24 +244,44 @@ namespace pathCam {
   void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
                            float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float downScaleFactor) {
     if ((siftInitialized && siftWindow) || (siftFullInitialized && !siftWindow)){return;}
-    //assert(buffer.cols == width * downScaleFactor && buffer.rows == height * downScaleFactor);
+
+    cudaError_t e = cudaGetLastError();
+    assert (e == cudaSuccess);
 
     Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
-    cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
+    Rect full(0, 0, width, height);
+    assert ((roi & full) == roi);
+
+    buffer_mutex.lock();
+    assert(get_Raw());
+    Mat hostRaw(height, width, CV_8UC1, get_Raw());
+    cuda::GpuMat raw;
+    //cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
+
+    raw.upload(hostRaw);
+
     raw(roi).convertTo(buffer,CV_32F);
+    buffer_mutex.unlock();
 
     CudaImage cImgRaw;
     cImgRaw.Allocate(buffer.cols, buffer.rows, buffer.step / sizeof(float), false,
                          reinterpret_cast<float *>(buffer.data), nullptr);
 
     if (siftWindow) {
+      assert(buffer.rows == parent->siftWindow && buffer.cols == parent->siftWindow);
+      //assert(siftData.numPts <= 0);
       InitSiftData(siftData, numPts, true, true);
-      ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      catch_ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      //assert(siftData.numPts > 0);
       sortSiftDataByX(siftData);
+      //assert(siftData.numPts > 0);
       siftInitialized = true;
     }else {
+      assert(buffer.rows == height && buffer.cols == width);
+      //assert(siftDataFull.numPts <= 0);
       InitSiftData(siftDataFull,numPts,true,true);
-      ExtractSift(siftDataFull,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      catch_ExtractSift(siftDataFull,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      //assert(siftDataFull.numPts > 0);
       siftFullInitialized = true;
     }
   }

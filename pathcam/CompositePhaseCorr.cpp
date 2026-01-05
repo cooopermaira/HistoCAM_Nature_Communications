@@ -6,19 +6,83 @@
 namespace pathCam {
   cuda::GpuMat &getThreadConvertSpace(int width, int height);// {
 
-  void copy_sift_data(SiftData &dst,const SiftData& src) {
-    InitSiftData(dst,src.numPts,true,true);
-    cudaMemcpy(dst.d_data,src.d_data,src.numPts * sizeof(SiftPoint),cudaMemcpyDeviceToDevice);
-    memcpy(dst.h_data,dst.h_data,src.numPts * sizeof(SiftPoint));
+  void copy_sift_data(SiftData &dst, const SiftData &src)
+  {
+    InitSiftData(dst, src.numPts, true, true);
+
+    const size_t bytes = static_cast<size_t>(src.numPts) * sizeof(SiftPoint);
+
+    cudaError_t e1 = cudaMemcpy(dst.d_data, src.d_data, bytes, cudaMemcpyDeviceToDevice);
+    if (e1 != cudaSuccess)
+    {
+      fprintf(stderr, "cudaMemcpy D2D failed: %s\n", cudaGetErrorString(e1));
+      abort();
+    }
+
+    cudaError_t e2 = cudaMemcpy(dst.h_data, dst.d_data, bytes, cudaMemcpyDeviceToHost);
+    if (e2 != cudaSuccess)
+    {
+      fprintf(stderr, "cudaMemcpy D2H failed: %s\n", cudaGetErrorString(e2));
+      abort();
+    }
+
+    dst.numPts = src.numPts;
   }
 
-  static cuda::GpuMat get_grayscale(Image * &_img) {
-    cuda::GpuMat temp = getThreadConvertSpace(_img->width, _img->height);
-    Size size(_img->width, _img->height);
-    cuda::GpuMat image_Mat(size, CV_8U, _img->get_raw_cuda());
-    image_Mat.convertTo(temp,CV_32FC1);
-    return temp;
+
+#include <vector>
+#include <cmath>
+
+  inline void findHomographyInliersCPU(
+      const SiftData& data,
+      const float H[9],          // [0..8], with H[8]=1
+      float thresh,              // same thresh you passed to FindHomography
+      float minScore,
+      float maxAmbiguity,
+      std::vector<uint8_t>& inlierMask,  // output: size = data.numPts
+      int* outInlierCount = nullptr)
+  {
+    const float thresh2 = thresh * thresh;
+    const int n = data.numPts;
+
+    inlierMask.assign(n, 0);
+    int inliers = 0;
+
+    for (int i = 0; i < n; ++i) {
+      const SiftPoint& p = data.h_data[i];
+
+      // Match validity: in cudasift, p.match is typically -1 when no match
+      if (p.match < 0) continue;
+
+      // Same filters FindHomography uses:
+      if (p.score <= minScore) continue;
+      if (p.ambiguity >= maxAmbiguity) continue;
+
+      const float x = p.xpos;
+      const float y = p.ypos;
+
+      // Project (x,y) with H
+      const float X = H[0]*x + H[1]*y + H[2];
+      const float Y = H[3]*x + H[4]*y + H[5];
+      const float W = H[6]*x + H[7]*y + 1.0f;
+
+      if (W == 0.0f) continue;
+      const float u = X / W;
+      const float v = Y / W;
+
+      const float dx = u - p.match_xpos;
+      const float dy = v - p.match_ypos;
+
+      const float err2 = dx*dx + dy*dy;
+      if (err2 <= thresh2) {
+        inlierMask[i] = 1;
+        ++inliers;
+      }
+    }
+
+    if (outInlierCount) *outInlierCount = inliers;
   }
+
 
   void sort_overlaps_by_likelihood(std::vector<std::pair<Image *, Rect> > &_overlaps, const float &_targetScale) {
     auto parent = _overlaps[0].first->parent;
@@ -80,18 +144,22 @@ namespace pathCam {
       if (_fullImageFtExtract) {
         bufW = _rootImg->width;
         bufH = _rootImg->height;
-        octaves = 4;
-        pts = 60000;
-      }else {
-        bufW = bufH = parent->siftWindow;
         octaves = 5;
         pts = 100000;
+      }else {
+        bufW = bufH = parent->siftWindow;
+        octaves = 4;
+        pts = 60000;
       }
-      _rootImg->extract_sift(pts,octaves,0,0.4f,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
+      if (cvtBuffer.rows != bufH || cvtBuffer.cols != bufW) {
+        cvtBuffer = cuda::GpuMat(bufH,bufW,CV_32FC1);
+      }
+      _rootImg->extract_sift(pts,octaves,0,0.4f,0.1f,cvtBuffer, !_fullImageFtExtract);
       _rootImg->free_memory_RAW();
     }
     if (_fullImageFtExtract) {
-      rootCopy = _rootImg->siftDataFull;
+      copy_sift_data(rootCopy,_rootImg->siftDataFull);
+      //rootCopy = _rootImg->siftDataFull;
     }else {
       copy_sift_data(rootCopy,_rootImg->siftData); //avoids shuffling a sorted data order needed later
     }
@@ -100,7 +168,7 @@ namespace pathCam {
 
     //get their sift data
     _target->siftMutex.lock();
-    if (!_target->siftInitialized) {
+    if ((!_target->siftInitialized && !_fullImageFtExtract) || (!_target->siftFullInitialized && _fullImageFtExtract)) {
       _target->load_raw_from_disk();
 
       if (!parent->unifiedMemory && !_target->cudaBufferReady) {
@@ -111,27 +179,34 @@ namespace pathCam {
       if (_fullImageFtExtract) {
         bufW = _target->width;
         bufH = _target->height;
-        octaves = 4;
-        pts = 60000;
-      }else {
-        bufW = bufH = parent->siftWindow;
         octaves = 5;
         pts = 100000;
+      }else {
+        bufW = bufH = parent->siftWindow;
+        octaves = 4;
+        pts = 60000;
       }
-      _target->extract_sift(pts,octaves,0,0.4,0.1f,getThreadConvertSpace(bufW,bufH), !_fullImageFtExtract);
+      if (cvtBuffer.rows != bufH || cvtBuffer.cols != bufW) {
+        cvtBuffer = cuda::GpuMat(bufH,bufW,CV_32FC1);
+      }
+      _target->extract_sift(pts,octaves,0,0.4,0.1f,cvtBuffer, !_fullImageFtExtract);
       _target->free_memory_RAW();
     }
     if (_fullImageFtExtract) {
-      compareCopy = _target->siftDataFull;
+      copy_sift_data(compareCopy,_target->siftDataFull);
+      //compareCopy = _target->siftDataFull;
     }else {
       copy_sift_data(compareCopy,_target->siftData); //avoids shuffling a sorted data order needed later
     }
     _target->siftMutex.unlock();
 
+    assert(rootCopy.numPts > 0 && compareCopy.numPts > 0);
     MatchSiftData(rootCopy, compareCopy);
+
     std::vector<float> homography(9);
     int numMatches;
     bool validHomography = false;
+
     int count = 0, maxAttempts = 20;
     while (!validHomography && count < maxAttempts && xcMatchShouldContinue) {
       ++count;
@@ -183,10 +258,23 @@ namespace pathCam {
       myRegInfo->attempt_absolute_reg(true);
       std::cout << "component " << componentIndex << " suspended and joined to component "
           << _target->regInfo->component_membership << std::endl;
+
+      std::vector<uint8_t> inlierMask;
+      std::vector<KeyPoint> kp1,kp2;
+      int inlierCount;
+      //Poco::Thread::sleep(1000);
+      // findHomographyInliersCPU(rootCopy,homography.data(),5.f,0.8,0.9,inlierMask,&inlierCount);
+      // sift_to_cvMatch(rootCopy,_rootImg,_target,inlierCount,inlierMask,kp1,kp2);
+      //
+      // auto comp = reinterpret_cast<MetricComposite *>(parent->composites[theirComponentIndex]);
+      // comp->update_mutex.lock();
+      // comp->extraMatches.emplace_back(_rootImg,_target,kp1,kp2);
+      // comp->update_mutex.unlock();
       return true;
     }
-    pairwiseDistance += (1 - relativeScale) * Point2f(float(imageSize.width - parent->siftWindow) / 2.f, float(imageSize.height - parent->siftWindow) / 2.f);
-
+    if (!_fullImageFtExtract) {
+      pairwiseDistance += (1 - relativeScale) * Point2f(float(imageSize.width - parent->siftWindow) / 2.f, float(imageSize.height - parent->siftWindow) / 2.f);
+    }
     Point2f queryAbC = pairwiseDistance + theirAbC;
 
     //convert queryAbC to base component spce
@@ -247,5 +335,25 @@ namespace pathCam {
         establish_scale_between_pairs(_rootImg, mostRcntRslv, false);
       }
     }
+  }
+
+  void Composite::sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,
+                                  const std::vector<uint8_t> &inlierMask, std::vector<
+                                    KeyPoint> &keypoints1, std::vector<KeyPoint> &keypoints2) {
+
+    keypoints1.resize(inlierCount);
+    keypoints2.resize(inlierCount);
+    assert((int)inlierMask.size() == siftData.numPts);
+
+    int loc = 0;
+    for (int i = 0; i < siftData.numPts; ++i) {
+      if (inlierMask[i]) {
+        assert(loc < inlierCount);
+        keypoints1[loc].pt = Point2f(siftData.h_data[i].xpos,siftData.h_data[i].ypos);
+        keypoints2[loc].pt = Point2f(siftData.h_data[i].match_xpos,siftData.h_data[i].match_ypos);
+        ++loc;
+      }
+    }
+    assert(loc == inlierCount);
   }
 }

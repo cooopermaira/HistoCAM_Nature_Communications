@@ -91,11 +91,7 @@ namespace pathCam {
 
     assert(blurCtx->enqueueV3(blurStream));
     outstandingBlurInference = true;
-    // for (int i = 0; i < blurImagesInProcess.size(); ++i) {
-    //   if (blurImagesInProcess[i]->index == 0) {
-    //     int k = 0;
-    //   }
-    // }
+
   }
 
   void StreamCam::receive_blur_metric() {

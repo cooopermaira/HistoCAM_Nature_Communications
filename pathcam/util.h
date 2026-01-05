@@ -136,7 +136,7 @@ namespace pathCam {
     //   std::cout << "WARNING: Could not check GPU memory status" << std::endl;
     // }
     
-    if (0 > ExtractSift(siftData,img,numOctaves,initBlur,thresh,lowestScale,scaleUp)) {
+    if (0 != ExtractSift(siftData,img,numOctaves,initBlur,thresh,lowestScale,scaleUp)) {
       int k = 0;
     }
   }

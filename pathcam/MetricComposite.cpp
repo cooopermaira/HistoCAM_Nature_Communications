@@ -208,7 +208,7 @@ namespace pathCam {
       );
 
       if (tiles.empty()) {
-        img->free_memory_RAW();
+        //img->free_memory_RAW();
         img = nullptr;
       }
     }
@@ -227,7 +227,7 @@ namespace pathCam {
       ++debugFrameCount;
 
       tiles.clear();
-      img->free_memory_RAW();
+      //img->free_memory_RAW();
       img = nullptr;
     }
 // PROCESS OLD FRAMES END
@@ -242,27 +242,64 @@ namespace pathCam {
     members.insert(root);
 
     for (auto &img: members) {
-      img->keypointsImageSpace.resize(img->keypoints.size());
+      img->keypointsImageSpace.resize(img->keypointsImageSpace.size() + img->keypoints.size());
       for (int i = 0; i < img->keypoints.size(); ++i) {
-        auto pt = img->keypoints[i].pt;
-        img->keypointsImageSpace[i].pt.x = pt.x / parent->scale_factor;
-        img->keypointsImageSpace[i].pt.y = pt.y / parent->scale_factor;
+        img->keypointsImageSpace[i].pt = img->keypoints[i].pt / parent->scale_factor;
       }
     }
 
     auto matches = ftg->matches;
     std::vector<Match *> memberMatches;
 
+    float maxX = 0, maxY = 0;
     for (auto m: matches) {
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
         memberMatches.push_back(m);
+        auto p1 = m->image_1->regInfo->absoluteCoords;
+        auto p2 = m->image_2->regInfo->absoluteCoords;
+
         for (int i = 0; i < m->good_matches.size(); ++i) {
           if (m->inliers[i]) {
+
+            auto p3 = m->image_1->keypointsImageSpace[m->good_matches[i].queryIdx].pt;
+            auto p4 = m->image_2->keypointsImageSpace[m->good_matches[i].trainIdx].pt;
+            auto valx = abs((p1.x - p2.x) + (p3.x - p4.x));
+            auto valy = abs((p1.y - p2.y) - (p3.y - p4.y));
+            if (maxX < valx) {
+              maxX = valx;
+            }
             ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
           }
         }
       }
     }
+
+    int k = 0;
+    auto test = extraMatches[0];
+    k = 5;
+    //update_mutex.lock();
+    for (auto &[img1,img2,kp1,kp2] : extraMatches) {
+    // for (int ii = 0; ii < extraMatches.size(); ++ii){
+    //   auto img1 = std::get<0>(extraMatches[ii]);
+    //   auto img2 = std::get<1>(extraMatches[ii]);
+    //   auto kp1 = std::get<2>(extraMatches[ii]);
+    //   auto kp2 = std::get<3>(extraMatches[ii]);
+      assert(kp1.size() == kp2.size());
+      img1->keypointsImageSpace.reserve(img1->keypointsImageSpace.size() + kp1.size());
+      img2->keypointsImageSpace.reserve(img2->keypointsImageSpace.size() + kp2.size());
+      std::vector<DMatch> good_matches(kp2.size());
+      for (int i = 0; i < kp1.size(); ++i) {
+        DMatch dm;
+        dm.queryIdx = img1->keypointsImageSpace.size();
+        dm.trainIdx = img2->keypointsImageSpace.size();
+
+        img1->keypointsImageSpace.push_back(kp1[i]);
+        img2->keypointsImageSpace.push_back(kp2[i]);
+
+        ftg->process_match(img1->index,img2->index,dm);
+      }
+    }
+    //update_mutex.unlock();
 
     const std::vector memberImages(members.begin(), members.end());
     auto tracks = ftg->generateCurrentTracks(memberImages);

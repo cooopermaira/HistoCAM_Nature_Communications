@@ -135,6 +135,7 @@ namespace pathCam {
       img->regInfo->accessMutex->unlock();
 
       Rect imageBoxCompSpace(AbC, imageSize);
+      img->buffer_mutex.lock();
       for (auto &tile: affectedTiles) {
         Rect tileBoxCompSpace(parent->tileSize * tile, Size(parent->tileSize, parent->tileSize));
 
@@ -146,17 +147,19 @@ namespace pathCam {
         
         ans = ans || prepare_4CPA(img, intersectionInImageSpace);
       }
+      img->buffer_mutex.unlock();
       return ans;
     }
 
-    return prepare_4CPA(img);
+    img->buffer_mutex.lock();
+    bool ans = prepare_4CPA(img);
+    img->buffer_mutex.unlock();
+    return ans;
   }
 
 
   bool Composite::prepare_4CPA(Image *img, Rect roi_) {
-    if (roi_.x < 0 || roi_.y < 0) {
-      int k = 0;
-    }
+    assert(roi_.x >= 0 && roi_.y >= 0);
     bool wholeImage = false;
 
     try {
@@ -176,9 +179,11 @@ namespace pathCam {
         wholeImage = true;
       } else {
         assert(img->get_Raw());
+
         adjust_roi_for_debayer(roi_);
         Mat rawMat(imageSize, CV_8U, img->get_Raw());
         cvtColor(rawMat(roi_), threeChannelPreallocated(roi_), COLOR_BayerBG2BGR);
+
         threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChannelPreallocated.data);
       }
 

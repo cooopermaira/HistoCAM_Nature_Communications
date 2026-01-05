@@ -40,7 +40,7 @@ namespace pathCam {
 
       if (!previous->is_good()) { continue; }
 
-      Match *m = new Match(previous, image);
+      auto m = new Match(previous, image);
       matcher.match(m);
 
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {

@@ -52,7 +52,7 @@ namespace pathCam {
     //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
     // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
 
-    load_blur_engine();
+    // load_blur_engine();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
