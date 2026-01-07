@@ -33,6 +33,23 @@ namespace pathCam {
     g_gauss->apply(src, dst, s);
   }
 
+  void Image::cleanup_blur_check_statics() {
+    static std::once_flag cleanup_flag;
+
+    std::call_once(cleanup_flag, [] {
+        // Explicitly release GPU memory
+        if (!blurMask.empty())
+          blurMask.release();
+
+      if (!hannWindow.empty())
+        hannWindow.release();
+
+    g_gauss.release();  // cv::Ptr reset
+
+    // Optional but useful during debugging
+    cudaDeviceSynchronize();
+});
+  }
 
 
   void Image::prepare_blur_check_statics() {
@@ -74,23 +91,21 @@ namespace pathCam {
                                         0),
                                       cudaBufferReady(false) {
     prepare_blur_check_statics();
-    // if (hannWindow.empty()) {
-    //   Mat temp;
-    //   createHanningWindow(temp,Size(blurPatch,blurPatch),CV_32F);
-    //   hannWindow.upload(temp);
-    // }
-    // if (cornerRad.empty()) {
-    //   Mat temp(blurPatch,blurPatch,CV_8U,Scalar(0));
-    //   circle(temp,Point(0,0),blurCheckRadius,Scalar(255),1);
-    //   circle(temp,Point(0,blurPatch),blurCheckRadius,Scalar(255),1);
-    //   circle(temp,Point(blurPatch,0),blurCheckRadius,Scalar(255),1);
-    //   circle(temp,Point(blurPatch,blurPatch),blurCheckRadius,Scalar(255),1);
-    //   cornerRad.upload(temp);
-    // }
+
   };
 
   Image::~Image() {
     free_memory_RAW(true);
+    if (siftFullInitialized) {
+      FreeSiftData(siftDataFull);
+    }
+    if (siftInitialized) {
+      FreeSiftData(siftData);
+    }
+    if (regInfo) {
+      delete regInfo;
+    }
+    cleanup_blur_check_statics();
   }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
@@ -142,7 +157,11 @@ namespace pathCam {
         if (mempool) {
           mempool->release(raw_buffer);
         } else {
-          free(raw_buffer);
+          if (parent && parent->unifiedMemory) {
+            cudaFree(raw_buffer);
+          }else {
+            free(raw_buffer);
+          }
         }
         raw_buffer = nullptr;
         reference_count = 0;
@@ -192,7 +211,9 @@ namespace pathCam {
     cuda::multiply(gray, hannWindow, gray, 1, -1, s);
 
     //compute the log magnitude of the dft
-    void *buff = malloc(blurPatch * blurPatch * sizeof(float));
+    char *buff;
+    cudaMallocManaged(&buff, blurPatch * blurPatch * sizeof(float));
+
     cuda::GpuMat planes[] = {gray, cuda::GpuMat(gray.rows, gray.cols,CV_32F, Scalar(0))};
     cuda::GpuMat complexI, mag, rcv(blurPatch, blurPatch,CV_32FC1, buff);
     cuda::merge(planes, 2, complexI, s);
@@ -213,7 +234,7 @@ namespace pathCam {
 
     blurDFT = Mat(blurPatch, blurPatch,CV_32FC1, buff);
     resize(blurDFT, blurDFT, Size(128, 128));
-    free(buff);
+    cudaFree(buff);
 
     if (submitForInference) {
       parent->Q_blur_metric(this);
@@ -241,50 +262,7 @@ namespace pathCam {
   }
 
 
-  void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                           float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float downScaleFactor) {
-    if ((siftInitialized && siftWindow) || (siftFullInitialized && !siftWindow)){return;}
 
-    cudaError_t e = cudaGetLastError();
-    assert (e == cudaSuccess);
-
-    Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
-    Rect full(0, 0, width, height);
-    assert ((roi & full) == roi);
-
-    buffer_mutex.lock();
-    assert(get_Raw());
-    Mat hostRaw(height, width, CV_8UC1, get_Raw());
-    cuda::GpuMat raw;
-    //cuda::GpuMat raw(height, width, CV_8UC1, get_Raw());
-
-    raw.upload(hostRaw);
-
-    raw(roi).convertTo(buffer,CV_32F);
-    buffer_mutex.unlock();
-
-    CudaImage cImgRaw;
-    cImgRaw.Allocate(buffer.cols, buffer.rows, buffer.step / sizeof(float), false,
-                         reinterpret_cast<float *>(buffer.data), nullptr);
-
-    if (siftWindow) {
-      assert(buffer.rows == parent->siftWindow && buffer.cols == parent->siftWindow);
-      //assert(siftData.numPts <= 0);
-      InitSiftData(siftData, numPts, true, true);
-      catch_ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
-      //assert(siftData.numPts > 0);
-      sortSiftDataByX(siftData);
-      //assert(siftData.numPts > 0);
-      siftInitialized = true;
-    }else {
-      assert(buffer.rows == height && buffer.cols == width);
-      //assert(siftDataFull.numPts <= 0);
-      InitSiftData(siftDataFull,numPts,true,true);
-      catch_ExtractSift(siftDataFull,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
-      //assert(siftDataFull.numPts > 0);
-      siftFullInitialized = true;
-    }
-  }
 
 
 
@@ -529,6 +507,20 @@ namespace pathCam {
     return parent->scale_factor;
   }
 
+  void Image::allocate_memory_RAW() {
+    if (raw_buffer == 0) {
+      // if (mempool) {
+      //   raw_buffer = reinterpret_cast<char *>(mempool->get());
+      // } else {
+      //   if (parent && parent->unifiedMemory) {
+      cudaMallocManaged(&raw_buffer,width * height);
+      //   }else {
+      //     raw_buffer = new char[width * height];
+      //   }
+      // }
+    }
+  }
+
   void Image::load_raw_from_disk() {
     buffer_mutex.lock();
     if (!raw_buffer) {
@@ -546,5 +538,68 @@ namespace pathCam {
     }
     ++reference_count;
     buffer_mutex.unlock();
+  }
+
+  void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
+                           float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float downScaleFactor) {
+    if ((siftInitialized && siftWindow) || (siftFullInitialized && !siftWindow)){return;}
+
+    Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
+
+    buffer_mutex.lock();
+    assert(get_Raw());
+
+
+    // Mat hostRaw(height, width, CV_8UC1, get_Raw());
+    // cuda::GpuMat raw;
+    // raw.upload(hostRaw(roi));
+    // raw.convertTo(buffer,CV_32FC1);
+
+    cuda::GpuMat raw(height, width, CV_8UC1, get_Raw(),width);
+    raw(roi).convertTo(buffer,CV_32F);
+
+    cudaError_t e = cudaGetLastError();
+    if (e != cudaSuccess) {
+      printf("convertTo launch error: %s\n", cudaGetErrorString(e));
+      abort();
+    }
+
+    // 2) Force completion so any illegal access in OpenCV shows up HERE
+    e = cudaDeviceSynchronize();
+    if (e != cudaSuccess) {
+      printf("convertTo sync error: %s\n", cudaGetErrorString(e));
+      abort();
+    }
+
+
+    buffer_mutex.unlock();
+
+    CudaImage cImgRaw;
+    cImgRaw.Allocate(buffer.cols, buffer.rows, buffer.step / sizeof(float), false,
+                         reinterpret_cast<float *>(buffer.data), nullptr);
+
+    if (siftWindow) {
+      assert(buffer.rows == parent->siftWindow && buffer.cols == parent->siftWindow);
+
+      InitSiftData(siftData, numPts, true, true);
+
+      parent->CudaSiftGlobalUseMutex.lock();
+      catch_ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      parent->CudaSiftGlobalUseMutex.unlock();
+
+      assert(siftData.numPts > 0);
+      sortSiftDataByX(siftData);
+      siftInitialized = true;
+    }else {
+      assert(buffer.rows == height && buffer.cols == width);
+      InitSiftData(siftDataFull,numPts,true,true);
+
+      parent->CudaSiftGlobalUseMutex.lock();
+      catch_ExtractSift(siftDataFull,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      parent->CudaSiftGlobalUseMutex.unlock();
+
+      assert(siftDataFull.numPts > 0);
+      siftFullInitialized = true;
+    }
   }
 }

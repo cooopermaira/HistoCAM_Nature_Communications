@@ -183,19 +183,18 @@ namespace pathCam {
     //get flatfield file name from parent and load from disk
     std::string filename = parent->get_flatfield(componentMagLabel);
     size_t nBytes = parent->image_height * parent->image_width;
-    char *buffer = new char[nBytes];
-    char *bufferCuda;
+    char *buffer;
+    CHECK_CUDA(cudaMallocManaged(&buffer,nBytes));
+
     std::ifstream stream;
     stream.open(filename, std::ios::binary);
     stream.read(buffer, nBytes);
 
-    //allocate space on GPU and copy data up
-    CHECK_CUDA(cudaMalloc(&bufferCuda, nBytes));
-    CHECK_CUDA(cudaMemcpy(bufferCuda, buffer, nBytes, cudaMemcpyHostToDevice));
-
-    ffGPU = cuda::GpuMat(Size(parent->image_width, parent->image_height), CV_8U, bufferCuda);
+    ffGPU = cuda::GpuMat(Size(parent->image_width, parent->image_height), CV_8U, buffer);
 
     cuda::cvtColor(ffGPU, ffGPU, COLOR_BayerBG2BGR);
+    cudaFree(buffer);
+
     ffGPU.convertTo(ffGPU,CV_32F);
     double scale = 1 / 240.0;
     cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
@@ -1506,7 +1505,7 @@ namespace pathCam {
 
     subdiv.getEdgeList(edges);
 
-    parent->resize_mmatch_mutex->readLock();
+    parent->resize_mmatch_mutex.readLock();
     int count1 = 0;
     int count2 = 0;
     for (int i = 0; i < edges.size(); i++) {

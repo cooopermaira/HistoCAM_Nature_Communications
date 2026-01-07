@@ -12,17 +12,7 @@ namespace pathCam {
   using Poco::Util::LayeredConfiguration;
 
 
-  StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config), buffer_mutex(new Poco::FastMutex()),
-                                                           image_mutex(new Poco::RWLock()),
-                                                           reg_results_mutex(new Poco::RWLock),
-                                                           resize_mmatch_mutex(new Poco::RWLock()),
-                                                           compositeQ_mutex(new Poco::FastMutex()),
-                                                           component_mutex(new Poco::FastMutex()),
-                                                           resize_buffer_mutex(new Poco::FastMutex()),
-                                                           lastFrameMutex(new Poco::FastMutex()),
-                                                           scaleRepoMutex(new Poco::FastMutex()),
-                                                           pixelDistanceMutex(new Poco::FastMutex()),
-                                                           siftQMutex(new Poco::FastMutex()),
+  StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config),
                                                            cm(new CompositeManager(this)),
                                                            qm(new QManager(this)),
                                                            dr(new DiskReader(this)),
@@ -34,7 +24,6 @@ namespace pathCam {
                                                            microscopeInput(true) {
     //inferencing = false;
     if (inferencing) {
-      inferenceQMutex = new Poco::FastMutex();
       im = new InferenceManager(this);
     }
 
@@ -52,7 +41,7 @@ namespace pathCam {
     //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
     // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
 
-    // load_blur_engine();
+    load_blur_engine();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
@@ -67,7 +56,7 @@ namespace pathCam {
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(threads, threads, windowWidth);
     JobQ->parent = this;
-    jqSecondary = new JobQueue(4, 4, 0);
+    jqSecondary = new JobQueue(1, 1, 0);
 
 
     //lastFrame = Rect(0,0,image_width,image_height);
@@ -130,22 +119,22 @@ namespace pathCam {
 
   void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index,
                                     std::string _label) {
-    lastFrameMutex->lock();
+    lastFrameMutex.lock();
     lastFrame = _rectInScale1Space;
     lastComponentIndex = _component_index;
     showAsCircle = _showAsCircle;
     lastLabel = _label;
-    lastFrameMutex->unlock();
+    lastFrameMutex.unlock();
   }
 
   void StreamCam::get_last_frame(cv::Rect_<float> &_rectInBaseSpace, bool &_showAsCircle, int &_lastComponentIndex,
                                  std::string &_magLabel) {
-    lastFrameMutex->lock();
+    lastFrameMutex.lock();
     _lastComponentIndex = lastComponentIndex;
     _showAsCircle = showAsCircle;
     _rectInBaseSpace = lastFrame;
     _magLabel = lastLabel;
-    lastFrameMutex->unlock();
+    lastFrameMutex.unlock();
   }
 
 
@@ -153,7 +142,7 @@ namespace pathCam {
     Image *mostRecentResolved = nullptr;
     bool objChange = false;
 
-    image_mutex->readLock();
+    image_mutex.readLock();
     for (int i = _fromImage->index - 1; i >= 0; --i) {
       auto img = images[i];
       if (img && img->label == Image::_UNDEREXP) {
@@ -165,7 +154,7 @@ namespace pathCam {
         break;
       }
     }
-    image_mutex->unlock();
+    image_mutex.unlock();
 
     return {mostRecentResolved, objChange};
   }
@@ -179,7 +168,7 @@ namespace pathCam {
     auto myBR = get_AbC_relative_from_relative(_componentIndex, p2, 0);
     Rect myRect(myTL, myBR);
 
-    image_mutex->readLock();
+    image_mutex.readLock();
     for (auto &img: images) {
       if (!(img && img->regInfo)) { continue; }
       if (composites[img->regInfo->component_membership]->imagePyramid->scale == 0) { continue; };
@@ -194,7 +183,7 @@ namespace pathCam {
         result.push_back({img, intersect});
       }
     }
-    image_mutex->unlock();
+    image_mutex.unlock();
 
     return result;
   }
@@ -341,7 +330,7 @@ namespace pathCam {
 
   void StreamCam::push_SIFT_matches(std::vector<std::pair<Image *, Image *> > &_newOverlaps, Image *_image) {
     sfm->matchWorkOutstanding += (int) _newOverlaps.size();
-    siftQMutex->lock();
+    siftQMutex.lock();
     if (compositorCudaDevice != siftCudaDevice) {
       siftDataQueue.push(_image);
     }
@@ -351,7 +340,7 @@ namespace pathCam {
     } else {
       siftMatchQueue.push_back(_newOverlaps);
     }
-    siftQMutex->unlock();
+    siftQMutex.unlock();
   }
 
 #endif
@@ -363,13 +352,13 @@ namespace pathCam {
   // }
 
   void StreamCam::set_match(unsigned long _image_idx, unsigned long _prev_idx, Match *_m, bool _invert) {
-    resize_mmatch_mutex->writeLock();
+    resize_mmatch_mutex.writeLock();
     if (_invert) {
       matchM.match[_image_idx][_prev_idx] = new Match(_m);
     } else {
       matchM.match[_prev_idx][_image_idx] = _m;
     }
-    resize_mmatch_mutex->unlock();
+    resize_mmatch_mutex.unlock();
   }
 
   void StreamCam::clear_buffer(int _image_idx) {
@@ -449,43 +438,43 @@ namespace pathCam {
 
 
   void StreamCam::add_image(Image *image, unsigned long index) {
-    image_mutex->writeLock();
-    reg_results_mutex->writeLock();
+    image_mutex.writeLock();
+    reg_results_mutex.writeLock();
     unsigned long size = images.size();
     if (index >= size) {
       images.resize(index + 100);
 
       reg_results.resize(index + 100);
 
-      resize_mmatch_mutex->writeLock();
+      resize_mmatch_mutex.writeLock();
       matchM.resize(index + 100);
-      resize_mmatch_mutex->unlock();
+      resize_mmatch_mutex.unlock();
     }
 
     reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
-    reg_results_mutex->unlock();
+    reg_results_mutex.unlock();
 
     images[index] = image;
     ++maxIndex;
-    image_mutex->unlock();
+    image_mutex.unlock();
   }
 
   void StreamCam::add_registration(pathCam::RegInfo *regInfo) {
-    reg_results_mutex->writeLock();
+    reg_results_mutex.writeLock();
     auto index = regInfo->index;
     reg_results[index] = regInfo;
-    reg_results_mutex->unlock();
+    reg_results_mutex.unlock();
     auto image = get_image_ref(index);
     image->regInfo = regInfo;
   }
 
 
-  std::vector<Image *> StreamCam::get_image_ref(const std::vector<unsigned long int> &_indexes) const {
+  std::vector<Image *> StreamCam::get_image_ref(const std::vector<unsigned long int> &_indexes) {
     /*because images vector can be expanded, this gives access to the pointers within that vector under mutex lock.
     an empty vector of unsigned longs returns entire list of images*/
     std::vector<Image *> temp;
 
-    image_mutex->readLock();
+    image_mutex.readLock();
     if (_indexes.empty()) {
       unsigned long i = 0;
       while (images[i] && i <= maxIndex) {
@@ -498,7 +487,7 @@ namespace pathCam {
         }
       }
     }
-    image_mutex->unlock();
+    image_mutex.unlock();
 
     return temp;
   }
@@ -506,33 +495,33 @@ namespace pathCam {
   std::vector<RegInfo *> StreamCam::get_reg_ref(const std::vector<unsigned long> &_indexes) {
     std::vector<RegInfo *> temp;
 
-    reg_results_mutex->writeLock();
+    reg_results_mutex.writeLock();
     for (unsigned int i = 0; i < _indexes.size(); i++) {
       if (reg_results[_indexes[i]]) {
         temp.push_back(reg_results[_indexes[i]]);
       }
     }
-    reg_results_mutex->unlock();
+    reg_results_mutex.unlock();
 
     return temp;
   };
 
   RegInfo *StreamCam::get_reg_ref(unsigned long image_idx) {
     RegInfo *temp;
-    reg_results_mutex->readLock();
+    reg_results_mutex.readLock();
     temp = reg_results[image_idx];
-    reg_results_mutex->unlock();
+    reg_results_mutex.unlock();
     return temp;
   }
 
   Image *StreamCam::get_image_ref(unsigned long index) {
     Image *temp = nullptr;
 
-    image_mutex->readLock();
+    image_mutex.readLock();
     if (index < images.size()) {
       temp = images[index];
     }
-    image_mutex->unlock();
+    image_mutex.unlock();
 
     return temp;
   }
@@ -553,7 +542,7 @@ namespace pathCam {
 
     //auto *temp = new CompositeVoronoi(this, image_size, component_index);
     auto component = new MetricComposite(this, image_size, component_index);
-    component_mutex->lock();
+    component_mutex.lock();
     composites.push_back(component);
 
     if (composites.size() == 1) {
@@ -571,7 +560,7 @@ namespace pathCam {
 
     ri->set_abc({0, 0}, component_index, true);
 
-    component_mutex->unlock();
+    component_mutex.unlock();
   }
 
   //demo
@@ -634,19 +623,19 @@ namespace pathCam {
   }
 
   std::vector<RegInfo *> StreamCam::get_Q_front(bool _pop) {
-    compositeQ_mutex->lock();
+    compositeQ_mutex.lock();
     std::vector<RegInfo *> temp = compositeBatch.top();
     if (_pop) {
       compositeBatch.pop();
     }
-    compositeQ_mutex->unlock();
+    compositeQ_mutex.unlock();
     return temp;
   }
 
   std::vector<std::tuple<int, int, unsigned int> > StreamCam::get_tile_embed_Q_front() {
     std::vector<std::tuple<int, int, unsigned int> > temp;
 
-    inferenceQMutex->lock();
+    inferenceQMutex.lock();
     if (!tileEmbedQ.empty()) {
       unsigned int component_index = std::get<2>(tileEmbedQ.front());
 
@@ -655,10 +644,10 @@ namespace pathCam {
         temp.push_back(tileEmbedQ.front());
         tileEmbedQ.pop();
       }
-      inferenceQMutex->unlock();
+      inferenceQMutex.unlock();
       return temp;
     } else {
-      inferenceQMutex->unlock();
+      inferenceQMutex.unlock();
       return {};
     }
   }
@@ -667,7 +656,7 @@ namespace pathCam {
   std::vector<std::pair<Image *, Image *> > StreamCam::get_sift_match_Q_front(std::vector<Image *> &_images) {
     std::vector<std::pair<Image *, Image *> > temp;
 
-    siftQMutex->lock();
+    siftQMutex.lock();
 
     //move all the buffers to my device (if necessary)
     get_sift_data_Q_front(_images);
@@ -677,7 +666,7 @@ namespace pathCam {
       temp = siftMatchQueue.front();
       siftMatchQueue.pop_front();
     }
-    siftQMutex->unlock();
+    siftQMutex.unlock();
     return temp;
   }
 
@@ -702,21 +691,21 @@ namespace pathCam {
 
   void StreamCam::push_tile_embed_Q(std::vector<Point2i> &_tiles, unsigned int _componentIndex) {
     if (inferencing) {
-      inferenceQMutex->lock();
+      inferenceQMutex.lock();
       for (auto tilePoint: _tiles) {
         auto tpl = std::tuple<int, int, unsigned>(tilePoint.x, tilePoint.y, _componentIndex);
         tileEmbedQ.push(tpl);
       }
-      inferenceQMutex->unlock();
+      inferenceQMutex.unlock();
       inferenceWait.set();
     }
   }
 
   Image *StreamCam::get_Q_front_Spin() {
-    resize_buffer_mutex->lock();
+    resize_buffer_mutex.lock();
     Image *temp = spin_image_buffer.front();
     spin_image_buffer.pop();
-    resize_buffer_mutex->unlock();
+    resize_buffer_mutex.unlock();
     return temp;
   }
 
@@ -730,7 +719,7 @@ namespace pathCam {
   bool StreamCam::sufficient_distance(Vec2 _coordsInQuestion, int _componentIdx) {
     bool answer = false;
 
-    pixelDistanceMutex->lock();
+    pixelDistanceMutex.lock();
 
     if (lastAcceptedCoords.size() < _componentIdx + 1) {
       lastAcceptedCoords.resize(_componentIdx + 1);
@@ -745,7 +734,7 @@ namespace pathCam {
       }
     }
 
-    pixelDistanceMutex->unlock();
+    pixelDistanceMutex.unlock();
     return answer;
   }
 
@@ -764,29 +753,29 @@ namespace pathCam {
     _regInfo->inCompositeQ = true;
     _regInfo->accessMutex->unlock();
 
-    compositeQ_mutex->lock();
+    compositeQ_mutex.lock();
     compositeBatch.push({_regInfo});
-    compositeQ_mutex->unlock();
+    compositeQ_mutex.unlock();
   }
 
   bool StreamCam::get_scale_and_offset(unsigned int component_index, double &_scale, cv::Point2f &_offset) {
-    scaleRepoMutex->lock();
+    scaleRepoMutex.lock();
     if (scaleRepo.find(component_index) == scaleRepo.end()) {
-      scaleRepoMutex->unlock();
+      scaleRepoMutex.unlock();
       return false;
     }
 
     auto res = scaleRepo[component_index];
     _scale = res.first;
     _offset = res.second;
-    scaleRepoMutex->unlock();
+    scaleRepoMutex.unlock();
     return true;
   }
 
   bool StreamCam::compositeQ_empty() {
-    compositeQ_mutex->lock();
+    compositeQ_mutex.lock();
     bool isEmpty = compositeBatch.size() == 0;
-    compositeQ_mutex->unlock();
+    compositeQ_mutex.unlock();
     return isEmpty;
   }
 
@@ -800,5 +789,14 @@ namespace pathCam {
       jobComplete.wait();
     }
     someoneWaitingOnJobCompleteEvent = false;
+  }
+
+  StreamCam::~StreamCam() {
+    clean_up_blur_engine();
+    for (auto c : composites) {
+      delete c;
+    }
+    delete jqSecondary;
+    delete JobQ;
   }
 }

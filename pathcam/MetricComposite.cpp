@@ -81,17 +81,29 @@ namespace pathCam {
     waitingFrames.resize(frameDelay, {nullptr, {}});
     //compositeImage = imagePyramid->level[0];
 
-    rectMask = Mat(image_size, CV_8U, cv::Scalar(255));
-    rectMaskGPU = cuda::GpuMat(image_size,CV_8UC1, rectMask.data);
-    threeChannelPreallocated = Mat(image_size, CV_8UC3);
-    threeChannelPrealGPU = cuda::GpuMat(image_size, CV_8UC3, threeChannelPreallocated.data);
-    fourChannelPreallocated = Mat::zeros(image_size, CV_8UC4);
-    fourChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC4, fourChannelPreallocated.data);
+    cudaMallocManaged(&rectMaskBuf,imageSize.area());
+    cudaMemset(rectMaskBuf,255,imageSize.area());
+    rectMask = Mat(image_size, CV_8UC1,rectMaskBuf);
+    rectMaskGPU = cuda::GpuMat(imageSize,CV_8UC1,rectMaskBuf);
+
+    cudaMallocManaged(&threeChnBuf,3 * imageSize.area());
+    threeChannelPreallocated = Mat(imageSize,CV_8UC3,threeChnBuf);
+    threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3,threeChnBuf);
+
+    cudaMallocManaged(&fourChnBuf,4 * imageSize.area());
+    fourChannelPreallocated = Mat(imageSize,CV_8UC4,fourChnBuf);
+    fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4,fourChnBuf);
 
     circleMask = Mat::zeros(image_size, CV_8U);
     circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
            Scalar(255),
            -1);
+  }
+
+  MetricComposite::~MetricComposite() {
+    cudaFree(threeChnBuf);
+    cudaFree(fourChnBuf);
+    cudaFree(rectMaskBuf);
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
@@ -275,11 +287,10 @@ namespace pathCam {
     }
 
     int k = 0;
-    auto test = extraMatches[0];
-    k = 5;
     //update_mutex.lock();
-    for (auto &[img1,img2,kp1,kp2] : extraMatches) {
-    // for (int ii = 0; ii < extraMatches.size(); ++ii){
+    // for (auto &[img1,img2,kp1,kp2] : extraMatches) {
+    for (int ii = 0; ii < extraMatches.size(); ++ii){
+      auto [img1,img2,kp1,kp2] = extraMatches[ii];
     //   auto img1 = std::get<0>(extraMatches[ii]);
     //   auto img2 = std::get<1>(extraMatches[ii]);
     //   auto kp1 = std::get<2>(extraMatches[ii]);
@@ -288,7 +299,7 @@ namespace pathCam {
       img1->keypointsImageSpace.reserve(img1->keypointsImageSpace.size() + kp1.size());
       img2->keypointsImageSpace.reserve(img2->keypointsImageSpace.size() + kp2.size());
       std::vector<DMatch> good_matches(kp2.size());
-      for (int i = 0; i < kp1.size(); ++i) {
+      for (int i = 0; i < min(int(kp1.size()),300); ++i) {
         DMatch dm;
         dm.queryIdx = img1->keypointsImageSpace.size();
         dm.trainIdx = img2->keypointsImageSpace.size();
@@ -549,4 +560,6 @@ namespace pathCam {
     }
     return members;
   }
+
+
 }

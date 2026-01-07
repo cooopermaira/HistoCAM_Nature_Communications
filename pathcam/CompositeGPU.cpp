@@ -183,8 +183,6 @@ namespace pathCam {
         adjust_roi_for_debayer(roi_);
         Mat rawMat(imageSize, CV_8U, img->get_Raw());
         cvtColor(rawMat(roi_), threeChannelPreallocated(roi_), COLOR_BayerBG2BGR);
-
-        threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChannelPreallocated.data);
       }
 
       //ff correct

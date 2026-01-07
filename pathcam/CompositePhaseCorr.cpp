@@ -4,7 +4,7 @@
 #include <pathCam.h>
 
 namespace pathCam {
-  cuda::GpuMat &getThreadConvertSpace(int width, int height);// {
+  // cuda::GpuMat &getThreadConvertSpace(int width, int height);// {
 
   void copy_sift_data(SiftData &dst, const SiftData &src)
   {
@@ -130,9 +130,11 @@ namespace pathCam {
 
 
   bool Composite::establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract) {
-    //get my sift data
     SiftData rootCopy,compareCopy;
-    _rootImg->siftMutex.lock();
+
+    //_rootImg->siftMutex.lock();
+
+    //get my sift data
     if ((!_rootImg->siftInitialized && !_fullImageFtExtract) || (!_rootImg->siftFullInitialized && _fullImageFtExtract)) {
       _rootImg->load_raw_from_disk();
 
@@ -163,11 +165,11 @@ namespace pathCam {
     }else {
       copy_sift_data(rootCopy,_rootImg->siftData); //avoids shuffling a sorted data order needed later
     }
-    _rootImg->siftMutex.unlock();
+    //_rootImg->siftMutex.unlock();
 
 
     //get their sift data
-    _target->siftMutex.lock();
+    //_target->siftMutex.lock();
     if ((!_target->siftInitialized && !_fullImageFtExtract) || (!_target->siftFullInitialized && _fullImageFtExtract)) {
       _target->load_raw_from_disk();
 
@@ -198,10 +200,11 @@ namespace pathCam {
     }else {
       copy_sift_data(compareCopy,_target->siftData); //avoids shuffling a sorted data order needed later
     }
-    _target->siftMutex.unlock();
+    //_target->siftMutex.unlock();
 
     assert(rootCopy.numPts > 0 && compareCopy.numPts > 0);
     MatchSiftData(rootCopy, compareCopy);
+    FreeSiftData(compareCopy);
 
     std::vector<float> homography(9);
     int numMatches;
@@ -218,6 +221,7 @@ namespace pathCam {
           scale = 1 / scale;
           if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
             validHomography = true;
+            break;
           }
         }
       }
@@ -227,6 +231,7 @@ namespace pathCam {
     }
 
     if (!validHomography) {
+      FreeSiftData(rootCopy);
       return false;
     }
     float relativeScale = (homography[0] + homography[4]) / 2;
@@ -262,14 +267,15 @@ namespace pathCam {
       std::vector<uint8_t> inlierMask;
       std::vector<KeyPoint> kp1,kp2;
       int inlierCount;
-      //Poco::Thread::sleep(1000);
-      // findHomographyInliersCPU(rootCopy,homography.data(),5.f,0.8,0.9,inlierMask,&inlierCount);
-      // sift_to_cvMatch(rootCopy,_rootImg,_target,inlierCount,inlierMask,kp1,kp2);
-      //
-      // auto comp = reinterpret_cast<MetricComposite *>(parent->composites[theirComponentIndex]);
-      // comp->update_mutex.lock();
-      // comp->extraMatches.emplace_back(_rootImg,_target,kp1,kp2);
-      // comp->update_mutex.unlock();
+
+      findHomographyInliersCPU(rootCopy,homography.data(),5.f,0.8,0.9,inlierMask,&inlierCount);
+      sift_to_cvMatch(rootCopy,_rootImg,_target,inlierCount,inlierMask,kp1,kp2);
+      FreeSiftData(rootCopy);
+
+      auto comp = reinterpret_cast<MetricComposite *>(parent->composites[theirComponentIndex]);
+      comp->update_mutex.lock();
+      comp->extraMatches.emplace_back(_rootImg,_target,kp1,kp2);
+      comp->update_mutex.unlock();
       return true;
     }
     if (!_fullImageFtExtract) {

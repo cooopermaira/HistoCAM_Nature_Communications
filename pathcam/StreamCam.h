@@ -99,22 +99,23 @@ namespace pathCam {
   public:
     StreamCam(Poco::Util::LayeredConfiguration::Ptr config);
 
-    ~StreamCam() { delete buffer_mutex, delete image_mutex; clean_up_blur_engine();}
+    ~StreamCam();
 
-    Poco::RWLock *image_mutex;
-    Poco::RWLock *reg_results_mutex;
-    Poco::RWLock *resize_mmatch_mutex;
-    Poco::FastMutex *resize_buffer_mutex;
-    Poco::FastMutex *buffer_mutex;
-    Poco::FastMutex *compositeQ_mutex;
-    Poco::FastMutex *component_mutex;
-    Poco::FastMutex *lastFrameMutex;
-    Poco::FastMutex *scaleRepoMutex;
-    Poco::FastMutex *inferenceQMutex;
-    Poco::FastMutex *siftQMutex;
-    Poco::FastMutex *pixelDistanceMutex;
+    Poco::RWLock image_mutex;
+    Poco::RWLock reg_results_mutex;
+    Poco::RWLock resize_mmatch_mutex;
+    Poco::FastMutex resize_buffer_mutex;
+    Poco::FastMutex buffer_mutex;
+    Poco::FastMutex compositeQ_mutex;
+    Poco::FastMutex component_mutex;
+    Poco::FastMutex lastFrameMutex;
+    Poco::FastMutex scaleRepoMutex;
+    Poco::FastMutex inferenceQMutex;
+    Poco::FastMutex siftQMutex;
+    Poco::FastMutex pixelDistanceMutex;
     Poco::FastMutex pyramidQMutex;
     Poco::FastMutex blurMutex;
+    Poco::FastMutex CudaSiftGlobalUseMutex;
 
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
@@ -264,9 +265,9 @@ namespace pathCam {
     void clear_buffer(int _image_idx);
 
     void set_scale_and_offset(unsigned int component_index, double scale, Point2f offset) {
-      scaleRepoMutex->lock();
+      scaleRepoMutex.lock();
       scaleRepo[component_index] = {scale, offset};
-      scaleRepoMutex->unlock();
+      scaleRepoMutex.unlock();
     }
 
     bool get_scale_and_offset(unsigned int component_index, double &_scale, Point2f &_offset);
@@ -291,7 +292,7 @@ namespace pathCam {
 
     Image* get_image_ref(unsigned long);
 
-    std::vector<Image *> get_image_ref(const std::vector<unsigned long>&) const;
+    std::vector<Image *> get_image_ref(const std::vector<unsigned long>&);
 
     std::vector<RegInfo*> get_reg_ref(const std::vector<unsigned long>&);
 

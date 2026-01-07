@@ -15,6 +15,12 @@ namespace pathCam {
     pool = new Poco::ThreadPool(min_threads, max_threads, 60, POCO_THREAD_STACK_SIZE);
   }
 
+  JobQueue::~JobQueue() {
+    delete pool;
+    delete queue_mutex;
+    delete pathCamEvent;
+  }
+
   std::pair<long, unsigned long> JobQueue::get_job_ref_index_and_sort_order(int jobTypeFlag, unsigned long image_idx)
   {
     /*

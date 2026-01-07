@@ -40,6 +40,7 @@ namespace pathCam{
 
   public:
     JobQueue(int min_threads, int max_threads,int windowWidth = 3);
+    ~JobQueue();
     void add_runnable(RunnableIntermediate *job, long sortOrder = -1);
     void cancel_job(int jobTypeFlag, unsigned long image_idx);
     bool run_jobs(bool join_all);

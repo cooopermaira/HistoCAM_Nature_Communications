@@ -87,6 +87,7 @@ namespace pathCam {
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     void prepare_blur_check_statics();
+    static void cleanup_blur_check_statics();
     bool move_buffer_to_gpu(int _device, bool _freeHostBuffer = false);
 #endif
 
@@ -189,13 +190,7 @@ namespace pathCam {
     MemoryPool *mempool;
 
     //already protected by mutex in calling function
-    inline void allocate_memory_RAW() {
-      if (raw_buffer == 0) {
-        if (mempool) {
-          raw_buffer = reinterpret_cast<char *>(mempool->get());
-        } else { raw_buffer = new char[width * height]; }
-      }
-    }
+    inline void allocate_memory_RAW();
 
 
     char *raw_buffer;

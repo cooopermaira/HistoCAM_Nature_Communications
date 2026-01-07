@@ -14,6 +14,7 @@ namespace pathCam {
     class MetricComposite : public Composite {
     public:
         MetricComposite(StreamCam *parent, Size image_size, int componentIndex);
+        ~MetricComposite();
 
         void update() override;
 
@@ -57,6 +58,10 @@ namespace pathCam {
         inline static std::mutex EstRoot_mutex;
 
         Poco::FastMutex cvtMutex;
+
+        char* threeChnBuf;
+        char* fourChnBuf;
+        char* rectMaskBuf;
 
     };
 

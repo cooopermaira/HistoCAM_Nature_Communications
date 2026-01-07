@@ -595,10 +595,10 @@ namespace pathCam {
       return {0,0};
     }
 
-    parent->resize_mmatch_mutex->readLock();
+    parent->resize_mmatch_mutex.readLock();
     auto m1 = parent->matchM.match[myImage->index][theirImage->index];
     if (m1 == nullptr) {
-      parent->resize_mmatch_mutex->unlock();
+      parent->resize_mmatch_mutex.unlock();
       return {0,0};
     }
     Point2d actualDistance(myImage->absoluteCoords.x - theirImage->absoluteCoords.x,myImage->absoluteCoords.y - theirImage->absoluteCoords.y);

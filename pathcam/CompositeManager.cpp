@@ -12,6 +12,10 @@
 using namespace cv;
 using namespace cv::detail;
 
+int lastMC = 0,countDown = 100;
+bool hasBeenNonZero = false;
+
+
 namespace pathCam {
   CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),
                                                           rebuildJobsOutstanding(true) {
@@ -29,7 +33,7 @@ namespace pathCam {
 
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
-      //debug_termination_check();
+      debug_termination_check();
 
       //pull new components that might need to be processed
       std::tuple<unsigned long, Size, unsigned int> newComp;
@@ -117,6 +121,7 @@ namespace pathCam {
       t.join();
     }
     threads.clear();
+
 
     auto tAlign = std::chrono::high_resolution_clock::now();
 
@@ -223,9 +228,22 @@ namespace pathCam {
   }
 
   void CompositeManager::debug_termination_check() {
-    if (parent->matchableCount > 11) {
+    if (parent->matchableCount > 0) {
+      hasBeenNonZero = true;
+    }
+
+    if (!hasBeenNonZero){return;}
+    if (parent->matchableCount == lastMC) {
+      --countDown;
+      if (countDown > 0) {
+        return;
+      }
+    }else {
+      lastMC = parent->matchableCount;
+      countDown = 100;
       return;
     }
+
     std::vector<unsigned long> emptyList;
     auto ans = parent->get_image_ref(emptyList);
 

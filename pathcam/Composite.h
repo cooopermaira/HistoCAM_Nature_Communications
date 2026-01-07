@@ -41,6 +41,8 @@ namespace pathCam {
     friend class RebuildRunnable;
 
   public:
+    virtual ~Composite() = default;
+
     StreamCam *parent;
     Image* root;
     Mat local_quality_score, composite_z_buffer, flat_field;
