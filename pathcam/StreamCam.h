@@ -292,7 +292,7 @@ namespace pathCam {
 
     Image* get_image_ref(unsigned long);
 
-    std::vector<Image *> get_image_ref(const std::vector<unsigned long>&);
+    std::vector<Image *> get_image_ref(const std::vector<long int> &);
 
     std::vector<RegInfo*> get_reg_ref(const std::vector<unsigned long>&);
 

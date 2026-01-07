@@ -143,6 +143,7 @@ namespace pathCam {
       delete m;
     }
 
+
     if (!successful) {
       parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
     }

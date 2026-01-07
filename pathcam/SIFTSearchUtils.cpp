@@ -29,54 +29,7 @@ namespace pathCam {
   }
 
 
-  // Generate tracks from current state
-  std::vector<FeatureTrack> FeatureTrackGenerator::generateCurrentTracks(const std::vector<Image *> &images) {
-    if (!uf_ptr || index_to_feature.empty()) {
-      return {};
-    }
 
-    auto ans = createTracksFromConnections(images, *uf_ptr);
-    //debug
-
-    // int edge2_2=0,edge4_4=0,edge2_4=0,edge10_10=0,edge2_10=0,edge4_10=0,edge2_4_10=0;
-    // for (auto &t : ans) {
-    //   bool two = false,four = false,ten = false;
-    //   for (auto &obs : t.observations) {
-    //     if (obs.imgRef->component_membership == 0) {
-    //       two = true;
-    //     }
-    //     if (obs.imgRef->component_membership==1) {
-    //       four = true;
-    //     }
-    //     if (obs.imgRef->component_membership == 2) {
-    //       ten = true;
-    //     }
-    //   }
-    //   if (two && !four && !ten) {
-    //       ++edge2_2;
-    //   }
-    //   if (two && four && !ten) {
-    //     ++edge2_4;
-    //   }
-    //   if (two && four && ten) {
-    //     ++edge2_4_10;
-    //   }
-    //   if (!two &&four && ten) {
-    //     ++edge4_10;
-    //   }
-    //   if (!two && !four && ten) {
-    //     ++edge10_10;
-    //   }
-    //   if (!two && four && !ten) {
-    //     ++edge4_4;
-    //   }
-    //   if (two && !four && ten) {
-    //     ++edge2_10;
-    //   }
-    // }
-    // int k = 0;
-    return ans;
-  }
 
   void FeatureTrackGenerator::process_match(long _srcImgIdx, long _dstImgIdx, const DMatch &_match) {
     ImageFeaturePair feat1{(long) _srcImgIdx, _match.queryIdx};
@@ -91,49 +44,15 @@ namespace pathCam {
   }
 
 
-  void FeatureTrackGenerator::buildConnectionGraph(const std::vector<pMatch> &all_matches,
-                                                   UnionFind &uf) {
-    for (const auto &match_info: all_matches) {
-      for (const auto &match: match_info.matches) {
-        ImageFeaturePair feat1{(long) match_info.src_img_idx, match.queryIdx};
-        ImageFeaturePair feat2{(long) match_info.dst_img_idx, match.trainIdx};
-
-        auto it1 = feature_to_index.find(feat1);
-        auto it2 = feature_to_index.find(feat2);
-
-        if (it1 != feature_to_index.end() && it2 != feature_to_index.end()) {
-          uf.unite(it1->second, it2->second);
-        }
-      }
+  // Generate tracks from current state
+  std::vector<FeatureTrack> FeatureTrackGenerator::generateCurrentTracks(const std::vector<Image *> &images) {
+    if (!uf_ptr || index_to_feature.empty()) {
+      return {};
     }
+
+    auto ans = createTracksFromConnections(images, *uf_ptr);
+    return ans;
   }
-
-  // std::vector<FeatureTrack> FeatureTrackGenerator::generateTracks(const std::vector<Image *> &images,
-  //                                                                 const std::vector<pMatch> &all_matches) {
-  //   // Step 1: Create global indexing for all features
-  //   createGlobalFeatureIndex(images);
-  //
-  //   // Step 2: Build connection graph using Union-Find
-  //   UnionFind uf(index_to_feature.size());
-  //   buildConnectionGraph(all_matches, uf);
-  //
-  //   // Step 3: Group connected features into tracks
-  //   return createTracksFromConnections(images, uf);
-  // }
-
-  // void FeatureTrackGenerator::createGlobalFeatureIndex(const std::vector<Image *> &images) {
-  //   int global_index = 0;
-  //
-  //   for (const auto &img: images) {
-  //     for (int feat_id = 0; feat_id < img->siftData.numPts; feat_id++) {
-  //       ImageFeaturePair pair{img->index, feat_id};
-  //       feature_to_index[pair] = global_index;
-  //       index_to_feature.push_back(pair);
-  //       global_index++;
-  //     }
-  //   }
-  // }
-
 
   std::vector<FeatureTrack> FeatureTrackGenerator::createTracksFromConnections(
     const std::vector<Image *> &images,
@@ -163,7 +82,7 @@ namespace pathCam {
       FeatureTrack track(track_id++);
 
       // Check for multiple observations in same image (should not happen with good matching)
-      std::set<int> images_in_track;
+      std::set<long> images_in_track;
       bool valid_track = true;
 
       for (int global_idx: feature_indices) {

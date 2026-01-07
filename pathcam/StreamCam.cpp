@@ -397,8 +397,8 @@ namespace pathCam {
   }
 
   void StreamCam::mark_neighbors_as_underexposed(unsigned long _index) {
-    std::vector<unsigned long> neighborhood;
-    for (unsigned long i = max(0ul, _index - windowWidth); i <= _index + windowWidth; i++) {
+    std::vector<long> neighborhood;
+    for (long i = max(0ul, _index - windowWidth); i <= _index + windowWidth; i++) {
       neighborhood.push_back(i);
       JobQ->cancel_job(2, i);
     }
@@ -469,19 +469,19 @@ namespace pathCam {
   }
 
 
-  std::vector<Image *> StreamCam::get_image_ref(const std::vector<unsigned long int> &_indexes) {
+  std::vector<Image *> StreamCam::get_image_ref(const std::vector<long int> &_indexes) {
     /*because images vector can be expanded, this gives access to the pointers within that vector under mutex lock.
     an empty vector of unsigned longs returns entire list of images*/
     std::vector<Image *> temp;
 
     image_mutex.readLock();
     if (_indexes.empty()) {
-      unsigned long i = 0;
+      long i = 0;
       while (images[i] && i <= maxIndex) {
         temp.push_back(images[i++]);
       }
     } else {
-      for (unsigned int i = 0; i < _indexes.size(); i++) {
+      for (int i = 0; i < _indexes.size(); i++) {
         if (images[_indexes[i]] && _indexes[i] <= maxIndex) {
           temp.push_back(images[_indexes[i]]);
         }
@@ -613,7 +613,7 @@ namespace pathCam {
 
   std::vector<Image *> StreamCam::get_component_image_refs(unsigned long component) {
     auto dm = composites[component]->delaunayMembers;
-    std::vector<unsigned long> res(dm.size());
+    std::vector<long> res(dm.size());
     int i = 0;
     for (auto [key, value]: dm) {
       res[i] = dm[key];

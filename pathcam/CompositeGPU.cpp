@@ -213,7 +213,7 @@ namespace pathCam {
 
   void CompositeVoronoi::GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add) {
     // get a copy of references to all images at once so that only one mutex lock is needed
-    std::vector<unsigned long> indexes;
+    std::vector<long> indexes;
     for (int i = 0; i < _newInfo.size(); i++) {
       indexes.push_back(_newInfo[i]->index);
     }

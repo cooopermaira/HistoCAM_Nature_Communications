@@ -5,28 +5,29 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  inline SiftData collect_SiftData(const std::vector<std::pair<Image*,std::vector<const SiftPoint*>>> &_inVec, int _subsample) {
+  inline SiftData collect_SiftData(const std::vector<std::pair<Image *, std::vector<const SiftPoint *> > > &_inVec,
+                                   int _subsample) {
     SiftData siftData;
     int totalPoints = 0;
-    for (auto &[img,vec] : _inVec) {
+    for (auto &[img,vec]: _inVec) {
       totalPoints += vec.size();
     }
     totalPoints /= _subsample;
 
-    InitSiftData(siftData,totalPoints,true,true);
+    InitSiftData(siftData, totalPoints, true, true);
 
 
     int startPos = 0;
-    for (auto &[img,vec] : _inVec) {
+    for (auto &[img,vec]: _inVec) {
       Point2f shift((img->width - img->parent->siftWindow) / 2 + img->regInfo->absoluteCoords.x,
-        (img->height - img->parent->siftWindow) / 2 + img->regInfo->absoluteCoords.y);
-      for (int i = 0; i < static_cast<int>(vec.size())/_subsample; ++i) {
-        const SiftPoint* src = vec[i * _subsample];            // take every 10th input
-        siftData.h_data[startPos + i] = *src;          // pack output contiguously
+                    (img->height - img->parent->siftWindow) / 2 + img->regInfo->absoluteCoords.y);
+      for (int i = 0; i < static_cast<int>(vec.size()) / _subsample; ++i) {
+        const SiftPoint *src = vec[i * _subsample]; // take every 10th input
+        siftData.h_data[startPos + i] = *src; // pack output contiguously
         siftData.h_data[startPos + i].xpos += shift.x;
         siftData.h_data[startPos + i].ypos += shift.y;
       }
-      startPos += static_cast<int>(vec.size())/_subsample;
+      startPos += static_cast<int>(vec.size()) / _subsample;
     }
 
     cudaMemcpy(siftData.d_data, siftData.h_data,
@@ -38,11 +39,10 @@ namespace pathCam {
   }
 
   inline void querySiftRect_sortedByX(
-    const SiftData& sd,
+    const SiftData &sd,
     float xmin, float xmax,
     float ymin, float ymax,
-    std::vector<const SiftPoint*>& out)
-  {
+    std::vector<const SiftPoint *> &out) {
     assert(sd.h_data);
     assert(sd.numPts >= 0 && sd.numPts <= sd.maxPts);
     if (sd.numPts == 0 || xmin > xmax || ymin > ymax) {
@@ -50,18 +50,18 @@ namespace pathCam {
       return;
     }
 
-    const SiftPoint* begin = sd.h_data;
-    const SiftPoint* end   = sd.h_data + sd.numPts;
+    const SiftPoint *begin = sd.h_data;
+    const SiftPoint *end = sd.h_data + sd.numPts;
 
     // First point with xpos >= xmin
     auto lo = std::lower_bound(begin, end, xmin,
-                               [](const SiftPoint& p, float v) {
+                               [](const SiftPoint &p, float v) {
                                  return p.xpos < v;
                                });
 
     // First point with xpos > xmax
     auto hi = std::upper_bound(lo, end, xmax,
-                               [](float v, const SiftPoint& p) {
+                               [](float v, const SiftPoint &p) {
                                  return v < p.xpos;
                                });
 
@@ -76,23 +76,23 @@ namespace pathCam {
   }
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
-      parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
+    parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
     frameDelay = 10;
     waitingFrames.resize(frameDelay, {nullptr, {}});
     //compositeImage = imagePyramid->level[0];
 
-    cudaMallocManaged(&rectMaskBuf,imageSize.area());
-    cudaMemset(rectMaskBuf,255,imageSize.area());
-    rectMask = Mat(image_size, CV_8UC1,rectMaskBuf);
-    rectMaskGPU = cuda::GpuMat(imageSize,CV_8UC1,rectMaskBuf);
+    cudaMallocManaged(&rectMaskBuf, imageSize.area());
+    cudaMemset(rectMaskBuf, 255, imageSize.area());
+    rectMask = Mat(image_size, CV_8UC1, rectMaskBuf);
+    rectMaskGPU = cuda::GpuMat(imageSize,CV_8UC1, rectMaskBuf);
 
-    cudaMallocManaged(&threeChnBuf,3 * imageSize.area());
-    threeChannelPreallocated = Mat(imageSize,CV_8UC3,threeChnBuf);
-    threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3,threeChnBuf);
+    cudaMallocManaged(&threeChnBuf, 3 * imageSize.area());
+    threeChannelPreallocated = Mat(imageSize,CV_8UC3, threeChnBuf);
+    threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChnBuf);
 
-    cudaMallocManaged(&fourChnBuf,4 * imageSize.area());
-    fourChannelPreallocated = Mat(imageSize,CV_8UC4,fourChnBuf);
-    fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4,fourChnBuf);
+    cudaMallocManaged(&fourChnBuf, 4 * imageSize.area());
+    fourChannelPreallocated = Mat(imageSize,CV_8UC4, fourChnBuf);
+    fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4, fourChnBuf);
 
     circleMask = Mat::zeros(image_size, CV_8U);
     circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
@@ -130,7 +130,7 @@ namespace pathCam {
       t.detach();
     }
 
-// PROCESS NEW FRAMES BEGIN
+    // PROCESS NEW FRAMES BEGIN
     if (!staging.empty()) {
       auto ri = staging.front();
       auto img = ri->image;
@@ -191,10 +191,10 @@ namespace pathCam {
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
       ++positionForNextWaitngFrame;
     }
-// PROCESS NEW FRAMES END
+    // PROCESS NEW FRAMES END
 
 
-//PROCESS OLD FRAMES BEGIN
+    //PROCESS OLD FRAMES BEGIN
 
     //process delayed frames, allowing them to blur correct if necessary
     //this is an erase-remove_if implementation with a lambda function inside that updates tileObj
@@ -242,75 +242,91 @@ namespace pathCam {
       //img->free_memory_RAW();
       img = nullptr;
     }
-// PROCESS OLD FRAMES END
+    // PROCESS OLD FRAMES END
   }
 
   void MetricComposite::align_and_rebuild() {
     auto start = std::chrono::high_resolution_clock::now();
 
+    ig = new ImageGraph();
     bai = new BundleAdjustmentIntegrator();
 
     auto members = find_contributing_images();
     members.insert(root);
 
     for (auto &img: members) {
-      img->keypointsImageSpace.resize(img->keypointsImageSpace.size() + img->keypoints.size());
+      img->keypointsImageSpace.resize(img->keypoints.size());
       for (int i = 0; i < img->keypoints.size(); ++i) {
         img->keypointsImageSpace[i].pt = img->keypoints[i].pt / parent->scale_factor;
       }
     }
 
-    auto matches = ftg->matches;
+    auto matches = ftg->matches; //matches are just stored here before being processed all at once.
     std::vector<Match *> memberMatches;
 
-    float maxX = 0, maxY = 0;
+    auto start1 = std::chrono::high_resolution_clock::now();
+    for (auto m: matches) {
+      ig->addEdge(m->image_1->index, m->image_2->index, ImageGraph::EdgeKind::ORB);
+    }
+    for (int ii = 0; ii < extraMatches.size(); ++ii) {
+      auto [img1,img2,kp1,kp2] = extraMatches[ii];
+      ig->addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
+    }
+
+    for (auto img : members) {
+      ig->setMember(img->index,true);
+    }
+
+
+    auto result = ig->computeMinPromotionsToConnectMembersPreferORB();
+
+    if (!result.promoted_nodes.empty()) {
+      std::cout<<"Component "<<componentIndex<<" promoting additional "<<result.promoted_nodes.size()<<" frames in BA"<<std::endl;
+      //important to check if empty or get_image_ref returns every image known to StreamCam
+      for (auto img : parent->get_image_ref(result.promoted_nodes)) {
+        members.insert(img);
+      }
+    }
+
+    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start1).count();
+
+
     for (auto m: matches) {
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
         memberMatches.push_back(m);
-        auto p1 = m->image_1->regInfo->absoluteCoords;
-        auto p2 = m->image_2->regInfo->absoluteCoords;
-
         for (int i = 0; i < m->good_matches.size(); ++i) {
           if (m->inliers[i]) {
-
-            auto p3 = m->image_1->keypointsImageSpace[m->good_matches[i].queryIdx].pt;
-            auto p4 = m->image_2->keypointsImageSpace[m->good_matches[i].trainIdx].pt;
-            auto valx = abs((p1.x - p2.x) + (p3.x - p4.x));
-            auto valy = abs((p1.y - p2.y) - (p3.y - p4.y));
-            if (maxX < valx) {
-              maxX = valx;
-            }
             ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
           }
         }
       }
     }
 
-    int k = 0;
-    //update_mutex.lock();
-    // for (auto &[img1,img2,kp1,kp2] : extraMatches) {
-    for (int ii = 0; ii < extraMatches.size(); ++ii){
-      auto [img1,img2,kp1,kp2] = extraMatches[ii];
-    //   auto img1 = std::get<0>(extraMatches[ii]);
-    //   auto img2 = std::get<1>(extraMatches[ii]);
-    //   auto kp1 = std::get<2>(extraMatches[ii]);
-    //   auto kp2 = std::get<3>(extraMatches[ii]);
-      assert(kp1.size() == kp2.size());
-      img1->keypointsImageSpace.reserve(img1->keypointsImageSpace.size() + kp1.size());
-      img2->keypointsImageSpace.reserve(img2->keypointsImageSpace.size() + kp2.size());
-      std::vector<DMatch> good_matches(kp2.size());
-      for (int i = 0; i < min(int(kp1.size()),300); ++i) {
-        DMatch dm;
-        dm.queryIdx = img1->keypointsImageSpace.size();
-        dm.trainIdx = img2->keypointsImageSpace.size();
+    if (result.used_sift) {
+      std::cout<<"Component "<<componentIndex<<" using sift in BA"<<std::endl;
+      for (auto [img1,img2,kp1,kp2] : extraMatches) {
 
-        img1->keypointsImageSpace.push_back(kp1[i]);
-        img2->keypointsImageSpace.push_back(kp2[i]);
+        if (members.find(img1) != members.end() && members.find(img2) != members.end()) {
 
-        ftg->process_match(img1->index,img2->index,dm);
+          assert(kp1.size() == kp2.size());
+          img1->keypointsImageSpace.reserve(img1->keypointsImageSpace.size() + kp1.size());
+          img2->keypointsImageSpace.reserve(img2->keypointsImageSpace.size() + kp2.size());
+
+          for (int i = 0; i < min(int(kp1.size()), 300); ++i) {
+            DMatch dm;
+            dm.queryIdx = img1->keypointsImageSpace.size();
+            dm.trainIdx = img2->keypointsImageSpace.size();
+
+            img1->keypointsImageSpace.push_back(kp1[i]);
+            img2->keypointsImageSpace.push_back(kp2[i]);
+
+            ftg->process_match(img1->index, img2->index, dm);
+          }
+        }
       }
     }
-    //update_mutex.unlock();
+
 
     const std::vector memberImages(members.begin(), members.end());
     auto tracks = ftg->generateCurrentTracks(memberImages);
@@ -330,18 +346,17 @@ namespace pathCam {
     rebuild(memberImages);
 
 
-
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start).count();
-    std::cout<<"total align time comp "<<componentIndex<<": "<<t3<<std::endl;
+    std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
   void MetricComposite::rebuild(std::vector<Image *> members) {
-
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
     }
+    auto liveTilesCopy = imagePyramid->liveTiles;
     imagePyramid->liveTiles.clear();
 
     for (auto &img: members) {
@@ -361,7 +376,8 @@ namespace pathCam {
       }
     }
 
-    std::vector<std::pair<Image*,std::vector<const SiftPoint*>>> componentFeatures;
+    std::vector<std::pair<Image *, std::vector<const SiftPoint *> > > componentFeatures;
+    Point2i siftWindowCorner((imageSize.width - parent->siftWindow) / 2, (imageSize.height - parent->siftWindow) / 2);
 
     for (auto &img: members) {
       std::vector<Point2i> tileIndexes;
@@ -377,37 +393,48 @@ namespace pathCam {
       }
       process_tiles(img, tileIndexes);
 
-      Point2i siftWindowCorner((imageSize.width - parent->siftWindow)/2,(imageSize.height - parent->siftWindow)/2);
 
-      for (auto &tileInd : tileIndexes) {
+      for (auto &tileInd: tileIndexes) {
         auto lowerQueryPt = tileInd * parent->tileSize - img->regInfo->absoluteCoords - siftWindowCorner;
-        auto upperQueryPt = lowerQueryPt + Point2i(parent->tileSize,parent->tileSize);
+        auto upperQueryPt = lowerQueryPt + Point2i(parent->tileSize, parent->tileSize);
         assert(img->siftInitialized);
-        std::vector<const SiftPoint*> fts;
+        std::vector<const SiftPoint *> fts;
         querySiftRect_sortedByX(img->siftData,
-          lowerQueryPt.x,upperQueryPt.x,lowerQueryPt.y,upperQueryPt.y,fts);
+                                lowerQueryPt.x, upperQueryPt.x, lowerQueryPt.y, upperQueryPt.y, fts);
 
         if (!fts.empty()) {
-          componentFeatures.emplace_back(img,fts);
+          componentFeatures.emplace_back(img, fts);
         }
       }
     }
 
-    compSiftData = collect_SiftData(componentFeatures,5);
+
+    auto tBox = Rect(0, 0, parent->tileSize, parent->tileSize);
+    for (auto &tileIdx: liveTilesCopy) {
+      auto tileObj = imagePyramid->get_base_tile(tileIdx);
+      if (!tileObj->owner) {
+        //kill tile
+        tileObj->image.setTo(Scalar(0, 0, 0, 0));
+        Rect tileReg(tileIdx * parent->tileSize, Size(parent->tileSize, parent->tileSize));
+        imagePyramid->level[0]->tileUpwards(tileIdx, tileReg, tileObj, tBox);
+        tileObj.reset();
+      }
+    }
+
+    compSiftData = collect_SiftData(componentFeatures, 5);
   }
 
   void MetricComposite::search_and_absorb_other_components() {
-    for (auto &m : componentJoinMatches) {
+    for (auto &m: componentJoinMatches) {
       Image *myMember, *theirMember;
       if (m->image_1->regInfo->component_membership == componentIndex) {
         myMember = m->image_1;
         theirMember = m->image_2;
-      }else {
+      } else {
         myMember = m->image_2;
         theirMember = m->image_1;
       }
       if (theirMember->regInfo->component_membership != componentIndex) {
-
       }
     }
   }
@@ -419,7 +446,8 @@ namespace pathCam {
     if (!img->in_memory()) {
       img->load_raw_from_disk();
     }
-    img->load_raw_from_disk(); //not a mistake. we have two process that need the raw, second call increments the counter
+    img->load_raw_from_disk();
+    //not a mistake. we have two process that need the raw, second call increments the counter
 
     if (!img->subsequentMatchLaunched) {
       img->subsequentMatchLaunched = true;
@@ -535,7 +563,7 @@ namespace pathCam {
     return results;
   }
 
-  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image *_img) const {
+  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, const Image *_img) const {
     //tile has no owner, candidate frame wins by default
     if (!_to->owner) {
       return true;
@@ -560,6 +588,4 @@ namespace pathCam {
     }
     return members;
   }
-
-
 }

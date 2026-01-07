@@ -258,6 +258,7 @@ namespace pathCam {
       auto myRegInfo = _rootImg->regInfo;
 
       myRegInfo->root = false;
+      myRegInfo->stayFixedDuringBundleAdjustment = false;
       myRegInfo->matchedTo = _target->index;
       myRegInfo->relativeCoords = pairwiseDistance;
       myRegInfo->attempt_absolute_reg(true);
@@ -273,9 +274,7 @@ namespace pathCam {
       FreeSiftData(rootCopy);
 
       auto comp = reinterpret_cast<MetricComposite *>(parent->composites[theirComponentIndex]);
-      comp->update_mutex.lock();
       comp->extraMatches.emplace_back(_rootImg,_target,kp1,kp2);
-      comp->update_mutex.unlock();
       return true;
     }
     if (!_fullImageFtExtract) {

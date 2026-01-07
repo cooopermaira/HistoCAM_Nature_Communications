@@ -244,7 +244,7 @@ namespace pathCam {
       return;
     }
 
-    std::vector<unsigned long> emptyList;
+    std::vector<long> emptyList;
     auto ans = parent->get_image_ref(emptyList);
 
     std::vector<RunnableIntermediate *> somehowOutstandingMatchables;

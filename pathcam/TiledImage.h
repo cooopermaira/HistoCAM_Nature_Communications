@@ -67,11 +67,12 @@ struct TileObj {
 
   Poco::FastMutex mutex;
   cuda::GpuMat image;
+  char* buf;
 
   std::map<int,std::pair<cuda::GpuMat,void*>> SAMMasks;
 
   TileObj(int _tileSize, Point2i _index = {}) : index(_index) {
-    auto buf = new char[_tileSize * _tileSize * 4]();
+    cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
 
     //cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
     //cudaMemset(buf,0,_tileSize * _tileSize * 4);
@@ -91,7 +92,7 @@ struct TileObj {
       usingPreferred = false;
     }
     mutex.unlock();
-    delete image.data;
+    cudaFree(buf);
     image.release();
   }
 };

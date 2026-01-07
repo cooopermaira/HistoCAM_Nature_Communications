@@ -447,7 +447,7 @@ namespace pathCam {
     auto start = std::chrono::high_resolution_clock::now();
 
     // get a copy of references to all images at once so that only one mutex lock is needed
-    std::vector<unsigned long> indexes;
+    std::vector<long> indexes;
     for (int i = 0; i < new_info.size(); i++) {
       indexes.push_back(new_info[i]->index);
     }
@@ -1083,7 +1083,7 @@ namespace pathCam {
 
   void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo *> new_info) {
     // get a copy of references to all images at once so that only one mutex lock is needed
-    std::vector<unsigned long> indexes;
+    std::vector<long> indexes;
     for (int i = 0; i < new_info.size(); i++) {
       indexes.push_back(new_info[i]->index);
     }
@@ -1285,7 +1285,7 @@ namespace pathCam {
   };
 
   void Composite::add_images(std::vector<RegInfo *> new_info) {
-    std::vector<unsigned long int> indexes;
+    std::vector<long> indexes;
 
     for (int i = 0; i < new_info.size(); i++) {
       indexes.push_back(new_info[i]->index);
@@ -1452,9 +1452,9 @@ namespace pathCam {
   void
   CompositeVoronoi::exclude_for_blur() {
     Subdiv2D dt;
-    std::map<int, unsigned long> dtMembers;
+    std::map<int, long> dtMembers;
 
-    std::vector<unsigned long> image_indexes(delaunayMembers.size());
+    std::vector<long> image_indexes(delaunayMembers.size());
     int i = 0;
     for (auto item: delaunayMembers) {
       image_indexes[i] = item.second;

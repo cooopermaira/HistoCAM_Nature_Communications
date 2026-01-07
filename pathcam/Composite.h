@@ -103,7 +103,7 @@ namespace pathCam {
 
     std::vector<RegInfo *> contributingRegInfos;
     std::set<Image *> contributingImages;
-    std::map<int, unsigned long> delaunayMembers;
+    std::map<int, long> delaunayMembers;
     std::queue<RegInfo*> staging;
 
 

@@ -63,9 +63,8 @@ namespace pathCam {
         char* fourChnBuf;
         char* rectMaskBuf;
 
+        ImageGraph *ig;
     };
-
-
 
 
 
