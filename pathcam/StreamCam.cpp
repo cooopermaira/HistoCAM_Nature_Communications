@@ -526,10 +526,10 @@ namespace pathCam {
     return temp;
   }
 
-  void StreamCam::add_new_component_Q(unsigned long image_index, Size image_size) {
+  int StreamCam::add_new_component_Q(unsigned long image_index, Size image_size) {
     auto component_index = increment_and_get_components();
     newComponentQ.push({image_index, image_size, component_index});
-    std::cout << "component " << component_index << " spawning from frame " << image_index << std::endl;
+    return component_index;
   }
 
 

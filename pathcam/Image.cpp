@@ -441,7 +441,7 @@ namespace pathCam {
   char *Image::get_raw_cuda() {
     //assert(raw_buffer_cuda);
     if (parent && parent->unifiedMemory) {
-      assert(raw_buffer);
+      //assert(raw_buffer);
       return raw_buffer;
     }
     return raw_buffer_cuda;

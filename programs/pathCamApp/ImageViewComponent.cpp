@@ -94,7 +94,7 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
         }
         g.setOpacity(1.f);
         g.drawImage(*im, bounds);
-
+        //
         // //draw tile bounds with owner frame
         // g.setColour(juce::Colours::greenyellow);
         // g.drawRect(bounds, 3);

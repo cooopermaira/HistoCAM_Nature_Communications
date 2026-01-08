@@ -318,7 +318,7 @@ namespace pathCam {
 
     void add_new_component(unsigned long image_index, cv::Size image_size, unsigned int component_index);
 
-    void add_new_component_Q(unsigned long image_index, cv::Size image_size);
+    int add_new_component_Q(unsigned long image_index, cv::Size image_size);
 
     void run_agg_classify();
 

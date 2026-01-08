@@ -101,10 +101,9 @@ namespace pathCam {
     std::cout << "composite loop time: " + std::to_string(duration) << std::endl;
 
 
+
     //process delayed frames
-
     std::vector<std::thread> threads;
-
     for (auto &comp: parent->composites) {
       if (comp->suspended) { continue; }
       auto mc = reinterpret_cast<MetricComposite *>(comp);
@@ -123,9 +122,15 @@ namespace pathCam {
     parent->notify_observers();
     threads.clear();
 
-
     auto tAlign = std::chrono::high_resolution_clock::now();
 
+
+    for (auto img : parent->images) {
+      if (!img){continue;}
+      if (img->get_Raw() || img->get_raw_cuda()) {
+        std::cout<<img->index<<std::endl;
+      }
+    }
     parent->compositing = false;
     return;
 

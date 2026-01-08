@@ -135,6 +135,9 @@ namespace pathCam {
       auto ri = staging.front();
       auto img = ri->image;
       staging.pop();
+      if (img->index == 1) {
+        int k = 0;
+      }
 
       update_Bbox_no_composite({ri});
 
@@ -220,7 +223,10 @@ namespace pathCam {
       );
 
       if (tiles.empty()) {
-        //img->free_memory_RAW();
+        if (img->index == 1) {
+          int k = 0;
+        }
+        img->free_memory_RAW();
         img = nullptr;
       }
     }
@@ -233,13 +239,17 @@ namespace pathCam {
 
       assert(img && img->get_Raw());
 
+      if (img->index == 1) {
+        int k = 0;
+      }
       process_tiles(img, tiles);
 
       debugTileCount2 += tiles.size();
       ++debugFrameCount;
 
+
       tiles.clear();
-      //img->free_memory_RAW();
+      img->free_memory_RAW();
       img = nullptr;
     }
     // PROCESS OLD FRAMES END
@@ -273,17 +283,35 @@ namespace pathCam {
       ig->addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
     }
 
-    for (auto img : members) {
-      ig->setMember(img->index,true);
+    for (auto img: members) {
+      ig->setMember(img->index, true);
     }
+
+    //debug
+    std::vector<RegInfo *> regInfos;
+    for (auto img: members) {
+      regInfos.push_back(img->regInfo);
+    }
+    std::sort(regInfos.begin(), regInfos.end(),
+              [](const RegInfo *a, const RegInfo *b) {
+                return a->index < b->index;
+              });
+
+    for (auto ri: regInfos) {
+      std::cout << ri->index << " " << ri->matchedTo << std::endl;
+    }
+
+    // auto endri = regInfos.back();
+    // while ()
 
 
     auto result = ig->computeMinPromotionsToConnectMembersPreferORB();
 
     if (!result.promoted_nodes.empty()) {
-      std::cout<<"Component "<<componentIndex<<" promoting additional "<<result.promoted_nodes.size()<<" frames in BA"<<std::endl;
+      std::cout << "Component " << componentIndex << " promoting additional " << result.promoted_nodes.size() <<
+          " frames in BA" << std::endl;
       //important to check if empty or get_image_ref returns every image known to StreamCam
-      for (auto img : parent->get_image_ref(result.promoted_nodes)) {
+      for (auto img: parent->get_image_ref(result.promoted_nodes)) {
         members.insert(img);
       }
     }
@@ -304,11 +332,9 @@ namespace pathCam {
     }
 
     if (result.used_sift) {
-      std::cout<<"Component "<<componentIndex<<" using sift in BA"<<std::endl;
-      for (auto [img1,img2,kp1,kp2] : extraMatches) {
-
+      std::cout << "Component " << componentIndex << " using sift in BA" << std::endl;
+      for (auto [img1,img2,kp1,kp2]: extraMatches) {
         if (members.find(img1) != members.end() && members.find(img2) != members.end()) {
-
           assert(kp1.size() == kp2.size());
           img1->keypointsImageSpace.reserve(img1->keypointsImageSpace.size() + kp1.size());
           img2->keypointsImageSpace.reserve(img2->keypointsImageSpace.size() + kp2.size());
@@ -435,6 +461,7 @@ namespace pathCam {
         theirMember = m->image_1;
       }
       if (theirMember->regInfo->component_membership != componentIndex) {
+        //absorb it, which means change all the members' registrations
       }
     }
   }
@@ -443,13 +470,12 @@ namespace pathCam {
   void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, const bool forceFullImage) {
     assert(parent->unifiedMemory); //change this to a fix later
 
-    if (!img->in_memory()) {
-      img->load_raw_from_disk();
-    }
     img->load_raw_from_disk();
+
     //not a mistake. we have two process that need the raw, second call increments the counter
 
     if (!img->subsequentMatchLaunched) {
+      img->load_raw_from_disk();
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       auto cms = new ComponentMatchSearch(parent, img);
@@ -460,6 +486,7 @@ namespace pathCam {
 
     //put raw data into fourChannelPreallocated
     prepare_4CPA(img, tiles, forceFullImage);
+    img->free_memory_RAW();
 
     //calculate region of pyramid for data placement
     auto imageBox = cv::Rect_<float>(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->width,

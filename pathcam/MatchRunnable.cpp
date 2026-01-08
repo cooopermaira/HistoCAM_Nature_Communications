@@ -9,8 +9,6 @@
 #include "pathCam.h"
 
 namespace pathCam {
-
-
   cuda::GpuMat &getThreadConvertSpace(int width, int height) {
     thread_local cuda::GpuMat buffer;
 
@@ -26,8 +24,8 @@ namespace pathCam {
     std::vector<Match *> matches;
 
     image->siftMutex.lock();
-    image->extract_sift(parent->siftPoints,4,0,0.4f,0.1f,
-                        getThreadConvertSpace(parent->siftWindow,parent->siftWindow), true);
+    image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
+                        getThreadConvertSpace(parent->siftWindow, parent->siftWindow), true);
     image->siftMutex.unlock();
     image->free_memory_RAW();
 
@@ -61,7 +59,7 @@ namespace pathCam {
           //these two components should actually be the same component. we will suspend one and join to the other
           myComp->componentJoinMatches.push_back(match);
           theirComp->componentJoinMatches.push_back(match);
-        }else {
+        } else {
           delete match;
         }
       } else {
@@ -145,7 +143,9 @@ namespace pathCam {
 
 
     if (!successful) {
-      parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
+      auto component_index = parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
+      std::cout << "component " << component_index << " spawning from frame " << image_index << " (" <<
+          image->image_file.getBaseName()<<")" << std::endl;
     }
     //parent->RegistrationConsecQ.add_index(image_idx);
 
