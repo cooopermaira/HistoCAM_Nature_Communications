@@ -59,8 +59,16 @@ void MRTiledImageSet::update_bounds() {
   auto maxX = minX+bounds.width;
   auto maxY = minY+bounds.height;
   for (const auto & image : images){
-    auto imageMinX = image->bounds.x + image->offset.x * image->scale;
-    auto imageMinY = image->bounds.y + image->offset.y * image->scale;
+    if (image->suspended){continue;}
+
+
+    auto imageMinX = (image->bounds.x + image->offset.x) * image->scale;
+    auto imageMinY = (image->bounds.y + image->offset.y) * image->scale;
+
+    // if (image->scale < 0.11 &&imageMinX < 0) {
+    //
+    // }
+
     minX = fmin(minX,imageMinX);
     minY = fmin(minY,imageMinY);
 

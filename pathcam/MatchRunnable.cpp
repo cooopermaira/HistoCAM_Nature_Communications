@@ -25,10 +25,10 @@ namespace pathCam {
     auto matcher = DescriptorMatcher(parent->matcher_type);
     std::vector<Match *> matches;
 
-    //image->siftMutex.lock();
+    image->siftMutex.lock();
     image->extract_sift(parent->siftPoints,4,0,0.4f,0.1f,
                         getThreadConvertSpace(parent->siftWindow,parent->siftWindow), true);
-    //image->siftMutex.unlock();
+    image->siftMutex.unlock();
     image->free_memory_RAW();
 
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {

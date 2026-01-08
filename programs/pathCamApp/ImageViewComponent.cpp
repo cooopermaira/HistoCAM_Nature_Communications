@@ -1,6 +1,9 @@
 #include "JuceHeader.h"
 
-
+static int wrapMod(int x, int m) {
+  // result in [0, m-1] even if x is negative
+  return (x % m + m) % m;
+}
 //==============================================================================
 ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
                                        StringArray &iconNames,
@@ -39,22 +42,15 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
 ImageViewComponent::~ImageViewComponent() {
 }
 
-
-void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
-  bool canShadeClasses = false;
-
-  for (unsigned int i = 0; i < MRImage->images.size(); i++) {
-    g.setColour(juce::Colours::white);
-
-    if (MRImage->images[i]->scale == 0 || MRImage->images[i]->suspended) { continue; }
+void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRTiledImage>tiledImage) {
 
     //convert bounds from view space to image space
     auto imageview = *view;
-    imageview *= 1.0 / MRImage->images[i]->scale;
-    imageview -= fPoint(MRImage->images[i]->offset.x, MRImage->images[i]->offset.y);
+    imageview *= 1.0 / tiledImage->scale;
+    imageview -= fPoint(tiledImage->offset.x, tiledImage->offset.y);
 
     //query tiles within image space bounds
-    std::vector<TileQuery> tiles = MRImage->images[i]->
+    std::vector<TileQuery> tiles = tiledImage->
         getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
 
     //draw each tile
@@ -99,17 +95,17 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         g.setOpacity(1.f);
         g.drawImage(*im, bounds);
 
-        //draw tile bounds with owner frame
-        g.setColour(juce::Colours::greenyellow);
-        g.drawRect(bounds, 3);
-
-        std::string ij;
-        if (tile->owner) {
-          ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
-        }
-        g.setFont(20);
-        g.drawText(ij, bounds.getCentreX() - 250,
-                   bounds.getCentreY() - 15, 500, 30, Justification::centred);
+        // //draw tile bounds with owner frame
+        // g.setColour(juce::Colours::greenyellow);
+        // g.drawRect(bounds, 3);
+        //
+        // std::string ij;
+        // if (tile->owner) {
+        //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
+        // }
+        // g.setFont(20);
+        // g.drawText(ij, bounds.getCentreX() - 250,
+        //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
 
         for (auto & mask : tile->SAMMasks) {
           auto jImg = static_cast<juce::Image*>(mask.second.second);
@@ -141,7 +137,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
           g.reduceClipRegion(*im, imgToCanvas);
 
-          int maglab = MRImage->images[i]->magLabel;
+          int maglab = tiledImage->magLabel;
           auto color = levelColors[4 - maglab];
           auto overlayColor = Colour(color.getRed(), color.getGreen(), color.getBlue(), (uint8)100);
 
@@ -153,10 +149,11 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     }
 
     //tile classification
+  /*
     if (MRImage->images.size() > 0 && shadeClasses) {
       auto sCam = MRImage->images[0]->parent;
 
-      auto baseTiles = MRImage->images[i]->
+      auto baseTiles = tiledImage->
           getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()), true);
 
       for (auto tile: baseTiles) {
@@ -169,7 +166,7 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
 
         //get class for color
         auto tileCoords = std::tuple<int, int, unsigned>(tile.i, tile.j, i);
-        int classScore = MRImage->images[i]->get_class_for_tile(tileCoords);
+        int classScore = tiledImage->get_class_for_tile(tileCoords);
         if (classScore == -1) { continue; }
 
         //draw it
@@ -185,6 +182,31 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
         g.fillRect(bounds);
       }
     }
+    */
+}
+
+void ImageViewComponent::drawSlide(Graphics &g, float scale) {
+  bool canShadeClasses = false;
+
+  const int N = (int)MRImage->images.size();
+  if (N == 0) return;
+
+  const int mode = wrapMod(componentSelector, N + 1);   // 0..N
+  const bool showAll = (mode == 0);
+  const int selectedIdx = showAll ? -1 : (mode - 1);   // 0..N-1
+
+  if (!showAll) {
+      g.beginTransparencyLayer(0.3f);
+  }
+
+  for (int i = 0; i < N; ++i) {
+    if (!showAll && i == selectedIdx) continue;
+
+    auto img = MRImage->images[i];
+    if (img->scale == 0 || img->suspended) continue;
+
+    g.setColour(juce::Colours::white);
+    drawLayer(g, scale, img);
 
 
     // //draws grid on image with indexes
@@ -198,6 +220,32 @@ void ImageViewComponent::drawSlide(juce::Graphics &g, float scale) {
     //                  bounds.getCentreY() - 45, 100, 30, Justification::centred);
     //    }
   }
+
+  if (!showAll) {
+    g.endTransparencyLayer();
+
+    // draw selected at full opacity
+    auto img = MRImage->images[selectedIdx];
+    if (img->scale != 0 && !img->suspended) {
+      g.setColour(juce::Colours::white);
+      drawLayer(g, scale, img);
+
+      if (!parent->sCam->microscopeInput) {
+        g.setColour(juce::Colours::red);
+
+        g.setFont(15);
+        g.drawText("current objective", 5, getHeight() - 30, 110,
+                   Justification::centredLeft, true);
+
+        g.setFont(40.0f);
+        g.drawText(pathCam::Image::get_label(img->magLabel),
+                   20, getHeight() - 50, 100,
+                   Justification::centredLeft, true);
+      }
+    }
+  }
+
+
   //Define buffer space from the edges
   if (MRImage->images.size() > 0 && shadeClasses) {
     auto sCam = MRImage->images[0]->parent;
@@ -331,6 +379,35 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
   }
   if (key == juce::KeyPress::createFromDescription("a")) {
     shadeClasses = !shadeClasses;
+    repaint();
+    return true;
+  }
+  if (key == KeyPress::createFromDescription("c")) {
+    const int N = (int)MRImage->images.size();
+    if (N == 0) return true;
+
+    const int M = N + 1;                 // 0..N  (0 = show all)
+    int mode = wrapMod(componentSelector + 1, M);
+
+    // If we're in "show one component" mode, skip suspended components.
+    if (mode != 0) {
+      int guard = 0;
+      while (guard++ < M) {
+        const int idx = mode - 1;        // 0..N-1
+        if (!MRImage->images[idx]->suspended) break;
+
+        mode = wrapMod(mode + 1, M);     // advance within 0..N
+        if (mode == 0) {
+          // landed on "show all" -> always allowed
+          break;
+        }
+      }
+
+      // If we failed to find a non-suspended component (all suspended), show all.
+      if (guard >= M && mode != 0) mode = 0;
+    }
+
+    componentSelector = mode;
     repaint();
     return true;
   }

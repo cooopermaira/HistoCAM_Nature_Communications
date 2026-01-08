@@ -98,7 +98,7 @@ namespace pathCam {
         submit_outstanding_jobs();
       }
     }
-    std::cout << "CM duration: " + std::to_string(duration) << std::endl;
+    std::cout << "composite loop time: " + std::to_string(duration) << std::endl;
 
 
     //process delayed frames
@@ -120,10 +120,14 @@ namespace pathCam {
     for (auto &t: threads) {
       t.join();
     }
+    parent->notify_observers();
     threads.clear();
 
 
     auto tAlign = std::chrono::high_resolution_clock::now();
+
+    parent->compositing = false;
+    return;
 
     for (auto &comp: parent->composites) {
       if (comp->suspended) { continue; }
@@ -144,6 +148,7 @@ namespace pathCam {
     for (auto &t: threads) {
       t.join();
     }
+    parent->notify_observers();
 
     auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
     std::cout << "total align time " << tAlignEnd << std::endl;

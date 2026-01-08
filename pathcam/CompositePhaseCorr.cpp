@@ -132,7 +132,7 @@ namespace pathCam {
   bool Composite::establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract) {
     SiftData rootCopy,compareCopy;
 
-    //_rootImg->siftMutex.lock();
+    _rootImg->siftMutex.lock();
 
     //get my sift data
     if ((!_rootImg->siftInitialized && !_fullImageFtExtract) || (!_rootImg->siftFullInitialized && _fullImageFtExtract)) {
@@ -165,11 +165,11 @@ namespace pathCam {
     }else {
       copy_sift_data(rootCopy,_rootImg->siftData); //avoids shuffling a sorted data order needed later
     }
-    //_rootImg->siftMutex.unlock();
+    _rootImg->siftMutex.unlock();
 
 
     //get their sift data
-    //_target->siftMutex.lock();
+    _target->siftMutex.lock();
     if ((!_target->siftInitialized && !_fullImageFtExtract) || (!_target->siftFullInitialized && _fullImageFtExtract)) {
       _target->load_raw_from_disk();
 
@@ -200,7 +200,7 @@ namespace pathCam {
     }else {
       copy_sift_data(compareCopy,_target->siftData); //avoids shuffling a sorted data order needed later
     }
-    //_target->siftMutex.unlock();
+    _target->siftMutex.unlock();
 
     assert(rootCopy.numPts > 0 && compareCopy.numPts > 0);
     MatchSiftData(rootCopy, compareCopy);

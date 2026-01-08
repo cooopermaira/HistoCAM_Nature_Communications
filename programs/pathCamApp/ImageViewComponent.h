@@ -15,6 +15,7 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
 public:
   bool shadeLevels;
   bool shadeClasses;
+  int componentSelector = 0;
   std::vector<juce::Colour> levelColors = {
     Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
     Colour(243, 249, 243)
@@ -79,6 +80,8 @@ protected:
   std::vector<cv::Mat> channels;
 
   OpenGLContext gl;
+
+  void drawLayer(Graphics &g, float scale, std::shared_ptr<MRTiledImage>tiledImage);
 
   void mouseDown(const juce::MouseEvent &event) override;
   void mouseDrag(const juce::MouseEvent &event) override;

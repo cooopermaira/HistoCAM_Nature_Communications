@@ -88,7 +88,7 @@ namespace pathCam {
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << duration.count() << std::endl;
+    std::cout << "total runtime "<<duration.count() << std::endl;
     return true;
   }
 
@@ -582,8 +582,8 @@ namespace pathCam {
   }
 
   void StreamCam::notify_observers() {
-    for (unsigned int i = 0; i < observers.size(); i++) {
-      MRimage->update_bounds();
+    MRimage->update_bounds();
+    for (int i = 0; i < observers.size(); i++) {
       observers[i]->notify_new_data();
     }
   }
