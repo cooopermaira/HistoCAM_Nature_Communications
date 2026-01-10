@@ -117,6 +117,8 @@ namespace pathCam {
     Poco::FastMutex blurMutex;
     Poco::FastMutex CudaSiftGlobalUseMutex;
 
+    long cudaSiftTime = 0;
+
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
     std::string lastLabel;

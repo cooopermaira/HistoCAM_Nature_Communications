@@ -349,7 +349,7 @@ namespace pathCam {
 
   bool Image::is_good() {
     //return label == _2X;
-    if (label == _UNDEREXP) {
+    if (label == _UNDEREXP || label == _LOWFEAT) {
       return false;
     }
     return true;
@@ -524,6 +524,11 @@ namespace pathCam {
   void Image::load_raw_from_disk() {
     buffer_mutex.lock();
     if (!raw_buffer) {
+      // if (loadCount > 0) {
+      //   std::cout<<"multiple disk loading: index "<<index<<std::endl;
+      // }
+      ++loadCount;
+
       if (image_file.toString() != "") {
         std::ifstream stream;
         stream.open(image_file.toString(), std::ios::binary);
@@ -541,19 +546,13 @@ namespace pathCam {
   }
 
   void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                           float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float downScaleFactor) {
+                           float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float *tempSpace) {
     if ((siftInitialized && siftWindow) || (siftFullInitialized && !siftWindow)){return;}
 
     Rect roi((width - buffer.cols)/2, (height - buffer.rows)/2,buffer.cols,buffer.rows);
 
     buffer_mutex.lock();
     assert(get_Raw());
-
-
-    // Mat hostRaw(height, width, CV_8UC1, get_Raw());
-    // cuda::GpuMat raw;
-    // raw.upload(hostRaw(roi));
-    // raw.convertTo(buffer,CV_32FC1);
 
     cuda::GpuMat raw(height, width, CV_8UC1, get_Raw(),width);
     raw(roi).convertTo(buffer,CV_32F);
@@ -584,7 +583,9 @@ namespace pathCam {
       InitSiftData(siftData, numPts, true, true);
 
       parent->CudaSiftGlobalUseMutex.lock();
-      catch_ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false);
+      auto start = std::chrono::high_resolution_clock::now();
+      ExtractSift(siftData,cImgRaw,octaves,initBlur,thresh,lowestScale,false,tempSpace);
+      parent->cudaSiftTime += std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
       parent->CudaSiftGlobalUseMutex.unlock();
 
       assert(siftData.numPts > 0);

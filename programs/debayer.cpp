@@ -159,14 +159,14 @@ int main(int argc, char *argv[]) {
 
   if (inFile.isDirectory()) {
     std::vector<int> *blur = new std::vector<int>;
-    //std::vector<std::string> *names = new std::vector<std::string>;
-    std::vector<std::string> names = load_label_names("/home/cm/Downloads/blur.txt");
+    std::vector<std::string> *names = new std::vector<std::string>;
+    //std::vector<std::string> names = load_label_names("/home/cm/Downloads/blur.txt");
 
     blur->resize(5000, 0);
-    //names->resize(5000);
+    names->resize(5000);
 
     std::cout << "Processing Directories\n";
-    auto jq = pathCam::JobQueue(1, 1);
+    auto jq = new pathCam::JobQueue(5, 5);
 
     Poco::DirectoryIterator it(inFile);
     Poco::DirectoryIterator end;
@@ -238,17 +238,18 @@ int main(int argc, char *argv[]) {
 
         ff = flat_field20x;
         std::string of = outFile.toString();
-        auto *dr = new pathCam::DebayerRunnable(images[i], ff, outFile, blur, &names, i);
-        jq.add_runnable(dr, i);
+        auto img = images[i];
+        auto *dr = new pathCam::DebayerRunnable(img, ff, outFile, blur, names, i);
+        jq->add_runnable(dr, -1);
       }
     }
     outputFile.close();
 
     auto start = std::chrono::high_resolution_clock::now();
-    while (!jq.is_empty()) {
-      jq.run_jobs(false);
+    while (!jq->is_empty()) {
+      jq->run_jobs(false);
     }
-    jq.pool->joinAll();
+    jq->pool->joinAll();
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << duration.count() << std::endl;

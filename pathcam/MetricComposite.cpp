@@ -76,7 +76,7 @@ namespace pathCam {
   }
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
-    parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
+      parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
     frameDelay = 10;
     waitingFrames.resize(frameDelay, {nullptr, {}});
     //compositeImage = imagePyramid->level[0];
@@ -135,9 +135,7 @@ namespace pathCam {
       auto ri = staging.front();
       auto img = ri->image;
       staging.pop();
-      if (img->index == 1) {
-        int k = 0;
-      }
+
 
       update_Bbox_no_composite({ri});
 
@@ -223,9 +221,6 @@ namespace pathCam {
       );
 
       if (tiles.empty()) {
-        if (img->index == 1) {
-          int k = 0;
-        }
         img->free_memory_RAW();
         img = nullptr;
       }
@@ -239,9 +234,7 @@ namespace pathCam {
 
       assert(img && img->get_Raw());
 
-      if (img->index == 1) {
-        int k = 0;
-      }
+
       process_tiles(img, tiles);
 
       debugTileCount2 += tiles.size();
@@ -264,12 +257,7 @@ namespace pathCam {
     auto members = find_contributing_images();
     members.insert(root);
 
-    for (auto &img: members) {
-      img->keypointsImageSpace.resize(img->keypoints.size());
-      for (int i = 0; i < img->keypoints.size(); ++i) {
-        img->keypointsImageSpace[i].pt = img->keypoints[i].pt / parent->scale_factor;
-      }
-    }
+
 
     auto matches = ftg->matches; //matches are just stored here before being processed all at once.
     std::vector<Match *> memberMatches;
@@ -287,19 +275,19 @@ namespace pathCam {
       ig->setMember(img->index, true);
     }
 
-    //debug
-    std::vector<RegInfo *> regInfos;
-    for (auto img: members) {
-      regInfos.push_back(img->regInfo);
-    }
-    std::sort(regInfos.begin(), regInfos.end(),
-              [](const RegInfo *a, const RegInfo *b) {
-                return a->index < b->index;
-              });
-
-    for (auto ri: regInfos) {
-      std::cout << ri->index << " " << ri->matchedTo << std::endl;
-    }
+    // //debug
+    // std::vector<RegInfo *> regInfos;
+    // for (auto img: members) {
+    //   regInfos.push_back(img->regInfo);
+    // }
+    // std::sort(regInfos.begin(), regInfos.end(),
+    //           [](const RegInfo *a, const RegInfo *b) {
+    //             return a->index < b->index;
+    //           });
+    //
+    // for (auto ri: regInfos) {
+    //   std::cout << ri->index << " " << ri->matchedTo << std::endl;
+    // }
 
     // auto endri = regInfos.back();
     // while ()
@@ -321,13 +309,22 @@ namespace pathCam {
 
 
     for (auto m: matches) {
-      if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-        memberMatches.push_back(m);
-        for (int i = 0; i < m->good_matches.size(); ++i) {
-          if (m->inliers[i]) {
-            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
-          }
+      // if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
+      memberMatches.push_back(m);
+      members.insert(m->image_1);
+      members.insert(m->image_2);
+
+      for (int i = 0; i < m->good_matches.size(); ++i) {
+        if (m->inliers[i]) {
+          ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
         }
+      }
+      // }
+    }
+    for (auto &img: members) {
+      img->keypointsImageSpace.resize(img->keypoints.size());
+      for (int i = 0; i < img->keypoints.size(); ++i) {
+        img->keypointsImageSpace[i].pt = img->keypoints[i].pt / parent->scale_factor;
       }
     }
 
@@ -420,18 +417,18 @@ namespace pathCam {
       process_tiles(img, tileIndexes);
 
 
-      for (auto &tileInd: tileIndexes) {
-        auto lowerQueryPt = tileInd * parent->tileSize - img->regInfo->absoluteCoords - siftWindowCorner;
-        auto upperQueryPt = lowerQueryPt + Point2i(parent->tileSize, parent->tileSize);
-        assert(img->siftInitialized);
-        std::vector<const SiftPoint *> fts;
-        querySiftRect_sortedByX(img->siftData,
-                                lowerQueryPt.x, upperQueryPt.x, lowerQueryPt.y, upperQueryPt.y, fts);
-
-        if (!fts.empty()) {
-          componentFeatures.emplace_back(img, fts);
-        }
-      }
+      // for (auto &tileInd: tileIndexes) {
+      //   auto lowerQueryPt = tileInd * parent->tileSize - img->regInfo->absoluteCoords - siftWindowCorner;
+      //   auto upperQueryPt = lowerQueryPt + Point2i(parent->tileSize, parent->tileSize);
+      //   assert(img->siftInitialized);
+      //   std::vector<const SiftPoint *> fts;
+      //   querySiftRect_sortedByX(img->siftData,
+      //                           lowerQueryPt.x, upperQueryPt.x, lowerQueryPt.y, upperQueryPt.y, fts);
+      //
+      //   if (!fts.empty()) {
+      //     componentFeatures.emplace_back(img, fts);
+      //   }
+      // }
     }
 
 
@@ -475,7 +472,7 @@ namespace pathCam {
     //not a mistake. we have two process that need the raw, second call increments the counter
 
     if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk();
+      //img->load_raw_from_disk();
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       auto cms = new ComponentMatchSearch(parent, img);

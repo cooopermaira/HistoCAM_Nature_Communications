@@ -16,6 +16,7 @@ namespace pathCam {
 
     long index;
     double blurTime = 0;
+    int loadCount = 0;
 
     int width, height;
     int scope_radius;
@@ -58,7 +59,7 @@ namespace pathCam {
     ~Image();
 
     void extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                      float lowestScale, cv::cuda::GpuMat &buffer, bool siftWindow, float downScaleFactor = 1);
+                      float lowestScale, cv::cuda::GpuMat &buffer, bool siftWindow, float *tempSpace = nullptr);
 
 
     void set_memory_pool(MemoryPool *mempool_in) {

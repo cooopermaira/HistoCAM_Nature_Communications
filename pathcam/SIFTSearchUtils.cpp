@@ -97,7 +97,8 @@ namespace pathCam {
 
         // Get feature coordinates
         auto img_it = image_lookup.find(pair.image_id);
-        if (img_it != image_lookup.end() && pair.feature_id < img_it->second->keypointsImageSpace.size()) {
+        bool cond1 = img_it != image_lookup.end();
+        if (cond1 && pair.feature_id < img_it->second->keypointsImageSpace.size()) {
           const auto &pos = img_it->second->keypointsImageSpace[pair.feature_id];
 
 

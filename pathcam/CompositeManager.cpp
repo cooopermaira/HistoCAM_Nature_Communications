@@ -125,15 +125,6 @@ namespace pathCam {
     auto tAlign = std::chrono::high_resolution_clock::now();
 
 
-    for (auto img : parent->images) {
-      if (!img){continue;}
-      if (img->get_Raw() || img->get_raw_cuda()) {
-        std::cout<<img->index<<std::endl;
-      }
-    }
-    parent->compositing = false;
-    return;
-
     for (auto &comp: parent->composites) {
       if (comp->suspended) { continue; }
       auto mc = reinterpret_cast<MetricComposite *>(comp);
@@ -154,6 +145,16 @@ namespace pathCam {
       t.join();
     }
     parent->notify_observers();
+
+
+    for (auto img : parent->images) {
+      if (!img){continue;}
+      if (img->get_Raw() || img->get_raw_cuda()) {
+        std::cout<<img->index<<std::endl;
+      }
+    }
+    parent->compositing = false;
+    return;
 
     auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
     std::cout << "total align time " << tAlignEnd << std::endl;
@@ -284,6 +285,7 @@ namespace pathCam {
     _regInfo->accessMutex->lock();
     assert(_regInfo->inCompositeQ);
     _regInfo->inCompositeQ = false;
+    _regInfo->image->label = parent->composites[_regInfo->component_membership]->componentMagLabel;
     parent->composites[_regInfo->component_membership]->stage(_regInfo);
     _regInfo->accessMutex->unlock();
   }

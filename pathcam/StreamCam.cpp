@@ -49,14 +49,12 @@ namespace pathCam {
     siftCudaDevice = compositorCudaDevice;
 
     // cudaSetDevice(compositorCudaDevice);
-    // SpeedSam ss2("/home/max/Downloads/sam2_hiera_large.encoder.onnx","/home/max/Downloads/sam2_hiera_large.decoder.onnx");
-    // segmentWithPoint(ss2,"/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs.jpg","/home/max/pathcam/pathcam/SPEED-SAM-C-TENSORRT/assets/dogs_mask2.jpg");
 #endif
 
     MRimage.reset(new MRTiledImageSet());
     JobQ = new JobQueue(threads, threads, windowWidth);
     JobQ->parent = this;
-    jqSecondary = new JobQueue(1, 1, 0);
+    jqSecondary = new JobQueue(6, 6, 0);
 
 
     //lastFrame = Rect(0,0,image_width,image_height);
@@ -89,6 +87,7 @@ namespace pathCam {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "total runtime "<<duration.count() << std::endl;
+    std::cout<<"cudasift extract time "<<cudaSiftTime<<std::endl;
     return true;
   }
 
