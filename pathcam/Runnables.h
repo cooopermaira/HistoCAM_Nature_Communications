@@ -45,12 +45,13 @@ namespace pathCam {
                                                               someoneWaitingOnJobCompleteEvent(false),
                                                               unprocessed(true),
                                                               precedingJobCount(0) {
+      //sort_order = jobTypeFlag > 0 ? 0 : -1;
     }
 
     Poco::Event jobComplete;
     bool someoneWaitingOnJobCompleteEvent;
     bool unprocessed;
-    long sort_order = 0;
+    long sort_order;
     long image_index;
     std::atomic<int> precedingJobCount;
     int jobTypeFlag = 0;

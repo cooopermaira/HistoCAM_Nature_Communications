@@ -84,10 +84,12 @@ namespace pathCam {
       inference_thread.join();
     }
 
+    cleanup_and_reset();
+
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << "total runtime "<<duration.count() << std::endl;
-    std::cout<<"cudasift extract time "<<cudaSiftTime<<std::endl;
+    std::cout << "total runtime " << duration.count() << std::endl;
+    std::cout << "cudasift extract time " << cudaSiftTime << std::endl;
     return true;
   }
 
@@ -409,27 +411,69 @@ namespace pathCam {
     JobQ->queue_mutex->unlock();
   }
 
-  std::string StreamCam::get_flatfield(int label) {
+  void StreamCam::set_flatfield(int label, const cuda::GpuMat &ffGpu) {
+    switch (label) {
+      case Image::_2X:
+        flat_field2X = ffGpu;
+        return;
+      case Image::_4X:
+        flat_field4X = ffGpu;
+        return;
+      case Image::_10X:
+        flat_field10X = ffGpu;
+        return;
+      case Image::_20X:
+        flat_field20X = ffGpu;
+        return;
+      default:
+        throw std::runtime_error("not recognized");
+    }
+  }
+
+  cuda::GpuMat StreamCam::get_flatfield(int label) {
+    switch (label) {
+      case Image::_2X:
+        return flat_field2X;
+      case Image::_4X:
+        return flat_field4X;
+      case Image::_10X:
+        return flat_field10X;
+      case Image::_20X:
+        return flat_field20X;
+      default:
+        throw std::runtime_error("not recognized");
+    }
+  }
+
+  std::string StreamCam::get_flatfield_path(int label, bool &ffAlreadySet) {
     if (recordingMode) {
       switch (label) {
         case Image::_2X:
+          if (flat_field2X.empty()) { ffAlreadySet = false; }
           return flat_field_file_2x_r.toString();
         case Image::_4X:
+          if (flat_field4X.empty()) { ffAlreadySet = false; }
           return flat_field_file_4x_r.toString();
         case Image::_10X:
+          if (flat_field10X.empty()) { ffAlreadySet = false; }
           return flat_field_file_10x_r.toString();
         case Image::_20X:
+          if (flat_field20X.empty()) { ffAlreadySet = false; }
           return flat_field_file_20x_r.toString();
       }
     } else {
       switch (label) {
         case Image::_2X:
+          if (flat_field2X.empty()) { ffAlreadySet = false; }
           return flat_field_file_2x.toString();
         case Image::_4X:
+          if (flat_field4X.empty()) { ffAlreadySet = false; }
           return flat_field_file_4x.toString();
         case Image::_10X:
+          if (flat_field10X.empty()) { ffAlreadySet = false; }
           return flat_field_file_10x.toString();
         case Image::_20X:
+          if (flat_field20X.empty()) { ffAlreadySet = false; }
           return flat_field_file_20x.toString();
       }
     }
@@ -445,9 +489,9 @@ namespace pathCam {
 
       reg_results.resize(index + 100);
 
-      resize_mmatch_mutex.writeLock();
-      matchM.resize(index + 100);
-      resize_mmatch_mutex.unlock();
+      // resize_mmatch_mutex.writeLock();
+      // matchM.resize(index + 100);
+      // resize_mmatch_mutex.unlock();
     }
 
     reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
@@ -790,9 +834,64 @@ namespace pathCam {
     someoneWaitingOnJobCompleteEvent = false;
   }
 
+  void StreamCam::cleanup_and_reset() {
+    //clean up all reginfo
+    for (int i = 0; i < reg_results.size(); ++i) {
+      if (reg_results[i]) {
+        delete reg_results[i];
+      }
+    }
+    reg_results.clear();
+
+    //clean up all images
+    for (int i = 0; i < images.size(); ++i) {
+      if (images[i]) {
+        delete images[i];
+      }
+    }
+    images.clear();
+
+    //clean up all jobs (jobq 1 and 2)
+    for (int i = 0; i < JobQ->jobRefs.size(); ++i) {
+      if (JobQ->jobRefs[i]) {
+        delete JobQ->jobRefs[i];
+      }
+    }
+    JobQ->jobRefs.clear();
+    JobQ->cancelJob.clear();
+    JobQ->jobsReadiness.clear();
+    for (int i = 0; i < JobQ->jobRefsZeroFlag.size(); ++i) {
+      if (JobQ->jobRefsZeroFlag[i]) {
+        delete JobQ->jobRefsZeroFlag[i];
+      }
+    }
+    JobQ->jobRefsZeroFlag.clear();
+
+
+    for (int i = 0; i < jqSecondary->jobRefs.size(); ++i) {
+      if (jqSecondary->jobRefs[i]) {
+        delete jqSecondary->jobRefs[i];
+      }
+    }
+    jqSecondary->jobRefs.clear();
+    jqSecondary->cancelJob.clear();
+    jqSecondary->jobsReadiness.clear();
+    for (int i = 0; i < jqSecondary->jobRefsZeroFlag.size(); ++i) {
+      if (jqSecondary->jobRefsZeroFlag[i]) {
+        delete jqSecondary->jobRefsZeroFlag[i];
+      }
+    }
+    jqSecondary->jobRefsZeroFlag.clear();
+
+
+    //clean up all composites
+
+    //clean up all
+  }
+
   StreamCam::~StreamCam() {
     clean_up_blur_engine();
-    for (auto c : composites) {
+    for (auto c: composites) {
       delete c;
     }
     delete jqSecondary;

@@ -105,6 +105,7 @@ class MRTiledImageSet{
   
 public:
   cv::Rect_<float> bounds;
+  std::string labelName;
 
 
   MRTiledImageSet(){};

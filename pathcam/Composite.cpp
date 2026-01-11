@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <pathCam.h>
 
+#include <memory>
+
 namespace pathCam {
   CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size,
                                      unsigned int component_index) : Composite(
@@ -181,7 +183,13 @@ namespace pathCam {
     set_candidate_scale_ratios();
 
     //get flatfield file name from parent and load from disk
-    std::string filename = parent->get_flatfield(componentMagLabel);
+    bool ffAlreadySet;
+    std::string filename = parent->get_flatfield_path(componentMagLabel, ffAlreadySet);
+    if (ffAlreadySet) {
+      ffGPU = parent->get_flatfield(componentMagLabel);
+      flatfieldKnown = true;
+      return;
+    }
     size_t nBytes = parent->image_height * parent->image_width;
     char *buffer;
     CHECK_CUDA(cudaMallocManaged(&buffer,nBytes));
@@ -198,6 +206,8 @@ namespace pathCam {
     ffGPU.convertTo(ffGPU,CV_32F);
     double scale = 1 / 240.0;
     cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
+
+    parent->set_flatfield(componentMagLabel,ffGPU);
 
     flatfieldKnown = true;
   }
@@ -1144,9 +1154,9 @@ namespace pathCam {
     componentIndex(_componentIndex), imageSize(image_size),
     root_offset(0.0, 0.0),
     max_offset(0.0, 0.0) {
-    flat_field = parent->flat_field2X;
+    //flat_field = parent->flat_field2X;
 
-    imagePyramid.reset(new MRTiledImage(parent));
+    imagePyramid = std::make_shared<MRTiledImage>(parent);
     std::shared_ptr<TiledImage> current = std::make_shared<TiledImage>(
       imagePyramid, parent->tileSize, parent->tileSize,
       0);

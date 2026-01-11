@@ -87,12 +87,12 @@ namespace pathCam {
     auto matcher = DescriptorMatcher(parent->matcher_type);
     std::vector<Match *> matches;
 
-    // image->siftMutex.lock();
-    // image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
-    //                     getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
-    //                     true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
-    // image->siftMutex.unlock();
-    // image->free_memory_RAW();
+    image->siftMutex.lock();
+    image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
+                        getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
+                        true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
+    image->siftMutex.unlock();
+    image->free_memory_RAW();
 
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
@@ -171,7 +171,7 @@ namespace pathCam {
 
       if (result == 1) {
         if (std::abs(m->t_x) < image->width / 1 && std::abs(m->t_y) < image->height / 1) {
-          parent->set_match(image_idx, prev_idx, m);
+          //parent->set_match(image_idx, prev_idx, m);
 
           //this should all be in the damn constructor
 
@@ -188,17 +188,18 @@ namespace pathCam {
           auto rj = new RegistrationRunnable(parent, tempReg);
           parent->JobQ->add_runnable(rj);
           successful = true;
+          delete m;
           break;
-        } else {
-          parent->resize_mmatch_mutex.readLock();
-          parent->matchM.match[prev_idx][image_idx] = nullptr;
-          parent->resize_mmatch_mutex.unlock();
+        // } else {
+        //   parent->resize_mmatch_mutex.readLock();
+        //   parent->matchM.match[prev_idx][image_idx] = nullptr;
+        //   parent->resize_mmatch_mutex.unlock();
         }
-      } else {
-        // if(result == -1 || result == -2){
-        parent->resize_mmatch_mutex.readLock();
-        parent->matchM.match[prev_idx][image_idx] = nullptr;
-        parent->resize_mmatch_mutex.unlock();
+      // } else {
+      //   // if(result == -1 || result == -2){
+      //   parent->resize_mmatch_mutex.readLock();
+      //   parent->matchM.match[prev_idx][image_idx] = nullptr;
+      //   parent->resize_mmatch_mutex.unlock();
       }
 
       delete m;

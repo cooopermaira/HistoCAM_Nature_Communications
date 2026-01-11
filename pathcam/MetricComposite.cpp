@@ -94,16 +94,25 @@ namespace pathCam {
     fourChannelPreallocated = Mat(imageSize,CV_8UC4, fourChnBuf);
     fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4, fourChnBuf);
 
-    circleMask = Mat::zeros(image_size, CV_8U);
-    circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
-           Scalar(255),
-           -1);
+    if (parent->circleMask.empty()) {
+      circleMask = Mat::zeros(image_size, CV_8U);
+      circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
+             Scalar(255),
+             -1);
+    }
   }
 
   MetricComposite::~MetricComposite() {
     cudaFree(threeChnBuf);
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
+    for (int i = 0; i < ftg->matches.size(); ++i) {
+      if (ftg->matches[i]) {
+        delete ftg->matches[i];
+      }
+      ftg->matches.clear();
+    }
+    for (int i = 0; i < ftg.)
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
@@ -256,7 +265,6 @@ namespace pathCam {
 
     auto members = find_contributing_images();
     members.insert(root);
-
 
 
     auto matches = ftg->matches; //matches are just stored here before being processed all at once.
@@ -472,7 +480,7 @@ namespace pathCam {
     //not a mistake. we have two process that need the raw, second call increments the counter
 
     if (!img->subsequentMatchLaunched) {
-      //img->load_raw_from_disk();
+      img->load_raw_from_disk();
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       auto cms = new ComponentMatchSearch(parent, img);

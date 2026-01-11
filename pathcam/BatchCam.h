@@ -112,11 +112,11 @@ namespace pathCam {
         delete mempool[i];
       }
       mempool.clear();
-
-      for (unsigned int i = 0; i < images.size(); i++) {
-        delete images[i];
-      }
-      images.clear();
+      //
+      // for (unsigned int i = 0; i < images.size(); i++) {
+      //   delete images[i];
+      // }
+      // images.clear();
     }
 
     virtual bool run();

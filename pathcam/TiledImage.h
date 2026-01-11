@@ -73,9 +73,8 @@ struct TileObj {
 
   TileObj(int _tileSize, Point2i _index = {}) : index(_index) {
     cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
+    cudaMemset(buf,0,_tileSize * _tileSize * 4);
 
-    //cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
-    //cudaMemset(buf,0,_tileSize * _tileSize * 4);
     image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4,buf);
     preferredObj = nullptr;
     usingPreferred = false;

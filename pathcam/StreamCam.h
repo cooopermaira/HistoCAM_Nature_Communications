@@ -149,14 +149,15 @@ namespace pathCam {
     std::map<int, std::pair<double, Point2f>> scaleRepo;
     std::map<std::tuple<int,int,int>,int> tileCoordToClass;
 
-    Mat flat_field2X;
-    Mat flat_field4X;
-    Mat flat_field10X;
-    Mat flat_field20X;
+    cuda::GpuMat flat_field2X;
+    cuda::GpuMat flat_field4X;
+    cuda::GpuMat flat_field10X;
+    cuda::GpuMat flat_field20X;
     Mat circleMask;
     Mat regCircleMask;
 
     std::shared_ptr<MRTiledImageSet> MRimage;
+    std::vector<std::shared_ptr<MRTiledImageSet>> previousSlides;
 
     std::vector<std::pair<std::string, double>> debugImageBlurWithNames;
     std::vector<double> debugImageBlur;
@@ -250,7 +251,11 @@ namespace pathCam {
 
     void mark_neighbors_as_underexposed(unsigned long index);
 
-    std::string get_flatfield(int label);
+    std::string get_flatfield_path(int label, bool &ffAlreadySet);
+
+    cuda::GpuMat get_flatfield(int label);
+
+    void set_flatfield(int label, const cuda::GpuMat& ffGpu);
 
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index,
                            std::string _label);
@@ -283,6 +288,8 @@ namespace pathCam {
     void update_observers();
 
     void notify_observers();
+
+    void cleanup_and_reset();
 
     bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID);
 

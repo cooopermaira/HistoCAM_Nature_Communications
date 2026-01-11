@@ -102,9 +102,9 @@ namespace pathCam {
     if (siftInitialized) {
       FreeSiftData(siftData);
     }
-    if (regInfo) {
-      delete regInfo;
-    }
+    // if (regInfo) {
+    //   delete regInfo;
+    // }
     cleanup_blur_check_statics();
   }
 
