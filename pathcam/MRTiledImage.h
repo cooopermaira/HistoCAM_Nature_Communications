@@ -11,122 +11,137 @@
 #include "pathCam.h"
 #include "StreamCam.h"
 #include "TiledImage.h"
+
 struct Point2iLess {
-  bool operator()(const cv::Point2i& a,
-                  const cv::Point2i& b) const {
+  bool operator()(const cv::Point2i &a,
+                  const cv::Point2i &b) const {
     return (a.y < b.y) || (a.y == b.y && a.x < b.x);
   }
 };
 
-class MRTiledImage{
-  
+class MRTiledImageSet;
+
+class MRTiledImage {
   friend class LoadingThread;
-  
+
 public:
   bool suspended = false;
   cv::Rect_<float> bounds;
-  unsigned int tile_size,magLabel,componentIndex = 0;
+  unsigned int tile_size, magLabel, componentIndex = 0;
   double scale;
   Point2f offset;
   Poco::Event scaleSet;
-  pathCam::StreamCam* parent;
-
-  std::vector < std::shared_ptr< TiledImage > > level;
+  pathCam::StreamCam *parent;
+  std::shared_ptr<MRTiledImageSet> MRImageSet;
+  std::vector<std::shared_ptr<TiledImage> > level;
   std::set<Point2i, Point2iLess> liveTiles;
 
-  
-  MRTiledImage(pathCam::StreamCam* parent = nullptr,unsigned int _tile_size=0);
 
-  ~MRTiledImage(){ level.clear(); };
-    
+  MRTiledImage(pathCam::StreamCam *parent = nullptr, unsigned int _tile_size = 0);
+
+  ~MRTiledImage() { level.clear(); };
+
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
 
   std::shared_ptr<TileObj> get_base_tile(int x, int y) {
-    return level[0]->getTile(x,y);
+    return level[0]->getTile(x, y);
   }
 
   std::shared_ptr<TileObj> get_base_tile(Point2i _index) {
     return level[0]->getTile(_index);
   }
 
-// #ifdef HAVE_OPENCV_CUDAARITHM
-  void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, std::vector<Point2i> &retileIndices) {
-    level[0]->insertTilesAtBase(image_in,mask,box,retileIndices);
-
+  // #ifdef HAVE_OPENCV_CUDAARITHM
+  void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box,
+                         std::vector<Point2i> &retileIndices) {
+    level[0]->insertTilesAtBase(image_in, mask, box, retileIndices);
   };
-// #else
-  void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices){
-    level[0]->insertTilesAtBase(image_in,mask,box,retileIndices);
+  // #else
+  void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices) {
+    level[0]->insertTilesAtBase(image_in, mask, box, retileIndices);
     bounds = level[0]->bounds;
   };;
 
-// #endif
+  // #endif
 
-  int get_class_for_tile(std::tuple<int,int,unsigned> _tile);
-  
+  int get_class_for_tile(std::tuple<int, int, unsigned> _tile);
+
   void build(cv::Mat &image_in);
 
-  void set_scale(double _scale) {scale = _scale;}
+  void set_scale(double _scale) { scale = _scale; }
 
-  void set_mag_label(unsigned int _magLabel){magLabel = _magLabel;}
+  void set_mag_label(unsigned int _magLabel) { magLabel = _magLabel; }
 
-  void set_offset(Point2f _offset){offset = _offset;}
-  
-  std::vector < TileQuery > getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen, bool pullFromBase = false);
+  void set_offset(Point2f _offset) { offset = _offset; }
+
+  std::vector<TileQuery> getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen, bool pullFromBase = false);
 
 private:
+  inline cv::Rect_<float> worldToLevel(cv::Rect_<float> r, unsigned int level) {
+    float denom = (2.0f * level);
+    return cv::Rect_<float>(r.x / denom, r.y / denom, r.width / denom, r.height / denom);
+  }
 
-  inline cv::Rect_<float> worldToLevel(cv::Rect_<float> r, unsigned int level){
-    float denom = (2.0f*level);
-    return cv::Rect_<float>(r.x/denom, r.y/denom, r.width/denom, r.height/denom);
+  inline cv::Rect_<float> levelToWorld(cv::Rect_<float> r, unsigned int level) {
+    float denom = (2.0f * level);
+    return cv::Rect_<float>(r.x * denom, r.y * denom, r.width * denom, r.height * denom);
   }
-  
-  inline cv::Rect_<float> levelToWorld(cv::Rect_<float> r, unsigned int level){
-    float denom = (2.0f*level);
-    return cv::Rect_<float>(r.x*denom, r.y*denom, r.width*denom, r.height*denom);
+
+  inline Point2f worldToLevel(Point2f p, unsigned int level) {
+    return p / (2.0f * level);
   }
-  
-  inline Point2f worldToLevel(Point2f p, unsigned int level){
-    return p/(2.0f*level);
+
+  inline Point2f levelToWorld(Point2f p, unsigned int level) {
+    return p * (2.0f * level);
   }
-  
-  inline Point2f levelToWorld(Point2f p, unsigned int level){
-    return p*(2.0f*level);
-  }
-  
 };
 
 
-
-class MRTiledImageSet{
-  
+class MRTiledImageSet {
   friend class ImageViewComponent;
   friend class CaptureComponent;
-  
+
 public:
   cv::Rect_<float> bounds;
   std::string labelName;
 
 
-  MRTiledImageSet(){};
+  MRTiledImageSet() {
+  };
 
-  void add(std::shared_ptr<MRTiledImage> image){
-    images.push_back(image);
+  Point2f get_display_coords_for_zero_scale(std::shared_ptr<MRTiledImage> _member) const {
+    Point2f startPoint(bounds.br().x,0);
+    for (auto mrimg : MRImages) {
+      if (mrimg == _member) {
+        startPoint.x -= _member->bounds.tl().x;
+        startPoint.x += 500;
+        return startPoint;
+      }
+      if (!mrimg->suspended && mrimg->scale == 0) {
+        startPoint.x += (mrimg->bounds.br().x - mrimg->bounds.tl().x);
+      }
+    }
+    throw std::runtime_error("did not find calling member in list of MRTiledImages");
+  }
+
+  void add(std::shared_ptr<MRTiledImage> image) {
+    MRImages.push_back(image);
   }
 
   void sort_by_scale() {
-    std::stable_sort(images.begin(), images.end(),
-  [](const auto& a, const auto& b) { return a->scale > b->scale; });
+    std::stable_sort(MRImages.begin(), MRImages.end(),
+                     [](const auto &a, const auto &b) { return a->scale > b->scale; });
     int k = 0;
   }
-  
-  bool empty(){ return images.empty(); }
 
-  cv::Rect_<float> get_component_bounds(int _component_index){return images[_component_index]->bounds;}
+  bool empty() { return MRImages.empty(); }
+
+  cv::Rect_<float> get_component_bounds(int _component_index) { return MRImages[_component_index]->bounds; }
+
   void update_bounds();
 
 private:
-  std::vector < std::shared_ptr < MRTiledImage> > images;
+  std::vector<std::shared_ptr<MRTiledImage> > MRImages;
 };
 
 

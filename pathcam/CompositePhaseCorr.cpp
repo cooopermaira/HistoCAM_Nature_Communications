@@ -333,14 +333,16 @@ namespace pathCam {
           auto img = overlappingFrames[i].first;
           std::cout << count++ << std::endl;
           if (establish_scale_between_pairs(_rootImg, img, true) || !xcMatchShouldContinue) {
-            break;
+            return;
           }
         }
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
         establish_scale_between_pairs(_rootImg, mostRcntRslv, false);
+        return;
       }
     }
+    std::cout<<"xc registration failed for component "<<componentIndex<<std::endl;
   }
 
   void Composite::sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,

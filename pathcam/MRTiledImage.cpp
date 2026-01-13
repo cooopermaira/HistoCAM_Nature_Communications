@@ -58,7 +58,7 @@ void MRTiledImageSet::update_bounds() {
   auto minY = bounds.y;
   auto maxX = minX+bounds.width;
   auto maxY = minY+bounds.height;
-  for (const auto & image : images){
+  for (const auto & image : MRImages){
     if (image->suspended){continue;}
 
 

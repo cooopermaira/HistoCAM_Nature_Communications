@@ -70,7 +70,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
   ImageViewComponent::drawSlide(g, scale);
 
-  if (view->isEmpty() || MRImage->empty()) {
+  if (view->isEmpty() || MRImageSet->empty()) {
     return;
   }
 

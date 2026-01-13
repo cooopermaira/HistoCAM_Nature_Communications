@@ -117,7 +117,7 @@ namespace pathCam {
     std::string static get_label(unsigned int _label) {
       switch (_label) {
         case _NOLABEL:
-          return "No label";
+          return "Unk";
           break;
         case _2X:
           return "2x";

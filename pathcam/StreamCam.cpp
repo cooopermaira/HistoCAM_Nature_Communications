@@ -51,7 +51,7 @@ namespace pathCam {
     // cudaSetDevice(compositorCudaDevice);
 #endif
 
-    MRimage.reset(new MRTiledImageSet());
+    MRImageSet.reset(new MRTiledImageSet());
     JobQ = new JobQueue(threads, threads, windowWidth);
     JobQ->parent = this;
     jqSecondary = new JobQueue(6, 6, 0);
@@ -405,6 +405,9 @@ namespace pathCam {
     }
 
     auto answer = get_image_ref(neighborhood);
+    for (auto img:answer) {
+      img->mark_too_dark();
+    }
 
     JobQ->queue_mutex->lock();
     JobQ->update_job_readiness(2, _index);
@@ -618,14 +621,14 @@ namespace pathCam {
 
   void StreamCam::update_observers() {
     for (unsigned int i = 0; i < observers.size(); i++) {
-      MRimage->update_bounds();
+      MRImageSet->update_bounds();
       observers[i]->notify_new_data();
       observers[i]->update();
     }
   }
 
   void StreamCam::notify_observers() {
-    MRimage->update_bounds();
+    MRImageSet->update_bounds();
     for (int i = 0; i < observers.size(); i++) {
       observers[i]->notify_new_data();
     }
@@ -823,7 +826,7 @@ namespace pathCam {
   }
 
   std::shared_ptr<MRTiledImageSet> StreamCam::get_image_reference() {
-    return MRimage;
+    return MRImageSet;
   }
 
   void RunnableIntermediate::waitOnThisGuy() {

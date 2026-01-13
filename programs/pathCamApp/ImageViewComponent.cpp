@@ -4,11 +4,12 @@ static int wrapMod(int x, int m) {
   // result in [0, m-1] even if x is negative
   return (x % m + m) % m;
 }
+
 //==============================================================================
 ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
                                        StringArray &iconNames,
                                        OwnedArray<Drawable> &iconsFromZipFile, MainComponent *parent) : parent(parent),
-  MRImage(NULL),
+  MRImageSet(NULL),
   view(view),
   shadeLevels(
     false) {
@@ -19,7 +20,7 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
 
   juce::Rectangle<int> b = getLocalBounds();
 
-  MRImage = NULL;
+  MRImageSet = NULL;
 
   horizontalScrollBar.addListener(this);
   verticalScrollBar.addListener(this);
@@ -42,113 +43,118 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
 ImageViewComponent::~ImageViewComponent() {
 }
 
-void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRTiledImage>tiledImage) {
+void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRTiledImage> tiledImage) {
+  //convert bounds from view space to image space
+  auto imageview = *view;
 
-    //convert bounds from view space to image space
-    auto imageview = *view;
+  if (tiledImage->scale == 0) {
+    auto ans = tiledImage->MRImageSet->get_display_coords_for_zero_scale(tiledImage);
+    imageview -= fPoint(ans.x, ans.y);
+  } else {
     imageview *= 1.0 / tiledImage->scale;
     imageview -= fPoint(tiledImage->offset.x, tiledImage->offset.y);
+  }
 
-    //query tiles within image space bounds
-    std::vector<TileQuery> tiles = tiledImage->
-        getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
+  //query tiles within image space bounds
+  std::vector<TileQuery> tiles = tiledImage->
+      getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
 
-    //draw each tile
-    for (unsigned int t = 0; t < tiles.size(); t++) {
-      auto tile = tiles[t].image;
-      auto bounds = RectCtoJ<float>(tiles[t].bounds);
-      bounds *= view2screenScale(imageview) * scale;
-      bounds.expand(0.5, 0.5);
-      tiles[t].bounds = RectJtoC<float>(bounds);
+  //draw each tile
+  for (unsigned int t = 0; t < tiles.size(); t++) {
+    auto tile = tiles[t].image;
+    auto bounds = RectCtoJ<float>(tiles[t].bounds);
+    bounds *= view2screenScale(imageview) * scale;
+    bounds.expand(0.5, 0.5);
+    tiles[t].bounds = RectJtoC<float>(bounds);
 
-      if (tile->image.data) {
-        if (!tile->usingPreferred) {
-          juce::Image *im = new juce::Image(juce::Image::ARGB, tile->image.cols, tile->image.rows, true);
-          tile->preferredObj = im;
-          tile->destroyPreferredObj = [](void* p) {
-            delete static_cast<juce::Image*>(p);
-          };
-          tile->usingPreferred = true;
-        }
+    if (tile->image.data) {
+      if (!tile->usingPreferred) {
+        juce::Image *im = new juce::Image(juce::Image::ARGB, tile->image.cols, tile->image.rows, true);
+        tile->preferredObj = im;
+        tile->destroyPreferredObj = [](void *p) {
+          delete static_cast<juce::Image *>(p);
+        };
+        tile->usingPreferred = true;
+      }
 
-        auto im = static_cast<juce::Image *>(tile->preferredObj);
-        tile->mutex.lock();
+      auto im = static_cast<juce::Image *>(tile->preferredObj);
+      tile->mutex.lock();
 
-        if (tile->newData) {
-          auto img = tile->image;
-          juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-          CHECK_CUDA(cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
-                       img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost));
-          tile->newData = false;
-        }
-        if (tile->newAnnoData) {
-          for (auto &kv : tile->SAMMasks) {
-            if (!kv.second.second) {
-              kv.second.second = new juce::Image(juce::Image::SingleChannel, tile->image.cols, tile->image.rows, true);
-            }
-            auto annoMask = static_cast<juce::Image *>(kv.second.second);
-            juce::Image::BitmapData bitmap_data(*annoMask,juce::Image::BitmapData::ReadWriteMode::writeOnly);
-            auto img = kv.second.first;
-            CHECK_CUDA(cudaMemcpy2D(bitmap_data.data,img.cols,img.data,img.step,img.cols,img.rows,cudaMemcpyDeviceToHost));
+      if (tile->newData) {
+        auto img = tile->image;
+        juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
+        CHECK_CUDA(cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
+          img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost));
+        tile->newData = false;
+      }
+      if (tile->newAnnoData) {
+        for (auto &kv: tile->SAMMasks) {
+          if (!kv.second.second) {
+            kv.second.second = new juce::Image(juce::Image::SingleChannel, tile->image.cols, tile->image.rows, true);
           }
-        }
-        g.setOpacity(1.f);
-        g.drawImage(*im, bounds);
-        //
-        // //draw tile bounds with owner frame
-        // g.setColour(juce::Colours::greenyellow);
-        // g.drawRect(bounds, 3);
-        //
-        // std::string ij;
-        // if (tile->owner) {
-        //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
-        // }
-        // g.setFont(20);
-        // g.drawText(ij, bounds.getCentreX() - 250,
-        //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
-
-        for (auto & mask : tile->SAMMasks) {
-          auto jImg = static_cast<juce::Image*>(mask.second.second);
-          g.saveState();
-          g.setOpacity(0.5f);
-
-          const float sx = bounds.getWidth()  / (float) jImg->getWidth();
-          const float sy = bounds.getHeight() / (float) jImg->getHeight();
-
-          AffineTransform maskToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
-
-          auto annoColor = (*parent->annotate->annotations.get())[mask.first].get()->getColor();
-          //Colour annoColor = parent->annotate
-
-          g.reduceClipRegion(*jImg,maskToCanvas);
-          g.setColour(annoColor.withAlpha(0.5f));
-          g.fillAll();
-          g.restoreState();
-        }
-
-        tile->mutex.unlock();
-
-        if (shadeLevels) {
-          Graphics::ScopedSaveState save(g);
-
-          const float sx = bounds.getWidth()  / (float) im->getWidth();
-          const float sy = bounds.getHeight() / (float) im->getHeight();
-          AffineTransform imgToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
-
-          g.reduceClipRegion(*im, imgToCanvas);
-
-          int maglab = tiledImage->magLabel;
-          auto color = levelColors[4 - maglab];
-          auto overlayColor = Colour(color.getRed(), color.getGreen(), color.getBlue(), (uint8)100);
-
-          g.setColour(overlayColor);
-          g.fillRect(bounds);
-
+          auto annoMask = static_cast<juce::Image *>(kv.second.second);
+          juce::Image::BitmapData bitmap_data(*annoMask, juce::Image::BitmapData::ReadWriteMode::writeOnly);
+          auto img = kv.second.first;
+          CHECK_CUDA(cudaMemcpy2D(bitmap_data.data,img.cols,img.data,img.step,img.cols,img.rows,cudaMemcpyDeviceToHost))
+          ;
         }
       }
-    }
+      g.setOpacity(1.f);
+      g.drawImage(*im, bounds);
+      //
+      // //draw tile bounds with owner frame
+      // g.setColour(juce::Colours::greenyellow);
+      // g.drawRect(bounds, 3);
+      //
+      // std::string ij;
+      // if (tile->owner) {
+      //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
+      // }
+      // g.setFont(20);
+      // g.drawText(ij, bounds.getCentreX() - 250,
+      //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
 
-    //tile classification
+      for (auto &mask: tile->SAMMasks) {
+        auto jImg = static_cast<juce::Image *>(mask.second.second);
+        g.saveState();
+        g.setOpacity(0.5f);
+
+        const float sx = bounds.getWidth() / (float) jImg->getWidth();
+        const float sy = bounds.getHeight() / (float) jImg->getHeight();
+
+        AffineTransform maskToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
+
+        auto annoColor = (*parent->annotate->annotations.get())[mask.first].get()->getColor();
+        //Colour annoColor = parent->annotate
+
+        g.reduceClipRegion(*jImg, maskToCanvas);
+        g.setColour(annoColor.withAlpha(0.5f));
+        g.fillAll();
+        g.restoreState();
+      }
+
+      tile->mutex.unlock();
+
+      if (shadeLevels) {
+        Graphics::ScopedSaveState save(g);
+
+        const float sx = bounds.getWidth() / (float) im->getWidth();
+        const float sy = bounds.getHeight() / (float) im->getHeight();
+        AffineTransform imgToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
+
+        g.reduceClipRegion(*im, imgToCanvas);
+
+        int maglab = tiledImage->magLabel;
+        auto color = levelColors[4 - maglab];
+        auto overlayColor = Colour(color.getRed(), color.getGreen(), color.getBlue(), (uint8) 100);
+
+        g.setColour(overlayColor);
+        g.fillRect(bounds);
+      }
+    }
+  }
+
+  //tile classification
   /*
     if (MRImage->images.size() > 0 && shadeClasses) {
       auto sCam = MRImage->images[0]->parent;
@@ -188,22 +194,22 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
 void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   bool canShadeClasses = false;
 
-  const int N = (int)MRImage->images.size();
+  const int N = (int) MRImageSet->MRImages.size();
   if (N == 0) return;
 
-  const int mode = wrapMod(componentSelector, N + 1);   // 0..N
+  const int mode = wrapMod(componentSelector, N + 1); // 0..N
   const bool showAll = (mode == 0);
-  const int selectedIdx = showAll ? -1 : (mode - 1);   // 0..N-1
+  const int selectedIdx = showAll ? -1 : (mode - 1); // 0..N-1
 
   if (!showAll) {
-      g.beginTransparencyLayer(0.3f);
+    g.beginTransparencyLayer(0.3f);
   }
 
   for (int i = 0; i < N; ++i) {
     if (!showAll && i == selectedIdx) continue;
 
-    auto img = MRImage->images[i];
-    if (img->scale == 0 || img->suspended) continue;
+    auto img = MRImageSet->MRImages[i];
+    if (/*img->scale == 0 ||*/ img->suspended) continue;
 
     g.setColour(juce::Colours::white);
     drawLayer(g, scale, img);
@@ -225,7 +231,7 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
     g.endTransparencyLayer();
 
     // draw selected at full opacity
-    auto img = MRImage->images[selectedIdx];
+    auto img = MRImageSet->MRImages[selectedIdx];
     if (img->scale != 0 && !img->suspended) {
       g.setColour(juce::Colours::white);
       drawLayer(g, scale, img);
@@ -247,8 +253,8 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
 
 
   //Define buffer space from the edges
-  if (MRImage->images.size() > 0 && shadeClasses) {
-    auto sCam = MRImage->images[0]->parent;
+  if (MRImageSet->MRImages.size() > 0 && shadeClasses) {
+    auto sCam = MRImageSet->MRImages[0]->parent;
     int paddingX = 100;
     int paddingY = 150;
     int squareSize = 30; // Size of the square
@@ -296,7 +302,6 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
 }
 
 
-
 void ImageViewComponent::refreshImage() {
   const ScopedLock lock(mutex);
   zoomAndCenter();
@@ -306,10 +311,10 @@ void ImageViewComponent::refreshImage() {
 void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   const ScopedLock lock(mutex);
 
-  MRImage = image;
+  MRImageSet = image;
 
-  horizontalScrollBar.setRangeLimits(MRImage->bounds.x, MRImage->bounds.width);
-  verticalScrollBar.setRangeLimits(MRImage->bounds.y, MRImage->bounds.height);
+  horizontalScrollBar.setRangeLimits(MRImageSet->bounds.x, MRImageSet->bounds.width);
+  verticalScrollBar.setRangeLimits(MRImageSet->bounds.y, MRImageSet->bounds.height);
 
   horizontalScrollBar.setVisible(true);
   verticalScrollBar.setVisible(true);
@@ -383,20 +388,20 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     return true;
   }
   if (key == KeyPress::createFromDescription("c")) {
-    const int N = (int)MRImage->images.size();
+    const int N = (int) MRImageSet->MRImages.size();
     if (N == 0) return true;
 
-    const int M = N + 1;                 // 0..N  (0 = show all)
+    const int M = N + 1; // 0..N  (0 = show all)
     int mode = wrapMod(componentSelector + 1, M);
 
     // If we're in "show one component" mode, skip suspended components.
     if (mode != 0) {
       int guard = 0;
       while (guard++ < M) {
-        const int idx = mode - 1;        // 0..N-1
-        if (!MRImage->images[idx]->suspended) break;
+        const int idx = mode - 1; // 0..N-1
+        if (!MRImageSet->MRImages[idx]->suspended) break;
 
-        mode = wrapMod(mode + 1, M);     // advance within 0..N
+        mode = wrapMod(mode + 1, M); // advance within 0..N
         if (mode == 0) {
           // landed on "show all" -> always allowed
           break;
@@ -416,8 +421,8 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     repaint();
     return true; // Key press handled
   }
-  if (key==juce::KeyPress::createFromDescription("q")) {
-    if (!MRImage->images.empty()) {
+  if (key == juce::KeyPress::createFromDescription("q")) {
+    if (!MRImageSet->MRImages.empty()) {
       //MRImage->images[0]->parent->as->create_segmentation()
     }
   }
@@ -454,7 +459,7 @@ void ImageViewComponent::paint(juce::Graphics &g) {
   g.drawImageAt(checkerboard, 0, 0);
   //g.fillAll(juce::Colours::white);
 
-  if (MRImage) {
+  if (MRImageSet) {
     drawSlide(g, 1.0);
   }
 
@@ -502,7 +507,7 @@ void ImageViewComponent::resized() {
 
   b = getLocalBounds();
 
-  if (MRImage && isVisible()) {
+  if (MRImageSet && isVisible()) {
     scaleCenter(fPoint((float) b.getHorizontalRange().getLength() /
                        (float) old_bounds.getHorizontalRange().getLength(),
                        (float) b.getVerticalRange().getLength() /
@@ -520,7 +525,7 @@ void ImageViewComponent::resized() {
 }
 
 void ImageViewComponent::zoomAndCenter() {
-  if (!MRImage || MRImage->images.empty() || !isVisible()) { return; }
+  if (!MRImageSet || MRImageSet->MRImages.empty() || !isVisible()) { return; }
 
   //  Rect_<float> bounds;
   //  bool showAsCircle;
@@ -553,11 +558,11 @@ void ImageViewComponent::zoomAndCenter() {
   //
   //  scaleCenter(fPoint(scale, scale));
 
-  view->setCentre(RectCtoJ(MRImage->bounds).getCentre());
+  view->setCentre(RectCtoJ(MRImageSet->bounds).getCentre());
 
-  float scale = max((float) MRImage->bounds.width /
+  float scale = max((float) MRImageSet->bounds.width /
                     (float) view->getHorizontalRange().getLength(),
-                    (float) MRImage->bounds.height /
+                    (float) MRImageSet->bounds.height /
                     (float) view->getVerticalRange().getLength());
 
   scaleCenter(fPoint(scale, scale));

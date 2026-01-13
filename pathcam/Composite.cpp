@@ -136,7 +136,7 @@ namespace pathCam {
       ff_correct_existing_tiles();
     }
     imagePyramid->set_mag_label(componentMagLabel);
-    parent->MRimage->sort_by_scale();
+    parent->MRImageSet->sort_by_scale();
     update_mutex.unlock();
   }
 
@@ -1162,7 +1162,8 @@ namespace pathCam {
       0);
     imagePyramid->level.push_back(current);
     imagePyramid->componentIndex = _componentIndex;
-    parent->MRimage->add(imagePyramid);
+    parent->MRImageSet->add(imagePyramid);
+    imagePyramid->MRImageSet = parent->MRImageSet;
     //local_quality_score = score_image_2X(4852,6464,2190);
   }
 

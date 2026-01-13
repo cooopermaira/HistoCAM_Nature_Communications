@@ -94,11 +94,12 @@ namespace pathCam {
       successful = true;
     } else {
       //std::cout<<"Too Black: "+std::to_string(image_index)<<std::endl;
+
       parent->mark_neighbors_as_underexposed(image_index);
       image->free_memory_RAW();
     }
 
-    parent->loaderCount--;
+    --parent->loaderCount;
     jobComplete.set();
     successful = true;
   }

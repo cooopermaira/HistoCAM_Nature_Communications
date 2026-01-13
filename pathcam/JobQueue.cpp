@@ -85,19 +85,24 @@ namespace pathCam {
 
       int fv = max(0,int(image_idx) - windowWidth);
       int lv = image_idx + windowWidth;
-      std::vector<int> iters(lv - fv + 1);
-      std::iota(iters.begin(),iters.end(),fv);
+      std::vector<int> neighborsIdx(lv - fv + 1);
+      std::iota(neighborsIdx.begin(),neighborsIdx.end(),fv);
 
-      for (auto i : iters){
+      for (auto i : neighborsIdx){
 
         auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, i);
 
-        jobsReadiness[answer.first]++;
+        ++jobsReadiness[answer.first];
 
         unsigned long readinessRequired = 7 + min(i - windowWidth, 0);
+        auto jobHasSufficientNeighborPermission = jobsReadiness[answer.first] >= readinessRequired;
+        bool jobHasBeenCreated = jobRefs[answer.first];
+        bool jobIsUnprocessed = false;
+        if (jobHasBeenCreated) {
+          jobIsUnprocessed = jobRefs[answer.first]->unprocessed;
+        }
 
-
-        if (jobsReadiness[answer.first] >= readinessRequired && jobRefs[answer.first] && jobRefs[answer.first]->unprocessed) {
+        if (jobHasSufficientNeighborPermission && jobHasBeenCreated && jobIsUnprocessed) {
           //enough of this job's neighbors have processed, this job has enough information to run.
           if (cancelJob[answer.first]) {
             --parent->matchableCount;

@@ -189,7 +189,7 @@ namespace pathCam {
         debugTileCount1 += immediateProcessingTiles.size();
       }
 
-      if (imagePyramid->scale > 0) {
+      //if (imagePyramid->scale > 0) {
         float x = (imagePyramid->offset.x + img->absoluteCoords.x) * imagePyramid->scale;
         float y = (imagePyramid->offset.y + img->absoluteCoords.y) * imagePyramid->scale;
         float w = parent->image_width * imagePyramid->scale;
@@ -198,7 +198,8 @@ namespace pathCam {
 
         parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
                                   Image::get_label(componentMagLabel));
-      }
+      //}
+
     } else {
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
       ++positionForNextWaitngFrame;

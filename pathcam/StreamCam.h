@@ -156,7 +156,7 @@ namespace pathCam {
     Mat circleMask;
     Mat regCircleMask;
 
-    std::shared_ptr<MRTiledImageSet> MRimage;
+    std::shared_ptr<MRTiledImageSet> MRImageSet;
     std::vector<std::shared_ptr<MRTiledImageSet>> previousSlides;
 
     std::vector<std::pair<std::string, double>> debugImageBlurWithNames;

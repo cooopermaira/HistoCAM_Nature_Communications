@@ -39,7 +39,7 @@ public:
 
   void fixAspectRatio()
   {
-    if (!MRImage || !isVisible())
+    if (!MRImageSet || !isVisible())
     {
       return;
     }
@@ -70,7 +70,7 @@ public:
   void refreshImage();
 
 protected:
-  std::shared_ptr<MRTiledImageSet> MRImage;
+  std::shared_ptr<MRTiledImageSet> MRImageSet;
   MainComponent *parent;
   std::atomic<bool> newData;
   cv::Mat greenShade;
@@ -96,7 +96,7 @@ protected:
 
   inline void translate(fPoint amount)
   {
-    if (!MRImage)
+    if (!MRImageSet)
     {
       return;
     }
@@ -109,7 +109,7 @@ protected:
 
   inline void scaleCenter(fPoint scale)
   {
-    if (!MRImage)
+    if (!MRImageSet)
     {
       return;
     }
@@ -125,7 +125,7 @@ protected:
 
   inline fPoint screen2viewScale(fRectangle myview)
   {
-    if (!MRImage)
+    if (!MRImageSet)
     {
       return fPoint();
     }
@@ -135,7 +135,7 @@ protected:
 
   inline fPoint view2screenScale(fRectangle myview)
   {
-    if (!MRImage)
+    if (!MRImageSet)
     {
       return fPoint();
     }
@@ -145,7 +145,7 @@ protected:
 
   inline fPoint screen2view(fPoint p, fRectangle myview)
   {
-    if (!MRImage)
+    if (!MRImageSet)
     {
       return p;
     }
@@ -154,7 +154,7 @@ protected:
 
   inline fPoint view2screen(fPoint p, fRectangle myview)
   {
-    if (!MRImage)
+    if (!MRImageSet)
     {
       return p;
     }
