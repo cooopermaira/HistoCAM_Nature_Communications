@@ -249,6 +249,7 @@ namespace pathCam {
       //we're part of this component. suspend self, create a match and attempt registration.
       suspended = true;
       imagePyramid->suspended = true;
+      _rootImg->load_raw_from_disk();
 
       for (auto &p: imagePyramid->liveTiles) {
         auto tObj = imagePyramid->level[0]->getTile(p.x, p.y);

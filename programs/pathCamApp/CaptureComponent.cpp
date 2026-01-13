@@ -35,7 +35,7 @@ public:
 
   virtual void run() {
     cptcmp->sCam->run();
-    cptcmp->stopSimulating();
+    //cptcmp->stopSimulating();
   }
 };
 
@@ -158,7 +158,9 @@ void CaptureComponent::startSimulating() {
   parent->capture->setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
-  // std::thread t([this](){sCam->run();});
+  // std::thread t([this]() {
+  //   sCam->run();
+  // });
   // t.detach();
   compositeThread.start(new sCamPocoRunnable(this));
   updateDrawThread.start(new drawThreadRunnable(parent, compositeThread));

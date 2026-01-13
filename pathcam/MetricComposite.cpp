@@ -106,13 +106,12 @@ namespace pathCam {
     cudaFree(threeChnBuf);
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
-    for (int i = 0; i < ftg->matches.size(); ++i) {
-      if (ftg->matches[i]) {
-        delete ftg->matches[i];
+    for (int i = 0; i < ftg->storedMatches.size(); ++i) {
+      if (ftg->storedMatches[i]) {
+        delete ftg->storedMatches[i];
       }
-      ftg->matches.clear();
+      ftg->storedMatches.clear();
     }
-    for (int i = 0; i < ftg.)
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
@@ -143,6 +142,9 @@ namespace pathCam {
     if (!staging.empty()) {
       auto ri = staging.front();
       auto img = ri->image;
+      memberFrames.push_back(img);
+      assert(img->regInfo);
+
       staging.pop();
 
 
@@ -241,9 +243,7 @@ namespace pathCam {
       contributingImages.insert(img);
       needsAlignment = true;
 
-      assert(img && img->get_Raw());
-
-
+      //assert(img && img->get_Raw());
       process_tiles(img, tiles);
 
       debugTileCount2 += tiles.size();
@@ -263,14 +263,14 @@ namespace pathCam {
     ig = new ImageGraph();
     bai = new BundleAdjustmentIntegrator();
 
-    auto members = find_contributing_images();
+    std::unordered_set<Image *> members = find_contributing_images();
     members.insert(root);
 
 
-    auto matches = ftg->matches; //matches are just stored here before being processed all at once.
+    auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
     std::vector<Match *> memberMatches;
 
-    auto start1 = std::chrono::high_resolution_clock::now();
+
     for (auto m: matches) {
       ig->addEdge(m->image_1->index, m->image_2->index, ImageGraph::EdgeKind::ORB);
     }
@@ -283,51 +283,34 @@ namespace pathCam {
       ig->setMember(img->index, true);
     }
 
-    // //debug
-    // std::vector<RegInfo *> regInfos;
-    // for (auto img: members) {
-    //   regInfos.push_back(img->regInfo);
-    // }
-    // std::sort(regInfos.begin(), regInfos.end(),
-    //           [](const RegInfo *a, const RegInfo *b) {
-    //             return a->index < b->index;
-    //           });
-    //
-    // for (auto ri: regInfos) {
-    //   std::cout << ri->index << " " << ri->matchedTo << std::endl;
-    // }
+    auto graphConnectivityResult = ig->computeMinPromotionsToConnectMembersPreferORB();
+    if (!graphConnectivityResult.success){return;}
 
-    // auto endri = regInfos.back();
-    // while ()
-
-
-    auto result = ig->computeMinPromotionsToConnectMembersPreferORB();
-
-    if (!result.promoted_nodes.empty()) {
-      std::cout << "Component " << componentIndex << " promoting additional " << result.promoted_nodes.size() <<
+    if (!graphConnectivityResult.promoted_nodes.empty()) {
+      std::cout << "Component " << componentIndex << " promoting additional " << graphConnectivityResult.promoted_nodes.size() <<
           " frames in BA" << std::endl;
       //important to check if empty or get_image_ref returns every image known to StreamCam
-      for (auto img: parent->get_image_ref(result.promoted_nodes)) {
+      for (auto img: parent->get_image_ref(graphConnectivityResult.promoted_nodes)) {
+        ig->setMember(img->index,true);
         members.insert(img);
       }
     }
 
-    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start1).count();
-
 
     for (auto m: matches) {
-      // if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-      memberMatches.push_back(m);
-      members.insert(m->image_1);
-      members.insert(m->image_2);
+      if (m->image_1->index == 197 || m->image_2->index == 196) {
+        int k = 0;
+      }
+      if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
+        // members.insert(m->image_1);
+        // members.insert(m->image_2);
 
-      for (int i = 0; i < m->good_matches.size(); ++i) {
-        if (m->inliers[i]) {
-          ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
+        for (int i = 0; i < m->good_matches.size(); ++i) {
+          if (m->inliers[i]) {
+            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
+          }
         }
       }
-      // }
     }
     for (auto &img: members) {
       img->keypointsImageSpace.resize(img->keypoints.size());
@@ -336,8 +319,9 @@ namespace pathCam {
       }
     }
 
-    if (result.used_sift) {
+    if (graphConnectivityResult.used_sift) {
       std::cout << "Component " << componentIndex << " using sift in BA" << std::endl;
+      return;
       for (auto [img1,img2,kp1,kp2]: extraMatches) {
         if (members.find(img1) != members.end() && members.find(img2) != members.end()) {
           assert(kp1.size() == kp2.size());
@@ -358,22 +342,71 @@ namespace pathCam {
       }
     }
 
-
-    const std::vector memberImages(members.begin(), members.end());
+    //GENERATE TRACKS AND RUN
+    std::vector memberImages(members.begin(), members.end());
     auto tracks = ftg->generateCurrentTracks(memberImages);
     bai->run_bundle_adjustment(tracks, memberImages);
+    // for (auto &[id,pv]: bai->poseVertices) {
+    //   std::cout << id << " " << pv->edges.size() << std::endl;
+    // }
 
-    float maxDev = 0, avgDev = 0;
+    //decide if youre going to accept the bundle adjustment answer, at least in part.
+    auto start1 = std::chrono::high_resolution_clock::now();
+
+    auto rootID = root->index;
+    std::unordered_map<ImageGraph::ImgId, ImageGraph::ImgId> parentGraph;
+    bool ok = ig->computePreferredParentsToRootAfterPromotions(rootID, parentGraph);
+    //ok will always be true if we've gotten this far in the function
+
+    std::unordered_map<ImageGraph::ImgId,int> idDistanceToRoot;
+    idDistanceToRoot.reserve(memberImages.size() * 2);
+    std::sort(memberImages.begin(), memberImages.end(),
+    [&](Image* a, Image* b) {
+        int da = ImageGraph::hopDistanceToRoot(a->index, rootID, parentGraph, idDistanceToRoot);
+        int db = ImageGraph::hopDistanceToRoot(b->index, rootID, parentGraph, idDistanceToRoot);
+
+        if (da != db) return da < db;
+        return a->index < b->index; // tie-breaker: lower id first (or keep stable_sort if you prefer)
+    });
+
     for (auto img: memberImages) {
       if (!img->regInfo->stayFixedDuringBundleAdjustment) {
-        auto pv = bai->optimizer->poseVertex(img->index);
-        Point2i coords(-pv->t[0], -pv->t[1]);
-        Point2i diff = img->regInfo->absoluteCoords - coords;
+        auto myVertex = bai->optimizer->poseVertex(img->index);
+        auto theirID = parentGraph[img->index];
+        auto theirVertex = bai->optimizer->poseVertex(theirID);
 
-        img->regInfo->absoluteCoords = coords;
+        bool found = false;
+        Match* ourMatch;
+        Image* them;
+        int multiplier;
+        for (auto m : img->matches) {
+          if (m->image_1->index == theirID || m->image_2->index == theirID) {
+            them = m->image_1->index == theirID ? m->image_1 : m->image_2;
+            multiplier = m->image_1->index == theirID ? -1 : 1;
+            ourMatch = m;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw std::runtime_error("failed to find match while testing BA solution");
+        }
+
+        Point2i ourDistance(multiplier * ourMatch->t_x,multiplier * ourMatch->t_y);
+        Point2i myCoords(-myVertex->t[0], -myVertex->t[1]);
+        Point2i theirCoords(-theirVertex->t[0], -theirVertex->t[1]);
+        auto vDist = myCoords - theirCoords;
+
+        Point2i acceptedDistance = vDist;
+        if ((ourDistance.x - vDist.x) * (ourDistance.x - vDist.x) + (ourDistance.y - vDist.y) * (ourDistance.y - vDist.y) > 900) {
+          acceptedDistance = ourDistance;
+        }
+
+        img->regInfo->absoluteCoords = them->regInfo->absoluteCoords + acceptedDistance;
       }
     }
-
+    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
+           (std::chrono::high_resolution_clock::now() - start1).count();
     rebuild(memberImages);
 
 
@@ -422,7 +455,7 @@ namespace pathCam {
             img->regInfo->absoluteCoords.y + imageSize.height >= ul.y + parent->tileSize);
         }
       }
-      process_tiles(img, tileIndexes);
+      process_tiles(img, tileIndexes,false);
 
 
       // for (auto &tileInd: tileIndexes) {
@@ -472,18 +505,18 @@ namespace pathCam {
   }
 
 
-  void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, const bool forceFullImage) {
+  void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad, const bool forceFullImage) {
     assert(parent->unifiedMemory); //change this to a fix later
 
-    img->load_raw_from_disk();
+    img->load_raw_from_disk(alertDoubleLoad);
 
     //not a mistake. we have two process that need the raw, second call increments the counter
 
     if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk();
+      img->load_raw_from_disk(alertDoubleLoad);
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
-      auto cms = new ComponentMatchSearch(parent, img);
+      auto cms = new ComponentMatchSearch(parent, img, this);
       parent->jqSecondary->add_runnable(cms);
     }
     //lock mutex against component wide flatfielding

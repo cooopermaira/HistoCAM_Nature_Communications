@@ -24,7 +24,7 @@ namespace pathCam {
 
         int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) const;
 
-        void process_tiles(Image *img, std::vector<Point2i> &tiles, bool forceFullImage = false);
+        void process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad = true, bool forceFullImage = false);
 
         void align_and_rebuild() override;
 
@@ -37,6 +37,7 @@ namespace pathCam {
         std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});
 
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
+        std::vector<Image*> memberFrames;
 
         FeatureTrackGenerator* ftg;
         BundleAdjustmentIntegrator* bai;
@@ -53,7 +54,7 @@ namespace pathCam {
         std::atomic<int> outstandingCMS_jobs = 0;
 
 
-        std::shared_ptr<TiledImage> compositeImage;
+        std::shared_ptr<TiledImage> baseImage;
 
         inline static std::mutex EstRoot_mutex;
 

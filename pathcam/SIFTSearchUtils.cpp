@@ -160,7 +160,7 @@ namespace pathCam {
       optimizer->addPoseVertex(poseVertex);
 
       //keep possession of it
-      poseVertices[img->index] = std::move(poseVertex);
+      poseVertices[img->index] = poseVertex;
     }
     assert(stayFixedCount == 1);
 
@@ -192,10 +192,10 @@ namespace pathCam {
     constexpr auto robustKernelType = cuba::RobustKernelType::HUBER;
     const double deltaMono = sqrt(5.9);
 
-    optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
+    //optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
 
     optimizer->initialize();
-    optimizer->setPoseUpdateAllowance(false, true);
+    optimizer->setPoseUpdateAllowance(true, true);
 
     optimizer->optimize(100);
   }

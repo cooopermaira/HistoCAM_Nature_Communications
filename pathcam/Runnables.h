@@ -328,8 +328,9 @@ namespace pathCam {
   public:
     StreamCam *parent;
     Image *image;
+    MetricComposite* component;
 
-    ComponentMatchSearch(StreamCam *_parent, Image *_image) : parent(_parent),
+    ComponentMatchSearch(StreamCam *_parent, Image *_image,MetricComposite *_component) : parent(_parent),component(_component),
                                                               image(_image),
                                                               RunnableIntermediate(_image->index, 0) {};
     void run() override;

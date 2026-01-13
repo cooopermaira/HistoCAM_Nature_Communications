@@ -521,12 +521,13 @@ namespace pathCam {
     }
   }
 
-  void Image::load_raw_from_disk() {
+  void Image::load_raw_from_disk(bool _alertDoubleLoad) {
     buffer_mutex.lock();
     if (!raw_buffer) {
-      // if (loadCount > 0) {
-      //   std::cout<<"multiple disk loading: index "<<index<<std::endl;
-      // }
+      if (hasBeenInMemory && _alertDoubleLoad) {
+        std::cout<<"image "<<index<<" double load"<<std::endl;
+      }
+
       ++loadCount;
 
       if (image_file.toString() != "") {
@@ -535,6 +536,7 @@ namespace pathCam {
         allocate_memory_RAW();
         stream.read(raw_buffer, width * height);
         stream.close();
+        hasBeenInMemory = true;
       } else {
         std::cerr << "Loading from disk with no path\n";
         buffer_mutex.unlock();

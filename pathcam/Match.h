@@ -20,6 +20,7 @@ public:
   Image * image_2;
 
   int mostMatches = 0;
+  int numMatches = 0;
   
   
   std::vector<DMatch> good_matches;

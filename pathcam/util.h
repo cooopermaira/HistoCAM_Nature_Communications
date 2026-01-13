@@ -278,6 +278,20 @@ private:
     return comp;
   }
 
+    int lowestMemberIdxById(const std::vector<bool>& m) const {
+    int best = -1;
+    ImgId best_id = 0;
+    for (int i = 0; i < (int)m.size(); ++i) {
+      if (!m[i]) continue;
+      ImgId id = idx_to_id_[i];
+      if (best == -1 || id < best_id) {
+        best = i;
+        best_id = id;
+      }
+    }
+    return best;
+  }
+
   int countMemberComponents(const std::vector<bool>& working_member, const std::vector<int>& comp) const {
     int mx = -1;
     for (int i = 0; i < (int)comp.size(); ++i) {
@@ -446,6 +460,33 @@ private:
   }
 
 public:
+
+    static int hopDistanceToRoot(
+    ImgId node,
+    ImgId root,
+    const std::unordered_map<ImgId, ImgId>& parent,
+    std::unordered_map<ImgId, int>& memo)
+    {
+      if (node == root) return 0;
+
+      if (auto it = memo.find(node); it != memo.end())
+        return it->second;
+
+      auto itp = parent.find(node);
+      if (itp == parent.end())
+        return std::numeric_limits<int>::max() / 8; // unreachable / not in tree
+
+      ImgId p = itp->second;
+      if (p == node) // bad parent map (cycle/self but not root)
+        return std::numeric_limits<int>::max() / 8;
+
+      int d = hopDistanceToRoot(p, root, parent, memo);
+      if (d >= std::numeric_limits<int>::max() / 16)
+        return memo[node] = d;
+
+      return memo[node] = d + 1;
+    }
+
   // ----------------------------
   // Optional helpers / introspection
   // ----------------------------
@@ -456,6 +497,120 @@ public:
   }
 
   ImgId nodeId(int idx) const { return idx_to_id_.at(idx); }
+
+     // Compute a parent tree from root over FINAL members (original members + promoted),
+  // where paths prefer ORB exactly like the solver:
+  // - Traversing an edge that has ORB available costs (sift=0, hops=1)
+  // - Traversing an edge that is SIFT-only costs (sift=1, hops=1)
+  //
+  // Minimizes lexicographically: (num_sift_only_edges, hop_count).
+  //
+  // Returns false if some final member is unreachable even with ORB+SIFT edges.
+  bool computePreferredParentsToRootAfterPromotions(
+      ImgId& out_root,
+      std::unordered_map<ImgId, ImgId>& out_parent) const
+  {
+    out_parent.clear();
+
+    // Build final membership
+    std::vector<bool> final_member = member_;
+
+    const int root_idx = lowestMemberIdxById(final_member);
+    if (root_idx < 0) return false; // no members at all
+
+    out_root = idx_to_id_[root_idx];
+
+    // Lexicographic distance: first minimize siftEdges, then hops.
+    struct Dist {
+      int sift = std::numeric_limits<int>::max() / 8;
+      int hops = std::numeric_limits<int>::max() / 8;
+    };
+    auto better = [](const Dist& a, const Dist& b) {
+      if (a.sift != b.sift) return a.sift < b.sift;
+      return a.hops < b.hops;
+    };
+
+    const int N = (int)adj_.size();
+    std::vector<Dist> dist(N);
+    std::vector<int> parent_idx(N, -1);
+
+    dist[root_idx] = Dist{0, 0};
+    parent_idx[root_idx] = root_idx;
+
+    // priority queue ordered by (sift, hops)
+    struct QItem { int sift, hops, v; };
+    auto cmp = [](const QItem& a, const QItem& b) {
+      if (a.sift != b.sift) return a.sift > b.sift;
+      if (a.hops != b.hops) return a.hops > b.hops;
+      return a.v > b.v;
+    };
+    std::priority_queue<QItem, std::vector<QItem>, decltype(cmp)> pq(cmp);
+    pq.push(QItem{0, 0, root_idx});
+
+    while (!pq.empty()) {
+      auto cur = pq.top(); pq.pop();
+      const int u = cur.v;
+      if (cur.sift != dist[u].sift || cur.hops != dist[u].hops) continue;
+
+      for (const auto& nb : adj_[u]) {
+        const int v = nb.v;
+        if (!final_member[v]) continue;
+
+        const bool has_orb  = (nb.mask_bits & 0x1u) != 0;
+        const bool has_sift = (nb.mask_bits & 0x2u) != 0;
+        if (!has_orb && !has_sift) continue; // shouldn't happen, but safe
+
+        // Prefer ORB whenever available; only count SIFT when it's SIFT-only.
+        const int add_sift = (!has_orb && has_sift) ? 1 : 0;
+
+        Dist nd{ dist[u].sift + add_sift, dist[u].hops + 1 };
+        if (better(nd, dist[v])) {
+          dist[v] = nd;
+          parent_idx[v] = u;
+          pq.push(QItem{nd.sift, nd.hops, v});
+        }
+      }
+    }
+
+    // Build parent map; check reachability
+    bool all_reached = true;
+    for (int i = 0; i < N; ++i) {
+      if (!final_member[i]) continue;
+      if (parent_idx[i] == -1) { all_reached = false; continue; }
+
+      const ImgId id  = idx_to_id_[i];
+      const ImgId pid = idx_to_id_[ parent_idx[i] ];
+      out_parent[id] = pid;
+    }
+    out_parent[out_root] = out_root;
+
+    return all_reached;
+  }
+
+  // Reconstruct path [root ... node] from parent map (root points to itself).
+  static std::vector<ImgId> reconstructPathToRoot(
+      ImgId node,
+      ImgId root,
+      const std::unordered_map<ImgId, ImgId>& parent)
+  {
+    std::vector<ImgId> path;
+    auto it = parent.find(node);
+    if (it == parent.end()) return path;
+
+    ImgId cur = node;
+    while (true) {
+      path.push_back(cur);
+      if (cur == root) break;
+
+      auto jt = parent.find(cur);
+      if (jt == parent.end()) { path.clear(); return path; }
+      ImgId p = jt->second;
+      if (p == cur) { path.clear(); return path; } // cycle / bad parent map
+      cur = p;
+    }
+    std::reverse(path.begin(), path.end());
+    return path;
+  }
 
 private:
   // Node storage

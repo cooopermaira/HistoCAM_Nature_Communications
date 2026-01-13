@@ -83,16 +83,16 @@ namespace pathCam {
   }
 
   void ComponentMatchSearch::run() {
-    auto myComp = reinterpret_cast<MetricComposite *>(parent->composites[image->regInfo->component_membership]);
     auto matcher = DescriptorMatcher(parent->matcher_type);
     std::vector<Match *> matches;
 
-    image->siftMutex.lock();
-    image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
-                        getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
-                        true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
-    image->siftMutex.unlock();
+    // image->siftMutex.lock();
+    // image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
+    //                     getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
+    //                     true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
+    // image->siftMutex.unlock();
     image->free_memory_RAW();
+
 
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
@@ -101,36 +101,43 @@ namespace pathCam {
       if (!previous->is_good()) {continue;}
       if (image->label != Image::_UNKNOWN && previous->label != Image::_UNKNOWN && image->label != previous->label){continue;}
 
+      Rect me(image->regInfo->absoluteCoords - Point2i(200,200),image->regInfo->absoluteCoords + Point2i(image->width+200,image->height+200));
+      Rect them(previous->regInfo->absoluteCoords - Point2i(200,200),previous->regInfo->absoluteCoords + Point2i(previous->width+200,previous->height+200));
+      if ((me & them).empty()){continue;}
+
       auto m = new Match(previous, image);
       matcher.match(m);
 
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
+        m->numMatches = std::accumulate(m->inliers.begin(),m->inliers.end(),0);
         //forward match to feature track generator (ftg)
+        image->matches.push_back(m);
+        previous->matches.push_back(m);
         matches.push_back(m);
       } else {
         delete m;
       }
     }
 
-    myComp->ftg->accessMutex.lock();
+    component->ftg->accessMutex.lock();
     for (auto &match: matches) {
       if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
         auto theirComp = reinterpret_cast<MetricComposite *>
             (parent->composites[match->image_1->regInfo->component_membership]);
 
-        if (myComp->componentMagLabel == theirComp->componentMagLabel) {
+        if (component->componentMagLabel == theirComp->componentMagLabel) {
           //these two components should actually be the same component. we will suspend one and join to the other
-          myComp->componentJoinMatches.push_back(match);
+          component->componentJoinMatches.push_back(match);
           theirComp->componentJoinMatches.push_back(match);
         } else {
           delete match;
         }
       } else {
-        myComp->ftg->store_match(match);
+        component->ftg->store_match(match);
       }
     }
-    myComp->ftg->accessMutex.unlock();
-    --myComp->outstandingCMS_jobs;
+    component->ftg->accessMutex.unlock();
+    --component->outstandingCMS_jobs;
   }
 
   void MatchRunnable::run() {

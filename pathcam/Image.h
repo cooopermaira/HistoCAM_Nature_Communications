@@ -9,6 +9,7 @@ namespace pathCam {
   using Poco::MemoryPool;
   class RegInfo;
   class StreamCam;
+  class Match;
   class Image {
   public:
     StreamCam* parent;
@@ -39,10 +40,12 @@ namespace pathCam {
     std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
     bool blurSet = false;
+    bool hasBeenInMemory = false;
 
     bool subsequentMatchLaunched = false;
     bool fullKeyPoints = false;
 
+    std::vector<Match*> matches;
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
     cv::Mat descriptors;
 
@@ -70,7 +73,7 @@ namespace pathCam {
       image_file = _image_file;
     }
 
-    void load_raw_from_disk();
+    void load_raw_from_disk(bool _alertDoubleLoad = true);
 
     void manually_set_label();
 
@@ -108,7 +111,6 @@ namespace pathCam {
 
     void check_blur_async(const cv::Mat &img = cv::Mat(), bool submitForInference = true);
 
-    static cv::Point2f compute_sharpness(cv::Mat &_img);
 
     float debayer(int x, int y);
 
