@@ -41,7 +41,7 @@ namespace pathCam {
     //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
     // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
 
-    load_blur_engine();
+    //load_blur_engine();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
@@ -51,7 +51,6 @@ namespace pathCam {
     // cudaSetDevice(compositorCudaDevice);
 #endif
 
-    MRImageSet.reset(new MRTiledImageSet());
     JobQ = new JobQueue(threads, threads, windowWidth);
     JobQ->parent = this;
     jqSecondary = new JobQueue(6, 6, 0);
@@ -66,10 +65,17 @@ namespace pathCam {
   bool StreamCam::run() {
     auto start = std::chrono::high_resolution_clock::now();
 
+    auto dr1 = DiskReader(this);
+    auto qm1 = QManager(this);
+    auto cm1 = CompositeManager(this);
 
-    disk_thread.start(dr);
-    Q_thread.start(qm);
-    composite_thread.start(cm);
+    microscopeInput = true;
+    compositing = true;
+
+    disk_thread.start(dr1);
+    Q_thread.start(qm1);
+    composite_thread.start(cm1);
+
     //postprocessor_thread.start(ppm);
     if (inferencing) {
       inference_thread.start(*im);
@@ -90,6 +96,8 @@ namespace pathCam {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "total runtime " << duration.count() << std::endl;
     std::cout << "cudasift extract time " << cudaSiftTime << std::endl;
+
+
     return true;
   }
 
@@ -405,7 +413,7 @@ namespace pathCam {
     }
 
     auto answer = get_image_ref(neighborhood);
-    for (auto img:answer) {
+    for (auto img: answer) {
       img->mark_too_dark();
     }
 
@@ -826,6 +834,9 @@ namespace pathCam {
   }
 
   std::shared_ptr<MRTiledImageSet> StreamCam::get_image_reference() {
+    if (!MRImageSet) {
+      MRImageSet = std::make_shared<MRTiledImageSet>();
+    }
     return MRImageSet;
   }
 
@@ -889,9 +900,12 @@ namespace pathCam {
 
     //clean up all composites
     composites.clear();
+    components = 0;
+    maxIndex = -1;
 
     //clean up all
     previousSlides.push_back(std::move(MRImageSet));
+    return;
   }
 
   StreamCam::~StreamCam() {

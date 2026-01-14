@@ -17,7 +17,7 @@ public:
     MainComponent(Poco::Util::LayeredConfiguration::Ptr config);
   ~MainComponent() override;
   unsigned int ImageWidth, ImageHeight;
-  pathCam::StreamCam* sCam;
+  std::shared_ptr<pathCam::StreamCam> sCam;
   
   //==============================================================================
   void paint (juce::Graphics& g) override;

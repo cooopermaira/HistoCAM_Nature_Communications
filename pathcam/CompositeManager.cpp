@@ -31,6 +31,7 @@ namespace pathCam {
 
     rebuildJobsOutstanding = 0;
 
+    std::cout<<"composite manager beginning"<<std::endl;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
       debug_termination_check();

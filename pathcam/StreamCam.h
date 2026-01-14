@@ -192,11 +192,11 @@ namespace pathCam {
 
     std::atomic<bool> compositing = true;
     std::atomic<bool> tileEmbeddingComplete = false;
-    std::atomic<unsigned int> components = 0;
-    std::atomic<unsigned int> diskCount = 0;
-    std::atomic<unsigned int> loaderCount = 0;
+    std::atomic<int> components = 0;
+    std::atomic<int> diskCount = 0;
+    std::atomic<int> loaderCount = 0;
     std::atomic<int> matchableCount = 0;
-    std::atomic<unsigned int> regCount = 0;
+    std::atomic<int> regCount = 0;
 
     std::vector<DataObserver *> observers;
 

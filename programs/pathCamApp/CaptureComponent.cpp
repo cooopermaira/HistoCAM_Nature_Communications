@@ -156,7 +156,7 @@ void CaptureComponent::startSimulating() {
     sCam->add_observer(parent);
     scopeRadius = sCam->get_scope_radius();
     aiOverlay->set_sCam(sCam);
-    parent->sCam = sCam.get();
+    parent->sCam = sCam;
   }
 
   if (!inputPath.empty()) {
@@ -199,6 +199,7 @@ void CaptureComponent::stopRecording() {
 void CaptureComponent::stopSimulating() {
   simulating = false;
   compositeThread.join();
+  updateDrawThread.join();
   repaint();
 }
 
@@ -229,7 +230,7 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
       //open camera barcode reader
 #else
       //selecting input
-      parent->fc.reset(new FileChooser("Choose an image to open...", File::getCurrentWorkingDirectory(),
+      parent->fc.reset(new FileChooser("Choose an image to open...", File("/home/cm/Documents/data/blur_test/config/"),
                                        "*.png,*.jpeg,*.tiff"));
 
       parent->fc->launchAsync(FileBrowserComponent::openMode

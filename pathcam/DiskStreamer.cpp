@@ -328,6 +328,7 @@ namespace pathCam {
   }
 
   void DiskReader::run() {
+    std::cout<<"disk reader beginning"<<std::endl;
     std::ifstream infile;
     if (!parent->inputFileOverride.empty()) {
       infile = std::ifstream(parent->inputFileOverride.c_str());
