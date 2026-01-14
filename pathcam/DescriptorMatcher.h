@@ -27,7 +27,7 @@ public:
 
   
   
-  void match(Match *match) const;
+  void match(const std::shared_ptr<Match> &match) const;
   
   
   

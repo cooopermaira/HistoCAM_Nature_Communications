@@ -62,7 +62,7 @@ namespace pathCam {
 
     void set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat);
 
-    void get_tile_data(pathCam::Composite * _comp, unsigned int _interval);
+    void get_tile_data(std::shared_ptr<Composite> _comp, unsigned int _interval);
 
     void make_raw_buffer(void *_buffer = nullptr);
 

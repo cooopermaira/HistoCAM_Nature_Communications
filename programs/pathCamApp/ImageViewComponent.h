@@ -12,10 +12,12 @@ class ImageViewComponent : public juce::Component, public juce::ScrollBar::Liste
 
   friend class ImageViewOverlay;
 
+
 public:
   bool shadeLevels;
   bool shadeClasses;
   int componentSelector = 0;
+  int MRImageSetSelector = 0;
   std::vector<juce::Colour> levelColors = {
     Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
     Colour(243, 249, 243)
@@ -93,6 +95,8 @@ protected:
   void mouseMagnify(const MouseEvent &, float magnifyAmmount) override;
 
   void zoomAndCenter();
+
+  void adjust_MRImageSet(int mode) const;
 
   inline void translate(fPoint amount)
   {

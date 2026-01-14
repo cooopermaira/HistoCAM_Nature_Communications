@@ -116,7 +116,11 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
   g.setFont(40.0);
   g.drawText(magLabel, 20, getHeight() - 50, 100, Justification::centredLeft, true);
+
+
 }
+
+
 
 void CaptureComponent::startRecording() {
   recording = true;
@@ -139,6 +143,8 @@ void CaptureComponent::startRecording() {
   compositeThread.start(new bcamPocoRunnable(this));
   updateDrawThread.start(new drawThreadRunnable(parent, compositeThread));
 
+  captureOverlay->resized();
+  aiOverlay->resized();
   repaint();
 }
 
@@ -153,6 +159,10 @@ void CaptureComponent::startSimulating() {
     parent->sCam = sCam.get();
   }
 
+  if (!inputPath.empty()) {
+    sCam->set_input_file(inputPath);
+  }
+
   parent->MRimage = sCam->get_image_reference();
   parent->imageview->setImage(parent->MRimage);
   parent->capture->setImage(parent->MRimage);
@@ -165,6 +175,7 @@ void CaptureComponent::startSimulating() {
   compositeThread.start(new sCamPocoRunnable(this));
   updateDrawThread.start(new drawThreadRunnable(parent, compositeThread));
 
+  captureOverlay->resized();
   aiOverlay->resized();
   //reportOverlay->resized();
   repaint();
@@ -188,6 +199,71 @@ void CaptureComponent::stopRecording() {
 void CaptureComponent::stopSimulating() {
   simulating = false;
   compositeThread.join();
-  //TODO
   repaint();
+}
+
+void CaptureComponent::set_input(const FileChooser &fc)  {
+  File result = fc.getResult();
+  if (result.exists()) {
+    inputPath = result.getFullPathName().toStdString();
+    procedureMode = 1;
+    ready = true;
+    if (MRImageSet) {
+      parent->imageview->setImage(nullptr);
+      parent->capture->setImage(nullptr); //parent->capture is just this
+      parent->annotate->setImage(nullptr);
+    }
+    captureOverlay->resized();
+    repaint();
+  }
+}
+
+bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) {
+  ImageViewComponent::keyPressed(key, originatingComponent);
+
+  if (!isVisible()) { return false; }
+
+  if (key.getKeyCode() == KeyPress::spaceKey) {
+    if (procedureMode == 0) { // begin selecting or setting up input
+#ifdef WITH_SPINNAKER
+      //open camera barcode reader
+#else
+      //selecting input
+      parent->fc.reset(new FileChooser("Choose an image to open...", File::getCurrentWorkingDirectory(),
+                                       "*.png,*.jpeg,*.tiff"));
+
+      parent->fc->launchAsync(FileBrowserComponent::openMode
+                              | FileBrowserComponent::canSelectFiles,
+                              std::bind(&CaptureComponent::set_input, this, std::placeholders::_1));
+      return true;
+#endif
+    }
+    if (procedureMode == 1) { // begin an actual recording/simulation
+
+#ifdef WITH_SPINNAKER
+      if (!ready) {
+        std::cout<<"slide barcode not read"<<std::endl;
+        return true;
+      }
+      startRecording();
+#else
+      startSimulating();
+#endif
+      ready = false;
+      procedureMode = 2;
+      return true;
+    }
+    if (procedureMode == 2) {
+      stop();
+      captureOverlay->resized();
+      procedureMode = 0;
+      return true;
+    }
+    std::cout << "invalid procedure mode, resetting" << std::endl;
+    procedureMode = 0;
+    return true;
+
+    if (recording || simulating) { stop(); }
+  }
+  return false; // Key press not handled
 }

@@ -9,6 +9,7 @@
 class MainComponent final : public juce::Component, public DataObserver
 {
   friend class LoadingThread;
+  friend class CaptureComponent;
     
 public:
   //==============================================================================
@@ -43,7 +44,7 @@ public:
     capture->refreshImage();
     annotate->refreshImage();
   }
-  
+
 private:
   
   void loadImage(std::string path);

@@ -312,6 +312,7 @@ void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   const ScopedLock lock(mutex);
 
   MRImageSet = image;
+  if (!image){return;}
 
   horizontalScrollBar.setRangeLimits(MRImageSet->bounds.x, MRImageSet->bounds.width);
   verticalScrollBar.setRangeLimits(MRImageSet->bounds.y, MRImageSet->bounds.height);
@@ -369,8 +370,53 @@ void ImageViewComponent::mouseMagnify(const MouseEvent &, float magnifyAmmount) 
   repaint();
 }
 
+void ImageViewComponent::adjust_MRImageSet(int mode) const {
+  const bool showCurrent = (mode == 0);
+  const int selectedIdx = showCurrent ? -1 : (mode - 1); // 0..N-1
+  if (showCurrent) {
+    parent->imageview->setImage(parent->sCam->get_image_reference());
+    parent->capture->setImage(parent->sCam->get_image_reference());
+    parent->annotate->setImage(parent->sCam->get_image_reference());
+  }else {
+    parent->imageview->setImage(parent->sCam->previousSlides[selectedIdx]);
+    parent->capture->setImage(parent->sCam->previousSlides[selectedIdx]);
+    parent->annotate->setImage(parent->sCam->previousSlides[selectedIdx]);
+  }
+}
 
 bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) {
+  if (key.getTextCharacter() == '>') {
+
+    //cant change to past slide while compositing
+    if (parent->capture->simulating || parent->capture->recording){return true;}
+
+    if (parent->sCam) {
+      const int N = static_cast<int>(parent->sCam->previousSlides.size());
+
+      if (N == 0){return true;}
+      int mode = wrapMod(MRImageSetSelector + 1, N + 1);
+      MRImageSetSelector = mode;
+      adjust_MRImageSet(mode);
+    }
+    return true;
+  }
+
+  if (key.getTextCharacter() == '<') {
+
+    //cant change to past slide while compositing
+    if (parent->capture->simulating || parent->capture->recording){return true;}
+
+    if (parent->sCam) {
+      const int N = static_cast<int>(parent->sCam->previousSlides.size());
+
+      if (N == 0){return true;}
+      int mode = wrapMod(MRImageSetSelector - 1, N + 1);
+      MRImageSetSelector = mode;
+      adjust_MRImageSet(mode);
+    }
+    return true;
+  }
+
   if (key == juce::KeyPress::createFromDescription("-")) {
     scaleCenter(fPoint(2.0, 2.0));
     repaint();
@@ -416,6 +462,7 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     repaint();
     return true;
   }
+
   if (key == juce::KeyPress::createFromDescription("s")) {
     shadeLevels = !shadeLevels;
     repaint();

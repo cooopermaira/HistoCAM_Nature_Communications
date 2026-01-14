@@ -328,7 +328,13 @@ namespace pathCam {
   }
 
   void DiskReader::run() {
-    std::ifstream infile(parent->input_images.toString().c_str());
+    std::ifstream infile;
+    if (!parent->inputFileOverride.empty()) {
+      infile = std::ifstream(parent->inputFileOverride.c_str());
+    }
+    else {
+      infile = std::ifstream(parent->input_images.toString().c_str());
+    }
     std::string imageFile;
     unsigned long image_index = 0;
 

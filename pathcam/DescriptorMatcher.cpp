@@ -14,7 +14,7 @@ namespace pathCam {
   }
 
 
-  void DescriptorMatcher::match(Match *match) const {
+  void DescriptorMatcher::match(const std::shared_ptr<Match> &match) const {
     //From OpenCV tutorial
     std::vector<std::vector<DMatch> > knn_matches;
 

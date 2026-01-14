@@ -274,7 +274,7 @@ namespace pathCam {
       sift_to_cvMatch(rootCopy,_rootImg,_target,inlierCount,inlierMask,kp1,kp2);
       FreeSiftData(rootCopy);
 
-      auto comp = reinterpret_cast<MetricComposite *>(parent->composites[theirComponentIndex]);
+      auto comp = std::dynamic_pointer_cast<MetricComposite>(parent->composites[theirComponentIndex]);
       comp->extraMatches.emplace_back(_rootImg,_target,kp1,kp2);
       return true;
     }

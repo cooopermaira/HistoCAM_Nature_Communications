@@ -587,7 +587,7 @@ namespace pathCam {
     ri->stayFixedDuringBundleAdjustment = true;
 
     //auto *temp = new CompositeVoronoi(this, image_size, component_index);
-    auto component = new MetricComposite(this, image_size, component_index);
+    auto component = std::make_shared<MetricComposite>(this, image_size, component_index);
     component_mutex.lock();
     composites.push_back(component);
 
@@ -888,15 +888,15 @@ namespace pathCam {
 
 
     //clean up all composites
+    composites.clear();
 
     //clean up all
+    previousSlides.push_back(std::move(MRImageSet));
   }
 
   StreamCam::~StreamCam() {
     clean_up_blur_engine();
-    for (auto c: composites) {
-      delete c;
-    }
+
     delete jqSecondary;
     delete JobQ;
   }

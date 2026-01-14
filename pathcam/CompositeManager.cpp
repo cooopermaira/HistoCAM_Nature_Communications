@@ -106,7 +106,7 @@ namespace pathCam {
     std::vector<std::thread> threads;
     for (auto &comp: parent->composites) {
       if (comp->suspended) { continue; }
-      auto mc = reinterpret_cast<MetricComposite *>(comp);
+      auto mc = std::dynamic_pointer_cast<MetricComposite>(comp);
 
       threads.emplace_back([mc]() {
         for (int i = 0; i < mc->frameDelay; ++i) {
@@ -127,7 +127,7 @@ namespace pathCam {
 
     for (auto &comp: parent->composites) {
       if (comp->suspended) { continue; }
-      auto mc = reinterpret_cast<MetricComposite *>(comp);
+      auto mc = std::dynamic_pointer_cast<MetricComposite>(comp);
 
       threads.emplace_back([mc]() {
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -169,11 +169,11 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
-    std::cout << "debug frame count: " << reinterpret_cast<MetricComposite *>(parent->composites[0])->debugFrameCount <<
+    std::cout << "debug frame count: " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->debugFrameCount <<
         std::endl;
-    std::cout << "tiles processed (immediate): " << reinterpret_cast<MetricComposite *>(parent->composites[0])->
+    std::cout << "tiles processed (immediate): " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->
         debugTileCount1 << std::endl;
-    std::cout << "tiles processed (later): " << reinterpret_cast<MetricComposite *>(parent->composites[0])->
+    std::cout << "tiles processed (later): " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->
         debugTileCount2 << std::endl;
 
 

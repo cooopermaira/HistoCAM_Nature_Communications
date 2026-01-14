@@ -84,7 +84,7 @@ namespace pathCam {
 
   void ComponentMatchSearch::run() {
     auto matcher = DescriptorMatcher(parent->matcher_type);
-    std::vector<Match *> matches;
+    std::vector<std::shared_ptr<Match>> matches;
 
     // image->siftMutex.lock();
     // image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
@@ -105,7 +105,7 @@ namespace pathCam {
       Rect them(previous->regInfo->absoluteCoords - Point2i(200,200),previous->regInfo->absoluteCoords + Point2i(previous->width+200,previous->height+200));
       if ((me & them).empty()){continue;}
 
-      auto m = new Match(previous, image);
+      auto m = std::make_shared<Match>(previous, image);
       matcher.match(m);
 
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
@@ -114,24 +114,24 @@ namespace pathCam {
         image->matches.push_back(m);
         previous->matches.push_back(m);
         matches.push_back(m);
-      } else {
-        delete m;
       }
     }
 
     component->ftg->accessMutex.lock();
     for (auto &match: matches) {
       if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
-        auto theirComp = reinterpret_cast<MetricComposite *>
+        auto theirComp = std::dynamic_pointer_cast<std::shared_ptr<MetricComposite>>
             (parent->composites[match->image_1->regInfo->component_membership]);
-
-        if (component->componentMagLabel == theirComp->componentMagLabel) {
-          //these two components should actually be the same component. we will suspend one and join to the other
-          component->componentJoinMatches.push_back(match);
-          theirComp->componentJoinMatches.push_back(match);
-        } else {
-          delete match;
+        if (!theirComp) {
+          throw std::runtime_error("not a metric composite");
         }
+        // if (component->componentMagLabel == theirComp->componentMagLabel) {
+        //   //these two components should actually be the same component. we will suspend one and join to the other
+        //   component->componentJoinMatches.push_back(match);
+        //   theirComp->componentJoinMatches.push_back(match);
+        // } else {
+        //   delete match;
+        // }
       } else {
         component->ftg->store_match(match);
       }
@@ -164,7 +164,7 @@ namespace pathCam {
 
       if (!previous->is_good()) { continue; }
 
-      Match *m = new Match(previous, image);
+      auto m = std::make_shared<Match>(previous,image);
       matcher.match(m);
 
       int result = MotionEstimator::findHomography(m, parent->estimator_type, 10);
@@ -195,7 +195,6 @@ namespace pathCam {
           auto rj = new RegistrationRunnable(parent, tempReg);
           parent->JobQ->add_runnable(rj);
           successful = true;
-          delete m;
           break;
         // } else {
         //   parent->resize_mmatch_mutex.readLock();
@@ -209,7 +208,6 @@ namespace pathCam {
       //   parent->resize_mmatch_mutex.unlock();
       }
 
-      delete m;
     }
 
 

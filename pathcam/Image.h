@@ -45,7 +45,7 @@ namespace pathCam {
     bool subsequentMatchLaunched = false;
     bool fullKeyPoints = false;
 
-    std::vector<Match*> matches;
+    std::vector<std::shared_ptr<Match>> matches;
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
     cv::Mat descriptors;
 

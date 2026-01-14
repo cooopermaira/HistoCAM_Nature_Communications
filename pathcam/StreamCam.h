@@ -119,6 +119,7 @@ namespace pathCam {
 
     long cudaSiftTime = 0;
 
+    std::string inputFileOverride = "";
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
     std::string lastLabel;
@@ -173,7 +174,7 @@ namespace pathCam {
 
     //std::vector < double > variancesForDebug;
     //std::vector<CompositeVoronoi *> composites;
-    std::vector<Composite*> composites;
+    std::vector<std::shared_ptr<Composite>> composites;
     std::vector<bool> visited;
 
     std::queue<std::tuple<unsigned long, cv::Size, unsigned int> > newComponentQ;
@@ -280,6 +281,8 @@ namespace pathCam {
     bool get_scale_and_offset(unsigned int component_index, double &_scale, Point2f &_offset);
 
     std::shared_ptr<MRTiledImageSet> get_image_reference();
+
+    void set_input_file(const std::string &_path){inputFileOverride = _path;}
 
     void add_observer(DataObserver *new_observer) {
       observers.push_back(new_observer);

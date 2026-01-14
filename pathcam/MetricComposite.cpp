@@ -106,12 +106,6 @@ namespace pathCam {
     cudaFree(threeChnBuf);
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
-    for (int i = 0; i < ftg->storedMatches.size(); ++i) {
-      if (ftg->storedMatches[i]) {
-        delete ftg->storedMatches[i];
-      }
-      ftg->storedMatches.clear();
-    }
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
@@ -377,7 +371,7 @@ namespace pathCam {
         auto theirVertex = bai->optimizer->poseVertex(theirID);
 
         bool found = false;
-        Match* ourMatch;
+        std::shared_ptr<Match> ourMatch;
         Image* them;
         int multiplier;
         for (auto m : img->matches) {

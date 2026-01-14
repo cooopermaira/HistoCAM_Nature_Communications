@@ -104,7 +104,7 @@ public:
   std::shared_ptr<TileObj> image;
 
   
-  TileQuery(std::shared_ptr<TileObj> image, int i, int j, cv::Rect_<float> bounds) :
+  TileQuery(std::shared_ptr<TileObj> image, int i, int j, Rect_<float> bounds) :
       image(image), i(i), j(j), bounds(bounds) {
 
   };

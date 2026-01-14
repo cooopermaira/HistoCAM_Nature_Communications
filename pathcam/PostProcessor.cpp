@@ -60,8 +60,8 @@ namespace pathCam {
       for (auto mp: matchPairs) {
         if (mp.first->regInfo->component_membership == mp.second->regInfo->component_membership) {
           //match with orb features
-          Match m = Match(mp.first, mp.second);
-          matcher->match(&m);
+          auto m = std::make_shared<Match>(mp.first,mp.second);
+          matcher->match(m);
         }
         ++numMatchesProcessed;
         // Run matching in both directions

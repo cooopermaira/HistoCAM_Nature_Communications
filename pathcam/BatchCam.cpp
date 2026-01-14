@@ -722,9 +722,8 @@ namespace pathCam {
           continue;
         }
 
-        parent->matchM.match[last_index][i + 1] = new pathCam::Match(last_registered, next_image);
 
-        pathCam::Match *m = parent->matchM.match[last_index][i + 1];
+        auto m = std::make_shared<Match>(last_registered,next_image);
         matcher->match(m);
 
         int result = mot->findHomography(m, parent->estimator_type, 100);
@@ -745,7 +744,7 @@ namespace pathCam {
                                                 Poco::format("%f", elapsed.count() * 1e-9));
           }
           //parent->reg_results[i+1] = RegInfo(true, Vec2(m->t_x, m->t_y));
-          parent->matchM.match[i + 1][last_index] = new pathCam::Match(m);
+          //parent->matchM.match[i + 1][last_index] = new pathCam::Match(m);
           last_index = i + 1;
         }
         if (result == -1) {
@@ -753,7 +752,6 @@ namespace pathCam {
             parent->results_logger->information(outfile + "failed. Not enough matches.");
           }
           //parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
-          delete m;
           parent->matchM.match[last_index][i + 1] = NULL;
         }
         if (result == -2) {
@@ -761,7 +759,6 @@ namespace pathCam {
             parent->results_logger->information(outfile + "failed. Not enough keypoints.");
           }
           //parent->reg_results[i+1] = RegInfo(false, parent->reg_results[i].absoluteCoords);
-          delete m;
           parent->matchM.match[last_index][i + 1] = NULL;
         }
 

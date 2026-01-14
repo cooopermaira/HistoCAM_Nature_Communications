@@ -161,7 +161,7 @@ namespace pathCam {
 
 
 
-  int MotionEstimator::findHomography(Match *m, int estimator_type, int requiredGoodMatches,
+  int MotionEstimator::findHomography(std::shared_ptr<Match>m, int estimator_type, int requiredGoodMatches,
                                       double ransacReprojThreshold,
                                       int maxIters, double confidence) {
 
