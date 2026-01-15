@@ -57,7 +57,7 @@ namespace pathCam {
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
     bool xcMatchShouldContinue = true;
-    std::vector<Match*> componentJoinMatches;
+    std::vector<std::shared_ptr<Match>> componentJoinMatches;
 
 
     std::shared_ptr<MRTiledImage> imagePyramid;

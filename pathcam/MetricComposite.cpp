@@ -272,6 +272,11 @@ namespace pathCam {
     for (int ii = 0; ii < extraMatches.size(); ++ii) {
       auto [img1,img2,kp1,kp2] = extraMatches[ii];
       ig->addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
+      for (auto m : matches) {
+        if (img1->index == m->image_1->index || img1->index == m->image_2->index || img2->index == m->image_1->index  || img2->index == m->image_2->index) {
+          std::cout<< img1->index<<" "<<img2->index << m->image_1->index<<" "<<m->image_2->index<<std::endl;
+        }
+      }
     }
 
     for (auto img: members) {
@@ -279,7 +284,10 @@ namespace pathCam {
     }
 
     auto graphConnectivityResult = ig->computeMinPromotionsToConnectMembersPreferORB();
-    if (!graphConnectivityResult.success){return;}
+    // if (!graphConnectivityResult.success) {
+    //   std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
+    //   return;
+    // }
 
     if (!graphConnectivityResult.promoted_nodes.empty()) {
       std::cout << "Component " << componentIndex << " promoting additional " << graphConnectivityResult.promoted_nodes.size() <<
@@ -293,11 +301,10 @@ namespace pathCam {
 
 
     for (auto m: matches) {
-
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-        // members.insert(m->image_1);
-        // members.insert(m->image_2);
-
+        //debug int k = 0;
+        ++m->image_1->matchCount;
+        ++m->image_2->matchCount;
         for (int i = 0; i < m->good_matches.size(); ++i) {
           if (m->inliers[i]) {
             ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
@@ -305,6 +312,14 @@ namespace pathCam {
         }
       }
     }
+    if (!graphConnectivityResult.success) {
+      std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
+      for (auto img : members) {
+        std::cout<<img->index<<" "<<img->matchCount<<std::endl;
+      }
+      return;
+    }
+
     for (auto &img: members) {
       img->keypointsImageSpace.resize(img->keypoints.size());
       for (int i = 0; i < img->keypoints.size(); ++i) {
@@ -339,7 +354,7 @@ namespace pathCam {
     std::vector memberImages(members.begin(), members.end());
 
     auto tracks = ftg->generateCurrentTracks(memberImages);
-    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks,memberImages, 2 * memberImages.size() + 100);
+    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks,memberImages, 2 * memberImages.size() + 200);
 
     rebuild(memberImages);
 

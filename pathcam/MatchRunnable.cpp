@@ -82,6 +82,7 @@ namespace pathCam {
     return buffer;
   }
 
+
   void ComponentMatchSearch::run() {
     auto matcher = DescriptorMatcher(parent->matcher_type);
     std::vector<std::shared_ptr<Match>> matches;
@@ -97,9 +98,10 @@ namespace pathCam {
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
 
+
       if (previous == nullptr) {continue;}
       if (!previous->is_good()) {continue;}
-      if (image->label != Image::_UNKNOWN && previous->label != Image::_UNKNOWN && image->label != previous->label){continue;}
+      if (image->label != Image::_NOLABEL && previous->label != Image::_NOLABEL && image->label != previous->label){continue;}
 
       Rect me(image->regInfo->absoluteCoords - Point2i(200,200),image->regInfo->absoluteCoords + Point2i(image->width+200,image->height+200));
       Rect them(previous->regInfo->absoluteCoords - Point2i(200,200),previous->regInfo->absoluteCoords + Point2i(previous->width+200,previous->height+200));
@@ -120,18 +122,16 @@ namespace pathCam {
     component->ftg->accessMutex.lock();
     for (auto &match: matches) {
       if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
-        auto theirComp = std::dynamic_pointer_cast<std::shared_ptr<MetricComposite>>
+        auto theirComp = std::dynamic_pointer_cast<MetricComposite>
             (parent->composites[match->image_1->regInfo->component_membership]);
         if (!theirComp) {
           throw std::runtime_error("not a metric composite");
         }
-        // if (component->componentMagLabel == theirComp->componentMagLabel) {
-        //   //these two components should actually be the same component. we will suspend one and join to the other
-        //   component->componentJoinMatches.push_back(match);
-        //   theirComp->componentJoinMatches.push_back(match);
-        // } else {
-        //   delete match;
-        // }
+        if (component->componentMagLabel == theirComp->componentMagLabel || component->componentMagLabel == Image::_NOLABEL || theirComp->componentMagLabel == Image::_NOLABEL) {
+          //these two components should actually be the same component. we will suspend one and join to the other
+          component->componentJoinMatches.push_back(match);
+          theirComp->componentJoinMatches.push_back(match);
+        }
       } else {
         component->ftg->store_match(match);
       }

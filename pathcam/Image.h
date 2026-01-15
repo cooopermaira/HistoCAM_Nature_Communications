@@ -19,6 +19,9 @@ namespace pathCam {
     double blurTime = 0;
     int loadCount = 0;
 
+    //debug
+    int matchCount = 0;
+
     int width, height;
     int scope_radius;
     std::atomic<unsigned int> reference_count;

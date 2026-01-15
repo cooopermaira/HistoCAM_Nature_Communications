@@ -154,8 +154,6 @@ namespace pathCam {
         std::cout<<img->index<<std::endl;
       }
     }
-    parent->compositing = false;
-    return;
 
     auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
     std::cout << "total align time " << tAlignEnd << std::endl;
