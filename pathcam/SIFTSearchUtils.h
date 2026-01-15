@@ -12,9 +12,9 @@ namespace pathCam {
     int image_id;
     int feature_id; // feature index within that image
     double x, y; // pixel coordinates
-    const Image* imgRef;
+    const Image *imgRef;
 
-    FeatureObservation(int img_id, int feat_id, double x_coord, double y_coord,const Image* _imgRef)
+    FeatureObservation(int img_id, int feat_id, double x_coord, double y_coord, const Image *_imgRef)
       : image_id(img_id), feature_id(feat_id), x(x_coord), y(y_coord), imgRef(_imgRef) {
     }
   };
@@ -139,8 +139,6 @@ namespace pathCam {
     std::vector<ImageFeaturePair> index_to_feature;
     std::unique_ptr<UnionFind> uf_ptr;
 
-
-
   public:
     std::vector<FeatureTrack> generateTracks(const std::vector<Image *> &images,
                                              const std::vector<pMatch> &all_matches);
@@ -152,15 +150,15 @@ namespace pathCam {
     }
 
 
-    void process_match(long _srcImgIdx, long _dstImgIdx, const DMatch& _match);
+    void process_match(long _srcImgIdx, long _dstImgIdx, const DMatch &_match);
 
-    void store_match(std::shared_ptr<Match> _match){storedMatches.push_back(_match);}
+    void store_match(std::shared_ptr<Match> _match) { storedMatches.push_back(_match); }
 
-    std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image*>& images);
+    std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image *> &images);
 
     Poco::FastMutex accessMutex;
 
-    std::vector<std::shared_ptr<Match>> storedMatches;
+    std::vector<std::shared_ptr<Match> > storedMatches;
 
   private:
     int getOrCreateFeatureIndex(const ImageFeaturePair &_pair);
@@ -174,7 +172,7 @@ namespace pathCam {
 
   class BundleAdjustmentIntegrator {
   public:
-    BundleAdjustmentIntegrator(){
+    BundleAdjustmentIntegrator() {
       optimizer = cuba::CudaBundleAdjustment::create();
     };
 
@@ -182,6 +180,15 @@ namespace pathCam {
 
 
     void run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images);
+
+    static void run_coopers_planar_bundle_adjustment(const std::vector<FeatureTrack> &_tracks,
+                                                     const std::vector<Image *> &_images);
+
+    static void run_coopers_planar_ba_edge_list(
+      const std::vector<FeatureTrack> &tracks,
+      std::vector<Image *> &images,
+      int maxIters = 2000,
+      double tolRel = 1e-8);
 
 
     // Store vertex pointers to maintain ownership

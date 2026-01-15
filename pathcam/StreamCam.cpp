@@ -13,15 +13,11 @@ namespace pathCam {
 
 
   StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config),
-                                                           cm(new CompositeManager(this)),
-                                                           qm(new QManager(this)),
-                                                           dr(new DiskReader(this)),
                                                            //ppm(new PostProcessManager(this)),
                                                            //sfm(new SiftFeatureMatcher(this)),
                                                            //ftg(new FeatureTrackGenerator),
                                                            inferenceWait(true),
-                                                           compositeWait(true),
-                                                           microscopeInput(true) {
+                                                           compositeWait(true){
     //inferencing = false;
     if (inferencing) {
       im = new InferenceManager(this);
@@ -41,7 +37,7 @@ namespace pathCam {
     //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
     // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
 
-    //load_blur_engine();
+    load_blur_engine();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);

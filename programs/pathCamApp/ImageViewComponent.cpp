@@ -395,6 +395,9 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
 
       if (N == 0){return true;}
       int mode = wrapMod(MRImageSetSelector + 1, N + 1);
+      if (mode == 0 && !parent->sCam->MRImageSet) {
+        mode = wrapMod(mode + 1, N + 1);
+      }
       MRImageSetSelector = mode;
       adjust_MRImageSet(mode);
     }
@@ -411,6 +414,9 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
 
       if (N == 0){return true;}
       int mode = wrapMod(MRImageSetSelector - 1, N + 1);
+      if (mode == 0 && !parent->sCam->MRImageSet) {
+        mode = wrapMod(mode - 1, N + 1);
+      }
       MRImageSetSelector = mode;
       adjust_MRImageSet(mode);
     }

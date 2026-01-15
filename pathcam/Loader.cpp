@@ -43,8 +43,8 @@ namespace pathCam {
 
 
     if (!image->is_mostly_black()) {
-      //image->check_blur_async(); //this is computationally very expensive even for small windows
-      image->motionBlur = 0.5;
+      image->check_blur_async(); //this is computationally very expensive even for small windows
+      // image->motionBlur = 0.5;
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);

@@ -138,7 +138,7 @@ namespace pathCam {
         auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
         std::cout << "wait time " << t2 << std::endl;
 
-        // mc->align_and_rebuild();
+        mc->align_and_rebuild();
       });
 
     }

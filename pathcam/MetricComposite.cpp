@@ -293,9 +293,7 @@ namespace pathCam {
 
 
     for (auto m: matches) {
-      if (m->image_1->index == 197 || m->image_2->index == 196) {
-        int k = 0;
-      }
+
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
         // members.insert(m->image_1);
         // members.insert(m->image_2);
@@ -339,74 +337,14 @@ namespace pathCam {
 
     //GENERATE TRACKS AND RUN
     std::vector memberImages(members.begin(), members.end());
+
     auto tracks = ftg->generateCurrentTracks(memberImages);
-    bai->run_bundle_adjustment(tracks, memberImages);
-    // for (auto &[id,pv]: bai->poseVertices) {
-    //   std::cout << id << " " << pv->edges.size() << std::endl;
-    // }
+    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks,memberImages, 2 * memberImages.size() + 100);
 
-    //decide if youre going to accept the bundle adjustment answer, at least in part.
-    auto start1 = std::chrono::high_resolution_clock::now();
-
-    auto rootID = root->index;
-    std::unordered_map<ImageGraph::ImgId, ImageGraph::ImgId> parentGraph;
-    bool ok = ig->computePreferredParentsToRootAfterPromotions(rootID, parentGraph);
-    //ok will always be true if we've gotten this far in the function
-
-    std::unordered_map<ImageGraph::ImgId,int> idDistanceToRoot;
-    idDistanceToRoot.reserve(memberImages.size() * 2);
-    std::sort(memberImages.begin(), memberImages.end(),
-    [&](Image* a, Image* b) {
-        int da = ImageGraph::hopDistanceToRoot(a->index, rootID, parentGraph, idDistanceToRoot);
-        int db = ImageGraph::hopDistanceToRoot(b->index, rootID, parentGraph, idDistanceToRoot);
-
-        if (da != db) return da < db;
-        return a->index < b->index; // tie-breaker: lower id first (or keep stable_sort if you prefer)
-    });
-
-    for (auto img: memberImages) {
-      if (!img->regInfo->stayFixedDuringBundleAdjustment) {
-        auto myVertex = bai->optimizer->poseVertex(img->index);
-        auto theirID = parentGraph[img->index];
-        auto theirVertex = bai->optimizer->poseVertex(theirID);
-
-        bool found = false;
-        std::shared_ptr<Match> ourMatch;
-        Image* them;
-        int multiplier;
-        for (auto m : img->matches) {
-          if (m->image_1->index == theirID || m->image_2->index == theirID) {
-            them = m->image_1->index == theirID ? m->image_1 : m->image_2;
-            multiplier = m->image_1->index == theirID ? -1 : 1;
-            ourMatch = m;
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          throw std::runtime_error("failed to find match while testing BA solution");
-        }
-
-        Point2i ourDistance(multiplier * ourMatch->t_x,multiplier * ourMatch->t_y);
-        Point2i myCoords(-myVertex->t[0], -myVertex->t[1]);
-        Point2i theirCoords(-theirVertex->t[0], -theirVertex->t[1]);
-        auto vDist = myCoords - theirCoords;
-
-        Point2i acceptedDistance = vDist;
-        if ((ourDistance.x - vDist.x) * (ourDistance.x - vDist.x) + (ourDistance.y - vDist.y) * (ourDistance.y - vDist.y) > 900) {
-          acceptedDistance = ourDistance;
-        }
-
-        img->regInfo->absoluteCoords = them->regInfo->absoluteCoords + acceptedDistance;
-      }
-    }
-    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
-           (std::chrono::high_resolution_clock::now() - start1).count();
     rebuild(memberImages);
 
-
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start).count();
+    (std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
