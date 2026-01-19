@@ -17,6 +17,8 @@ namespace pathCam {
   }
 
   void StreamCam::clean_up_blur_engine() const {
+    cudaDeviceSynchronize();
+    delete blurCtx;
     delete blurEngine;
     cudaStreamDestroy(blurStream);
     cudaFree(blurInputs);

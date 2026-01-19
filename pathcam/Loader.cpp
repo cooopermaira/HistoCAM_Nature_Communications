@@ -43,8 +43,8 @@ namespace pathCam {
 
 
     if (!image->is_mostly_black()) {
-      image->check_blur_async(); //this is computationally very expensive even for small windows
-      // image->motionBlur = 0.5;
+      // image->check_blur_async(); //this is computationally very expensive even for small windows
+      image->motionBlur = 0.5;
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
@@ -92,9 +92,10 @@ namespace pathCam {
       ++parent->matchableCount;
       parent->JobQ->add_runnable(matchjob);
       successful = true;
+
+      parent->increment_match_counter(true,image_index);
     } else {
       //std::cout<<"Too Black: "+std::to_string(image_index)<<std::endl;
-
       parent->mark_neighbors_as_underexposed(image_index);
       image->free_memory_RAW();
     }

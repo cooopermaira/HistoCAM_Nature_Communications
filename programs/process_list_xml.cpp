@@ -29,7 +29,7 @@ protected:
 
   void initialize(Application& self){
     Application::initialize(self);
-    if(!_helpRequested){ bcam = new StreamCam(configPtr()); }
+    // if(!_helpRequested){ bcam = new StreamCam(configPtr()); }
   }
   
   void uninitialize(){
@@ -82,7 +82,14 @@ protected:
   int main(const ArgVec& args){
     if (!_helpRequested)
     {
-      if(!bcam->run()){ return Application::EXIT_SOFTWARE; }
+      int i = 0;
+      while (true) {
+        bcam = new StreamCam(configPtr());
+        bcam->run();
+        delete bcam;
+        std::cout<<i++<<std::endl;
+      }
+      // if(!bcam->run()){ return Application::EXIT_SOFTWARE; }
     }
     return Application::EXIT_OK;
   }

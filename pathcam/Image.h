@@ -19,8 +19,14 @@ namespace pathCam {
     double blurTime = 0;
     int loadCount = 0;
 
-    //debug
+    // v DEBUG v
     int matchCount = 0;
+    bool decrementedMatchRunnable = false;
+    bool matcherWasCreatedByLoader = false;
+    bool matcherJobStarted = false;
+    std::vector<long> matchRunnableWasCancledBy;
+    int pathflag = 0;
+    // ^ DEBUG ^
 
     int width, height;
     int scope_radius;
@@ -93,7 +99,7 @@ namespace pathCam {
     }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    void prepare_blur_check_statics();
+    void prepare_blur_check_statics() const;
     static void cleanup_blur_check_statics();
     bool move_buffer_to_gpu(int _device, bool _freeHostBuffer = false);
 #endif
@@ -196,7 +202,7 @@ namespace pathCam {
     MemoryPool *mempool;
 
     //already protected by mutex in calling function
-    inline void allocate_memory_RAW();
+    void allocate_memory_RAW();
 
 
     char *raw_buffer;

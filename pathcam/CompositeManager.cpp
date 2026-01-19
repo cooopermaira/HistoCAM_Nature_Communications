@@ -12,7 +12,7 @@
 using namespace cv;
 using namespace cv::detail;
 
-int lastMC = 0,countDown = 100;
+int lastMC = 0, countDown = 100;
 bool hasBeenNonZero = false;
 
 
@@ -31,7 +31,7 @@ namespace pathCam {
 
     rebuildJobsOutstanding = 0;
 
-    std::cout<<"composite manager beginning"<<std::endl;
+    std::cout << "composite manager beginning" << std::endl;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
       debug_termination_check();
@@ -102,7 +102,6 @@ namespace pathCam {
     std::cout << "composite loop time: " + std::to_string(duration) << std::endl;
 
 
-
     //process delayed frames
     std::vector<std::thread> threads;
     for (auto &comp: parent->composites) {
@@ -133,14 +132,14 @@ namespace pathCam {
       threads.emplace_back([mc]() {
         auto t1 = std::chrono::high_resolution_clock::now();
         while (mc->outstandingCMS_jobs > 0) {
-          Poco::Thread::sleep(50);
+          Poco::Thread::sleep(1000);
         }
-        auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
+        auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).
+            count();
         std::cout << "wait time " << t2 << std::endl;
 
-        mc->align_and_rebuild();
+        // mc->align_and_rebuild();
       });
-
     }
     for (auto &t: threads) {
       t.join();
@@ -148,14 +147,15 @@ namespace pathCam {
     parent->notify_observers();
 
 
-    for (auto img : parent->images) {
-      if (!img){continue;}
+    for (auto img: parent->images) {
+      if (!img) { continue; }
       if (img->get_Raw() || img->get_raw_cuda()) {
-        std::cout<<img->index<<std::endl;
+        std::cout << img->index << std::endl;
       }
     }
 
-    auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
+    auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - tAlign).count();
     std::cout << "total align time " << tAlignEnd << std::endl;
     //
     // tAlign = std::chrono::high_resolution_clock::now();
@@ -168,7 +168,8 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
-    std::cout << "debug frame count: " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->debugFrameCount <<
+    std::cout << "debug frame count: " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->
+        debugFrameCount <<
         std::endl;
     std::cout << "tiles processed (immediate): " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->
         debugTileCount1 << std::endl;
@@ -241,14 +242,21 @@ namespace pathCam {
     if (parent->matchableCount > 0) {
       hasBeenNonZero = true;
     }
+    if (!hasBeenNonZero) { return; }
 
-    if (!hasBeenNonZero){return;}
-    if (parent->matchableCount == lastMC) {
+    if (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 || parent->matchableCount == 0
+      || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
+      return;
+    }
+
+    if (parent->matchableCount == lastMC) {//matchableCount has changed in how long now??
       --countDown;
       if (countDown > 0) {
         return;
       }
-    }else {
+      countDown = 100;
+
+    } else {//ok, matchableCount changed so things are still going on
       lastMC = parent->matchableCount;
       countDown = 100;
       return;
@@ -276,16 +284,25 @@ namespace pathCam {
         canceledJobs.push_back(job);
       }
     }
+    for (int i = 0; i < parent->maxIndex; ++i) {
+      if (parent->matchablesIncremented[i] != 1) {
+        std::cout<<i<<" incremented "<<parent->matchablesIncremented[i]<<" times"<<std::endl;
+      }
+      if (parent->matchablesDecremented[i] != 1) {
+        std::cout<<i<<" decremented "<<parent->matchablesDecremented[i]<<" times"<<std::endl;
+      }
+    }
+    //parent->compositing = false;
     int k = 0;
   }
 
 
   void CompositeManager::stage(RegInfo *_regInfo) const {
-    _regInfo->accessMutex->lock();
+    _regInfo->accessMutex.lock();
     assert(_regInfo->inCompositeQ);
     _regInfo->inCompositeQ = false;
     _regInfo->image->label = parent->composites[_regInfo->component_membership]->componentMagLabel;
     parent->composites[_regInfo->component_membership]->stage(_regInfo);
-    _regInfo->accessMutex->unlock();
+    _regInfo->accessMutex.unlock();
   }
 }

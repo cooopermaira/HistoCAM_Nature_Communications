@@ -51,6 +51,7 @@ namespace pathCam {
     Poco::Event jobComplete;
     bool someoneWaitingOnJobCompleteEvent;
     bool unprocessed;
+    bool referenced = false;
     long sort_order;
     long image_index;
     std::atomic<int> precedingJobCount;
@@ -315,9 +316,11 @@ namespace pathCam {
   class MatchRunnable : public RunnableIntermediate {
   public:
     StreamCam *parent;
-    unsigned long image_idx;
+    long image_idx;
 
-    MatchRunnable(StreamCam *parent, unsigned long image_idx) : RunnableIntermediate(image_idx, 2),
+    bool launched = false;
+
+    MatchRunnable(StreamCam *parent, long image_idx) : RunnableIntermediate(image_idx, 2),
                                                                                parent(parent),
                                                                                image_idx(image_idx) {};
 

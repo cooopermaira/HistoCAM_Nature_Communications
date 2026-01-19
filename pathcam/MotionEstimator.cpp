@@ -23,18 +23,18 @@ namespace pathCam {
   }
 
   bool RegInfo::get_abc(pathCam::RegInfo *caller, Point2i &_absoluteCoords, unsigned int &_componentMembership) {
-    accessMutex->lock();
+    accessMutex.lock();
 
     if (resolved) {
       children.push_back(caller);
       _absoluteCoords = absoluteCoords;
       _componentMembership = component_membership;
-      accessMutex->unlock();
+      accessMutex.unlock();
       return true;
     }
 
     callersWaiting.push_back(caller);
-    accessMutex->unlock();
+    accessMutex.unlock();
     return false;
   }
 
@@ -42,12 +42,12 @@ namespace pathCam {
 
     _absoluteCoords.x = std::round(_absoluteCoords.x);
     _absoluteCoords.y = std::round(_absoluteCoords.y);
-    accessMutex->lock();
+    accessMutex.lock();
     absoluteCoords = _absoluteCoords;
     component_membership = _componentMembership;
     resolved = true;
     waitOnResolve.set();
-    accessMutex->unlock();
+    accessMutex.unlock();
 
     auto image = parent->get_image_ref(index);
     image->regInfo = this;
@@ -120,7 +120,7 @@ namespace pathCam {
 
   Point2f RegInfo::get_AbC_relative_from_local(unsigned int _relativeComponentSpace) {
     /*returns images coordinates in requested component space*/
-    accessMutex->lock();
+    accessMutex.lock();
     auto imP = parent->composites[component_membership]->imagePyramid;
     assert(imP->scale != 0);
 
@@ -131,7 +131,7 @@ namespace pathCam {
     //convert absolute coordinates to base (first component) space
     auto resInBaseSpace = imP->scale * ( Point2f(absoluteCoords.x, absoluteCoords.y) + imP->offset);
 
-    accessMutex->unlock();
+    accessMutex.unlock();
     //convert to requested component space
     return  resInBaseSpace / imP_R->scale - imP_R->offset;
   }
@@ -140,7 +140,7 @@ namespace pathCam {
     /*sets absolute coordinates of image in its own component space given absolute coordinates in another component's
      * space
      */
-    accessMutex->lock();
+    accessMutex.lock();
     auto imP = parent->composites[component_membership]->imagePyramid;
     assert(imP->scale != 0);
 
@@ -156,7 +156,7 @@ namespace pathCam {
 
     absoluteCoords.x = resInMySpace.x;
     absoluteCoords.y = resInMySpace.y;
-    accessMutex->unlock();
+    accessMutex.unlock();
   }
 
 

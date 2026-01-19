@@ -130,9 +130,9 @@ namespace pathCam {
     if (affectedTiles.size() < 100 && !forceFullImage) {
       bool ans = false;
 
-      img->regInfo->accessMutex->lock();
+      img->regInfo->accessMutex.lock();
       auto AbC = img->regInfo->absoluteCoords;
-      img->regInfo->accessMutex->unlock();
+      img->regInfo->accessMutex.unlock();
 
       Rect imageBoxCompSpace(AbC, imageSize);
       img->buffer_mutex.lock();

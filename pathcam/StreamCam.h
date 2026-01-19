@@ -97,6 +97,9 @@ namespace pathCam {
 
 
   public:
+
+    // v DEBUG v
+    std::vector<int> matchablesIncremented,matchablesDecremented;
     StreamCam(Poco::Util::LayeredConfiguration::Ptr config);
 
     ~StreamCam();
@@ -169,7 +172,8 @@ namespace pathCam {
     PostProcessManager* ppm;
     SiftFeatureMatcher* sfm;
     AccessSAM *as;
-    JobQueue *JobQ,*jqSecondary;
+    std::shared_ptr<JobQueue>JobQ;
+    std::shared_ptr<JobQueue>jqSecondary;
     FeatureTrackGenerator *ftg;
 
     //std::vector < double > variancesForDebug;
@@ -214,6 +218,9 @@ namespace pathCam {
     std::queue<Image*> blurMeticQ;
     std::vector<Image*> blurImagesInProcess;
     int frames = 0, iters = 0;
+
+    // v DEBUG v
+    void increment_match_counter(bool trueForUpFalserDown,long imgIdx);
 
     bool run() override;
 
@@ -298,7 +305,7 @@ namespace pathCam {
 
     unsigned int increment_and_get_components() { return components++; }
 
-    void add_image(Image *image, unsigned long index);
+    void add_image(Image *image, long index);
 
     void add_registration(RegInfo* regInfo);
 

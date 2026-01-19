@@ -141,6 +141,7 @@ namespace pathCam {
   }
 
   void MatchRunnable::run() {
+    launched = true;
     Image *image = parent->get_image_ref(image_idx);
 
 
@@ -155,7 +156,7 @@ namespace pathCam {
 
     auto tempReg = parent->get_reg_ref(image_idx);
 
-    for (long int prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
+    for (long prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
 
       if (previous == nullptr) {
@@ -182,13 +183,13 @@ namespace pathCam {
 
           //this should all be in the damn constructor
 
-          tempReg->accessMutex->lock();
+          tempReg->accessMutex.lock();
           tempReg->index = image_idx;
           tempReg->root = false;
           tempReg->matchedTo = prev_idx;
           tempReg->relativeCoords.x = -1 * m->t_x;
           tempReg->relativeCoords.y = -1 * m->t_y;
-          tempReg->accessMutex->unlock();
+          tempReg->accessMutex.unlock();
           tempReg->image = image;
 
           parent->regCount++;
@@ -196,18 +197,8 @@ namespace pathCam {
           parent->JobQ->add_runnable(rj);
           successful = true;
           break;
-        // } else {
-        //   parent->resize_mmatch_mutex.readLock();
-        //   parent->matchM.match[prev_idx][image_idx] = nullptr;
-        //   parent->resize_mmatch_mutex.unlock();
         }
-      // } else {
-      //   // if(result == -1 || result == -2){
-      //   parent->resize_mmatch_mutex.readLock();
-      //   parent->matchM.match[prev_idx][image_idx] = nullptr;
-      //   parent->resize_mmatch_mutex.unlock();
       }
-
     }
 
 
@@ -216,8 +207,8 @@ namespace pathCam {
       std::cout << "component " << component_index << " spawning from frame " << image_index << " (" <<
           image->image_file.getBaseName()<<")" << std::endl;
     }
-    //parent->RegistrationConsecQ.add_index(image_idx);
 
+    parent->increment_match_counter(false,image_index);
     --parent->matchableCount;
     jobComplete.set();
     successful = true;

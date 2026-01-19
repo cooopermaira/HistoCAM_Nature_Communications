@@ -33,6 +33,7 @@ namespace pathCam {
                                                               loopMutex(new Poco::FastMutex),
                                                               loopInProcess(false),
                                                               matchWorkOutstanding(0) {
+    int k = 0;
   };
 
   void SiftFeatureMatcher::init() {

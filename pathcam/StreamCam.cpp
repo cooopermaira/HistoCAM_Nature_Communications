@@ -13,11 +13,12 @@ namespace pathCam {
 
 
   StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config),
+                                                           MRImageSet(std::make_shared<MRTiledImageSet>()),
                                                            //ppm(new PostProcessManager(this)),
                                                            //sfm(new SiftFeatureMatcher(this)),
                                                            //ftg(new FeatureTrackGenerator),
                                                            inferenceWait(true),
-                                                           compositeWait(true){
+                                                           compositeWait(true) {
     //inferencing = false;
     if (inferencing) {
       im = new InferenceManager(this);
@@ -37,7 +38,7 @@ namespace pathCam {
     //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
     // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
 
-    load_blur_engine();
+    // load_blur_engine();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
@@ -47,9 +48,9 @@ namespace pathCam {
     // cudaSetDevice(compositorCudaDevice);
 #endif
 
-    JobQ = new JobQueue(threads, threads, windowWidth);
+    JobQ = std::make_shared<JobQueue>(threads, threads, windowWidth);
     JobQ->parent = this;
-    jqSecondary = new JobQueue(6, 6, 0);
+    jqSecondary = std::make_shared<JobQueue>(6, 6, 0);
 
 
     //lastFrame = Rect(0,0,image_width,image_height);
@@ -65,7 +66,6 @@ namespace pathCam {
     auto qm1 = QManager(this);
     auto cm1 = CompositeManager(this);
 
-    microscopeInput = true;
     compositing = true;
 
     disk_thread.start(dr1);
@@ -86,7 +86,7 @@ namespace pathCam {
       inference_thread.join();
     }
 
-    cleanup_and_reset();
+    // cleanup_and_reset();
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -413,9 +413,7 @@ namespace pathCam {
       img->mark_too_dark();
     }
 
-    JobQ->queue_mutex->lock();
     JobQ->update_job_readiness(2, _index);
-    JobQ->queue_mutex->unlock();
   }
 
   void StreamCam::set_flatfield(int label, const cuda::GpuMat &ffGpu) {
@@ -487,26 +485,50 @@ namespace pathCam {
   }
 
 
-  void StreamCam::add_image(Image *image, unsigned long index) {
-    image_mutex.writeLock();
-    reg_results_mutex.writeLock();
-    unsigned long size = images.size();
-    if (index >= size) {
-      images.resize(index + 100);
+  void StreamCam::add_image(Image *image, long index) {
+    if (index >= images.size()) {
+      image_mutex.writeLock();
+      reg_results_mutex.writeLock();
 
+      images.resize(index + 100);
       reg_results.resize(index + 100);
 
-      // resize_mmatch_mutex.writeLock();
-      // matchM.resize(index + 100);
-      // resize_mmatch_mutex.unlock();
+      reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
+      reg_results_mutex.unlock();
+
+      images[index] = image;
+      ++maxIndex;
+      image_mutex.unlock();
+    }else {
+      reg_results_mutex.readLock();
+      reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
+      reg_results_mutex.unlock();
+
+      image_mutex.readLock();
+      images[index] = image;
+      ++maxIndex;
+      image_mutex.unlock();
     }
-
-    reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
-    reg_results_mutex.unlock();
-
-    images[index] = image;
-    ++maxIndex;
-    image_mutex.unlock();
+    //
+    // image_mutex.writeLock();
+    // reg_results_mutex.writeLock();
+    // long size = images.size();
+    // if (index >= size) {
+    //   images.resize(index + 100);
+    //
+    //   reg_results.resize(index + 100);
+    //
+    //   // resize_mmatch_mutex.writeLock();
+    //   // matchM.resize(index + 100);
+    //   // resize_mmatch_mutex.unlock();
+    // }
+    //
+    // reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
+    // reg_results_mutex.unlock();
+    //
+    // images[index] = image;
+    // ++maxIndex;
+    // image_mutex.unlock();
   }
 
   void StreamCam::add_registration(pathCam::RegInfo *regInfo) {
@@ -582,6 +604,19 @@ namespace pathCam {
     return component_index;
   }
 
+  void StreamCam::increment_match_counter(bool trueForUpFalserDown,long imgIdx) {
+    resize_mmatch_mutex.writeLock();
+    if (imgIdx + 50 >= matchablesIncremented.size() ) {
+      matchablesIncremented.resize(imgIdx + 1000);
+      matchablesDecremented.resize(imgIdx + 1000);
+    }
+    if (trueForUpFalserDown) {
+      ++matchablesIncremented[imgIdx];
+    }else {
+      ++matchablesDecremented[imgIdx];
+    }
+    resize_mmatch_mutex.unlock();
+  }
 
   void StreamCam::add_new_component(unsigned long image_index, Size image_size, unsigned int component_index) {
     auto ri = reg_results[image_index];
@@ -795,13 +830,13 @@ namespace pathCam {
      * Q, the membership has already been corrected by this point so just do nothing, the problem is solved
      * before it was noticed.
      */
-    _regInfo->accessMutex->lock();
+    _regInfo->accessMutex.lock();
     if (_regInfo->inCompositeQ) {
-      _regInfo->accessMutex->unlock();
+      _regInfo->accessMutex.unlock();
       return;
     }
     _regInfo->inCompositeQ = true;
-    _regInfo->accessMutex->unlock();
+    _regInfo->accessMutex.unlock();
 
     compositeQ_mutex.lock();
     compositeBatch.push({_regInfo});
@@ -905,9 +940,10 @@ namespace pathCam {
   }
 
   StreamCam::~StreamCam() {
-    clean_up_blur_engine();
+    // clean_up_blur_engine();
+    // Image::cleanup_blur_check_statics();
 
-    delete jqSecondary;
-    delete JobQ;
+    previousSlides.clear();
+
   }
 }

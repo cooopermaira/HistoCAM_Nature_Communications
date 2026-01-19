@@ -37,27 +37,20 @@ namespace pathCam {
     static std::once_flag cleanup_flag;
 
     std::call_once(cleanup_flag, [] {
-        // Explicitly release GPU memory
-        if (!blurMask.empty())
-          blurMask.release();
 
       if (!hannWindow.empty())
         hannWindow.release();
 
     g_gauss.release();  // cv::Ptr reset
 
-    // Optional but useful during debugging
     cudaDeviceSynchronize();
 });
   }
 
 
-  void Image::prepare_blur_check_statics() {
+  void Image::prepare_blur_check_statics() const {
     static std::once_flag flag;
     std::call_once(flag, [&] {
-      Mat m1(blurPatch, blurPatch,CV_8UC1, Scalar(255));
-      circle(m1, Point(blurPatch / 2, blurPatch / 2), 70, Scalar(0), -1);
-      blurMask.upload(m1);
 
       Mat temp(blurPatch, blurPatch,CV_8U, Scalar(0));
 
@@ -105,7 +98,6 @@ namespace pathCam {
     // if (regInfo) {
     //   delete regInfo;
     // }
-    cleanup_blur_check_statics();
   }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
@@ -189,7 +181,7 @@ namespace pathCam {
 
 
   void Image::check_blur_async(const Mat &img, bool submitForInference) {
-    auto start = std::chrono::high_resolution_clock::now();
+     auto start = std::chrono::high_resolution_clock::now();
     Mat grayHost;
     if (!img.empty()) {
       assert(img.rows == blurPatch && img.cols == blurPatch && img.channels() == 1);

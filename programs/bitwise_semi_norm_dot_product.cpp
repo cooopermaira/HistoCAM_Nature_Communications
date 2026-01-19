@@ -3,12 +3,12 @@
 //
 // #include "Poco/DirectoryIterator.h"
 #include <regex>
-// #include <fstream>
-// #include <cstdio>
-// #include <string>
-// #include <opencv2/core/cuda.hpp>
-// #include <opencv2/opencv.hpp>
-#include "pathCam.h"
+#include <fstream>
+#include <cstdio>
+#include <string>
+#include <opencv2/core/cuda.hpp>
+#include <opencv2/opencv.hpp>
+//#include "pathCam.h"
 using namespace cv;
 enum BayerPattern { RGGB, BGGR, GBRG, GRBG };
 
@@ -109,51 +109,51 @@ int main(int argc, char *argv[]) {
     projectKernelNonnegSum1(kernelsBGR[i]);
   }
 
-  int ksize = kernelsBGR[0].rows;
-  pathCam::Image image(6464 - ksize + 1,4852- ksize + 1,2040);
-  image.set_disk_file("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel.Raw");
-  Rect sharpRect((sharpRaw.cols - patchSize) / 2, (sharpRaw.rows - patchSize) / 2,patchSize,patchSize);
-  Rect blurRect((image.width - patchSize) / 2, (image.height - patchSize) / 2, patchSize,patchSize);
-
-  auto img = convolveBayerWithKernels_BGGR(sharpRaw,kernelsBGR);
-
-   auto alphas = computePerChannelScale_BGGR(img(blurRect),sharpRaw(sharpRect));
-  for (int i = 0; i < kernelsBGR.size(); ++i) {
-    kernelsBGR[i] *= alphas[i];
-  }
-
-
-  img = convolveBayerWithKernels_BGGR(sharpRaw,kernelsBGR);
-
-  Mat rcv;
-  img.convertTo(img,CV_8U);
-  cvtColor(img,rcv,COLOR_BayerBG2BGR);
-  imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_alpha_adjust_kernels.png",rcv);
-  Rect roi(2416 - ksize/2,1422 - ksize/2,image.blurPatch,image.blurPatch);
-
-  //imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft_uhoh.png",image.blurDFT);
-  // assert(img.isContinuous());
-  // size_t t = img.total(),e=img.elemSize();
-  // assert(t * e == image.width * image.height);
-  image.copy_in(img.data);
-  image.check_blur_async();
-  imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft_sum1.png",image.blurDFT);
-  //image.write_to_path();
-  return 0;
-
-  image.load_raw_from_disk();
-  Size image_size(image.width, image.height);
-  Mat img2(image_size,CV_8U,image.get_Raw());
-  //cvtColor(img2,img2,COLOR_BayerBG2BGR);
-  //imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel.png",img2);
-  image.check_blur_async();
-  auto m = image.blurDFT;
-  imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft.png",m);
-
-  image.free_memory_RAW();
-
-
-  int k = 0;
+  // int ksize = kernelsBGR[0].rows;
+  // pathCam::Image image(6464 - ksize + 1,4852- ksize + 1,2040);
+  // image.set_disk_file("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel.Raw");
+  // Rect sharpRect((sharpRaw.cols - patchSize) / 2, (sharpRaw.rows - patchSize) / 2,patchSize,patchSize);
+  // Rect blurRect((image.width - patchSize) / 2, (image.height - patchSize) / 2, patchSize,patchSize);
+  //
+  // auto img = convolveBayerWithKernels_BGGR(sharpRaw,kernelsBGR);
+  //
+  //  auto alphas = computePerChannelScale_BGGR(img(blurRect),sharpRaw(sharpRect));
+  // for (int i = 0; i < kernelsBGR.size(); ++i) {
+  //   kernelsBGR[i] *= alphas[i];
+  // }
+  //
+  //
+  // img = convolveBayerWithKernels_BGGR(sharpRaw,kernelsBGR);
+  //
+  // Mat rcv;
+  // img.convertTo(img,CV_8U);
+  // cvtColor(img,rcv,COLOR_BayerBG2BGR);
+  // imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_alpha_adjust_kernels.png",rcv);
+  // Rect roi(2416 - ksize/2,1422 - ksize/2,image.blurPatch,image.blurPatch);
+  //
+  // //imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft_uhoh.png",image.blurDFT);
+  // // assert(img.isContinuous());
+  // // size_t t = img.total(),e=img.elemSize();
+  // // assert(t * e == image.width * image.height);
+  // image.copy_in(img.data);
+  // image.check_blur_async();
+  // imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft_sum1.png",image.blurDFT);
+  // //image.write_to_path();
+  // return 0;
+  //
+  // image.load_raw_from_disk();
+  // Size image_size(image.width, image.height);
+  // Mat img2(image_size,CV_8U,image.get_Raw());
+  // //cvtColor(img2,img2,COLOR_BayerBG2BGR);
+  // //imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel.png",img2);
+  // image.check_blur_async();
+  // auto m = image.blurDFT;
+  // imwrite("/home/pathcam/pcamdata/postProc/blur_test/train/misc/out/22_convolved_by_channel_dft.png",m);
+  //
+  // image.free_memory_RAW();
+  //
+  //
+  // int k = 0;
 
 }
 

@@ -238,12 +238,10 @@ namespace pathCam {
       contributingImages.insert(img);
       needsAlignment = true;
 
-      //assert(img && img->get_Raw());
       process_tiles(img, tiles);
 
       debugTileCount2 += tiles.size();
       ++debugFrameCount;
-
 
       tiles.clear();
       img->free_memory_RAW();
@@ -284,10 +282,10 @@ namespace pathCam {
     }
 
     auto graphConnectivityResult = ig->computeMinPromotionsToConnectMembersPreferORB();
-    // if (!graphConnectivityResult.success) {
-    //   std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
-    //   return;
-    // }
+    if (!graphConnectivityResult.success) {
+      std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
+      return;
+    }
 
     if (!graphConnectivityResult.promoted_nodes.empty()) {
       std::cout << "Component " << componentIndex << " promoting additional " << graphConnectivityResult.promoted_nodes.size() <<
@@ -301,7 +299,9 @@ namespace pathCam {
 
 
     for (auto m: matches) {
-      if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
+      // if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
+      members.insert(m->image_1);
+      members.insert(m->image_2);
         //debug int k = 0;
         ++m->image_1->matchCount;
         ++m->image_2->matchCount;
@@ -310,7 +310,7 @@ namespace pathCam {
             ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
           }
         }
-      }
+      // }
     }
     if (!graphConnectivityResult.success) {
       std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
@@ -403,6 +403,7 @@ namespace pathCam {
             img->regInfo->absoluteCoords.y + imageSize.height >= ul.y + parent->tileSize);
         }
       }
+      img->subsequentMatchLaunched = true;
       process_tiles(img, tileIndexes,false);
 
 
@@ -479,7 +480,7 @@ namespace pathCam {
                                      img->height);
     Mat mask = componentMagLabel == Image::_2X ? circleMask : rectMask;
 
-    imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
+    //imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
     update_mutex.unlock();
   }
 

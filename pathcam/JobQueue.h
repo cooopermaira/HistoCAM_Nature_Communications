@@ -22,7 +22,6 @@ namespace pathCam{
     std::vector<RunnableIntermediate*> jobRefsZeroFlag;
     std::vector<int> jobsReadiness;
     std::vector<bool> cancelJob;
-    Poco::Event *pathCamEvent;
 
     StreamCam *parent;
 
@@ -30,7 +29,7 @@ namespace pathCam{
     struct CompareRunnable {
       bool operator()(const RunnableIntermediate *a, const RunnableIntermediate *b);
     };
-    Poco::FastMutex *queue_mutex;
+    Poco::FastMutex queue_mutex;
     Poco::ThreadPool *pool;
     //std::deque < RunnableIntermediate *> jobQueue;
     std::priority_queue<RunnableIntermediate*,std::deque<RunnableIntermediate*>,CompareRunnable> jobQueue;
@@ -47,7 +46,7 @@ namespace pathCam{
     [[nodiscard]] bool is_empty() const {return jobQueue.empty();}
 
     std::pair<long, unsigned long> get_job_ref_index_and_sort_order(int jobTypeFlag, unsigned long image_idx);
-    void update_job_readiness(int jobTypeFlag, unsigned long image_idx);
+    void update_job_readiness(int jobTypeFlag, long image_idx, bool secured = false);
   };
 
 }

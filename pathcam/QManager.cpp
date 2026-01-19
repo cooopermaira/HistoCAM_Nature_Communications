@@ -20,26 +20,34 @@ namespace pathCam {
 
     while (parent->compositing) {
 
-      if (count % 10 == 0) {
-        parent->launch_blur_metric();
-      }else if (count % 10 == 5) { //just gives a little time for it to run
-        parent->receive_blur_metric();
-      }
-      ++count;
-
-      if (jq->pool->available() && !jq->is_empty()) {
-          jq->queue_mutex->lock();
-          jq->pool->start(*jq->jobQueue.top());
+      // if (count % 10 == 0) {
+      //   parent->launch_blur_metric();
+      // }else if (count % 10 == 5) { //just gives a little time for it to run
+      //   parent->receive_blur_metric();
+      // }
+      // ++count;
+      Poco::Runnable* job = nullptr;
+      {
+        Poco::FastMutex::ScopedLock lock(jq->queue_mutex);
+        if (jq->pool->available() && !jq->jobQueue.empty()) {
+          job = jq->jobQueue.top();
           jq->jobQueue.pop();
-          jq->queue_mutex->unlock();
+        }
       }
-      if (jq2->pool->available() && !jq2->is_empty()) {
-        jq2->queue_mutex->lock();
-        jq2->pool->start(*jq2->jobQueue.top());
-        jq2->jobQueue.pop();
-        jq2->queue_mutex->unlock();
+      if (job) jq->pool->start(*job);
+
+      job = nullptr;
+      {
+        Poco::FastMutex::ScopedLock lock (jq2->queue_mutex);
+        if (jq2->pool->available() && !jq2->jobQueue.empty()) {
+          job = jq2->jobQueue.top();
+          jq2->jobQueue.pop();
+        }
       }
+      if (job) jq2->pool->start(*job);
 
     }
+    jq->pool->joinAll();
+    jq2->pool->joinAll();
   }
 }

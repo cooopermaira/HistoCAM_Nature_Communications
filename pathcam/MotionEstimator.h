@@ -41,7 +41,7 @@ public:
   int component_membership;
   Point2i absoluteCoords;
   Point2i relativeCoords = Point2i(0.0, 0.0);
-  Poco::FastMutex *accessMutex;
+  Poco::FastMutex accessMutex;
   Poco::Event waitOnResolve;
   std::vector<RegInfo*> callersWaiting, children;
   std::vector<std::pair<unsigned int, Match*>> componentCallersWaiting;
@@ -51,7 +51,7 @@ public:
   int numBestMatches = 0;
   
   RegInfo(StreamCam* parent, bool successful=false, Point2f absoluteCoords=Point2f(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
-  successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root),accessMutex(new Poco::FastMutex), parent(parent),
+  successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root), parent(parent),
   waitOnResolve(true),rootOfRoot(false) {
   };
 

@@ -9,20 +9,15 @@
 
 namespace pathCam {
   JobQueue::JobQueue(int min_threads, int max_threads, int _windowWidth) {
-    windowWidth = _windowWidth;
-    queue_mutex = new Poco::FastMutex(),
-        pathCamEvent = new Poco::Event(true);
+    windowWidth = _windowWidth;;
     pool = new Poco::ThreadPool(min_threads, max_threads, 60, POCO_THREAD_STACK_SIZE);
   }
 
   JobQueue::~JobQueue() {
     delete pool;
-    delete queue_mutex;
-    delete pathCamEvent;
   }
 
-  std::pair<long, unsigned long> JobQueue::get_job_ref_index_and_sort_order(int jobTypeFlag, unsigned long image_idx)
-  {
+  std::pair<long, unsigned long> JobQueue::get_job_ref_index_and_sort_order(int jobTypeFlag, unsigned long image_idx) {
     /*
      * Job Type Flags:
      * 0: Other
@@ -32,69 +27,60 @@ namespace pathCam {
      */
     unsigned long sort_order;
     int jobRefNumber;
-    if (jobTypeFlag == 1)
-    {
+    if (jobTypeFlag == 1) {
       sort_order = image_idx;
       jobRefNumber = image_idx * 3 + jobTypeFlag - 1;
-    }
-    else
-    if (jobTypeFlag == 2)
-    {
+    } else if (jobTypeFlag == 2) {
       sort_order = image_idx + 20;
       jobRefNumber = image_idx * 3 + jobTypeFlag - 1;
-    }
-    else if (jobTypeFlag == 3)
-    {
+    } else if (jobTypeFlag == 3) {
       sort_order = image_idx + 1;
       jobRefNumber = image_idx * 3 + jobTypeFlag - 1;
-    }
-    else
-    {
+    } else {
       sort_order = 0;
       jobRefNumber = -1;
     }
     return std::make_pair(jobRefNumber, sort_order);
   }
+
   void JobQueue::add_runnable(RunnableIntermediate *job, long _sortOrder) {
-    if(_sortOrder == -1) {
+    if (_sortOrder == -1) {
       std::pair<int, int> jr_so_pair = get_job_ref_index_and_sort_order(job->jobTypeFlag, job->image_index);
       job->jobRefNumber = jr_so_pair.first;
       job->sort_order = jr_so_pair.second;
-    }else{
+    } else {
       job->sort_order = _sortOrder;
     }
-    queue_mutex->lock();
+    queue_mutex.lock();
     if (job->jobRefNumber >= 0) {
       if (jobRefs.size() <= job->jobRefNumber + 50) {
         jobRefs.resize(job->jobRefNumber + 400);
-        jobsReadiness.resize(job->jobRefNumber + 400,0);
-        cancelJob.resize(job->jobRefNumber + 400,false);
+        jobsReadiness.resize(job->jobRefNumber + 400, 0);
+        cancelJob.resize(job->jobRefNumber + 400, false);
       }
       jobRefs[job->jobRefNumber] = job;
-      update_job_readiness(job->jobTypeFlag, job->image_index);
-    }else {
+      update_job_readiness(job->jobTypeFlag, job->image_index,true);
+    } else {
       jobRefsZeroFlag.push_back(job);
       jobQueue.push(job);
     }
-    queue_mutex->unlock();
-
+    queue_mutex.unlock();
   };
 
-  void JobQueue::update_job_readiness(int jobTypeFlag, unsigned long image_idx) {
+  void JobQueue::update_job_readiness(int jobTypeFlag, long image_idx, bool secured) {
+    if (!secured){queue_mutex.lock();}
     if (jobTypeFlag == 2) {
-
-      int fv = max(0,int(image_idx) - windowWidth);
+      int fv = max(0, int(image_idx) - windowWidth);
       int lv = image_idx + windowWidth;
       std::vector<int> neighborsIdx(lv - fv + 1);
-      std::iota(neighborsIdx.begin(),neighborsIdx.end(),fv);
+      std::iota(neighborsIdx.begin(), neighborsIdx.end(), fv);
 
-      for (auto i : neighborsIdx){
-
+      for (auto i: neighborsIdx) {
         auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, i);
 
         ++jobsReadiness[answer.first];
 
-        unsigned long readinessRequired = 7 + min(i - windowWidth, 0);
+        long readinessRequired = 7 + min(i - windowWidth, 0);
         auto jobHasSufficientNeighborPermission = jobsReadiness[answer.first] >= readinessRequired;
         bool jobHasBeenCreated = jobRefs[answer.first];
         bool jobIsUnprocessed = false;
@@ -105,22 +91,27 @@ namespace pathCam {
         if (jobHasSufficientNeighborPermission && jobHasBeenCreated && jobIsUnprocessed) {
           //enough of this job's neighbors have processed, this job has enough information to run.
           if (cancelJob[answer.first]) {
+            assert(parent);
+
             --parent->matchableCount;
             jobRefs[answer.first]->unprocessed = false;
 
             auto img = parent->get_image_ref(i);
             img->mark_too_dark();
             img->free_memory_RAW();
+            img->pathflag = 1;
 
-          }else {
-
+            parent->increment_match_counter(false,i);
+          } else {
             jobQueue.push(jobRefs[answer.first]);
             jobRefs[answer.first]->unprocessed = false;
-
+            auto img = parent->get_image_ref(i);
+            img->pathflag = 2;
           }
         }
+        if (!secured){queue_mutex.unlock();}
       }
-    }else {
+    } else {
       auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, image_idx);
       if (jobRefs[answer.first]->unprocessed) {
         jobQueue.push(jobRefs[answer.first]);
@@ -130,25 +121,23 @@ namespace pathCam {
   }
 
   void JobQueue::cancel_job(int jobTypeFlag, unsigned long image_idx) {
-
     auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, image_idx);
-    queue_mutex->lock();
+    queue_mutex.lock();
     cancelJob[answer.first] = true;
-    queue_mutex->unlock();
+    queue_mutex.unlock();
   }
 
   bool JobQueue::run_jobs(bool join_all) {
-    queue_mutex->lock();
+    queue_mutex.lock();
     int batchSize = std::min(20, (int) jobQueue.size());
-    queue_mutex->unlock();
+    queue_mutex.unlock();
 
     for (int i = 0; i < batchSize; i++) {
-
       if (pool->available() > 0) {
-        queue_mutex->lock();
+        queue_mutex.lock();
         pool->start(*jobQueue.top());
         jobQueue.pop();
-        queue_mutex->unlock();
+        queue_mutex.unlock();
       } else {
         Poco::Thread::sleep(10);
       }
