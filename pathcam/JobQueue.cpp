@@ -79,8 +79,11 @@ namespace pathCam {
         auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, i);
 
         ++jobsReadiness[answer.first];
+        if (i == 4) {
+          int k = 0;
+        }
 
-        long readinessRequired = 7 + min(i - windowWidth, 0);
+        long readinessRequired = 2 * windowWidth + 1 + min(i - windowWidth, 0);
         auto jobHasSufficientNeighborPermission = jobsReadiness[answer.first] >= readinessRequired;
         bool jobHasBeenCreated = jobRefs[answer.first];
         bool jobIsUnprocessed = false;
@@ -101,7 +104,7 @@ namespace pathCam {
             img->free_memory_RAW();
             img->pathflag = 1;
 
-            parent->increment_match_counter(false,i);
+            // parent->increment_match_counter(false,i);
           } else {
             jobQueue.push(jobRefs[answer.first]);
             jobRefs[answer.first]->unprocessed = false;
@@ -109,7 +112,6 @@ namespace pathCam {
             img->pathflag = 2;
           }
         }
-        if (!secured){queue_mutex.unlock();}
       }
     } else {
       auto answer = get_job_ref_index_and_sort_order(jobTypeFlag, image_idx);
@@ -118,6 +120,7 @@ namespace pathCam {
         jobRefs[answer.first]->unprocessed = false;
       }
     }
+    if (!secured){queue_mutex.unlock();}
   }
 
   void JobQueue::cancel_job(int jobTypeFlag, unsigned long image_idx) {

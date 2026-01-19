@@ -93,7 +93,7 @@ namespace pathCam {
       parent->JobQ->add_runnable(matchjob);
       successful = true;
 
-      parent->increment_match_counter(true,image_index);
+      // parent->increment_match_counter(true,image_index);
     } else {
       //std::cout<<"Too Black: "+std::to_string(image_index)<<std::endl;
       parent->mark_neighbors_as_underexposed(image_index);

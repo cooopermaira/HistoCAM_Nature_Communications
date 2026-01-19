@@ -117,6 +117,7 @@ namespace pathCam {
 
   public:
     bool successful;
+    bool outstandingSubmitted = false;
 
     std::atomic<int> rebuildJobsOutstanding = 0;
     Poco::Event rebuildJobsComplete;

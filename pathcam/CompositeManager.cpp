@@ -16,6 +16,7 @@ int lastMC = 0, countDown = 100;
 bool hasBeenNonZero = false;
 
 
+
 namespace pathCam {
   CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),
                                                           rebuildJobsOutstanding(true) {
@@ -34,7 +35,7 @@ namespace pathCam {
     std::cout << "composite manager beginning" << std::endl;
     while (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 ||
            parent->matchableCount > 0 || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
-      debug_termination_check();
+      //debug_termination_check();
 
       //pull new components that might need to be processed
       std::tuple<unsigned long, Size, unsigned int> newComp;
@@ -95,7 +96,9 @@ namespace pathCam {
         }
       }
 
-      if (!parent->microscopeInput && parent->loaderCount == 0) {
+      if (!parent->microscopeInput && parent->loaderCount == 0 && !outstandingSubmitted) {
+        std::cout<<"entered this if statement"<<std::endl;
+        outstandingSubmitted = true;
         submit_outstanding_jobs();
       }
     }
@@ -216,9 +219,15 @@ namespace pathCam {
   }
 
   void CompositeManager::submit_outstanding_jobs() {
-    for (int i = parent->maxIndex - parent->windowWidth; i <= parent->maxIndex; i++) {
-      parent->JobQ->update_job_readiness(2, i);
+    std::cout<<"submitting outstanding jobs"<<std::endl;
+
+    for (int i = parent->maxIndex + 1; i <= parent->maxIndex + parent->windowWidth; ++i) {
+      parent->JobQ->update_job_readiness(2,i);
     }
+    // for (int i = parent->maxIndex - parent->windowWidth; i <= parent->maxIndex; i++) {
+    //   std::cout<<"submitting "<<i<<std::endl;
+    //   parent->JobQ->update_job_readiness(2, i);
+    // }
   }
 
   void CompositeManager::perform_global_alignment() {
@@ -284,7 +293,7 @@ namespace pathCam {
         canceledJobs.push_back(job);
       }
     }
-    for (int i = 0; i < parent->maxIndex; ++i) {
+    for (int i = 0; i <= parent->maxIndex; ++i) {
       if (parent->matchablesIncremented[i] != 1) {
         std::cout<<i<<" incremented "<<parent->matchablesIncremented[i]<<" times"<<std::endl;
       }

@@ -141,6 +141,9 @@ namespace pathCam {
   }
 
   void MatchRunnable::run() {
+    if (image_idx == 4) {
+      int k = 0;
+    }
     launched = true;
     Image *image = parent->get_image_ref(image_idx);
 
@@ -208,7 +211,7 @@ namespace pathCam {
           image->image_file.getBaseName()<<")" << std::endl;
     }
 
-    parent->increment_match_counter(false,image_index);
+    // parent->increment_match_counter(false,image_index);
     --parent->matchableCount;
     jobComplete.set();
     successful = true;

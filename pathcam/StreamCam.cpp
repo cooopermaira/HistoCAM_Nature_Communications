@@ -604,19 +604,19 @@ namespace pathCam {
     return component_index;
   }
 
-  void StreamCam::increment_match_counter(bool trueForUpFalserDown,long imgIdx) {
-    resize_mmatch_mutex.writeLock();
-    if (imgIdx + 50 >= matchablesIncremented.size() ) {
-      matchablesIncremented.resize(imgIdx + 1000);
-      matchablesDecremented.resize(imgIdx + 1000);
-    }
-    if (trueForUpFalserDown) {
-      ++matchablesIncremented[imgIdx];
-    }else {
-      ++matchablesDecremented[imgIdx];
-    }
-    resize_mmatch_mutex.unlock();
-  }
+  // void StreamCam::increment_match_counter(bool trueForUpFalserDown,long imgIdx) {
+  //   resize_mmatch_mutex.writeLock();
+  //   if (imgIdx + 50 >= matchablesIncremented.size() ) {
+  //     matchablesIncremented.resize(imgIdx + 1000);
+  //     matchablesDecremented.resize(imgIdx + 1000);
+  //   }
+  //   if (trueForUpFalserDown) {
+  //     ++matchablesIncremented[imgIdx];
+  //   }else {
+  //     ++matchablesDecremented[imgIdx];
+  //   }
+  //   resize_mmatch_mutex.unlock();
+  // }
 
   void StreamCam::add_new_component(unsigned long image_index, Size image_size, unsigned int component_index) {
     auto ri = reg_results[image_index];

@@ -220,7 +220,7 @@ namespace pathCam {
     int frames = 0, iters = 0;
 
     // v DEBUG v
-    void increment_match_counter(bool trueForUpFalserDown,long imgIdx);
+    // void increment_match_counter(bool trueForUpFalserDown,long imgIdx);
 
     bool run() override;
 

@@ -348,12 +348,10 @@ namespace pathCam {
       Image *image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
       image->set_disk_file(imageFile);
       parent->pass_image(image, image_index);
-      image_index++;
+      ++image_index;
 
-
-
-      // Poco::Thread::sleep(1000.0 / 21.0);
-      Poco::Thread::sleep(sleep_ms(rng));
+      Poco::Thread::sleep(1000.0 / 21.0);
+      // Poco::Thread::sleep(sleep_ms(rng));
     }
     auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
 
