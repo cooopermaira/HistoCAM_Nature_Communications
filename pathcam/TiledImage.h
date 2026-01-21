@@ -20,7 +20,7 @@ template<typename T>
 class Dense2DArray {
 public:
   Dense2DArray(int minX = -2048, int maxX = 2048, int minY = -2048, int maxY = 2048)
-      : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
+    : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
     data.resize(width * height);
   }
 
@@ -36,7 +36,7 @@ public:
 
   int minX, minY, width, height;
 
-  private:
+private:
   std::vector<T> data;
 
 
@@ -52,14 +52,16 @@ struct TileObj {
   enum {
     noCoverage = 0, partialCoverage, singleFrameCoverage
   };
+
   Point2i index;
 
   int status = noCoverage;
-  pathCam::Image* owner = nullptr;
+  pathCam::Image *owner = nullptr;
 
   int updateCount = 0;
-  void* preferredObj;
-  void (*destroyPreferredObj)(void*) = nullptr;
+  void *preferredObj;
+
+  void (*destroyPreferredObj)(void *) = nullptr;
 
   bool usingPreferred = false;
   bool newData = false;
@@ -67,19 +69,20 @@ struct TileObj {
 
   Poco::FastMutex mutex;
   cuda::GpuMat image;
-  char* buf;
+  char *buf;
 
-  std::map<int,std::pair<cuda::GpuMat,void*>> SAMMasks;
+  std::map<int, std::pair<cuda::GpuMat, void *> > SAMMasks;
 
   TileObj(int _tileSize, Point2i _index = {}) : index(_index) {
-    cudaMallocManaged(&buf,_tileSize * _tileSize * 4);
-    cudaMemset(buf,0,_tileSize * _tileSize * 4);
+    cudaMallocManaged(&buf, _tileSize * _tileSize * 4);
+    cudaMemset(buf, 0, _tileSize * _tileSize * 4);
 
-    image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4,buf);
+    image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, buf);
     preferredObj = nullptr;
     usingPreferred = false;
     newData = false;
   }
+
   ~TileObj() {
     mutex.lock();
     if (usingPreferred && preferredObj) {
@@ -98,36 +101,36 @@ struct TileObj {
 
 struct TileQuery {
 public:
-
   int i, j;
   Rect_<float> bounds;
   std::shared_ptr<TileObj> image;
 
-  
-  TileQuery(std::shared_ptr<TileObj> image, int i, int j, Rect_<float> bounds) :
-      image(image), i(i), j(j), bounds(bounds) {
 
+  TileQuery(std::shared_ptr<TileObj> image, int i, int j, Rect_<float> bounds) : image(image), i(i), j(j),
+    bounds(bounds) {
   };
-
 };
 
 
 class MRTiledImage;
+
 class TiledImage {
 private:
-  std::shared_ptr<MRTiledImage> parent;
+  std::weak_ptr<MRTiledImage> parent;
   unsigned int tile_size;
   unsigned int logic_size;
   float logicRatio;
 
 public:
-  Dense2DArray<std::shared_ptr<TileObj>> tiles;
+  Dense2DArray<std::shared_ptr<TileObj> > tiles;
   Rect_<float> bounds;
 
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
              unsigned int logic_size = 256, int levelWithinPyramid = 0);
 
-  ~TiledImage() {};
+  ~TiledImage() {
+    std::cout << "TiledImage class destructor level " << levelWithinPyramid << std::endl;
+  };
 
   int levelWithinPyramid;
 
@@ -144,29 +147,28 @@ public:
   void insertMatAtBase(cv::Mat image_in, cv::Rect_<float> box, std::vector<Point2i> retileIndices);
 
 
-
   void saveBaseTilesToDisk();
 
-  void matToTile(const cv::Mat &mat, const cv::Mat &mask,int x, int y, Point2f rootOffset,
+  void matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y, Point2f rootOffset,
                  cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
   void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices);
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-  void matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask,int x, int y, Point2f rootOffset,
-               cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
+  void matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, int x, int y, Point2f rootOffset,
+                 cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
-  void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box, const std::vector<Point2i> &retileIndices);
+  void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box,
+                         const std::vector<Point2i> &retileIndices);
 
 
-
-  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, std::shared_ptr<TileObj> myTileObj, Rect cvRoi, int _segID = -1);
+  void tileUpwards(Point2i myTileIndex, Rect_<float> myLevelRegion, std::shared_ptr<TileObj> myTileObj, Rect cvRoi,
+                   int _segID = -1);
 
   std::shared_ptr<TileObj> getTile(int x, int y);
 
   std::shared_ptr<TileObj> getTile(Point2i);
 #else
-
 
 
   void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
@@ -194,11 +196,4 @@ private:
   void matToImage2(const cv::Mat mat, cv::Mat image,
                    Point2f offset, cv::Rect_<float> image_box,
                    cv::Rect_<float> tile_box);
-
-
-
-
-
 };
-
-

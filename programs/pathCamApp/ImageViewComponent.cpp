@@ -48,8 +48,13 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
   auto imageview = *view;
 
   if (tiledImage->scale == 0) {
-    auto ans = tiledImage->MRImageSet->get_display_coords_for_zero_scale(tiledImage);
-    imageview -= fPoint(ans.x, ans.y);
+    if (auto set = tiledImage->MRImageSet.lock()) {
+      auto ans = set->get_display_coords_for_zero_scale(tiledImage);
+      imageview -= fPoint(ans.x, ans.y);
+    } else {
+      // MRImageSet no longer exists (shouldn't happen if set owns tiles), but handle safely anyway.
+      throw std::runtime_error("MRImageSet no longer exists, but ImageViewComponent is trying to access it in drawLayer");
+    }
   } else {
     imageview *= 1.0 / tiledImage->scale;
     imageview -= fPoint(tiledImage->offset.x, tiledImage->offset.y);

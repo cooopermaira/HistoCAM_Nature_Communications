@@ -92,7 +92,7 @@ namespace pathCam {
     //                     getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
     //                     true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
     // image->siftMutex.unlock();
-    image->free_memory_RAW();
+    image->free_memory_RAW(); //incremented in MetricComposite::process_tiles(...)
 
 
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
@@ -113,8 +113,8 @@ namespace pathCam {
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
         m->numMatches = std::accumulate(m->inliers.begin(),m->inliers.end(),0);
         //forward match to feature track generator (ftg)
-        image->matches.push_back(m);
-        previous->matches.push_back(m);
+        // image->matches.push_back(m);
+        // previous->matches.push_back(m);
         matches.push_back(m);
       }
     }
@@ -129,8 +129,8 @@ namespace pathCam {
         }
         if (component->componentMagLabel == theirComp->componentMagLabel || component->componentMagLabel == Image::_NOLABEL || theirComp->componentMagLabel == Image::_NOLABEL) {
           //these two components should actually be the same component. we will suspend one and join to the other
-          component->componentJoinMatches.push_back(match);
-          theirComp->componentJoinMatches.push_back(match);
+          // component->componentJoinMatches.push_back(match);
+          // theirComp->componentJoinMatches.push_back(match);
         }
       } else {
         component->ftg->store_match(match);
@@ -138,21 +138,18 @@ namespace pathCam {
     }
     component->ftg->accessMutex.unlock();
     --component->outstandingCMS_jobs;
+    if (component->alignmentHasBegun) {
+      throw std::runtime_error("CMS jobs still running after CompositeManager thought they were done");
+    }
   }
 
   void MatchRunnable::run() {
-    if (image_idx == 4) {
-      int k = 0;
-    }
-    launched = true;
     Image *image = parent->get_image_ref(image_idx);
-
 
     if (!image->is_good()) {
       return;
     }
 
-    //pathCam::DescriptorMatcher *matcher = new pathCam::DescriptorMatcher(parent->matcher_type);
     auto matcher = DescriptorMatcher(parent->matcher_type);
     int mostMatches = 0;
     long bestMatch = -1;
@@ -162,11 +159,9 @@ namespace pathCam {
     for (long prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
 
-      if (previous == nullptr) {
+      if (previous == nullptr || !previous->is_good()) {
         continue;
       }
-
-      if (!previous->is_good()) { continue; }
 
       auto m = std::make_shared<Match>(previous,image);
       matcher.match(m);
@@ -195,7 +190,7 @@ namespace pathCam {
           tempReg->accessMutex.unlock();
           tempReg->image = image;
 
-          parent->regCount++;
+          ++parent->regCount;
           auto rj = new RegistrationRunnable(parent, tempReg);
           parent->JobQ->add_runnable(rj);
           successful = true;

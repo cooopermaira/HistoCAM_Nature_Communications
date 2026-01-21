@@ -318,7 +318,11 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
     Mat matROI = mat(ROIrect);
 
     auto tileObject = getTile(x, y);
-    parent->liveTiles.insert({x, y});
+    if (auto imagePyramid = parent.lock()) {
+      imagePyramid->liveTiles.insert({x, y});
+    }else {
+      throw std::runtime_error("failed to grab weak pointer parent in matToTile");
+    }
     Mat temp(tileObject->image.rows, tileObject->image.cols,CV_8UC4, tileObject->image.data);
 
     //profiling
@@ -419,6 +423,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
                              Rect cvRoi,
                              int _segID) {
   //this function takes a tiles data at a lower level of the pyramid and resizes it into the tile directly above it in the pyramid
+  if (auto imagePyramid = parent.lock()){
   try {
     //find appropriate region of upper level
     float xloc = myLevelRegion.x / 2.f;
@@ -440,7 +445,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
 
     //calculate theirROI and grab tile
     cv::Rect theirROI(theirTileRegionX, theirTileRegionY, theirLevelRegion.width, theirLevelRegion.height);
-    auto theirTileObj = parent->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
+    auto theirTileObj = imagePyramid->level[levelWithinPyramid + 1]->getTile(theirTileIndex.x, theirTileIndex.y);
 
     //resize self cv image into their cv image ROI
     auto newSize = Size(theirTileObj->image(theirROI).cols, theirTileObj->image(theirROI).rows);
@@ -456,7 +461,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
       theirTileObj->newData = true;
     } else {
       if (theirTileObj->SAMMasks.find(_segID) == theirTileObj->SAMMasks.end()) {
-        theirTileObj->SAMMasks[_segID] = {cuda::GpuMat(parent->tile_size, parent->tile_size,CV_8U, Scalar(0)), nullptr};
+        theirTileObj->SAMMasks[_segID] = {cuda::GpuMat(imagePyramid->tile_size, imagePyramid->tile_size,CV_8U, Scalar(0)), nullptr};
       }
 
       assert(theirTileObj->SAMMasks[_segID].first(theirROI).rows == myTileObj->SAMMasks[_segID].first(cvRoi).rows / 2
@@ -469,15 +474,15 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
     theirTileObj->mutex.unlock();
 
     //continue up pyramid
-    if (levelWithinPyramid + 1 < parent->level.size() - 1) {
-      parent->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirTileObj, theirROI,
-                                                         _segID);
+    if (levelWithinPyramid + 1 < imagePyramid->level.size() - 1) {
+      imagePyramid->level[levelWithinPyramid + 1]->tileUpwards(theirTileIndex, theirLevelRegion, theirTileObj, theirROI,_segID);
     }
   } catch (cv::Exception &e) {
     std::cout << "cv error in tileUpwards" << std::endl;
     std::cout << e.what() << std::endl;
-    throw std::exception();
+    throw std::runtime_error("cv error in tileUpwards");
   }
+}
 }
 
 

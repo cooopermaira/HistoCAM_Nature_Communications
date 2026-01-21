@@ -52,7 +52,7 @@ namespace pathCam {
         long fhTime = 0;
 
         std::atomic<int> outstandingCMS_jobs = 0;
-
+        std::atomic<bool> alignmentHasBegun = false;
 
         std::shared_ptr<TiledImage> baseImage;
 

@@ -33,7 +33,7 @@ protected:
   }
   
   void uninitialize(){
-    if(!_helpRequested){ delete bcam; }
+    if(!_helpRequested && bcam){ delete bcam; }
     Application::uninitialize();
   }
   
@@ -83,10 +83,11 @@ protected:
     if (!_helpRequested)
     {
       int i = 0;
-      while (true) {
+      while (i < 100) {
         bcam = new StreamCam(configPtr());
         bcam->run();
         delete bcam;
+        bcam = nullptr;
         std::cout<<i++<<std::endl;
       }
       // if(!bcam->run()){ return Application::EXIT_SOFTWARE; }

@@ -32,7 +32,7 @@ public:
   Point2f offset;
   Poco::Event scaleSet;
   pathCam::StreamCam *parent;
-  std::shared_ptr<MRTiledImageSet> MRImageSet;
+  std::weak_ptr<MRTiledImageSet> MRImageSet;
   std::vector<std::shared_ptr<TiledImage> > level;
   std::set<Point2i, Point2iLess> liveTiles;
 
@@ -106,8 +106,13 @@ public:
   std::string labelName;
 
 
-  MRTiledImageSet() {
-  };
+  // MRTiledImageSet() {
+  //   std::cerr << "constructor MRTiledImageSet this=" << this << "\n";
+  // };
+  // ~MRTiledImageSet() {
+  //   std::cerr << "~MRTiledImageSet this=" << this << "\n";
+  // }
+
 
   Point2f get_display_coords_for_zero_scale(std::shared_ptr<MRTiledImage> _member) const {
     Point2f startPoint(bounds.br().x,0);

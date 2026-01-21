@@ -1164,7 +1164,6 @@ namespace pathCam {
     imagePyramid->componentIndex = _componentIndex;
     parent->MRImageSet->add(imagePyramid);
     imagePyramid->MRImageSet = parent->MRImageSet;
-    //local_quality_score = score_image_2X(4852,6464,2190);
   }
 
 

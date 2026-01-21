@@ -13,10 +13,6 @@ namespace pathCam {
 
 
   StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config),
-                                                           MRImageSet(std::make_shared<MRTiledImageSet>()),
-                                                           //ppm(new PostProcessManager(this)),
-                                                           //sfm(new SiftFeatureMatcher(this)),
-                                                           //ftg(new FeatureTrackGenerator),
                                                            inferenceWait(true),
                                                            compositeWait(true) {
     //inferencing = false;
@@ -57,10 +53,16 @@ namespace pathCam {
     circleMask = cv::Mat::zeros(image_height, image_width, CV_8U);
     cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
                -1);
+
+
   }
 
   bool StreamCam::run() {
     auto start = std::chrono::high_resolution_clock::now();
+
+    if (!MRImageSet) {
+      MRImageSet = std::shared_ptr<MRTiledImageSet>(new MRTiledImageSet());
+    }
 
     auto dr1 = DiskReader(this);
     auto qm1 = QManager(this);
@@ -86,7 +88,7 @@ namespace pathCam {
       inference_thread.join();
     }
 
-    // cleanup_and_reset();
+    cleanup_and_reset();
 
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
@@ -100,10 +102,19 @@ namespace pathCam {
 
   bool StreamCam::spin_run() {
     std::cout << "spin_run started " << std::endl;
-    recordingMode = true;
 
-    Q_thread.start(qm);
-    composite_thread.start(cm);
+    if (!MRImageSet) {
+      MRImageSet = std::shared_ptr<MRTiledImageSet>(new MRTiledImageSet());
+    }
+
+    auto qm1 = QManager(this);
+    auto cm1 = CompositeManager(this);
+
+    recordingMode = true;
+    compositing = true;
+
+    Q_thread.start(qm1);
+    composite_thread.start(cm1);
     //postprocessor_thread.start(ppm);
     if (inferencing) {
       inference_thread.start(*im);
@@ -116,6 +127,8 @@ namespace pathCam {
       //im->thread.join();
       inference_thread.join();
     }
+
+    cleanup_and_reset();
 
     std::cout << "spin_run done" << std::endl;
 
@@ -880,6 +893,40 @@ namespace pathCam {
   }
 
   void StreamCam::cleanup_and_reset() {
+
+    //clean up all jobs (jobq 1 and 2)
+    JobQ->pool->joinAll();
+    for (int i = 0; i < JobQ->jobRefs.size(); ++i) {
+      if (JobQ->jobRefs[i]) {
+        delete JobQ->jobRefs[i];
+      }
+    }
+    JobQ->jobRefs.clear();
+    JobQ->cancelJob.clear();
+    JobQ->jobsReadiness.clear();
+    for (int i = 0; i < JobQ->jobRefsZeroFlag.size(); ++i) {
+      if (JobQ->jobRefsZeroFlag[i]) {
+        delete JobQ->jobRefsZeroFlag[i];
+      }
+    }
+    JobQ->jobRefsZeroFlag.clear();
+
+    jqSecondary->pool->joinAll();
+    for (int i = 0; i < jqSecondary->jobRefs.size(); ++i) {
+      if (jqSecondary->jobRefs[i]) {
+        delete jqSecondary->jobRefs[i];
+      }
+    }
+    jqSecondary->jobRefs.clear();
+    jqSecondary->cancelJob.clear();
+    jqSecondary->jobsReadiness.clear();
+    for (int i = 0; i < jqSecondary->jobRefsZeroFlag.size(); ++i) {
+      if (jqSecondary->jobRefsZeroFlag[i]) {
+        delete jqSecondary->jobRefsZeroFlag[i];
+      }
+    }
+    jqSecondary->jobRefsZeroFlag.clear();
+
     //clean up all reginfo
     for (int i = 0; i < reg_results.size(); ++i) {
       if (reg_results[i]) {
@@ -896,39 +943,6 @@ namespace pathCam {
     }
     images.clear();
 
-    //clean up all jobs (jobq 1 and 2)
-    for (int i = 0; i < JobQ->jobRefs.size(); ++i) {
-      if (JobQ->jobRefs[i]) {
-        delete JobQ->jobRefs[i];
-      }
-    }
-    JobQ->jobRefs.clear();
-    JobQ->cancelJob.clear();
-    JobQ->jobsReadiness.clear();
-    for (int i = 0; i < JobQ->jobRefsZeroFlag.size(); ++i) {
-      if (JobQ->jobRefsZeroFlag[i]) {
-        delete JobQ->jobRefsZeroFlag[i];
-      }
-    }
-    JobQ->jobRefsZeroFlag.clear();
-
-
-    for (int i = 0; i < jqSecondary->jobRefs.size(); ++i) {
-      if (jqSecondary->jobRefs[i]) {
-        delete jqSecondary->jobRefs[i];
-      }
-    }
-    jqSecondary->jobRefs.clear();
-    jqSecondary->cancelJob.clear();
-    jqSecondary->jobsReadiness.clear();
-    for (int i = 0; i < jqSecondary->jobRefsZeroFlag.size(); ++i) {
-      if (jqSecondary->jobRefsZeroFlag[i]) {
-        delete jqSecondary->jobRefsZeroFlag[i];
-      }
-    }
-    jqSecondary->jobRefsZeroFlag.clear();
-
-
     //clean up all composites
     composites.clear();
     components = 0;
@@ -936,14 +950,15 @@ namespace pathCam {
 
     //clean up all
     previousSlides.push_back(std::move(MRImageSet));
+
     return;
   }
 
   StreamCam::~StreamCam() {
     // clean_up_blur_engine();
-    // Image::cleanup_blur_check_statics();
+
+    Image::cleanup_blur_check_statics();
 
     previousSlides.clear();
-
   }
 }

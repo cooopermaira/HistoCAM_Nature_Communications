@@ -296,6 +296,7 @@ namespace pathCam {
     set_offset(resultantPoint / scale);
 
     std::cout<<"component "<<componentIndex<<" XC registered"<<std::endl;
+    FreeSiftData(rootCopy);
     return true;
   }
 

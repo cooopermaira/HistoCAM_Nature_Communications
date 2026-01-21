@@ -97,7 +97,6 @@ namespace pathCam {
       }
 
       if (!parent->microscopeInput && parent->loaderCount == 0 && !outstandingSubmitted) {
-        std::cout<<"entered this if statement"<<std::endl;
         outstandingSubmitted = true;
         submit_outstanding_jobs();
       }
@@ -135,13 +134,14 @@ namespace pathCam {
       threads.emplace_back([mc]() {
         auto t1 = std::chrono::high_resolution_clock::now();
         while (mc->outstandingCMS_jobs > 0) {
-          Poco::Thread::sleep(1000);
+          Poco::Thread::sleep(50);
         }
+        mc->alignmentHasBegun = true;
         auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).
             count();
         std::cout << "wait time " << t2 << std::endl;
 
-        // mc->align_and_rebuild();
+        mc->align_and_rebuild();
       });
     }
     for (auto &t: threads) {
@@ -219,15 +219,9 @@ namespace pathCam {
   }
 
   void CompositeManager::submit_outstanding_jobs() {
-    std::cout<<"submitting outstanding jobs"<<std::endl;
-
     for (int i = parent->maxIndex + 1; i <= parent->maxIndex + parent->windowWidth; ++i) {
       parent->JobQ->update_job_readiness(2,i);
     }
-    // for (int i = parent->maxIndex - parent->windowWidth; i <= parent->maxIndex; i++) {
-    //   std::cout<<"submitting "<<i<<std::endl;
-    //   parent->JobQ->update_job_readiness(2, i);
-    // }
   }
 
   void CompositeManager::perform_global_alignment() {

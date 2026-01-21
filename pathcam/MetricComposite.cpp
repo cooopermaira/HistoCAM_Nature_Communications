@@ -106,6 +106,7 @@ namespace pathCam {
     cudaFree(threeChnBuf);
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
+    FreeSiftData(compSiftData);
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
@@ -254,7 +255,7 @@ namespace pathCam {
     auto start = std::chrono::high_resolution_clock::now();
 
     ig = new ImageGraph();
-    bai = new BundleAdjustmentIntegrator();
+    //bai = new BundleAdjustmentIntegrator();
 
     std::unordered_set<Image *> members = find_contributing_images();
     members.insert(root);
@@ -358,6 +359,9 @@ namespace pathCam {
 
     rebuild(memberImages);
 
+    delete ig;
+    delete ftg;
+
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
     (std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
@@ -456,13 +460,10 @@ namespace pathCam {
 
   void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad, const bool forceFullImage) {
     assert(parent->unifiedMemory); //change this to a fix later
-
     img->load_raw_from_disk(alertDoubleLoad);
 
-    //not a mistake. we have two process that need the raw, second call increments the counter
-
     if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk(alertDoubleLoad);
+      img->load_raw_from_disk(alertDoubleLoad); //freed in ComponentMatchSearch::run()
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       auto cms = new ComponentMatchSearch(parent, img, this);
@@ -480,7 +481,7 @@ namespace pathCam {
                                      img->height);
     Mat mask = componentMagLabel == Image::_2X ? circleMask : rectMask;
 
-    //imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
+    imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
     update_mutex.unlock();
   }
 
