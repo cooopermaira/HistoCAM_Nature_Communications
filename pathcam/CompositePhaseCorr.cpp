@@ -330,7 +330,7 @@ namespace pathCam {
 
         int count = 0;
         //for (auto &[img,roi]: overlappingFrames) {
-        for (int i = 0; i < min(10,int(overlappingFrames.size())); ++i){
+        for (int i = 0; i < min(5,int(overlappingFrames.size())); ++i){
           auto img = overlappingFrames[i].first;
           std::cout << count++ << std::endl;
           if (establish_scale_between_pairs(_rootImg, img, true) || !xcMatchShouldContinue) {

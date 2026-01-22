@@ -34,7 +34,7 @@ namespace pathCam {
     //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
     // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
 
-    // load_blur_engine();
+    load_blur_engine();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
@@ -53,16 +53,17 @@ namespace pathCam {
     circleMask = cv::Mat::zeros(image_height, image_width, CV_8U);
     cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
                -1);
-
-
   }
 
   bool StreamCam::run() {
     auto start = std::chrono::high_resolution_clock::now();
 
     if (!MRImageSet) {
-      MRImageSet = std::shared_ptr<MRTiledImageSet>(new MRTiledImageSet());
+      MRImageSet = std::make_shared<MRTiledImageSet>();
     }
+    MRImageSet->cwd = make_working_directory();
+    MRImageSet->labelName = currentSlideLabel;
+
 
     auto dr1 = DiskReader(this);
     auto qm1 = QManager(this);
@@ -90,10 +91,10 @@ namespace pathCam {
 
     cleanup_and_reset();
 
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     std::cout << "total runtime " << duration.count() << std::endl;
     std::cout << "cudasift extract time " << cudaSiftTime << std::endl;
+    std::cout << std::endl << std::endl;
 
 
     return true;
@@ -104,8 +105,11 @@ namespace pathCam {
     std::cout << "spin_run started " << std::endl;
 
     if (!MRImageSet) {
-      MRImageSet = std::shared_ptr<MRTiledImageSet>(new MRTiledImageSet());
+      MRImageSet = std::make_shared<MRTiledImageSet>();
     }
+    MRImageSet->cwd = make_working_directory();
+    MRImageSet->labelName = currentSlideLabel;
+
 
     auto qm1 = QManager(this);
     auto cm1 = CompositeManager(this);
@@ -133,6 +137,47 @@ namespace pathCam {
     std::cout << "spin_run done" << std::endl;
 
     return true;
+  }
+
+  std::string StreamCam::set_slide_label(std::string _name) {
+    currentSlideIndex = previousSlides.size();
+    if (_name == "") {
+      if (currentSlideLabel == "") {
+        currentSlideLabel = std::to_string(currentSlideIndex);
+      } else {
+        currentSlideLabel = "";
+      }
+    } else {
+      currentSlideLabel = _name;
+    }
+    return currentSlideLabel;
+  }
+
+  Poco::Path StreamCam::make_working_directory() {
+    assert(!currentSlideLabel.empty());
+
+    // Build: <cwd>/<currentSlideLabel>/
+    Poco::Path p = Poco::Path::current();
+    p.pushDirectory(currentSlideLabel);
+    p.makeDirectory(); // ensures trailing slash; does NOT create on disk
+
+    Poco::File dir(p);
+
+    try {
+      if (!dir.exists()) {
+        // createDirectory() creates only the leaf; createDirectories() creates parents too.
+        dir.createDirectories();
+        std::cout << "created working directory " << p.toString() << std::endl;
+      } else if (!dir.isDirectory()) {
+        throw Poco::FileException("Path exists but is not a directory", p.toString());
+      }
+    } catch (const Poco::Exception& e) {
+      std::cerr << "Failed to create working directory '" << p.toString()
+                << "': " << e.displayText() << std::endl;
+      throw; // or handle as you prefer
+    }
+
+    return p;
   }
 
   void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index,
@@ -512,7 +557,7 @@ namespace pathCam {
       images[index] = image;
       ++maxIndex;
       image_mutex.unlock();
-    }else {
+    } else {
       reg_results_mutex.readLock();
       reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
       reg_results_mutex.unlock();
@@ -893,7 +938,6 @@ namespace pathCam {
   }
 
   void StreamCam::cleanup_and_reset() {
-
     //clean up all jobs (jobq 1 and 2)
     JobQ->pool->joinAll();
     for (int i = 0; i < JobQ->jobRefs.size(); ++i) {
@@ -949,13 +993,17 @@ namespace pathCam {
     maxIndex = -1;
 
     //clean up all
+    MRImageSet->detach();
+    MRImageSet->cache_to_disk();
     previousSlides.push_back(std::move(MRImageSet));
+
+    assert(set_slide_label().empty());
 
     return;
   }
 
   StreamCam::~StreamCam() {
-    // clean_up_blur_engine();
+    clean_up_blur_engine();
 
     Image::cleanup_blur_check_statics();
 

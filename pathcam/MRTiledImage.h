@@ -27,7 +27,7 @@ class MRTiledImage {
 public:
   bool suspended = false;
   cv::Rect_<float> bounds;
-  unsigned int tile_size, magLabel, componentIndex = 0;
+  int tile_size, magLabel, componentIndex = 0;
   double scale;
   Point2f offset;
   Poco::Event scaleSet;
@@ -35,9 +35,14 @@ public:
   std::weak_ptr<MRTiledImageSet> MRImageSet;
   std::vector<std::shared_ptr<TiledImage> > level;
   std::set<Point2i, Point2iLess> liveTiles;
+  std::vector<Point2i> liveTilesOrderedVec;
+
+  std::string strCachePath;
+
+  std::atomic<bool> cachedToDisk = false;
 
 
-  MRTiledImage(pathCam::StreamCam *parent = nullptr, unsigned int _tile_size = 0);
+  MRTiledImage(pathCam::StreamCam *parent = nullptr, int _tile_size = 0);
 
   ~MRTiledImage() { level.clear(); };
 
@@ -55,18 +60,23 @@ public:
   void insertTilesAtBase(cuda::GpuMat &image_in, cuda::GpuMat &mask, cv::Rect_<float> box,
                          std::vector<Point2i> &retileIndices) {
     level[0]->insertTilesAtBase(image_in, mask, box, retileIndices);
+    bounds = level[0]->bounds;
   };
   // #else
   void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices) {
     level[0]->insertTilesAtBase(image_in, mask, box, retileIndices);
     bounds = level[0]->bounds;
-  };;
+  }
 
   // #endif
 
   int get_class_for_tile(std::tuple<int, int, unsigned> _tile);
 
   void build(cv::Mat &image_in);
+
+  void cache_to_disk(const std::string& _cwd);
+
+  void uncache_from_disk();
 
   void set_scale(double _scale) { scale = _scale; }
 
@@ -104,14 +114,21 @@ class MRTiledImageSet {
 public:
   cv::Rect_<float> bounds;
   std::string labelName;
+  Poco::Path cwd;
+
+  std::atomic<bool> cachedToDisk = false;
+  std::atomic<bool> completed = false;
 
 
   // MRTiledImageSet() {
   //   std::cerr << "constructor MRTiledImageSet this=" << this << "\n";
   // };
-  // ~MRTiledImageSet() {
-  //   std::cerr << "~MRTiledImageSet this=" << this << "\n";
-  // }
+  ~MRTiledImageSet() {
+    Poco::File workDir(cwd);
+    if (workDir.exists() && workDir.isDirectory()) {
+      workDir.remove(true);
+    }
+  }
 
 
   Point2f get_display_coords_for_zero_scale(std::shared_ptr<MRTiledImage> _member) const {
@@ -144,6 +161,17 @@ public:
   cv::Rect_<float> get_component_bounds(int _component_index) { return MRImages[_component_index]->bounds; }
 
   void update_bounds();
+
+  void detach();
+
+  void cache_to_disk() {
+    auto start = std::chrono::high_resolution_clock::now();
+    for (auto &mrImg : MRImages) {
+      mrImg->cache_to_disk(cwd.toString());
+    }
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
+    int k = 0;
+  };
 
 private:
   std::vector<std::shared_ptr<MRTiledImage> > MRImages;

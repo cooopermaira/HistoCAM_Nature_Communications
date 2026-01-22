@@ -122,7 +122,10 @@ namespace pathCam {
 
     long cudaSiftTime = 0;
 
-    std::string inputFileOverride = "";
+    std::string inputFileOverride;
+    std::string currentSlideLabel;
+    int currentSlideIndex;
+
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
     std::string lastLabel;
@@ -289,8 +292,6 @@ namespace pathCam {
 
     std::shared_ptr<MRTiledImageSet> get_image_reference();
 
-    void set_input_file(const std::string &_path){inputFileOverride = _path;}
-
     void add_observer(DataObserver *new_observer) {
       observers.push_back(new_observer);
     }
@@ -301,9 +302,17 @@ namespace pathCam {
 
     void cleanup_and_reset();
 
+    void set_input_file(const std::string &_path){inputFileOverride = _path;}
+
+    std::string set_slide_label(std::string name = "");
+
+    std::string get_slide_label(){return currentSlideLabel;}
+
+    Poco::Path make_working_directory();
+
     bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID);
 
-    unsigned int increment_and_get_components() { return components++; }
+    int increment_and_get_components() { return components++; }
 
     void add_image(Image *image, long index);
 
@@ -340,6 +349,8 @@ namespace pathCam {
     int add_new_component_Q(unsigned long image_index, cv::Size image_size);
 
     void run_agg_classify();
+
+
 
 
   };

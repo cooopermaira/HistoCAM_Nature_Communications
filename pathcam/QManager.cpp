@@ -17,12 +17,12 @@ namespace pathCam {
     int count = 1;
 
     while (parent->compositing) {
-      // if (count % 10 == 0) {
-      //   parent->launch_blur_metric();
-      // }else if (count % 10 == 5) { //just gives a little time for it to run
-      //   parent->receive_blur_metric();
-      // }
-      // ++count;
+      if (count % 10 == 0) {
+        parent->launch_blur_metric();
+      }else if (count % 10 == 5) { //just gives a little time for it to run
+        parent->receive_blur_metric();
+      }
+      ++count;
       Poco::Runnable *job = nullptr;
       if (jq->pool->available()) {
         {

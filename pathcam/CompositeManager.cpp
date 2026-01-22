@@ -133,7 +133,7 @@ namespace pathCam {
 
       threads.emplace_back([mc]() {
         auto t1 = std::chrono::high_resolution_clock::now();
-        while (mc->outstandingCMS_jobs > 0) {
+        while (mc->outstandingCMS_jobs > 0 || mc->xcInProgress) {
           Poco::Thread::sleep(50);
         }
         mc->alignmentHasBegun = true;

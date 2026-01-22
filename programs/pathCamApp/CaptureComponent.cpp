@@ -162,6 +162,7 @@ void CaptureComponent::startSimulating() {
   if (!inputPath.empty()) {
     sCam->set_input_file(inputPath);
   }
+  sCam->set_slide_label();
 
   parent->MRimage = sCam->get_image_reference();
   parent->imageview->setImage(parent->MRimage);

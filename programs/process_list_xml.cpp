@@ -29,7 +29,7 @@ protected:
 
   void initialize(Application& self){
     Application::initialize(self);
-    // if(!_helpRequested){ bcam = new StreamCam(configPtr()); }
+    if(!_helpRequested){ bcam = new StreamCam(configPtr()); }
   }
   
   void uninitialize(){
@@ -84,7 +84,9 @@ protected:
     {
       int i = 0;
       while (i < 100) {
-        bcam = new StreamCam(configPtr());
+        if (!bcam) {
+          bcam = new StreamCam(configPtr());
+        }
         bcam->run();
         delete bcam;
         bcam = nullptr;

@@ -49,10 +49,10 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 
 add_subdirectory(poco)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Linux-specific commands
     message(STATUS "Building on Linux")
-endif()
+endif ()
 
 
 IF (APPLE)
@@ -94,8 +94,6 @@ INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
-
-
 
 
 link_directories("/home/cm/src/onnxruntime/build_cuda/Release")
@@ -163,10 +161,8 @@ IF (BUILD_TEST)
     target_link_libraries(test pathCamLib)
 ENDIF ()
 
-IF (BUILD_OLD_LIST)
-    add_executable(old_process_list_xml programs/old_process_list_xml.cpp)
-    target_link_libraries(old_process_list_xml pathCamLib)
-ENDIF ()
+add_executable(old_process_list_xml programs/old_process_list_xml.cpp)
+target_link_libraries(old_process_list_xml pathCamLib)
 
 add_executable(process_list_xml programs/process_list_xml.cpp)
 target_link_libraries(process_list_xml pathCamLib)
@@ -247,7 +243,6 @@ IF (BUILD_PATHCAM_GUI)
 
 
     target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
-
 
 
     if (MSVC)

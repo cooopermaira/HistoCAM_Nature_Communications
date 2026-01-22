@@ -115,13 +115,13 @@ public:
 class MRTiledImage;
 
 class TiledImage {
-private:
+public:
+
   std::weak_ptr<MRTiledImage> parent;
   unsigned int tile_size;
   unsigned int logic_size;
   float logicRatio;
 
-public:
   Dense2DArray<std::shared_ptr<TileObj> > tiles;
   Rect_<float> bounds;
 

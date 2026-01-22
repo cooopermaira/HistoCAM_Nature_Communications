@@ -123,12 +123,14 @@ namespace pathCam {
     //place component in MR image
     if (imagePyramid->scale == 0 && !xcMatchInitiated) {
       if (staging.empty()) { return; }
+      xcInProgress = true;
       xcMatchInitiated = true;
 
       std::thread t([this, img = staging.front()->image]() {
         std::lock_guard lock(EstRoot_mutex);
         std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
         establish_scale_at_root(img);
+        xcInProgress = false;
       });
       t.detach();
     }

@@ -554,6 +554,7 @@ void TiledImage::makeTile(int x, int y) {
     //tiles(x, y) = new cuda::GpuMat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
     tiles(x, y) = std::make_unique<TileObj>(tile_size);
 #else
+    throw std::runtime_error("oops, that configuration doesnt work anymore. try compiling openCV with CUDA");
     tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
 #endif
   }
