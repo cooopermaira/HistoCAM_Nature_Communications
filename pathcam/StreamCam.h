@@ -211,6 +211,7 @@ namespace pathCam {
 
     Poco::Event inferenceWait;
     Poco::Event compositeWait;
+    Poco::Event cacheAlert;
 
     ICudaEngine *blurEngine = nullptr;
     IExecutionContext *blurCtx = nullptr;
@@ -226,6 +227,8 @@ namespace pathCam {
     // void increment_match_counter(bool trueForUpFalserDown,long imgIdx);
 
     bool run() override;
+
+    bool core_run();
 
     bool spin_run();
 
@@ -290,7 +293,7 @@ namespace pathCam {
 
     bool get_scale_and_offset(unsigned int component_index, double &_scale, Point2f &_offset);
 
-    std::shared_ptr<MRTiledImageSet> get_image_reference();
+    std::shared_ptr<MRTiledImageSet> get_MRimage_reference();
 
     void add_observer(DataObserver *new_observer) {
       observers.push_back(new_observer);

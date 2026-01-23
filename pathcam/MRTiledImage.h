@@ -40,6 +40,7 @@ public:
   std::string strCachePath;
 
   std::atomic<bool> cachedToDisk = false;
+  std::atomic<bool> inMemory = true;
 
 
   MRTiledImage(pathCam::StreamCam *parent = nullptr, int _tile_size = 0);
@@ -72,9 +73,7 @@ public:
 
   int get_class_for_tile(std::tuple<int, int, unsigned> _tile);
 
-  void build(cv::Mat &image_in);
-
-  void cache_to_disk(const std::string& _cwd);
+  void cache_to_disk(const std::string &_cwd);
 
   void uncache_from_disk();
 
@@ -116,8 +115,11 @@ public:
   std::string labelName;
   Poco::Path cwd;
 
+  std::atomic<bool> inMemory = true;
+  std::atomic<bool> loadFromCacheQueued = false;
   std::atomic<bool> cachedToDisk = false;
   std::atomic<bool> completed = false;
+  int index;
 
 
   // MRTiledImageSet() {
@@ -132,8 +134,8 @@ public:
 
 
   Point2f get_display_coords_for_zero_scale(std::shared_ptr<MRTiledImage> _member) const {
-    Point2f startPoint(bounds.br().x,0);
-    for (auto mrimg : MRImages) {
+    Point2f startPoint(bounds.br().x, 0);
+    for (auto mrimg: MRImages) {
       if (mrimg == _member) {
         startPoint.x -= _member->bounds.tl().x;
         startPoint.x += 500;
@@ -166,12 +168,26 @@ public:
 
   void cache_to_disk() {
     auto start = std::chrono::high_resolution_clock::now();
-    for (auto &mrImg : MRImages) {
+    for (auto &mrImg: MRImages) {
+      assert(mrImg->inMemory);
       mrImg->cache_to_disk(cwd.toString());
     }
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
-    int k = 0;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start);
+    cachedToDisk = true;
+    inMemory = false;
   };
+
+  void uncache_from_disk() {
+    auto start = std::chrono::high_resolution_clock::now();
+    for (auto &mrImg: MRImages) {
+      assert(!mrImg->inMemory);
+      mrImg->uncache_from_disk();
+    }
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start);
+    inMemory = true;
+  }
 
 private:
   std::vector<std::shared_ptr<MRTiledImage> > MRImages;

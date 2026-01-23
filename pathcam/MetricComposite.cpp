@@ -428,14 +428,14 @@ namespace pathCam {
     }
 
 
-    auto tBox = Rect(0, 0, parent->tileSize, parent->tileSize);
+    Rect tileROI(0, 0, parent->tileSize, parent->tileSize);
     for (auto &tileIdx: liveTilesCopy) {
       auto tileObj = imagePyramid->get_base_tile(tileIdx);
       if (!tileObj->owner) {
         //kill tile
         tileObj->image.setTo(Scalar(0, 0, 0, 0));
-        Rect tileReg(tileIdx * parent->tileSize, Size(parent->tileSize, parent->tileSize));
-        imagePyramid->level[0]->tileUpwards(tileIdx, tileReg, tileObj, tBox);
+        Rect tileRegion(tileIdx * parent->tileSize, Size(parent->tileSize, parent->tileSize));
+        imagePyramid->level[0]->tileUpwards(tileIdx, tileRegion, tileObj, tileROI);
         tileObj.reset();
       }
     }
@@ -586,10 +586,12 @@ namespace pathCam {
       return true;
     }
 
-    //frames have about the same blur, prioritize closeness to center of frame instead
-    if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.1f) {
-      return get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index) >
-             get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index);
+    //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
+    //pretty close to the center of the frame
+    if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.05f) {
+      auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
+
+      return (v1 > 4 * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index));
     }
 
     //amount of motion blur is significantly different, choose clearest image

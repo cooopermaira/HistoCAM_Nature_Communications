@@ -6,11 +6,12 @@ static int wrapMod(int x, int m) {
 }
 
 //==============================================================================
-ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
+ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> _view,
                                        StringArray &iconNames,
                                        OwnedArray<Drawable> &iconsFromZipFile, MainComponent *parent) : parent(parent),
   MRImageSet(NULL),
-  view(view),
+  view(_view),
+  loadMRImageSetASAPEvent(Poco::Event::EVENT_AUTORESET),
   shadeLevels(
     false) {
   setOpaque(true); //telling juce that there is nothingi to render underneath
@@ -37,10 +38,45 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> view,
 
   shadeClasses = false;
 
+
   //gl.attachTo(*this);
 }
 
 ImageViewComponent::~ImageViewComponent() {
+}
+
+void ImageViewComponent::uncacher() {
+  while (cacherKeepGoing) {
+    if (parent->sCam) {
+      {
+        Poco::FastMutex::ScopedLock lock(loadASAPMutex);
+        while (!loadMRImageSetsASAP.empty()) {
+          auto slide = loadMRImageSetsASAP.front();
+          loadMRImageSetsASAP.pop();
+          slide->uncache_from_disk();
+          slide->loadFromCacheQueued = false;
+        }
+      }
+      loadMRImageSetASAPEvent.wait();
+    } else {
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+    }
+  }
+}
+
+void ImageViewComponent::cacher() {
+  while (cacherKeepGoing) {
+    if (parent->sCam) {
+      while (recentlyViewedSlides.size() > 1) {
+        if (std::shared_ptr<MRTiledImageSet> mrImgSet; recentlyViewedSlides.pop(mrImgSet)) {
+          mrImgSet->cache_to_disk();
+        }
+      }
+      parent->sCam->cacheAlert.wait();
+    } else {
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+    }
+  }
 }
 
 void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRTiledImage> tiledImage) {
@@ -53,7 +89,8 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
       imageview -= fPoint(ans.x, ans.y);
     } else {
       // MRImageSet no longer exists (shouldn't happen if set owns tiles), but handle safely anyway.
-      throw std::runtime_error("MRImageSet no longer exists, but ImageViewComponent is trying to access it in drawLayer");
+      throw std::runtime_error(
+        "MRImageSet no longer exists, but ImageViewComponent is trying to access it in drawLayer");
     }
   } else {
     imageview *= 1.0 / tiledImage->scale;
@@ -67,6 +104,8 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
   //draw each tile
   for (unsigned int t = 0; t < tiles.size(); t++) {
     auto tile = tiles[t].image;
+    tile->mutex.lock();
+
     auto bounds = RectCtoJ<float>(tiles[t].bounds);
     bounds *= view2screenScale(imageview) * scale;
     bounds.expand(0.5, 0.5);
@@ -83,7 +122,6 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
       }
 
       auto im = static_cast<juce::Image *>(tile->preferredObj);
-      tile->mutex.lock();
 
       if (tile->newData) {
         auto img = tile->image;
@@ -138,7 +176,6 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
         g.restoreState();
       }
 
-      tile->mutex.unlock();
 
       if (shadeLevels) {
         Graphics::ScopedSaveState save(g);
@@ -157,6 +194,7 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
         g.fillRect(bounds);
       }
     }
+    tile->mutex.unlock();
   }
 
   //tile classification
@@ -317,7 +355,7 @@ void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   const ScopedLock lock(mutex);
 
   MRImageSet = image;
-  if (!image){return;}
+  if (!image) { return; }
 
   horizontalScrollBar.setRangeLimits(MRImageSet->bounds.x, MRImageSet->bounds.width);
   verticalScrollBar.setRangeLimits(MRImageSet->bounds.y, MRImageSet->bounds.height);
@@ -375,30 +413,34 @@ void ImageViewComponent::mouseMagnify(const MouseEvent &, float magnifyAmmount) 
   repaint();
 }
 
-void ImageViewComponent::adjust_MRImageSet(int mode) const {
+void ImageViewComponent::adjust_MRImageSet(int mode) {
   const bool showCurrent = (mode == 0);
   const int selectedIdx = showCurrent ? -1 : (mode - 1); // 0..N-1
+  std::shared_ptr<MRTiledImageSet> mrImgSet;
   if (showCurrent) {
-    parent->imageview->setImage(parent->sCam->get_image_reference());
-    parent->capture->setImage(parent->sCam->get_image_reference());
-    parent->annotate->setImage(parent->sCam->get_image_reference());
-  }else {
-    parent->imageview->setImage(parent->sCam->previousSlides[selectedIdx]);
-    parent->capture->setImage(parent->sCam->previousSlides[selectedIdx]);
-    parent->annotate->setImage(parent->sCam->previousSlides[selectedIdx]);
+    mrImgSet = parent->sCam->get_MRimage_reference();
+    // parent->imageview->setImage(parent->sCam->get_MRimage_reference());
+    // parent->capture->setImage(parent->sCam->get_MRimage_reference());
+    // parent->annotate->setImage(parent->sCam->get_MRimage_reference());
+  } else {
+    mrImgSet = parent->sCam->previousSlides[selectedIdx];
+    // parent->imageview->setImage(parent->sCam->previousSlides[selectedIdx]);
+    // parent->capture->setImage(parent->sCam->previousSlides[selectedIdx]);
+    // parent->annotate->setImage(parent->sCam->previousSlides[selectedIdx]);
   }
+  setImage(mrImgSet);
+  parent->annotate->setImage(mrImgSet);
 }
 
 bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) {
   if (key.getTextCharacter() == '>') {
-
     //cant change to past slide while compositing
-    if (parent->capture->simulating || parent->capture->recording){return true;}
+    if (parent->capture->simulating || parent->capture->recording) { return true; }
 
     if (parent->sCam) {
       const int N = static_cast<int>(parent->sCam->previousSlides.size());
 
-      if (N == 0){return true;}
+      if (N == 0) { return true; }
       int mode = wrapMod(MRImageSetSelector + 1, N + 1);
       if (mode == 0 && !parent->sCam->MRImageSet) {
         mode = wrapMod(mode + 1, N + 1);
@@ -410,14 +452,13 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
   }
 
   if (key.getTextCharacter() == '<') {
-
     //cant change to past slide while compositing
-    if (parent->capture->simulating || parent->capture->recording){return true;}
+    if (parent->capture->simulating || parent->capture->recording) { return true; }
 
     if (parent->sCam) {
       const int N = static_cast<int>(parent->sCam->previousSlides.size());
 
-      if (N == 0){return true;}
+      if (N == 0) { return true; }
       int mode = wrapMod(MRImageSetSelector - 1, N + 1);
       if (mode == 0 && !parent->sCam->MRImageSet) {
         mode = wrapMod(mode - 1, N + 1);

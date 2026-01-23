@@ -13,8 +13,9 @@ namespace pathCam {
 
 
   StreamCam::StreamCam(LayeredConfiguration::Ptr config) : BatchCam(config),
-                                                           inferenceWait(true),
-                                                           compositeWait(true) {
+                                                           inferenceWait(Poco::Event::EVENT_AUTORESET),
+                                                           compositeWait(Poco::Event::EVENT_AUTORESET),
+                                                           cacheAlert(Poco::Event::EVENT_AUTORESET) {
     //inferencing = false;
     if (inferencing) {
       im = new InferenceManager(this);
@@ -55,6 +56,7 @@ namespace pathCam {
                -1);
   }
 
+
   bool StreamCam::run() {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -91,7 +93,8 @@ namespace pathCam {
 
     cleanup_and_reset();
 
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start);
     std::cout << "total runtime " << duration.count() << std::endl;
     std::cout << "cudasift extract time " << cudaSiftTime << std::endl;
     std::cout << std::endl << std::endl;
@@ -171,9 +174,9 @@ namespace pathCam {
       } else if (!dir.isDirectory()) {
         throw Poco::FileException("Path exists but is not a directory", p.toString());
       }
-    } catch (const Poco::Exception& e) {
+    } catch (const Poco::Exception &e) {
       std::cerr << "Failed to create working directory '" << p.toString()
-                << "': " << e.displayText() << std::endl;
+          << "': " << e.displayText() << std::endl;
       throw; // or handle as you prefer
     }
 
@@ -922,7 +925,7 @@ namespace pathCam {
     return isEmpty;
   }
 
-  std::shared_ptr<MRTiledImageSet> StreamCam::get_image_reference() {
+  std::shared_ptr<MRTiledImageSet> StreamCam::get_MRimage_reference() {
     if (!MRImageSet) {
       MRImageSet = std::make_shared<MRTiledImageSet>();
     }
@@ -992,10 +995,11 @@ namespace pathCam {
     components = 0;
     maxIndex = -1;
 
-    //clean up all
+    //store slide and reset slide member variable
     MRImageSet->detach();
-    MRImageSet->cache_to_disk();
+    MRImageSet->index = previousSlides.size();
     previousSlides.push_back(std::move(MRImageSet));
+    cacheAlert.set();
 
     assert(set_slide_label().empty());
 

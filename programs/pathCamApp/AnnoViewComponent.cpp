@@ -201,6 +201,7 @@ bool AnnoViewComponent::segMouseUp(const juce::MouseEvent &event) {
       isShiftDown()) {
     return true;
   }
+  return false;
 }
 
 bool AnnoViewComponent::segMouseDrag(const juce::MouseEvent &event) {
@@ -208,6 +209,7 @@ bool AnnoViewComponent::segMouseDrag(const juce::MouseEvent &event) {
       isShiftDown()) {
     return true;
   }
+  return false;
 }
 
 void AnnoViewComponent::mouseDown(const juce::MouseEvent &event) {

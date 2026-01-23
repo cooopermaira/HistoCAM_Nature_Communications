@@ -19,8 +19,7 @@ bool hasBeenNonZero = false;
 
 namespace pathCam {
   CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),
-                                                          rebuildJobsOutstanding(true) {
-  };
+                                                          rebuildJobsOutstanding(true) {};
 
   void CompositeManager::run() {
     unsigned long duration = 0;
@@ -171,13 +170,6 @@ namespace pathCam {
 
     push_remaining_tiles_for_inference();
 
-    std::cout << "debug frame count: " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->
-        debugFrameCount <<
-        std::endl;
-    std::cout << "tiles processed (immediate): " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->
-        debugTileCount1 << std::endl;
-    std::cout << "tiles processed (later): " << std::dynamic_pointer_cast<MetricComposite>(parent->composites[0])->
-        debugTileCount2 << std::endl;
 
 
     //save_components_to_disk();

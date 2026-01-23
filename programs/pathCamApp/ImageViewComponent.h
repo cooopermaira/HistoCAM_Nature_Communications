@@ -7,10 +7,102 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
+template <class T,
+          class Hash = std::hash<T>,
+          class KeyEqual = std::equal_to<T>>
+struct UniqueFifo {
+private:
+  mutable std::mutex m_;
+  std::deque<T> fifo_;
+  std::unordered_set<T, Hash, KeyEqual> seen_;
+
+public:
+  UniqueFifo() = default;
+
+  explicit UniqueFifo(std::size_t reserve_count) {
+    // safe in ctor (no concurrent access yet)
+    seen_.reserve(reserve_count);
+  }
+
+  bool empty() const noexcept {
+    std::lock_guard<std::mutex> lk(m_);
+    return fifo_.empty();
+  }
+
+  std::size_t size() const noexcept {
+    std::lock_guard<std::mutex> lk(m_);
+    return fifo_.size();
+  }
+
+  void clear() {
+    std::lock_guard<std::mutex> lk(m_);
+    fifo_.clear();
+    seen_.clear();
+  }
+
+  // Enqueue only if not already present
+  bool push_unique(const T& v) {
+    std::lock_guard<std::mutex> lk(m_);
+    if (seen_.insert(v).second) {
+      fifo_.push_back(v);
+      return true;
+    }
+    return false;
+  }
+
+  bool push_unique(T&& v) {
+    std::lock_guard<std::mutex> lk(m_);
+    // Need a stable key for the set; we cannot "move into both".
+    // So: insert a copy into the set; move into deque only if inserted.
+    auto [it, inserted] = seen_.emplace(v);
+    if (inserted) {
+      fifo_.push_back(std::move(v));
+      return true;
+    }
+    return false;
+  }
+
+  // Pop front; returns false if empty
+  bool pop(T& out) {
+    std::lock_guard<std::mutex> lk(m_);
+    if (fifo_.empty()) return false;
+    out = std::move(fifo_.front());
+    fifo_.pop_front();
+    seen_.erase(out); // allows re-enqueue later
+    return true;
+  }
+
+  // Convenience: pop and return by value
+  T pop_or_throw() {
+    std::lock_guard<std::mutex> lk(m_);
+    if (fifo_.empty()) throw std::runtime_error("UniqueFifo: pop on empty");
+    T out = std::move(fifo_.front());
+    fifo_.pop_front();
+    seen_.erase(out);
+    return out;
+  }
+
+  bool contains(const T& v) const {
+    std::lock_guard<std::mutex> lk(m_);
+    return seen_.find(v) != seen_.end();
+  }
+
+  // Optional: peek without popping
+  bool peek(T& out) const {
+    std::lock_guard<std::mutex> lk(m_);
+    if (fifo_.empty()) return false;
+    out = fifo_.front(); // copy
+    return true;
+  }
+};
+
+
+
 class ImageViewComponent : public juce::Component, public juce::ScrollBar::Listener, public juce::KeyListener
 {
 
   friend class ImageViewOverlay;
+  friend class CaptureComponent;
 
 
 public:
@@ -18,6 +110,9 @@ public:
   bool shadeClasses;
   int componentSelector = 0;
   int MRImageSetSelector = 0;
+
+  UniqueFifo<std::shared_ptr<MRTiledImageSet>> recentlyViewedSlides;
+
   std::vector<juce::Colour> levelColors = {
     Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
     Colour(243, 249, 243)
@@ -75,6 +170,7 @@ protected:
   std::shared_ptr<MRTiledImageSet> MRImageSet;
   MainComponent *parent;
   std::atomic<bool> newData;
+  std::atomic<bool> cacherKeepGoing = true;
   cv::Mat greenShade;
   cv::Mat holding1;
   cv::Mat holding2;
@@ -82,6 +178,11 @@ protected:
   std::vector<cv::Mat> channels;
 
   OpenGLContext gl;
+
+  Poco::FastMutex loadASAPMutex;
+  std::queue<std::shared_ptr<MRTiledImageSet>> loadMRImageSetsASAP;
+  Poco::Event loadMRImageSetASAPEvent;
+  std::thread cacheThread, uncacheThread;
 
   void drawLayer(Graphics &g, float scale, std::shared_ptr<MRTiledImage>tiledImage);
 
@@ -96,7 +197,20 @@ protected:
 
   void zoomAndCenter();
 
-  void adjust_MRImageSet(int mode) const;
+  void adjust_MRImageSet(int mode);
+
+  void cacher();
+
+  void uncacher();
+
+  void q_cache() {
+    if (!MRImageSet->inMemory && !MRImageSet->loadFromCacheQueued) {
+      Poco::FastMutex::ScopedLock lock(loadASAPMutex);
+      loadMRImageSetsASAP.push(MRImageSet);
+      loadMRImageSetASAPEvent.set();
+      MRImageSet->loadFromCacheQueued = true;
+    }
+  };
 
   inline void translate(fPoint amount)
   {
@@ -118,8 +232,9 @@ protected:
       return;
     }
     fPoint center = view->getCentre();
-    if (isVisible())
-    {
+    if (isVisible()){
+      q_cache();
+
       *view -= center;
       *view *= scale;
       *view += center;

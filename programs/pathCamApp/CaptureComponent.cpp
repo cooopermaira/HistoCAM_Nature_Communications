@@ -9,23 +9,6 @@
 
 #include "JuceHeader.h"
 
-class drawThreadRunnable : public Poco::Runnable {
-public:
-  drawThreadRunnable(MainComponent *parent, Poco::Thread &sCamThread) : parent(parent), sCamThread(sCamThread) {
-  };
-
-  virtual void run() {
-    while (sCamThread.isRunning()) {
-      parent->update();
-      Poco::Thread::sleep(100);
-    }
-    int k = 0;
-  }
-
-private:
-  MainComponent *parent;
-  Poco::Thread &sCamThread;
-};
 
 class sCamPocoRunnable : public Poco::Runnable {
 public:
@@ -33,9 +16,13 @@ public:
   };
   CaptureComponent *cptcmp;
 
-  virtual void run() {
+  void run() override {
     cptcmp->sCam->run();
-    //cptcmp->stopSimulating();
+    MessageManager::callAsync(
+      [safeParent = Component::SafePointer(cptcmp->parent)]() mutable {
+        if (safeParent != nullptr)
+          safeParent->stopCompositingUIUpdates();
+      });
   }
 };
 
@@ -49,6 +36,11 @@ public:
 #ifdef WITH_SPINNAKER
     cptcmp->bcam->run();
 #endif
+    MessageManager::callAsync(
+      [safeParent = Component::SafePointer(cptcmp->parent)]() mutable {
+        if (safeParent != nullptr)
+          safeParent->stopCompositingUIUpdates();
+      });
   }
 };
 
@@ -65,6 +57,9 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   addAndMakeVisible(aiOverlay.get());
   // reportOverlay.reset(new ReportOverlay(this, iconNames, iconsFromZipFile));
   // addAndMakeVisible(reportOverlay.get());
+
+  // uncacheThread = std::thread(&ImageViewComponent::uncacher, this);
+  cacheThread = std::thread(&ImageViewComponent::cacher, this);
 }
 
 void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
@@ -116,10 +111,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
   g.setFont(40.0);
   g.drawText(magLabel, 20, getHeight() - 50, 100, Justification::centredLeft, true);
-
-
 }
-
 
 
 void CaptureComponent::startRecording() {
@@ -129,19 +121,21 @@ void CaptureComponent::startRecording() {
     bcam.reset(new pathCam::SpinPath(config));
     bcam->add_observer(parent);
     scopeRadius = bcam->sCam->get_scope_radius();
-    parent->MRimage = bcam->get_image_reference();
+    aiOverlay->set_sCam(bcam->sCam);
     parent->sCam = bcam->sCam;
   }
   //aiOverlay->set_sCam(bcam->sCam);
+  bcam->sCam->set_slide_label();
 #endif
 
-  //bcam->run();
-  parent->imageview->setImage(parent->MRimage);
+  parent->MRimage = sCam->get_MRimage_reference();
   parent->capture->setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
+  parent->imageview->recentlyViewedSlides.push_unique(parent->MRimage);
+
   compositeThread.start(new bcamPocoRunnable(this));
-  updateDrawThread.start(new drawThreadRunnable(parent, compositeThread));
+  parent->startCompositingUIUpdates();
 
   captureOverlay->resized();
   aiOverlay->resized();
@@ -149,6 +143,10 @@ void CaptureComponent::startRecording() {
 }
 
 void CaptureComponent::startSimulating() {
+  if (compositeThread.isRunning()) {
+    compositeThread.join();
+  }
+
   simulating = true;
 
   if (!sCam) {
@@ -164,17 +162,15 @@ void CaptureComponent::startSimulating() {
   }
   sCam->set_slide_label();
 
-  parent->MRimage = sCam->get_image_reference();
-  parent->imageview->setImage(parent->MRimage);
+  parent->MRimage = sCam->get_MRimage_reference();
   parent->capture->setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
-  // std::thread t([this]() {
-  //   sCam->run();
-  // });
-  // t.detach();
+  parent->imageview->recentlyViewedSlides.push_unique(parent->MRimage);
+
+
   compositeThread.start(new sCamPocoRunnable(this));
-  updateDrawThread.start(new drawThreadRunnable(parent, compositeThread));
+  parent->startCompositingUIUpdates();
 
   captureOverlay->resized();
   aiOverlay->resized();
@@ -193,18 +189,19 @@ void CaptureComponent::stopRecording() {
   bcam->stopCamera();
 #endif
 
+
+  compositeThread.join();
   recording = false;
   repaint();
 }
 
 void CaptureComponent::stopSimulating() {
   simulating = false;
-  compositeThread.join();
-  updateDrawThread.join();
+  // parent->stopCompositingUIUpdates();
   repaint();
 }
 
-void CaptureComponent::set_input(const FileChooser &fc)  {
+void CaptureComponent::set_input(const FileChooser &fc) {
   File result = fc.getResult();
   if (result.exists()) {
     inputPath = result.getFullPathName().toStdString();
@@ -226,7 +223,8 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
   if (!isVisible()) { return false; }
 
   if (key.getKeyCode() == KeyPress::spaceKey) {
-    if (procedureMode == 0) { // begin selecting or setting up input
+    if (procedureMode == 0) {
+      // begin selecting or setting up input
 #ifdef WITH_SPINNAKER
       //open camera barcode reader
 #else
@@ -240,11 +238,12 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
       return true;
 #endif
     }
-    if (procedureMode == 1) { // begin an actual recording/simulation
+    if (procedureMode == 1) {
+      // begin an actual recording/simulation
 
 #ifdef WITH_SPINNAKER
       if (!ready) {
-        std::cout<<"slide barcode not read"<<std::endl;
+        std::cout << "slide barcode not read" << std::endl;
         return true;
       }
       startRecording();

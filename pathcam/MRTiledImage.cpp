@@ -72,53 +72,91 @@ int MRTiledImage::get_class_for_tile(std::tuple<int, int, unsigned> _tile) {
 }
 
 void MRTiledImage::cache_to_disk(const std::string &_cwd) {
-  Poco::File cwd(_cwd);
-  if (!cwd.exists() || !cwd.isDirectory()) {
-    throw std::runtime_error("cache_to_disk: cwd invalid: " + _cwd);
-  }
-
-  Poco::Path cachePath(_cwd);
-  cachePath.makeDirectory();
-  cachePath.setFileName(std::to_string(componentIndex));
-  cachePath.setExtension("pcRawLayer");
-
-  strCachePath = cachePath.toString();
-
-  int fd = ::open(strCachePath.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
-  if (fd == -1) {
-    throw std::runtime_error(std::string("file create failed: ") + strCachePath +
-                             " : " + std::strerror(errno));
-  }
-
-  // Ensure fd always closes, even if exceptions happen.
-  try {
-    // Materialize + order tiles (optional but you named it Ordered)
-    liveTilesOrderedVec.assign(liveTiles.begin(), liveTiles.end());
-    // std::sort(liveTilesOrderedVec.begin(), liveTilesOrderedVec.end()); // if tileIndex is sortable
-
-    const size_t tileSize = parent->tileSize;
-    const size_t bytesPerTile = tileSize * tileSize * 4; // RGBA8
-    const size_t numTiles = liveTilesOrderedVec.size();
-
-    // Check overflow (important if tileSize/numTiles can be large)
-    if (tileSize != 0 && bytesPerTile / tileSize / tileSize != 4) {
-      throw std::runtime_error("overflow computing bytesPerTile");
-    }
-    if (numTiles != 0 && bytesPerTile > SIZE_MAX / numTiles) {
-      throw std::runtime_error("overflow computing totalBytes");
+  std::cout<<"caching "<<MRImageSet.lock()->index<<std::endl;
+  if (!cachedToDisk) {
+    Poco::File cwd(_cwd);
+    if (!cwd.exists() || !cwd.isDirectory()) {
+      throw std::runtime_error("cache_to_disk: cwd invalid: " + _cwd);
     }
 
-    const size_t totalBytes = numTiles * bytesPerTile;
+    Poco::Path cachePath(_cwd);
+    cachePath.makeDirectory();
+    cachePath.setFileName(std::to_string(componentIndex));
+    cachePath.setExtension("pcRawLayer");
 
-    // Preallocate disk space (best-effort / strong guarantee depending on FS)
-    // posix_fallocate returns error code directly (does NOT set errno reliably)
-    int rc = ::posix_fallocate(fd, 0, static_cast<off_t>(totalBytes));
-    if (rc != 0) {
-      throw std::runtime_error(std::string("posix_fallocate failed: ") + std::strerror(rc));
+    strCachePath = cachePath.toString();
+
+    int fd = ::open(strCachePath.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0644);
+    if (fd == -1) {
+      throw std::runtime_error(std::string("file create failed: ") + strCachePath +
+                               " : " + std::strerror(errno));
     }
 
-    // Now write each tile buffer sequentially
-    for (const auto &tileIndex: liveTilesOrderedVec) {
+    // Ensure fd always closes, even if exceptions happen.
+    try {
+      // Materialize + order tiles (optional but you named it Ordered)
+      liveTilesOrderedVec.assign(liveTiles.begin(), liveTiles.end());
+      // std::sort(liveTilesOrderedVec.begin(), liveTilesOrderedVec.end()); // if tileIndex is sortable
+
+
+      const size_t tileSize = parent->tileSize;
+      const size_t bytesPerTile = tileSize * tileSize * 4; // RGBA8
+      const size_t numTiles = liveTilesOrderedVec.size();
+
+      // Check overflow (important if tileSize/numTiles can be large)
+      if (tileSize != 0 && bytesPerTile / tileSize / tileSize != 4) {
+        throw std::runtime_error("overflow computing bytesPerTile");
+      }
+      if (numTiles != 0 && bytesPerTile > SIZE_MAX / numTiles) {
+        throw std::runtime_error("overflow computing totalBytes");
+      }
+
+      const size_t totalBytes = numTiles * bytesPerTile;
+
+      // Preallocate disk space (best-effort / strong guarantee depending on FS)
+      // posix_fallocate returns error code directly (does NOT set errno reliably)
+      int rc = ::posix_fallocate(fd, 0, static_cast<off_t>(totalBytes));
+      if (rc != 0) {
+        throw std::runtime_error(std::string("posix_fallocate failed: ") + std::strerror(rc));
+      }
+
+      // Now write each tile buffer sequentially
+      for (const auto &tileIndex: liveTilesOrderedVec) {
+        auto tileObj = level[0]->getTile(tileIndex);
+        if (!tileObj) {
+          throw std::runtime_error("getTile returned null");
+        }
+
+        Poco::FastMutex::ScopedLock lock(tileObj->mutex);
+
+        if (!tileObj->buf) {
+          throw std::runtime_error("tileObj->buf is null");
+        }
+
+        write_all(fd, tileObj->buf, bytesPerTile);
+        cudaFree(tileObj->buf);
+        tileObj->buf = nullptr;
+        tileObj->image.release();
+        if (tileObj->destroyPreferredObj) {
+          tileObj->destroyPreferredObj(tileObj->preferredObj);
+        }
+        tileObj->usingPreferred = false;
+        tileObj->preferredObj = nullptr;
+        tileObj->destroyPreferredObj = nullptr;
+      }
+
+
+      ::close(fd);
+    } catch (...) {
+      ::close(fd);
+      // Optional: remove partially-written file if you consider it invalid
+      // ::unlink(outPath.c_str());
+      throw;
+    }
+    cachedToDisk = true;
+  } else {
+    assert(!liveTilesOrderedVec.empty());
+    for (auto &tileIndex: liveTilesOrderedVec) {
       auto tileObj = level[0]->getTile(tileIndex);
       if (!tileObj) {
         throw std::runtime_error("getTile returned null");
@@ -130,25 +168,24 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd) {
         throw std::runtime_error("tileObj->buf is null");
       }
 
-      write_all(fd, tileObj->buf, bytesPerTile);
       cudaFree(tileObj->buf);
       tileObj->buf = nullptr;
       tileObj->image.release();
+      if (tileObj->destroyPreferredObj) {
+        tileObj->destroyPreferredObj(tileObj->preferredObj);
+      }
+      tileObj->usingPreferred = false;
+      tileObj->preferredObj = nullptr;
+      tileObj->destroyPreferredObj = nullptr;
     }
-    cudaDeviceSynchronize();
-
-    ::close(fd);
-  } catch (...) {
-    ::close(fd);
-    // Optional: remove partially-written file if you consider it invalid
-    // ::unlink(outPath.c_str());
-    throw;
   }
 
   auto parentSP = level[0]->parent.lock();
   for (int i = 1; i < level.size() - 3; ++i) {
     level[i].reset(new TiledImage(parentSP, tile_size, tile_size * (1 << i), i));
   }
+  cudaDeviceSynchronize();
+  inMemory = false;
 }
 
 void MRTiledImage::uncache_from_disk() {
@@ -179,59 +216,56 @@ void MRTiledImage::uncache_from_disk() {
       }
 
       cudaError_t cerr = cudaDeviceSynchronize();
-    if (cerr != cudaSuccess) {
-      throw std::runtime_error(std::string("cudaDeviceSynchronize failed: ") +
-                               cudaGetErrorString(cerr));
-    }
-
-    int cpuDevice = cudaCpuDeviceId;
-    int gpuDevice = 0;
-    cudaGetDevice(&gpuDevice);
-
-    for (const auto &tileIndex : liveTilesOrderedVec) {
-      auto tileObj = level[0]->getTile(tileIndex);
-      if (!tileObj) throw std::runtime_error("getTile returned null");
-
-      Poco::FastMutex::ScopedLock lock(tileObj->mutex);
-
-      // Ensure the managed buffer exists (ideally you allocate these once and keep them)
-      if (!tileObj->buf) {
-        char *p = nullptr;
-        cerr = cudaMallocManaged(&p, bytesPerTile, cudaMemAttachGlobal);
-        if (cerr != cudaSuccess) {
-          throw std::runtime_error(std::string("cudaMallocManaged failed: ") +
-                                   cudaGetErrorString(cerr));
-        }
-        tileObj->buf = p;
-      }
-
-      // Pull pages to CPU to avoid faulting mid-read (optional but often helps)
-      // cerr = cudaMemPrefetchAsync(tileObj->buf, bytesPerTile, cpuDevice, 0);
-      // if (cerr != cudaSuccess) {
-      //   throw std::runtime_error(std::string("cudaMemPrefetchAsync->CPU failed: ") +
-      //                            cudaGetErrorString(cerr));
-      // }
-      cerr = cudaStreamSynchronize(0);
       if (cerr != cudaSuccess) {
-        throw std::runtime_error(std::string("cudaStreamSynchronize failed: ") +
+        throw std::runtime_error(std::string("cudaDeviceSynchronize failed: ") +
                                  cudaGetErrorString(cerr));
       }
 
-      // Read directly into the managed buffer
-      read_all(fd, tileObj->buf, bytesPerTile);
+      int cpuDevice = cudaCpuDeviceId;
+      int gpuDevice = 0;
+      cudaGetDevice(&gpuDevice);
 
-      // // If you're going to use it on GPU soon, prefetch back (optional)
-      // cerr = cudaMemPrefetchAsync(tileObj->buf, bytesPerTile, gpuDevice, 0);
-      // if (cerr != cudaSuccess) {
-      //   throw std::runtime_error(std::string("cudaMemPrefetchAsync->GPU failed: ") +
-      //                            cudaGetErrorString(cerr));
-      // }
+      for (const auto &tileIndex: liveTilesOrderedVec) {
+        auto tileObj = level[0]->getTile(tileIndex);
+        if (!tileObj) throw std::runtime_error("getTile returned null");
 
-      // Rebuild / invalidate any derived views as needed (depends on your code)
-      // tileObj->image = ...
-    }
 
-    ::close(fd);
+        Poco::FastMutex::ScopedLock lock(tileObj->mutex);
+
+        // Ensure the managed buffer exists (ideally you allocate these once and keep them)
+        if (!tileObj->buf) {
+          char *p = nullptr;
+          cerr = cudaMallocManaged(&p, bytesPerTile, cudaMemAttachGlobal);
+          if (cerr != cudaSuccess) {
+            throw std::runtime_error(std::string("cudaMallocManaged failed: ") +
+                                     cudaGetErrorString(cerr));
+          }
+          tileObj->buf = p;
+        }
+
+        // Pull pages to CPU to avoid faulting mid-read (optional but often helps)
+        // cerr = cudaMemPrefetchAsync(tileObj->buf, bytesPerTile, cpuDevice, 0);
+        // if (cerr != cudaSuccess) {
+        //   throw std::runtime_error(std::string("cudaMemPrefetchAsync->CPU failed: ") +
+        //                            cudaGetErrorString(cerr));
+        // }
+        cerr = cudaStreamSynchronize(0);
+        if (cerr != cudaSuccess) {
+          throw std::runtime_error(std::string("cudaStreamSynchronize failed: ") +
+                                   cudaGetErrorString(cerr));
+        }
+
+        // Read directly into the managed buffer
+        read_all(fd, tileObj->buf, bytesPerTile);
+        tileObj->image = cuda::GpuMat(tileSize, tileSize, CV_8UC4, tileObj->buf);
+        tileObj->newData = true;
+
+        Rect tileROI(0, 0, tileSize, tileSize);
+        Rect tileRegion(tileObj->index * tile_size, Size(tile_size, tile_size));
+        level[0]->tileUpwards(tileObj->index, tileRegion, tileObj, tileROI);
+      }
+
+      ::close(fd);
     }
   } catch (...) {
     // ::close(fd);

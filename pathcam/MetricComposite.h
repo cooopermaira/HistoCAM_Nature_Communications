@@ -18,8 +18,6 @@ namespace pathCam {
 
         void update() override;
 
-        void rebuild(std::vector<Image *> members);
-
         std::vector<std::pair<Point2i,int>> calculate_affected_tiles_with_status(Point2f AbC) const;
 
         int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) const;
@@ -27,6 +25,8 @@ namespace pathCam {
         void process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad = true, bool forceFullImage = false);
 
         void align_and_rebuild() override;
+
+        void rebuild(std::vector<Image *> members);
 
         bool image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image* _img) const;
 

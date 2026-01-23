@@ -117,7 +117,7 @@ public:
       sCam->add_observer(new_observer);
   }
 
-  std::shared_ptr < MRTiledImageSet > get_image_reference() { return sCam->get_image_reference(); }
+  std::shared_ptr < MRTiledImageSet > get_image_reference() { return sCam->get_MRimage_reference(); }
   
 private:
   
