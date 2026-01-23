@@ -128,7 +128,7 @@ void CaptureComponent::startRecording() {
   spinpath->sCam->set_slide_label();
 #endif
 
-  parent->MRimage = sCam->get_MRimage_reference();
+  parent->MRimage = spinpath->sCam->get_MRimage_reference();
   setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
