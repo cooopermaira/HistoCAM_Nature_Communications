@@ -227,6 +227,8 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
       // begin selecting or setting up input
 #ifdef WITH_SPINNAKER
       //open camera barcode reader
+      procedureMode = 1;
+      ready = true;
 #else
       //selecting input
       parent->fc.reset(new FileChooser("Choose an image to open...", File("/home/cm/Documents/data/blur_test/config/"),

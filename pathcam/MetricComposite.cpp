@@ -592,7 +592,8 @@ namespace pathCam {
     //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
     //pretty close to the center of the frame
     if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.05f) {
-      return get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index) > get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index);
+      auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
+      return (v1 > 10 * parent->tileSize * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index));
     }
 
     //amount of motion blur is significantly different, choose clearest image
