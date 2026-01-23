@@ -128,9 +128,7 @@ public:
   TiledImage(std::shared_ptr<MRTiledImage> parent = nullptr, unsigned int tile_size = 0,
              unsigned int logic_size = 256, int levelWithinPyramid = 0);
 
-  ~TiledImage() {
-    std::cout << "TiledImage class destructor level " << levelWithinPyramid << std::endl;
-  };
+  ~TiledImage() {};
 
   int levelWithinPyramid;
 

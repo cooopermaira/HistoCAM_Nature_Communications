@@ -50,6 +50,7 @@ void ImageViewComponent::uncacher() {
     if (parent->sCam) {
       {
         Poco::FastMutex::ScopedLock lock(loadASAPMutex);
+        std::cout<<"unacher awake"<<std::endl;
         while (!loadMRImageSetsASAP.empty()) {
           auto slide = loadMRImageSetsASAP.front();
           loadMRImageSetsASAP.pop();
@@ -76,6 +77,21 @@ void ImageViewComponent::cacher() {
     } else {
       std::this_thread::sleep_for(std::chrono::seconds(10));
     }
+  }
+}
+
+void ImageViewComponent::q_cache()  {
+  if (!MRImageSet->inMemory && !MRImageSet->loadFromCacheQueued) {
+    Poco::FastMutex::ScopedLock lock(loadASAPMutex);
+    loadMRImageSetsASAP.push(MRImageSet);
+    loadMRImageSetASAPEvent.set();
+    MRImageSet->loadFromCacheQueued = true;
+
+    if (MRImageSet->inMemory) {
+      int k = 0;
+    }
+    recentlyViewedSlides.push_unique(MRImageSet);
+    parent->sCam->cacheAlert.set();
   }
 }
 
@@ -438,6 +454,8 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     if (parent->capture->simulating || parent->capture->recording) { return true; }
 
     if (parent->sCam) {
+      Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
+
       const int N = static_cast<int>(parent->sCam->previousSlides.size());
 
       if (N == 0) { return true; }
@@ -456,6 +474,8 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     if (parent->capture->simulating || parent->capture->recording) { return true; }
 
     if (parent->sCam) {
+      Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
+
       const int N = static_cast<int>(parent->sCam->previousSlides.size());
 
       if (N == 0) { return true; }
@@ -664,7 +684,7 @@ void ImageViewComponent::zoomAndCenter() {
                     (float) MRImageSet->bounds.height /
                     (float) view->getVerticalRange().getLength());
 
-  scaleCenter(fPoint(scale, scale));
+  scaleCenter(fPoint(scale, scale),false);
 }
 
 juce::Image ImageViewComponent::createCheckerboardImage(int width,

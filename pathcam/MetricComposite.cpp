@@ -106,7 +106,9 @@ namespace pathCam {
     cudaFree(threeChnBuf);
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
-    FreeSiftData(compSiftData);
+    if (!suspended) {
+      FreeSiftData(compSiftData);
+    }
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
@@ -273,11 +275,11 @@ namespace pathCam {
     for (int ii = 0; ii < extraMatches.size(); ++ii) {
       auto [img1,img2,kp1,kp2] = extraMatches[ii];
       ig->addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
-      for (auto m : matches) {
-        if (img1->index == m->image_1->index || img1->index == m->image_2->index || img2->index == m->image_1->index  || img2->index == m->image_2->index) {
-          std::cout<< img1->index<<" "<<img2->index << m->image_1->index<<" "<<m->image_2->index<<std::endl;
-        }
-      }
+      // for (auto m : matches) {
+      //   if (img1->index == m->image_1->index || img1->index == m->image_2->index || img2->index == m->image_1->index  || img2->index == m->image_2->index) {
+      //     std::cout<< img1->index<<" "<<img2->index << m->image_1->index<<" "<<m->image_2->index<<std::endl;
+      //   }
+      // }
     }
 
     for (auto img: members) {
@@ -317,9 +319,9 @@ namespace pathCam {
     }
     if (!graphConnectivityResult.success) {
       std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
-      for (auto img : members) {
-        std::cout<<img->index<<" "<<img->matchCount<<std::endl;
-      }
+      // for (auto img : members) {
+      //   std::cout<<img->index<<" "<<img->matchCount<<std::endl;
+      // }
       return;
     }
 
@@ -589,9 +591,7 @@ namespace pathCam {
     //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
     //pretty close to the center of the frame
     if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.05f) {
-      auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
-
-      return (v1 > 4 * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index));
+      return get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index) > get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index);
     }
 
     //amount of motion blur is significantly different, choose clearest image

@@ -58,7 +58,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   // reportOverlay.reset(new ReportOverlay(this, iconNames, iconsFromZipFile));
   // addAndMakeVisible(reportOverlay.get());
 
-  // uncacheThread = std::thread(&ImageViewComponent::uncacher, this);
+  uncacheThread = std::thread(&ImageViewComponent::uncacher, this);
   cacheThread = std::thread(&ImageViewComponent::cacher, this);
 }
 
@@ -129,10 +129,10 @@ void CaptureComponent::startRecording() {
 #endif
 
   parent->MRimage = sCam->get_MRimage_reference();
-  parent->capture->setImage(parent->MRimage);
+  setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
-  parent->imageview->recentlyViewedSlides.push_unique(parent->MRimage);
+  recentlyViewedSlides.push_unique(parent->MRimage);
 
   compositeThread.start(new bcamPocoRunnable(this));
   parent->startCompositingUIUpdates();
@@ -163,10 +163,10 @@ void CaptureComponent::startSimulating() {
   sCam->set_slide_label();
 
   parent->MRimage = sCam->get_MRimage_reference();
-  parent->capture->setImage(parent->MRimage);
+  setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
-  parent->imageview->recentlyViewedSlides.push_unique(parent->MRimage);
+  recentlyViewedSlides.push_unique(parent->MRimage);
 
 
   compositeThread.start(new sCamPocoRunnable(this));

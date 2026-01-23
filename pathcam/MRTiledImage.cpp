@@ -72,7 +72,6 @@ int MRTiledImage::get_class_for_tile(std::tuple<int, int, unsigned> _tile) {
 }
 
 void MRTiledImage::cache_to_disk(const std::string &_cwd) {
-  std::cout<<"caching "<<MRImageSet.lock()->index<<std::endl;
   if (!cachedToDisk) {
     Poco::File cwd(_cwd);
     if (!cwd.exists() || !cwd.isDirectory()) {
@@ -266,6 +265,7 @@ void MRTiledImage::uncache_from_disk() {
       }
 
       ::close(fd);
+      inMemory = true;
     }
   } catch (...) {
     // ::close(fd);

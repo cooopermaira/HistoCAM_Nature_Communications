@@ -119,6 +119,7 @@ namespace pathCam {
     Poco::FastMutex pyramidQMutex;
     Poco::FastMutex blurMutex;
     Poco::FastMutex CudaSiftGlobalUseMutex;
+    Poco::FastMutex previousSlidesMutex;
 
     long cudaSiftTime = 0;
 

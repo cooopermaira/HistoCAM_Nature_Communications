@@ -143,7 +143,10 @@ namespace pathCam {
   }
 
   std::string StreamCam::set_slide_label(std::string _name) {
+    previousSlidesMutex.lock();
     currentSlideIndex = previousSlides.size();
+    previousSlidesMutex.unlock();
+
     if (_name == "") {
       if (currentSlideLabel == "") {
         currentSlideLabel = std::to_string(currentSlideIndex);
@@ -997,13 +1000,15 @@ namespace pathCam {
 
     //store slide and reset slide member variable
     MRImageSet->detach();
+
+    previousSlidesMutex.lock();
     MRImageSet->index = previousSlides.size();
     previousSlides.push_back(std::move(MRImageSet));
+    previousSlidesMutex.unlock();
+
     cacheAlert.set();
 
     assert(set_slide_label().empty());
-
-    return;
   }
 
   StreamCam::~StreamCam() {

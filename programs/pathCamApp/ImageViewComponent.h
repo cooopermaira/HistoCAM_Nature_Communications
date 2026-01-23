@@ -203,14 +203,7 @@ protected:
 
   void uncacher();
 
-  void q_cache() {
-    if (!MRImageSet->inMemory && !MRImageSet->loadFromCacheQueued) {
-      Poco::FastMutex::ScopedLock lock(loadASAPMutex);
-      loadMRImageSetsASAP.push(MRImageSet);
-      loadMRImageSetASAPEvent.set();
-      MRImageSet->loadFromCacheQueued = true;
-    }
-  };
+  void q_cache();
 
   inline void translate(fPoint amount)
   {
@@ -225,16 +218,16 @@ protected:
     updateScrollbar();
   }
 
-  inline void scaleCenter(fPoint scale)
-  {
+  inline void scaleCenter(fPoint scale,bool _uncache = true){
     if (!MRImageSet)
     {
       return;
     }
     fPoint center = view->getCentre();
     if (isVisible()){
-      q_cache();
-
+      if (_uncache) {
+        q_cache();
+      }
       *view -= center;
       *view *= scale;
       *view += center;

@@ -45,7 +45,7 @@ public:
 
   MRTiledImage(pathCam::StreamCam *parent = nullptr, int _tile_size = 0);
 
-  ~MRTiledImage() { level.clear(); };
+  ~MRTiledImage() = default;
 
   void insertMat(cv::Mat &image_in, cv::Rect_<float> box);
 
@@ -171,11 +171,12 @@ public:
     for (auto &mrImg: MRImages) {
       assert(mrImg->inMemory);
       mrImg->cache_to_disk(cwd.toString());
+      assert(!mrImg->inMemory);
     }
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::high_resolution_clock::now() - start);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     cachedToDisk = true;
     inMemory = false;
+    std::cout << "cached " << index << " in " << duration.count() << " ms" << std::endl;
   };
 
   void uncache_from_disk() {
@@ -183,10 +184,11 @@ public:
     for (auto &mrImg: MRImages) {
       assert(!mrImg->inMemory);
       mrImg->uncache_from_disk();
+      assert(mrImg->inMemory);
     }
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::high_resolution_clock::now() - start);
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     inMemory = true;
+    std::cout << "uncached " << index << " in " << duration.count() << " ms" << std::endl;
   }
 
 private:
