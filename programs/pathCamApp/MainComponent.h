@@ -28,7 +28,7 @@ public:
 
   void GuiEventHandler(std::string event);
 
-  ImageViewComponent *imageview;
+  // ImageViewComponent *imageview;
   std::shared_ptr<MRTiledImageSet> MRimage;
   std::shared_ptr<MRTiledImage> imagePyramid;
   CaptureComponent *capture;

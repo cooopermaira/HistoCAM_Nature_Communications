@@ -106,9 +106,9 @@ namespace pathCam {
     cudaFree(threeChnBuf);
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
-    if (!suspended) {
-      FreeSiftData(compSiftData);
-    }
+    // if (!suspended && successfullyAligned) {
+    //   FreeSiftData(compSiftData);
+    // }
   }
 
   /* This function is pretty confusing but the gist is that when a new frame comes in we find what pyramid tiles it
@@ -430,19 +430,20 @@ namespace pathCam {
     }
 
 
-    Rect tileROI(0, 0, parent->tileSize, parent->tileSize);
-    for (auto &tileIdx: liveTilesCopy) {
-      auto tileObj = imagePyramid->get_base_tile(tileIdx);
-      if (!tileObj->owner) {
-        //kill tile
-        tileObj->image.setTo(Scalar(0, 0, 0, 0));
-        Rect tileRegion(tileIdx * parent->tileSize, Size(parent->tileSize, parent->tileSize));
-        imagePyramid->level[0]->tileUpwards(tileIdx, tileRegion, tileObj, tileROI);
-        tileObj.reset();
-      }
-    }
-
-    compSiftData = collect_SiftData(componentFeatures, 5);
+    // Rect tileROI(0, 0, parent->tileSize, parent->tileSize);
+    // for (auto &tileIdx: liveTilesCopy) {
+    //   auto tileObj = imagePyramid->get_base_tile(tileIdx);
+    //   if (!tileObj->owner) {
+    //     //kill tile
+    //     tileObj->image.setTo(Scalar(0, 0, 0, 0));
+    //     Rect tileRegion(tileIdx * parent->tileSize, Size(parent->tileSize, parent->tileSize));
+    //     imagePyramid->level[0]->tileUpwards(tileIdx, tileRegion, tileObj, tileROI);
+    //     tileObj.reset();
+    //   }
+    // }
+    //
+    // compSiftData = collect_SiftData(componentFeatures, 5);
+    successfullyAligned = true;
   }
 
   void MetricComposite::search_and_absorb_other_components() {

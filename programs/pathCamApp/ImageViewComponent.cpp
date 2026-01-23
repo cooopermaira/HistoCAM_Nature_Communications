@@ -50,7 +50,6 @@ void ImageViewComponent::uncacher() {
     if (parent->sCam) {
       {
         Poco::FastMutex::ScopedLock lock(loadASAPMutex);
-        std::cout<<"unacher awake"<<std::endl;
         while (!loadMRImageSetsASAP.empty()) {
           auto slide = loadMRImageSetsASAP.front();
           loadMRImageSetsASAP.pop();
@@ -253,7 +252,13 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
 void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   bool canShadeClasses = false;
 
-  const int N = (int) MRImageSet->MRImages.size();
+  std::vector<std::shared_ptr<MRTiledImage>> mrImages;
+  {
+    Poco::FastMutex::ScopedLock lock(MRImageSet->mutex);
+    mrImages = MRImageSet->MRImages;
+  }
+
+  const int N = (int) mrImages.size();
   if (N == 0) return;
 
   const int mode = wrapMod(componentSelector, N + 1); // 0..N
@@ -267,7 +272,7 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   for (int i = 0; i < N; ++i) {
     if (!showAll && i == selectedIdx) continue;
 
-    auto img = MRImageSet->MRImages[i];
+    auto img = mrImages[i];
     if (/*img->scale == 0 ||*/ img->suspended) continue;
 
     g.setColour(juce::Colours::white);
@@ -290,7 +295,7 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
     g.endTransparencyLayer();
 
     // draw selected at full opacity
-    auto img = MRImageSet->MRImages[selectedIdx];
+    auto img = mrImages[selectedIdx];
     if (img->scale != 0 && !img->suspended) {
       g.setColour(juce::Colours::white);
       drawLayer(g, scale, img);
@@ -312,8 +317,8 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
 
 
   //Define buffer space from the edges
-  if (MRImageSet->MRImages.size() > 0 && shadeClasses) {
-    auto sCam = MRImageSet->MRImages[0]->parent;
+  if (mrImages.size() > 0 && shadeClasses) {
+    auto sCam = mrImages[0]->parent;
     int paddingX = 100;
     int paddingY = 150;
     int squareSize = 30; // Size of the square
@@ -540,11 +545,12 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     repaint();
     return true; // Key press handled
   }
-  if (key == juce::KeyPress::createFromDescription("q")) {
-    if (!MRImageSet->MRImages.empty()) {
-      //MRImage->images[0]->parent->as->create_segmentation()
-    }
-  }
+  // // segment anything
+  // if (key == juce::KeyPress::createFromDescription("q")) {
+  //   if (!MRImageSet->MRImages.empty()) {
+  //     //MRImage->images[0]->parent->as->create_segmentation()
+  //   }
+  // }
   if (key.getKeyCode() == KeyPress::escapeKey) {
     JUCEApplication::getInstance()->systemRequestedQuit();
   }
@@ -644,7 +650,12 @@ void ImageViewComponent::resized() {
 }
 
 void ImageViewComponent::zoomAndCenter() {
-  if (!MRImageSet || MRImageSet->MRImages.empty() || !isVisible()) { return; }
+  bool isEmpty;
+  {
+    Poco::FastMutex::ScopedLock lock(MRImageSet->mutex);
+    isEmpty = MRImageSet->MRImages.empty();
+  }
+  if (!MRImageSet || isEmpty || !isVisible()) { return; }
 
   //  Rect_<float> bounds;
   //  bool showAsCircle;

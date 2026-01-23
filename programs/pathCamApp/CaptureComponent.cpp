@@ -208,7 +208,7 @@ void CaptureComponent::set_input(const FileChooser &fc) {
     procedureMode = 1;
     ready = true;
     if (MRImageSet) {
-      parent->imageview->setImage(nullptr);
+      // parent->imageview->setImage(nullptr);
       parent->capture->setImage(nullptr); //parent->capture is just this
       parent->annotate->setImage(nullptr);
     }

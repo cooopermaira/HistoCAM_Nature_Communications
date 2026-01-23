@@ -346,6 +346,7 @@ void MRTiledImageSet::update_bounds() {
 }
 
 void MRTiledImageSet::detach() {
+  Poco::FastMutex::ScopedLock lock(mutex);
   completed = true;
 
   MRImages.erase(

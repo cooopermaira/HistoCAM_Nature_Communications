@@ -23,13 +23,13 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
     MRimage.reset(new MRTiledImageSet);
     toolbar = new ToolbarComponent(this);
     view.reset(new fRectangle());
-    imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile,this);
+    // imageview = new ImageViewComponent(view, iconNames, iconsFromZipFile,this);
     capture = new CaptureComponent(view, iconNames, iconsFromZipFile, config, this); //pass reference to bcam
 
     //capture->bcam->set_MainComponent_reference(this);
     annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile, this);
 
-    addAndMakeVisible(imageview);
+    // addAndMakeVisible(imageview);
     addAndMakeVisible(toolbar);
 
     addChildComponent(capture);
@@ -37,7 +37,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
 
 
     setWantsKeyboardFocus(true);
-    addKeyListener(imageview);
+    // addKeyListener(imageview);
     addKeyListener(capture);
     addKeyListener(annotate->getViewComp());
 
@@ -50,7 +50,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config):confi
 MainComponent::~MainComponent() {
     delete progressBar;
     delete toolbar;
-    delete imageview;
+    // delete imageview;
     delete capture;
     delete annotate;
 }
@@ -119,7 +119,7 @@ public:
     void threadComplete(bool userPressedCancel) override {
       if (userPressedCancel) { parent->MRimage.reset(new MRTiledImageSet()); }
         else {
-            parent->imageview->setImage(parent->MRimage);
+            // parent->imageview->setImage(parent->MRimage);
             parent->capture->setImage(parent->MRimage);
             parent->annotate->setImage(parent->MRimage);
         }
@@ -160,7 +160,7 @@ void MainComponent::resized() {
     const ScopedLock lock(mutex);
     juce::Rectangle<int> b = getLocalBounds();
     toolbar->setBounds(b.removeFromTop(50));
-    imageview->setBounds(b);
+    // imageview->setBounds(b);
     capture->setBounds(b);
     annotate->setBounds(b);
 
@@ -189,8 +189,8 @@ void MainComponent::GuiEventHandler(std::string event) {
 
     if (event == "home") {
         const ScopedLock lock(mutex);
-        imageview->setVisible(true);
-        imageview->fixAspectRatio();
+        // imageview->setVisible(true);
+        // imageview->fixAspectRatio();
         capture->setVisible(false);
         annotate->setVisible(false);
     }
@@ -199,7 +199,7 @@ void MainComponent::GuiEventHandler(std::string event) {
         const ScopedLock lock(mutex);
         capture->setVisible(true);
         capture->fixAspectRatio();
-        imageview->setVisible(false);
+        // imageview->setVisible(false);
         annotate->setVisible(false);
 
     }
@@ -208,7 +208,7 @@ void MainComponent::GuiEventHandler(std::string event) {
         const ScopedLock lock(mutex);
         annotate->setVisible(true);
         annotate->fixAspectRatio();
-        imageview->setVisible(false);
+        // imageview->setVisible(false);
         capture->setVisible(false);
     }
 

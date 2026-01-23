@@ -51,6 +51,9 @@ namespace pathCam {
         int debugTileCount1 = 0,debugTileCount2 = 0;
         long fhTime = 0;
 
+        bool successfullyAligned = false;
+        // bool componentSiftDataInit = false;
+
         std::atomic<int> outstandingCMS_jobs = 0;
         std::atomic<bool> xcInProgress = false;
         std::atomic<bool> alignmentHasBegun = false;

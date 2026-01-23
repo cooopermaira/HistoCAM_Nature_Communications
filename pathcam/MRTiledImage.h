@@ -121,6 +121,8 @@ public:
   std::atomic<bool> completed = false;
   int index;
 
+  Poco::FastMutex mutex;
+
 
   // MRTiledImageSet() {
   //   std::cerr << "constructor MRTiledImageSet this=" << this << "\n";
