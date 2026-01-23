@@ -34,7 +34,7 @@ public:
 
   virtual void run() {
 #ifdef WITH_SPINNAKER
-    cptcmp->bcam->run();
+    cptcmp->spinpath->run();
 #endif
     MessageManager::callAsync(
       [safeParent = Component::SafePointer(cptcmp->parent)]() mutable {
@@ -76,7 +76,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 #ifdef WITH_SPINNAKER
   if (recording) {
     int ignore;
-    bcam->sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel);
+    spinpath->sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel);
   }
 #endif
 
@@ -117,15 +117,15 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 void CaptureComponent::startRecording() {
   recording = true;
 #ifdef WITH_SPINNAKER
-  if (!bcam) {
-    bcam.reset(new pathCam::SpinPath(config));
-    bcam->add_observer(parent);
-    scopeRadius = bcam->sCam->get_scope_radius();
-    aiOverlay->set_sCam(bcam->sCam);
-    parent->sCam = bcam->sCam;
+  if (!spinpath) {
+    spinpath.reset(new pathCam::SpinPath(config));
+    spinpath->add_observer(parent);
+    scopeRadius = spinpath->sCam->get_scope_radius();
+    aiOverlay->set_sCam(spinpath->sCam);
+    parent->sCam = spinpath->sCam;
   }
   //aiOverlay->set_sCam(bcam->sCam);
-  bcam->sCam->set_slide_label();
+  spinpath->sCam->set_slide_label();
 #endif
 
   parent->MRimage = sCam->get_MRimage_reference();
@@ -186,7 +186,7 @@ void CaptureComponent::stop() {
 
 void CaptureComponent::stopRecording() {
 #ifdef WITH_SPINNAKER
-  bcam->stopCamera();
+  spinpath->stopCamera();
 #endif
 
 

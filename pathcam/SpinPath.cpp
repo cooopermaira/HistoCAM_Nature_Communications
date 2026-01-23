@@ -208,9 +208,9 @@ void ProcessStream::run() {
 }
 
 SpinPath::SpinPath(LayeredConfiguration::Ptr config):  camChannel(new SimpleFileChannel), camlogger(Poco::Logger::get("CamLogger")),
-                       IOChannel(new SimpleFileChannel), IOlogger(Poco::Logger::get("IOLogger")),sCam(new StreamCam(config))
+                       IOChannel(new SimpleFileChannel), IOlogger(Poco::Logger::get("IOLogger"))
 {
-
+  sCam = std::make_shared<StreamCam>(config);
   cache = new std::queue < cache_element >();
   camlogger.setChannel(camChannel);
   camChannel->setProperty("path", "camera.log");

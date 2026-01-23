@@ -99,7 +99,7 @@ private:
   
 public:
   //std::shared_ptr<StreamCam> sCam;
-  StreamCam* sCam;
+  std::shared_ptr<StreamCam> sCam;
   SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();
   int run();
@@ -117,7 +117,9 @@ public:
       sCam->add_observer(new_observer);
   }
 
-  std::shared_ptr < MRTiledImageSet > get_image_reference() { return sCam->get_MRimage_reference(); }
+  std::shared_ptr < MRTiledImageSet > get_image_reference() {
+    return sCam->get_MRimage_reference();
+  }
   
 private:
   
