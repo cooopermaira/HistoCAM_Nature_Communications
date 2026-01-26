@@ -45,6 +45,7 @@ void CaptureOverlay::resized()
     stopButton->setVisible(true);
     stopButton->setBounds(area.removeFromRight(100).reduced(20,0));
     parent->controlsOverlay->slideListButton->setVisible(false);
+    parent->labelList->setVisible(false);
   }else{
     simulateButton->setVisible(true);
     if (parent->sCam) {
