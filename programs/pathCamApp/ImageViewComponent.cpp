@@ -627,7 +627,7 @@ void ImageViewComponent::resized() {
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
   verticalScrollBar.setBounds(b.removeFromRight(20));
 
-  controlsOverlay->setBounds(juce::Rectangle<int>(20, 20, 60, 60));
+  controlsOverlay->setBounds(juce::Rectangle<int>(20, 20, 60, 120));
 
 
   b = getLocalBounds();
