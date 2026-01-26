@@ -211,6 +211,7 @@ namespace pathCam {
   }
 
   void CompositeManager::submit_outstanding_jobs() {
+    if (parent->maxIndex < 0){return;}
     for (int i = parent->maxIndex + 1; i <= parent->maxIndex + parent->windowWidth; ++i) {
       parent->JobQ->update_job_readiness(2,i);
     }

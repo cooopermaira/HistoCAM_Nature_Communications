@@ -37,7 +37,7 @@ public:
   std::string caseLabel;
 
 #ifdef WITH_SPINNAKER
-  std::shared_ptr<pathCam::SpinPath> bcam;
+  std::shared_ptr<pathCam::SpinPath> spinpath;
 #endif
 
   std::shared_ptr<pathCam::StreamCam> sCam;
