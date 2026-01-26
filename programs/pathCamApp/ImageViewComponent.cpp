@@ -615,42 +615,51 @@ void ImageViewComponent::paint(juce::Graphics &g) {
   }
 }
 
-
-void ImageViewComponent::resized() {
-  // This is called when the ImageViewComponent is resized.
-  // If you add any child components, this is where you should
-  // update their positions.
+void ImageViewComponent::layoutIn(juce::Rectangle<int> area)
+{
   const ScopedLock lock(mutex);
 
-  juce::Rectangle<int> b = getLocalBounds();
+  // Layout scrollbars inside `area`
+  auto b = area;
 
   horizontalScrollBar.setBounds(b.removeFromBottom(20));
   verticalScrollBar.setBounds(b.removeFromRight(20));
 
-  controlsOverlay->setBounds(juce::Rectangle<int>(20, 20, 60, 120));
+  // Controls overlay positioned relative to the top-left of `area`
+  controlsOverlay->setBounds(area.getX() + 20,
+                             area.getY() + 20,
+                             60,
+                             120);
 
-
-  b = getLocalBounds();
-
-  if (MRImageSet && isVisible()) {
-    scaleCenter(fPoint((float) b.getHorizontalRange().getLength() /
-                       (float) old_bounds.getHorizontalRange().getLength(),
-                       (float) b.getVerticalRange().getLength() /
-                       (float) old_bounds.getVerticalRange().getLength()));
+  // Everything below that previously used getLocalBounds() should use `area`
+  if (MRImageSet && isVisible())
+  {
+    // old_bounds used to mean "previous getLocalBounds()".
+    // Now it must mean "previous area used for layout".
+    if (old_bounds.getWidth() > 0 && old_bounds.getHeight() > 0) {
+      scaleCenter(fPoint((float) area.getWidth()  / (float) old_bounds.getWidth(),
+                         (float) area.getHeight() / (float) old_bounds.getHeight()));
+    }
   }
 
-  old_bounds = getLocalBounds();
+  old_bounds = area;
 
-
-  checkerboard = createCheckerboardImage(getLocalBounds().getWidth(),
-                                         getLocalBounds().getHeight(),
+  auto full = getLocalBounds();
+  checkerboard = createCheckerboardImage(full.getWidth(),
+                                         full.getHeight(),
                                          64,
                                          juce::Colours::lightgrey,
                                          juce::Colours::white);
+
+}
+
+void ImageViewComponent::resized() {
+  layoutIn(getLocalBounds());
 }
 
 void ImageViewComponent::zoomAndCenter() {
   bool isEmpty;
+  if (!MRImageSet){return;}
   {
     Poco::FastMutex::ScopedLock lock(MRImageSet->mutex);
     isEmpty = MRImageSet->MRImages.empty();

@@ -235,6 +235,8 @@ protected:
     updateScrollbar();
   }
 
+  void layoutIn(juce::Rectangle<int> area);
+
   inline fPoint screen2viewScale(fRectangle myview)
   {
     if (!MRImageSet)
@@ -287,13 +289,17 @@ private:
   juce::ScrollBar horizontalScrollBar{false}; // Horizontal scroll bar
   juce::ScrollBar verticalScrollBar{true};    // Vertical scroll bar
 
-  std::unique_ptr<ImageViewOverlay> controlsOverlay;
 
   juce::Time lastRepaintTime;
   static const int TARGET_FPS = 60;
   static const int MIN_REPAINT_INTERVAL_MS = 1000 / TARGET_FPS;
 
 protected:
+  juce::Rectangle<int> oldBounds;
+
+
+  std::unique_ptr<ImageViewOverlay> controlsOverlay;
+
   std::shared_ptr<fRectangle> view;
 
   CriticalSection mutex;

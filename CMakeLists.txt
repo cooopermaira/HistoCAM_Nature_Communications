@@ -96,12 +96,12 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 
-#link_directories("/home/cm/src/onnxruntime/build_cuda/Release")
-link_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/lib)
+link_directories("/home/cm/src/onnxruntime/build_cuda/Release")
+#link_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/lib)
 link_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/lib)
 
-#include_directories("/home/cm/src/onnxruntime/include")
-include_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/include)
+include_directories("/home/cm/src/onnxruntime/include")
+#include_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/include)
 include_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/include)
 
 add_subdirectory(CudaSift)

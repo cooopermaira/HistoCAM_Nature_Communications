@@ -186,6 +186,12 @@ namespace pathCam {
     return p;
   }
 
+  std::string StreamCam::get_slide_label(int slideIdx) {
+    Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
+    if (previousSlides.size() <= slideIdx){return "";}
+    return previousSlides[slideIdx]->labelName;
+  }
+
   void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index,
                                     std::string _label) {
     lastFrameMutex.lock();

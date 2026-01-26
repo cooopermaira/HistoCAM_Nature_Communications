@@ -294,6 +294,8 @@ namespace pathCam {
 
     bool get_scale_and_offset(unsigned int component_index, double &_scale, Point2f &_offset);
 
+
+    // FRONT END INTERACTION
     std::shared_ptr<MRTiledImageSet> get_MRimage_reference();
 
     void add_observer(DataObserver *new_observer) {
@@ -310,9 +312,13 @@ namespace pathCam {
 
     std::string set_slide_label(std::string name = "");
 
-    std::string get_slide_label(){return currentSlideLabel;}
+    std::string get_slide_label() const{return currentSlideLabel;}
 
     Poco::Path make_working_directory();
+
+    int get_num_slides() const{return (int)previousSlides.size();}
+
+    std::string get_slide_label(int slideIdx);
 
     bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID);
 

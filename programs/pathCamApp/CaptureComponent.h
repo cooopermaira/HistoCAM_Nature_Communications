@@ -46,20 +46,29 @@ public:
 
   void set_input(const FileChooser &fc);
 
-  void resized() override {
-    ImageViewComponent::resized();
+  void resized() override{
+    auto area = getLocalBounds();
+
+    const int panelWidth = (labelList && labelList->isVisible()) ? 100 : 0;
+    auto leftPanel = area.removeFromLeft(panelWidth);
+
+    if (labelList) {
+      labelList->setBounds(leftPanel);
+    }
+
+    // IMPORTANT: lay out ImageViewComponent *inside remaining area*
+    layoutIn(area);
 
     {
       const ScopedLock lock(mutex);
-      juce::Rectangle<int> b = getLocalBounds();
+      auto b = getLocalBounds();
       int width = 300;
-      captureOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - width - 20, 20, width, 60));
-      aiOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - 100 - 20,
-                                                b.getHeight() - 100 - 20, 100, 100));
-      // reportOverlay->setBounds(juce::Rectangle<int>(b.getWidth() - 200 - 40,
-      //                                           b.getHeight() - 100 - 20, 100, 100));
+      captureOverlay->setBounds({ b.getWidth() - width - 20, 20, width, 60 });
+      aiOverlay->setBounds({ b.getWidth() - 100 - 20,
+                             b.getHeight() - 100 - 20, 100, 100 });
     }
   }
+
 
   bool keyPressed(const juce::KeyPress &key, juce::Component *originatingComponent) override;
 
@@ -74,6 +83,8 @@ public:
   void stopSimulating();
 
   void drawSlide(juce::Graphics &g, float scale) override;
+
+  void setup_listbox();
 
 
   void paint(juce::Graphics &g) override {
@@ -97,6 +108,7 @@ public:
   }
 
 private:
+  std::unique_ptr<StreamCamLabelList> labelList;
   std::unique_ptr<CaptureOverlay> captureOverlay;
   std::unique_ptr<AIOverlay> aiOverlay;
   //std::unique_ptr<ReportOverlay> reportOverlay;

@@ -27,7 +27,7 @@ public:
       }
       if (iconNames[i] == "slideList.svg") {
         slideListButton.reset(new SvgButton("slides", iconsFromZipFile[i]));
-        slideListButton->addListener(this);
+        //slideListButton->addListener(this);
         addAndMakeVisible(*slideListButton);
       }
     }
@@ -48,11 +48,12 @@ public:
     slideListButton->setBounds(bottom);
   }
 
+  std::unique_ptr<SvgButton> slideListButton;
+
 private:
   void buttonClicked(juce::Button *button) override;
 
   std::unique_ptr<SvgButton> centerButton;
-  std::unique_ptr<SvgButton> slideListButton;
 
   ImageViewComponent *parent;
 
