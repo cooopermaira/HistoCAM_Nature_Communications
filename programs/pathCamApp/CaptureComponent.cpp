@@ -161,6 +161,7 @@ void CaptureComponent::startRecording() {
 
   captureOverlay->resized();
   aiOverlay->resized();
+  resized();
   repaint();
 }
 
@@ -202,6 +203,7 @@ void CaptureComponent::startSimulating() {
   captureOverlay->resized();
   aiOverlay->resized();
   //reportOverlay->resized();
+  resized();
   repaint();
 }
 
