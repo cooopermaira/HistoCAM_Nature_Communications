@@ -76,7 +76,7 @@ namespace pathCam {
   }
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
-      parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
+    parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
     frameDelay = 10;
     waitingFrames.resize(frameDelay, {nullptr, {}});
     //compositeImage = imagePyramid->level[0];
@@ -189,16 +189,15 @@ namespace pathCam {
       }
 
       //if (imagePyramid->scale > 0) {
-        float x = (imagePyramid->offset.x + img->absoluteCoords.x) * imagePyramid->scale;
-        float y = (imagePyramid->offset.y + img->absoluteCoords.y) * imagePyramid->scale;
-        float w = parent->image_width * imagePyramid->scale;
-        float h = parent->image_height * imagePyramid->scale;
-        bool showAsCircle = (componentMagLabel == Image::_2X);
+      float x = (imagePyramid->offset.x + img->absoluteCoords.x) * imagePyramid->scale;
+      float y = (imagePyramid->offset.y + img->absoluteCoords.y) * imagePyramid->scale;
+      float w = parent->image_width * imagePyramid->scale;
+      float h = parent->image_height * imagePyramid->scale;
+      bool showAsCircle = (componentMagLabel == Image::_2X);
 
-        parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
-                                  Image::get_label(componentMagLabel));
+      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
+                                Image::get_label(componentMagLabel));
       //}
-
     } else {
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
       ++positionForNextWaitngFrame;
@@ -207,11 +206,12 @@ namespace pathCam {
 
 
     //PROCESS OLD FRAMES BEGIN
-
-    //process delayed frames, allowing them to blur correct if necessary
-    //this is an erase-remove_if implementation with a lambda function inside that updates tileObj
-    //if img should be owner, otherwise it removes the tile from the img's list
-
+    /*
+        here we process delayed frames, allowing the least blurry frames to win out before processing.
+        this is an erase-remove_if implementation with a lambda function that updates the tileObj
+        if img should be owner, otherwise it removes the tile from the img's list as another img can fill that tile with
+        better data
+    */
     for (auto &[img,tiles]: waitingFrames) {
       if (!img) { continue; }
 
@@ -288,16 +288,17 @@ namespace pathCam {
 
     auto graphConnectivityResult = ig->computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
-      std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
+      std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
       return;
     }
 
     if (!graphConnectivityResult.promoted_nodes.empty()) {
-      std::cout << "Component " << componentIndex << " promoting additional " << graphConnectivityResult.promoted_nodes.size() <<
+      std::cout << "Component " << componentIndex << " promoting additional " << graphConnectivityResult.promoted_nodes.
+          size() <<
           " frames in BA" << std::endl;
       //important to check if empty or get_image_ref returns every image known to StreamCam
       for (auto img: parent->get_image_ref(graphConnectivityResult.promoted_nodes)) {
-        ig->setMember(img->index,true);
+        ig->setMember(img->index, true);
         members.insert(img);
       }
     }
@@ -307,18 +308,18 @@ namespace pathCam {
       // if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
       members.insert(m->image_1);
       members.insert(m->image_2);
-        //debug int k = 0;
-        ++m->image_1->matchCount;
-        ++m->image_2->matchCount;
-        for (int i = 0; i < m->good_matches.size(); ++i) {
-          if (m->inliers[i]) {
-            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
-          }
+      //debug int k = 0;
+      ++m->image_1->matchCount;
+      ++m->image_2->matchCount;
+      for (int i = 0; i < m->good_matches.size(); ++i) {
+        if (m->inliers[i]) {
+          ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
         }
+      }
       // }
     }
     if (!graphConnectivityResult.success) {
-      std::cout<<"component "<<componentIndex <<" failed to connect graph"<<std::endl;
+      std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
       // for (auto img : members) {
       //   std::cout<<img->index<<" "<<img->matchCount<<std::endl;
       // }
@@ -359,7 +360,7 @@ namespace pathCam {
     std::vector memberImages(members.begin(), members.end());
 
     auto tracks = ftg->generateCurrentTracks(memberImages);
-    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks,memberImages, 2 * memberImages.size() + 200);
+    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks, memberImages, 2 * memberImages.size() + 200);
 
     rebuild(memberImages);
 
@@ -367,7 +368,7 @@ namespace pathCam {
     delete ftg;
 
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
-    (std::chrono::high_resolution_clock::now() - start).count();
+        (std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
@@ -412,7 +413,7 @@ namespace pathCam {
         }
       }
       img->subsequentMatchLaunched = true;
-      process_tiles(img, tileIndexes,false);
+      process_tiles(img, tileIndexes, false);
 
 
       // for (auto &tileInd: tileIndexes) {
@@ -463,7 +464,8 @@ namespace pathCam {
   }
 
 
-  void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad, const bool forceFullImage) {
+  void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad,
+                                      const bool forceFullImage) {
     assert(parent->unifiedMemory); //change this to a fix later
     img->load_raw_from_disk(alertDoubleLoad);
 
@@ -486,7 +488,12 @@ namespace pathCam {
                                      img->height);
     Mat mask = componentMagLabel == Image::_2X ? circleMask : rectMask;
 
-    imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
+    int k = 0;
+    cv::Mat randomcolor(imageSize.height, imageSize.width, CV_8UC4,
+                        cv::Scalar(rand() & 255, rand() & 255, rand() & 255, 255));
+    imagePyramid->insertTilesAtBase(randomcolor, mask, imageBox, tiles);
+
+    // imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
     update_mutex.unlock();
   }
 
@@ -583,22 +590,59 @@ namespace pathCam {
     return results;
   }
 
-  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, const Image *_img) const {
-    //tile has no owner, candidate frame wins by default
-    if (!_to->owner) {
-      return true;
+  // bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, const Image *_img) const {
+  //   //tile has no owner, candidate frame wins by default
+  //   if (!_to->owner) {
+  //     return true;
+  //   }
+  //
+  //   //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
+  //   //pretty close to the center of the frame
+  //   if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.1f) {
+  //     auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
+  //     return (v1 > 10 * parent->tileSize * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(
+  //                                                                  _img->regInfo->absoluteCoords, _to->index));
+  //   }
+  //
+  //   //amount of motion blur is significantly different, choose clearest image
+  //   return _to->owner->motionBlur > _img->motionBlur;
+  // }
+
+  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj>& to,
+                                         const Image* cand) const
+  {
+    if (!to->owner) return true;
+    const Image* cur = to->owner;
+
+    const float curBlur = cur->motionBlur;
+    const float candBlur = cand->motionBlur;
+
+    // Require a minimum improvement in blur to replace, unless we are in a "nearly equal" band.
+    constexpr float blurReplaceMargin = 0.10f;  // <-- tune
+    constexpr float blurEqualBand     = 0.05f;
+
+    if (candBlur + blurReplaceMargin < curBlur) {
+      return true; // clearly better blur -> replace
     }
 
-    //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
-    //pretty close to the center of the frame
-    if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.05f) {
-      auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
-      return (v1 > 10 * parent->tileSize * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index));
+    // In the nearly-equal band, use center-distance, but still add a margin.
+    if (std::abs(curBlur - candBlur) < blurEqualBand) {
+      const auto curD = get_sqrd_center_distance_tile_to_img(cur->regInfo->absoluteCoords, to->index);
+      const auto candD = get_sqrd_center_distance_tile_to_img(cand->regInfo->absoluteCoords, to->index);
+
+      // Only replace if candidate is "meaningfully more central"
+      constexpr float centerImproveFactor = 0.80f; // cand must be <= 80% of current distance
+      if (candD < centerImproveFactor * curD) {
+        // also keep your "already near center" guard if desired
+        return (curD > 10 * parent->tileSize * parent->tileSize);
+      }
+      return false;
     }
 
-    //amount of motion blur is significantly different, choose clearest image
-    return _to->owner->motionBlur > _img->motionBlur;
+    // Otherwise, if blur isn't clearly better, keep current owner
+    return false;
   }
+
 
   std::unordered_set<Image *> MetricComposite::find_contributing_images() const {
     std::unordered_set<Image *> members;

@@ -211,6 +211,17 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
     }
     tile->mutex.unlock();
   }
+    //draws grid on image with indexes
+    for (unsigned int t = 0; t < tiles.size(); t++) {
+      auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
+      g.setColour(juce::Colours::greenyellow);
+      g.drawRect(bounds, 3);
+      std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+      g.setFont(20);
+      g.drawText(ij, bounds.getCentreX() - 50,
+                 bounds.getCentreY() - 45, 100, 30, Justification::centred);
+
+  }
 
   //tile classification
   /*
@@ -279,16 +290,7 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
     drawLayer(g, scale, img);
 
 
-    // //draws grid on image with indexes
-    //   for (unsigned int t = 0; t < tiles.size(); t++) {
-    //       auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
-    //       g.setColour(juce::Colours::greenyellow);
-    //       g.drawRect(bounds, 3);
-    //       std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-    //       g.setFont(20);
-    //       g.drawText(ij, bounds.getCentreX() - 50,
-    //                  bounds.getCentreY() - 45, 100, 30, Justification::centred);
-    //    }
+
   }
 
   if (!showAll) {
