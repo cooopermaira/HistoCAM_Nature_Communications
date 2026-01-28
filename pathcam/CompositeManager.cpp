@@ -139,7 +139,12 @@ namespace pathCam {
         auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).
             count();
         std::cout << "wait time " << t2 << std::endl;
-
+        // std::cout<<mc->find_contributing_images().size()<<std::endl;
+        // int i = 0;
+        // while (mc->consolidate_tile_ownership()){++i;}
+        // auto ans = mc->find_contributing_images();
+        // std::cout<<ans.size()<<std::endl;
+        // mc->rebuild(std::vector(ans.begin(),ans.end()));
         mc->align_and_rebuild();
       });
     }

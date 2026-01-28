@@ -21,11 +21,6 @@ namespace pathCam {
 
     // v DEBUG v
     int matchCount = 0;
-    bool decrementedMatchRunnable = false;
-    bool matcherWasCreatedByLoader = false;
-    bool matcherJobStarted = false;
-    std::vector<long> matchRunnableWasCancledBy;
-    int pathflag = 0;
     // ^ DEBUG ^
 
     int width, height;
@@ -44,7 +39,7 @@ namespace pathCam {
     cv::Point2i absoluteCoords;
     cv::Point2f debugInitialGuess;
 
-    Poco::FastMutex buffer_mutex,siftMutex;
+    Poco::FastMutex buffer_mutex,siftMutex,matchesMutex;
     std::mutex cudaBufferMutex, blurMutex;
     std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
@@ -54,6 +49,7 @@ namespace pathCam {
     bool subsequentMatchLaunched = false;
     bool fullKeyPoints = false;
 
+    std::unordered_set<cv::Point2i> ownedTiles;
     std::vector<std::shared_ptr<Match>> matches;
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
     cv::Mat descriptors;

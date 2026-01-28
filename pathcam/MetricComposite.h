@@ -26,11 +26,13 @@ namespace pathCam {
 
         void align_and_rebuild() override;
 
-        void rebuild(std::vector<Image *> members);
+        void rebuild(const std::vector<Image *> &members);
 
         bool image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image* _img) const;
 
         void search_and_absorb_other_components();
+
+        size_t consolidate_tile_ownership();
 
         [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const;
 

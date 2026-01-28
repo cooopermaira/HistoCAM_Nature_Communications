@@ -102,14 +102,12 @@ namespace pathCam {
             auto img = parent->get_image_ref(i);
             img->mark_too_dark();
             img->free_memory_RAW();
-            img->pathflag = 1;
 
             // parent->increment_match_counter(false,i);
           } else {
             jobQueue.push(jobRefs[answer.first]);
             jobRefs[answer.first]->unprocessed = false;
             auto img = parent->get_image_ref(i);
-            img->pathflag = 2;
           }
         }
       }

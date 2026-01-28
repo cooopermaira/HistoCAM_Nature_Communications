@@ -160,12 +160,16 @@ namespace pathCam {
 
       //calculate: for which of the affected tiles is this frame an improvement?
       for (auto &el: affectedPyramidTilesWithStatus) {
+        if (el.first.x == 16 && el.first.y == 17) {
+          int k = 0;
+        }
         auto pyrTileObj = imagePyramid->get_base_tile(el.first);
 
         //check if frame improves status of tile, if so process immediately
         if (pyrTileObj->status < el.second) {
           //if the tile is promoting to singleFrameCoverage, set owner and motionBlur from this frame
           if (el.second == TileObj::singleFrameCoverage) {
+            img->ownedTiles.insert(el.first);
             pyrTileObj->owner = img;
             pyrTileObj->status = el.second;
             immediateProcessingTiles.push_back(el.first);
@@ -175,10 +179,12 @@ namespace pathCam {
           // immediateProcessingTiles.push_back(el.first);
         }
 
-        // check if frame is less blurry than current source for tile (pyrTileObj)
-        else if (el.second == TileObj::singleFrameCoverage && image_improves_tile(pyrTileObj, img)) {
+        // check later if frame is less blurry than current source for tile (pyrTileObj)
+        else if (el.second == TileObj::singleFrameCoverage) {
           waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(el.first);
+          img->ownedTiles.insert(el.first);
         }
+
       }
       ++positionForNextWaitngFrame;
 
@@ -224,9 +230,11 @@ namespace pathCam {
                            return false;
                          }
                          if (image_improves_tile(tileObj, img)) {
+                           tileObj->owner->ownedTiles.erase(tileIdx);
                            tileObj->owner = img;
                            return false;
                          }
+                         img->ownedTiles.erase(tileIdx);
                          return true;
                        }), tiles.end()
       );
@@ -236,6 +244,7 @@ namespace pathCam {
         img = nullptr;
       }
     }
+
 
     //once delay is met, process frame
     auto &[img,tiles] = waitingFrames[positionForNextWaitngFrame % frameDelay];
@@ -257,12 +266,19 @@ namespace pathCam {
 
   void MetricComposite::align_and_rebuild() {
     auto start = std::chrono::high_resolution_clock::now();
+    // int consolidateCount = 0;
+    // while (consolidate_tile_ownership()) {
+    //   ++consolidateCount;
+    // }
 
     ig = new ImageGraph();
     //bai = new BundleAdjustmentIntegrator();
 
     std::unordered_set<Image *> members = find_contributing_images();
     members.insert(root);
+    std::vector membersForRebuild(members.begin(),members.end());
+
+    std::cout<<"member frames "<<members.size()<<std::endl;
 
 
     auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
@@ -275,12 +291,8 @@ namespace pathCam {
     for (int ii = 0; ii < extraMatches.size(); ++ii) {
       auto [img1,img2,kp1,kp2] = extraMatches[ii];
       ig->addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
-      // for (auto m : matches) {
-      //   if (img1->index == m->image_1->index || img1->index == m->image_2->index || img2->index == m->image_1->index  || img2->index == m->image_2->index) {
-      //     std::cout<< img1->index<<" "<<img2->index << m->image_1->index<<" "<<m->image_2->index<<std::endl;
-      //   }
-      // }
     }
+
 
     for (auto img: members) {
       ig->setMember(img->index, true);
@@ -302,12 +314,14 @@ namespace pathCam {
         members.insert(img);
       }
     }
+    auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(),members.end()));
+
 
 
     for (auto m: matches) {
-      // if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-      members.insert(m->image_1);
-      members.insert(m->image_2);
+      if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
+      // members.insert(m->image_1);
+      // members.insert(m->image_2);
       //debug int k = 0;
       ++m->image_1->matchCount;
       ++m->image_2->matchCount;
@@ -316,7 +330,7 @@ namespace pathCam {
           ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
         }
       }
-      // }
+      }
     }
     if (!graphConnectivityResult.success) {
       std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
@@ -362,7 +376,7 @@ namespace pathCam {
     auto tracks = ftg->generateCurrentTracks(memberImages);
     BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks, memberImages, 2 * memberImages.size() + 200);
 
-    rebuild(memberImages);
+    rebuild(membersForRebuild);
 
     delete ig;
     delete ftg;
@@ -372,7 +386,7 @@ namespace pathCam {
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
-  void MetricComposite::rebuild(std::vector<Image *> members) {
+  void MetricComposite::rebuild(const std::vector<Image *> &members) {
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
@@ -489,11 +503,11 @@ namespace pathCam {
     Mat mask = componentMagLabel == Image::_2X ? circleMask : rectMask;
 
     int k = 0;
-    cv::Mat randomcolor(imageSize.height, imageSize.width, CV_8UC4,
-                        cv::Scalar(rand() & 255, rand() & 255, rand() & 255, 255));
-    imagePyramid->insertTilesAtBase(randomcolor, mask, imageBox, tiles);
+    // cv::Mat randomcolor(imageSize.height, imageSize.width, CV_8UC4,
+    //                     cv::Scalar(rand() & 255, rand() & 255, rand() & 255, 255));
+    // imagePyramid->insertTilesAtBase(randomcolor, mask, imageBox, tiles);
 
-    // imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
+    imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
     update_mutex.unlock();
   }
 
@@ -590,58 +604,124 @@ namespace pathCam {
     return results;
   }
 
-  // bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, const Image *_img) const {
-  //   //tile has no owner, candidate frame wins by default
-  //   if (!_to->owner) {
+
+  size_t MetricComposite::consolidate_tile_ownership() {
+    auto start = std::chrono::high_resolution_clock::now();
+
+    constexpr int dx[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
+    constexpr int dy[8] = { -1,-1,-1,  0, 0,  1, 1, 1 };
+    std::vector<std::pair<Point2i, Image*>> updates;
+
+    for (auto &tileIdx : imagePyramid->liveTiles) {
+      std::unordered_map<Image*,int> neighborCount;
+      for (int i = 0; i < 8; ++i) {
+        //this method of grabbing tiles returns null if it doesnt exist rather than creating it
+        auto tileObj = imagePyramid->level[0]->tiles(tileIdx.x + dx[i], tileIdx.y + dy[i]);
+        if (tileObj && tileObj->owner) {
+          ++neighborCount[tileObj->owner];
+        }
+      }
+
+      //this method of grabbing tiles will create it if it doesnt exist, but we know it exists if its in liveTiles
+      auto myTile = imagePyramid->get_base_tile(tileIdx);
+      auto myOwnerPresence = neighborCount[myTile->owner];
+
+      int maxPresence = myOwnerPresence + 1;
+      std::vector<Image*> candidateOwners;
+      for (auto &[competingOwner,presence] : neighborCount) {
+        if (presence > maxPresence) {
+          candidateOwners.clear();
+          candidateOwners.push_back(competingOwner);
+        }else if (presence == maxPresence) {
+          candidateOwners.push_back(competingOwner);
+        }
+      }
+
+      //max distance a tile could be from an img
+      int bestDistance = (imageSize.width / 2 * imageSize.width / 2) + (imageSize.height / 2 * imageSize.height / 2);
+      Image* winner = myTile->owner;
+      for (auto & img : candidateOwners) {
+        auto dist = get_sqrd_center_distance_tile_to_img(img->regInfo->absoluteCoords,tileIdx);
+        if (dist < bestDistance) {
+          bestDistance = dist;
+          winner = img;
+        }
+      }
+      if (winner != myTile->owner) {
+        updates.emplace_back(tileIdx,winner);
+      }
+    }
+    for (auto &[tileIdx,img] : updates) {
+      imagePyramid->get_base_tile(tileIdx)->owner = img;
+    }
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start).count();
+
+    return updates.size();
+  }
+
+  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, const Image *_img) const {
+    //tile has no owner, candidate frame wins by default
+    if (!_to->owner) {
+      return true;
+    }
+
+    //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
+    //pretty close to the center of the frame
+    if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.01f) {
+
+      if (_to->owner->ownedTiles.size() < 12 && _img->ownedTiles.size() > 12) {
+        //owner does not have sufficient presence and should be removed to reduce member image count
+        return true;
+      }
+
+      auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
+      return (v1 > 25 * parent->tileSize * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(
+                                                                   _img->regInfo->absoluteCoords, _to->index));
+    }
+
+    //amount of motion blur is significantly different, choose clearest image
+    return _to->owner->motionBlur > _img->motionBlur;
+  }
+  //
+  // bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj>& to,
+  //                                        const Image* cand) const {
+  //
+  //   if (!to->owner) return true;
+  //   const Image* cur = to->owner;
+  //
+  //   const float curBlur = cur->motionBlur;
+  //   const float candBlur = cand->motionBlur;
+  //
+  //   // Require a minimum improvement in blur to replace, unless we are in a "nearly equal" band.
+  //   constexpr float blurReplaceMargin = 0.10f;  // <-- tune
+  //   constexpr float blurEqualBand     = 0.05f;
+  //
+  //   if (candBlur + blurReplaceMargin < curBlur) {
+  //     return true; // clearly better blur -> replace
+  //   }
+  //
+  //   if (cur->ownedTiles.size() < 12 && cand->ownedTiles.size() >= 12) {
   //     return true;
   //   }
   //
-  //   //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
-  //   //pretty close to the center of the frame
-  //   if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.1f) {
-  //     auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
-  //     return (v1 > 10 * parent->tileSize * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(
-  //                                                                  _img->regInfo->absoluteCoords, _to->index));
+  //   // In the nearly-equal band, use center-distance, but still add a margin.
+  //   if (std::abs(curBlur - candBlur) < blurEqualBand) {
+  //     const auto curD = get_sqrd_center_distance_tile_to_img(cur->regInfo->absoluteCoords, to->index);
+  //     const auto candD = get_sqrd_center_distance_tile_to_img(cand->regInfo->absoluteCoords, to->index);
+  //
+  //     // Only replace if candidate is "meaningfully more central"
+  //     constexpr float centerImproveFactor = 0.80f; // cand must be <= 80% of current distance
+  //     if (candD < centerImproveFactor * curD) {
+  //       // also keep your "already near center" guard if desired
+  //       return (curD > 25 * parent->tileSize * parent->tileSize);
+  //     }
+  //     return false;
   //   }
   //
-  //   //amount of motion blur is significantly different, choose clearest image
-  //   return _to->owner->motionBlur > _img->motionBlur;
+  //   // Otherwise, if blur isn't clearly better, keep current owner
+  //   return false;
   // }
-
-  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj>& to,
-                                         const Image* cand) const
-  {
-    if (!to->owner) return true;
-    const Image* cur = to->owner;
-
-    const float curBlur = cur->motionBlur;
-    const float candBlur = cand->motionBlur;
-
-    // Require a minimum improvement in blur to replace, unless we are in a "nearly equal" band.
-    constexpr float blurReplaceMargin = 0.10f;  // <-- tune
-    constexpr float blurEqualBand     = 0.05f;
-
-    if (candBlur + blurReplaceMargin < curBlur) {
-      return true; // clearly better blur -> replace
-    }
-
-    // In the nearly-equal band, use center-distance, but still add a margin.
-    if (std::abs(curBlur - candBlur) < blurEqualBand) {
-      const auto curD = get_sqrd_center_distance_tile_to_img(cur->regInfo->absoluteCoords, to->index);
-      const auto candD = get_sqrd_center_distance_tile_to_img(cand->regInfo->absoluteCoords, to->index);
-
-      // Only replace if candidate is "meaningfully more central"
-      constexpr float centerImproveFactor = 0.80f; // cand must be <= 80% of current distance
-      if (candD < centerImproveFactor * curD) {
-        // also keep your "already near center" guard if desired
-        return (curD > 10 * parent->tileSize * parent->tileSize);
-      }
-      return false;
-    }
-
-    // Otherwise, if blur isn't clearly better, keep current owner
-    return false;
-  }
 
 
   std::unordered_set<Image *> MetricComposite::find_contributing_images() const {

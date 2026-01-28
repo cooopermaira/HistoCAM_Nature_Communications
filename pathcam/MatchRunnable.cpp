@@ -110,11 +110,18 @@ namespace pathCam {
       auto m = std::make_shared<Match>(previous, image);
       matcher.match(m);
 
-      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 30)) {
         m->numMatches = std::accumulate(m->inliers.begin(),m->inliers.end(),0);
         //forward match to feature track generator (ftg)
-        // image->matches.push_back(m);
-        // previous->matches.push_back(m);
+
+        {
+          Poco::FastMutex::ScopedLock lock(image->matchesMutex);
+          image->matches.push_back(m);
+        }
+        {
+          Poco::FastMutex::ScopedLock lock(previous->matchesMutex);
+          previous->matches.push_back(m);
+        }
         matches.push_back(m);
       }
     }

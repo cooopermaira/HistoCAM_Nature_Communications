@@ -160,17 +160,17 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
       g.setOpacity(1.f);
       g.drawImage(*im, bounds);
       //
-      // //draw tile bounds with owner frame
-      // g.setColour(juce::Colours::greenyellow);
-      // g.drawRect(bounds, 3);
-      //
-      // std::string ij;
-      // if (tile->owner) {
-      //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
-      // }
-      // g.setFont(20);
-      // g.drawText(ij, bounds.getCentreX() - 250,
-      //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
+      //draw tile bounds with owner frame
+      g.setColour(juce::Colours::greenyellow);
+      g.drawRect(bounds, 3);
+
+      std::string ij;
+      if (tile->owner) {
+        ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
+      }
+      g.setFont(20);
+      g.drawText(ij, bounds.getCentreX() - 250,
+                 bounds.getCentreY() - 15, 500, 30, Justification::centred);
 
       for (auto &mask: tile->SAMMasks) {
         auto jImg = static_cast<juce::Image *>(mask.second.second);

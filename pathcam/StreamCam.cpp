@@ -1005,7 +1005,7 @@ namespace pathCam {
     maxIndex = -1;
 
     //store slide and reset slide member variable
-    MRImageSet->detach();
+    // MRImageSet->detach();
 
     previousSlidesMutex.lock();
     MRImageSet->index = previousSlides.size();
