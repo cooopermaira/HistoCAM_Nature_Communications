@@ -1005,12 +1005,14 @@ namespace pathCam {
     maxIndex = -1;
 
     //store slide and reset slide member variable
-    // MRImageSet->detach();
+    MRImageSet->detach();
 
-    previousSlidesMutex.lock();
-    MRImageSet->index = previousSlides.size();
-    previousSlides.push_back(std::move(MRImageSet));
-    previousSlidesMutex.unlock();
+
+    {
+      Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
+      MRImageSet->index = previousSlides.size();
+      previousSlides.push_back(std::move(MRImageSet));
+    }
 
     cacheAlert.set();
 

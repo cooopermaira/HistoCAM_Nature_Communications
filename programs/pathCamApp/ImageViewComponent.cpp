@@ -79,7 +79,7 @@ void ImageViewComponent::cacher() {
   }
 }
 
-void ImageViewComponent::q_cache()  {
+void ImageViewComponent::q_cache() {
   if (!MRImageSet->inMemory && !MRImageSet->loadFromCacheQueued) {
     Poco::FastMutex::ScopedLock lock(loadASAPMutex);
     loadMRImageSetsASAP.push(MRImageSet);
@@ -161,16 +161,16 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
       g.drawImage(*im, bounds);
       //
       //draw tile bounds with owner frame
-      g.setColour(juce::Colours::greenyellow);
-      g.drawRect(bounds, 3);
-
-      std::string ij;
-      if (tile->owner) {
-        ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
-      }
-      g.setFont(20);
-      g.drawText(ij, bounds.getCentreX() - 250,
-                 bounds.getCentreY() - 15, 500, 30, Justification::centred);
+      // g.setColour(juce::Colours::greenyellow);
+      // g.drawRect(bounds, 3);
+      //
+      // std::string ij;
+      // if (tile->owner) {
+      //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
+      // }
+      // g.setFont(20);
+      // g.drawText(ij, bounds.getCentreX() - 250,
+      //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
 
       for (auto &mask: tile->SAMMasks) {
         auto jImg = static_cast<juce::Image *>(mask.second.second);
@@ -211,17 +211,16 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
     }
     tile->mutex.unlock();
   }
-    //draws grid on image with indexes
-    for (unsigned int t = 0; t < tiles.size(); t++) {
-      auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
-      g.setColour(juce::Colours::greenyellow);
-      g.drawRect(bounds, 3);
-      std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-      g.setFont(20);
-      g.drawText(ij, bounds.getCentreX() - 50,
-                 bounds.getCentreY() - 45, 100, 30, Justification::centred);
-
-  }
+  // //draws grid on image with indexes
+  // for (unsigned int t = 0; t < tiles.size(); t++) {
+  //   auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
+  //   g.setColour(juce::Colours::greenyellow);
+  //   g.drawRect(bounds, 3);
+  //   std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+  //   g.setFont(20);
+  //   g.drawText(ij, bounds.getCentreX() - 50,
+  //              bounds.getCentreY() - 45, 100, 30, Justification::centred);
+  // }
 
   //tile classification
   /*
@@ -263,7 +262,7 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
 void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   bool canShadeClasses = false;
 
-  std::vector<std::shared_ptr<MRTiledImage>> mrImages;
+  std::vector<std::shared_ptr<MRTiledImage> > mrImages;
   {
     Poco::FastMutex::ScopedLock lock(MRImageSet->mutex);
     mrImages = MRImageSet->MRImages;
@@ -288,9 +287,6 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
 
     g.setColour(juce::Colours::white);
     drawLayer(g, scale, img);
-
-
-
   }
 
   if (!showAll) {
@@ -617,8 +613,7 @@ void ImageViewComponent::paint(juce::Graphics &g) {
   }
 }
 
-void ImageViewComponent::layoutIn(juce::Rectangle<int> area)
-{
+void ImageViewComponent::layoutIn(juce::Rectangle<int> area) {
   const ScopedLock lock(mutex);
 
   // Layout scrollbars inside `area`
@@ -634,12 +629,11 @@ void ImageViewComponent::layoutIn(juce::Rectangle<int> area)
                              120);
 
   // Everything below that previously used getLocalBounds() should use `area`
-  if (MRImageSet && isVisible())
-  {
+  if (MRImageSet && isVisible()) {
     // old_bounds used to mean "previous getLocalBounds()".
     // Now it must mean "previous area used for layout".
     if (old_bounds.getWidth() > 0 && old_bounds.getHeight() > 0) {
-      scaleCenter(fPoint((float) area.getWidth()  / (float) old_bounds.getWidth(),
+      scaleCenter(fPoint((float) area.getWidth() / (float) old_bounds.getWidth(),
                          (float) area.getHeight() / (float) old_bounds.getHeight()));
     }
   }
@@ -652,7 +646,6 @@ void ImageViewComponent::layoutIn(juce::Rectangle<int> area)
                                          64,
                                          juce::Colours::lightgrey,
                                          juce::Colours::white);
-
 }
 
 void ImageViewComponent::resized() {
@@ -661,7 +654,7 @@ void ImageViewComponent::resized() {
 
 void ImageViewComponent::zoomAndCenter() {
   bool isEmpty;
-  if (!MRImageSet){return;}
+  if (!MRImageSet) { return; }
   {
     Poco::FastMutex::ScopedLock lock(MRImageSet->mutex);
     isEmpty = MRImageSet->MRImages.empty();
@@ -706,7 +699,7 @@ void ImageViewComponent::zoomAndCenter() {
                     (float) MRImageSet->bounds.height /
                     (float) view->getVerticalRange().getLength());
 
-  scaleCenter(fPoint(scale, scale),false);
+  scaleCenter(fPoint(scale, scale), false);
 }
 
 juce::Image ImageViewComponent::createCheckerboardImage(int width,

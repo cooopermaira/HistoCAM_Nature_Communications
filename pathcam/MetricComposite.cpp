@@ -315,7 +315,10 @@ namespace pathCam {
       }
     }
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(),members.end()));
-
+    auto start1 = std::chrono::high_resolution_clock::now();
+    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members,memberOverlaps,ftg->storedMatches);
+    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start1).count();
 
 
     for (auto m: matches) {
@@ -445,18 +448,18 @@ namespace pathCam {
     }
 
 
-    // Rect tileROI(0, 0, parent->tileSize, parent->tileSize);
-    // for (auto &tileIdx: liveTilesCopy) {
-    //   auto tileObj = imagePyramid->get_base_tile(tileIdx);
-    //   if (!tileObj->owner) {
-    //     //kill tile
-    //     tileObj->image.setTo(Scalar(0, 0, 0, 0));
-    //     Rect tileRegion(tileIdx * parent->tileSize, Size(parent->tileSize, parent->tileSize));
-    //     imagePyramid->level[0]->tileUpwards(tileIdx, tileRegion, tileObj, tileROI);
-    //     tileObj.reset();
-    //   }
-    // }
-    //
+    Rect tileROI(0, 0, parent->tileSize, parent->tileSize);
+    for (auto &tileIdx: liveTilesCopy) {
+      auto tileObj = imagePyramid->get_base_tile(tileIdx);
+      if (!tileObj->owner) {
+        //kill tile
+        tileObj->image.setTo(Scalar(0, 0, 0, 0));
+        Rect tileRegion(tileIdx * parent->tileSize, Size(parent->tileSize, parent->tileSize));
+        imagePyramid->level[0]->tileUpwards(tileIdx, tileRegion, tileObj, tileROI);
+        tileObj.reset();
+      }
+    }
+
     // compSiftData = collect_SiftData(componentFeatures, 5);
     successfullyAligned = true;
   }
