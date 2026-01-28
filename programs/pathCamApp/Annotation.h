@@ -53,6 +53,10 @@ class PolygonAnnotation : public Annotation{
 public:
   PolygonAnnotation(juce::String name): Annotation(name), area(0.0) {};
 
+  bool containsPoint(const fPoint& p) {
+    rebuildPath();                 // ensure path matches points
+    return path.contains(p.getX(), p.getY());
+  }
 
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
     rebuildPath();

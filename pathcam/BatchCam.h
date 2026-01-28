@@ -26,6 +26,7 @@ namespace pathCam {
     friend class PairRegRunnable;
 
   public:
+    std::vector<ClassInfo> preconfiguredAnnoLabels;
     std::vector<ClassInfo> classesInfo;
     std::vector<MemoryPool *> mempool;
     Poco::Logger *logger;
@@ -54,7 +55,6 @@ namespace pathCam {
     Poco::Path python_venv_path;
     Poco::Path classifier_path;
     Poco::Path report_text_path;
-
 
     //Registration Params
     double crop_factor;

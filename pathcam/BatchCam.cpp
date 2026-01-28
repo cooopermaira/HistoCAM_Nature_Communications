@@ -117,6 +117,24 @@ namespace pathCam {
         return false;
       }
 
+      if (pConf->has("io.preconfigAnnoLabels")) {
+        int index = 0;
+        while (pConf->has("io.preconfigAnnoLabels.label["+std::to_string(index)+"].name")) {
+          ClassInfo classInfo;
+          std::string basepath = "io.preconfigAnnoLabels.label["+std::to_string(index)+"]";
+
+          classInfo.id = index;
+          classInfo.name = pConf->getString(basepath+".name");
+
+          std::string colorStr = pConf->getString(basepath + ".color");
+          std::stringstream ss(colorStr);
+          char comma;
+          ss >> classInfo.r >> comma >> classInfo.g >> comma >> classInfo.b;
+
+          preconfiguredAnnoLabels.push_back(classInfo);
+          ++index;
+        }
+      }
       if (pConf->has("io.inferencing.noref_blur") && pConf->has("io.inferencing.maxBlurBatchSize")) {
         no_ref_blur_model_path = Path(pConf->getString("io.inferencing.noref_blur"));
         maxBlurBatchSize = pConf->getInt("io.inferencing.maxBlurBatchSize");

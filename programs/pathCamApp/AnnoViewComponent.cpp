@@ -46,6 +46,41 @@ bool AnnoViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *o
 }
 
 bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
+  if (event.mods.isShiftDown() && event.mods.isRightButtonDown()){
+    const auto clickView = screen2view(fPoint(event.x, event.y), *view);
+
+    std::shared_ptr<PolygonAnnotation> hitPoly;
+    for (auto it = annotations->rbegin(); it != annotations->rend(); ++it){
+      auto poly = std::dynamic_pointer_cast<PolygonAnnotation>(*it);
+      if (poly && poly->containsPoint(clickView)) { hitPoly = poly; break; }
+    }
+    if (!hitPoly) return false;
+
+    juce::PopupMenu m;
+    for (int i = 0; i < parent->parent->sCam->preconfiguredAnnoLabels.size(); ++i) {
+      m.addItem(i + 1, parent->parent->sCam->preconfiguredAnnoLabels[i].name);
+    }
+    const auto screenPt = event.getScreenPosition();
+    juce::Rectangle<int> anchor(screenPt.x, screenPt.y, 1, 1);
+
+    m.showMenuAsync(
+        juce::PopupMenu::Options().withTargetScreenArea(anchor),
+        [this, hitPoly](int result){
+            if (result <= 0) return;
+            if (result >= 1 && result <= (int)parent->parent->sCam->preconfiguredAnnoLabels.size()){
+              auto ci = parent->parent->sCam->preconfiguredAnnoLabels[(size_t)(result - 1)];
+                hitPoly->setName(ci.name);
+                hitPoly->setColor(Colour(ci.r,ci.g,ci.b));
+                parent->annotationsUpdated();
+                repaint();
+            }
+        });
+
+    return true;
+  }
+
+
+
   if (event.mods.isRightButtonDown()) {
     if (parent->getMode() == Annotation::_POLY) {
       std::shared_ptr<Annotation> new_annotation;

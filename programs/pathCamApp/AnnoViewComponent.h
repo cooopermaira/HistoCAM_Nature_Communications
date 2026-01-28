@@ -12,6 +12,7 @@
 
 class AnnotateComponent;
 class MainComponent;
+
 class AnnoViewComponent  : public ImageViewComponent {
 public:
   AnnoViewComponent(AnnotateComponent *parent,
