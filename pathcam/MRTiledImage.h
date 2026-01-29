@@ -111,6 +111,8 @@ class MRTiledImageSet {
   friend class CaptureComponent;
 
 public:
+  std::vector<std::shared_ptr<MRTiledImage> > MRImages;
+
   cv::Rect_<float> bounds;
   std::string labelName;
   Poco::Path cwd;
@@ -193,8 +195,6 @@ public:
     std::cout << "uncached " << index << " in " << duration.count() << " ms" << std::endl;
   }
 
-private:
-  std::vector<std::shared_ptr<MRTiledImage> > MRImages;
 };
 
 

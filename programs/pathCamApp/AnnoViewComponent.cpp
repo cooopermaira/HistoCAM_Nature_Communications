@@ -35,7 +35,7 @@ bool AnnoViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *o
       auto input = cast->input;
       input.push_back(Point3f(cast->fovUpperLeftCorner.x, cast->fovUpperLeftCorner.y, 4));
       input.push_back(Point3f(cast->fovLowerRightCorner.x, cast->fovLowerRightCorner.y, 5));
-      parent->parent->sCam->segment_with_SAM(input, cast->ID);
+      parent->parent->sCam->segment_with_SAM(input, cast->ID, MRImageSet->index);
       repaint();
       return true; // Key press handled
     }

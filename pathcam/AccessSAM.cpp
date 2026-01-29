@@ -160,7 +160,7 @@ namespace pathCam {
   }
 
 
-  void AccessSAM::create_segmentation_coarse_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f> &_fov) {
+  void AccessSAM::create_segmentation_coarse_to_fine(std::vector<Point3f> &_clicks, int _segID, const std::vector<Point2f> &_fov, int _slideIdx) {
     cudaSetDevice(parent->compositorCudaDevice);
     for (auto &p : _clicks) {
       assert(p.x >= _fov[0].x && p.y >= _fov[0].y && p.x <= _fov[1].x && p.y <= _fov[1].y);
@@ -168,8 +168,11 @@ namespace pathCam {
     assert(_fov.size() == 2);
 
     //get base component (for now)
-    auto ipBase = parent->composites[0]->imagePyramid->level[0];
-
+    std::shared_ptr<TiledImage> ipBase;
+    {
+      Poco::FastMutex::ScopedLock lock(parent->previousSlidesMutex);
+      ipBase = parent->previousSlides[_slideIdx]->MRImages[0]->level[0];
+    }
     //create mat from tiles
     auto ul = ipBase->getIJ(_fov[0]);
     auto lr = ipBase->getIJ(_fov[1]);
@@ -252,7 +255,7 @@ namespace pathCam {
           tileMaskPreal.setTo(Scalar(0));
           output(fovROI).copyTo(tileMaskPreal(tileROI));
 
-          push_mask_for_display({x,y},0,tileMaskPreal,_segID,unionWithExistingMask);
+          push_mask_for_display({x,y},0,tileMaskPreal,_segID,unionWithExistingMask, _slideIdx);
           // maskMatHolding_32F.setTo(Scalar(0));
           // maskMatHolding_8U.setTo(Scalar(0));
           // output(fovROI).copyTo(maskMatHolding_32F(samTileROI));
@@ -554,8 +557,13 @@ namespace pathCam {
 
 
   void AccessSAM::push_mask_for_display(Point2i _tileCoord, unsigned int _componentIndex, const cuda::GpuMat &_mask,
-                                        int _segID, bool _unionWithExistingMask) {
-    auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
+                                        int _segID, bool _unionWithExistingMask, int _slideIdx) {
+    std::shared_ptr<TiledImage>pyrBase;
+    {
+      Poco::FastMutex::ScopedLock lock(parent->previousSlidesMutex);
+      pyrBase = parent->previousSlides[_slideIdx]->MRImages[0]->level[0];
+    }
+    // auto pyrBase = parent->composites[_componentIndex]->imagePyramid->level[0];
     auto tileObj = pyrBase->getTile(_tileCoord.x, _tileCoord.y);
 
     //if no display object exists, initialize one
@@ -577,8 +585,8 @@ namespace pathCam {
                      parent->tileSize);
     Rect tileRegion(0, 0, parent->tileSize, parent->tileSize);
 
-    auto level = parent->composites[0]->imagePyramid->level[0];
-    level->tileUpwards(_tileCoord, levelRegion, tileObj, tileRegion, _segID);
+    // auto level = parent->composites[0]->imagePyramid->level[0];
+    pyrBase->tileUpwards(_tileCoord, levelRegion, tileObj, tileRegion, _segID);
     //parent->composites[0]->imagePyramid->imgPyramidMutex->unlock();
 
     parent->notify_observers();

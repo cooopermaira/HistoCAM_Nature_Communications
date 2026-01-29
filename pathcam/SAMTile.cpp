@@ -263,7 +263,7 @@ namespace pathCam {
       }
       Rect maskRoi(tile.first.x * tileSize, tile.first.y * tileSize, tileSize, tileSize);
       if (cuda::countNonZero(output(maskRoi))) {
-        as->push_mask_for_display(tile.second, componentIndex, output(maskRoi), _segmentationID, !letMaskShrink);
+        // as->push_mask_for_display(tile.second, componentIndex, output(maskRoi), _segmentationID, !letMaskShrink, TODO);
       }
     }
     runIsRepeat = false;

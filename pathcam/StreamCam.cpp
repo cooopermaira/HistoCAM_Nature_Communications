@@ -737,13 +737,15 @@ namespace pathCam {
   }
 
   void StreamCam::notify_observers() {
-    MRImageSet->update_bounds();
+    if (MRImageSet) {
+      MRImageSet->update_bounds();
+    }
     for (int i = 0; i < observers.size(); i++) {
       observers[i]->notify_new_data();
     }
   }
 
-  bool StreamCam::segment_with_SAM(std::vector<Point3f> &_clicks, int _segID) {
+  bool StreamCam::segment_with_SAM(std::vector<Point3f> &_clicks, int _segID, int _slideIdx) {
     if (segmentWithSAM) {
       if (as) {
         if ((_clicks.end() - 2)->z == 4) {
@@ -751,7 +753,7 @@ namespace pathCam {
             std::vector<Point3f> inputClicks(_clicks.begin(), _clicks.end() - 2);
             Point2i fovUL((_clicks.end() - 2)->x, (_clicks.end() - 2)->y);
             Point2i fovLR(_clicks.back().x, _clicks.back().y);
-            as->create_segmentation_coarse_to_fine(inputClicks, _segID, {fovUL, fovLR});
+            as->create_segmentation_coarse_to_fine(inputClicks, _segID, {fovUL, fovLR}, _slideIdx);
             return true;
           } else {
             throw std::runtime_error("one FOV point but not the other");

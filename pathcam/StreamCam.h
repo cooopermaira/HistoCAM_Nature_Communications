@@ -320,7 +320,7 @@ namespace pathCam {
 
     std::string get_slide_label(int slideIdx);
 
-    bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID);
+    bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID, int _slideIdx);
 
     int increment_and_get_components() { return components++; }
 
