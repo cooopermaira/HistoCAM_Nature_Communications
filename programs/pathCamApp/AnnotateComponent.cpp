@@ -13,8 +13,8 @@ void AnnotateComponent::removeSelected()
     return;
 
   // Remove annotation object from the annotations list
-  auto itAnno = std::find(annotations->begin(), annotations->end(), selected);
-  if (itAnno == annotations->end())
+  auto itAnno = std::find(activeAnnotations->begin(), activeAnnotations->end(), selected);
+  if (itAnno == activeAnnotations->end())
     return;
 
   if (selected->getType() == Annotation::_SEG)
@@ -50,21 +50,16 @@ void AnnotateComponent::removeSelected()
     }
   }
 
-  annotations->erase(itAnno);
+  activeAnnotations->erase(itAnno);
   selected.reset();
 
   leftComponent->updatelist();
   repaint();
 }
 
+
 void AnnotateComponent::setImage(std::shared_ptr<MRTiledImageSet> image)  {
-  parent->MRimage->annotations = eraseAnnotations(annotations);
   rightComponent->setImage(image);
-  if (image && image->annotations && !image->annotations->empty()) {
-    annotations = restoreAnnotations(image->annotations);
-  }
-  else {
-    annotations->clear();
-  }
+  if (image){update_active_annotations(image->index);}
 }
 

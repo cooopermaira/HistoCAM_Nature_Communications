@@ -175,7 +175,7 @@ namespace pathCam {
     InferenceManager *im;
     PostProcessManager* ppm;
     SiftFeatureMatcher* sfm;
-    AccessSAM *as;
+    std::shared_ptr<AccessSAM> as;
     std::shared_ptr<JobQueue>JobQ;
     std::shared_ptr<JobQueue>jqSecondary;
     FeatureTrackGenerator *ftg;

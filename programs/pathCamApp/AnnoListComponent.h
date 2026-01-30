@@ -68,13 +68,14 @@ private:
 
 class AnnoListComponent : public Component {
 public:
+
   AnnoListComponent(AnnotateComponent *parent,
-                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations,
+                    std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > _annotations,
                     StringArray &iconNames,
-                    OwnedArray<Drawable> &iconsFromZipFile) : listBox(AnnoListBox(parent)), parent(parent), annotations(annotations) {
+                    OwnedArray<Drawable> &iconsFromZipFile) : listBox(AnnoListBox(parent)), parent(parent), annotations(_annotations) {
     
     model.reset(new AnnoListBoxModel());
-    model->annotations = annotations;
+    model->annotations = _annotations;
     model->parent = parent;
     
     listBox.setModel(model.get());
@@ -106,7 +107,14 @@ public:
     }
     
   }
-  
+
+  void updateAnnotations(std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > _annotations) {
+    annotations = _annotations;
+    model->annotations = _annotations;
+
+    listBox.updateContent();
+    listBox.repaint();
+  }
   
   void updatelist(){
     listBox.updateContent();
@@ -123,10 +131,10 @@ public:
   }
   
 private:
+  std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   AnnoListBox listBox;
   std::unique_ptr < AnnoListBoxModel >  model;
-  std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
-  
+
   AnnotateComponent * parent;
   
 };

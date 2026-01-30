@@ -21,8 +21,13 @@ namespace pathCam {
       im = new InferenceManager(this);
     }
 
+    segmentWithSAM = false;
     if (segmentWithSAM) {
-      as = new AccessSAM(this);
+      std::thread t([this]() {
+        as = std::make_shared<AccessSAM>(this);
+        as->load_model();
+      });
+      t.detach();
     }
 
     int threads = 1;
@@ -939,6 +944,10 @@ namespace pathCam {
   std::shared_ptr<MRTiledImageSet> StreamCam::get_MRimage_reference() {
     if (!MRImageSet) {
       MRImageSet = std::make_shared<MRTiledImageSet>();
+      {
+        Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
+        MRImageSet->index = previousSlides.size();
+      }
     }
     return MRImageSet;
   }
@@ -1012,7 +1021,6 @@ namespace pathCam {
 
     {
       Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
-      MRImageSet->index = previousSlides.size();
       previousSlides.push_back(std::move(MRImageSet));
     }
 

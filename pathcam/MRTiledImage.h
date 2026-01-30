@@ -123,14 +123,10 @@ public:
   std::atomic<bool> completed = false;
   int index;
 
-  std::shared_ptr<std::vector<std::shared_ptr<void>>> annotations;
-
   Poco::FastMutex mutex;
 
 
-  MRTiledImageSet() {
-    annotations.reset(new std::vector<std::shared_ptr<void>>());
-  };
+  MRTiledImageSet() {};
   ~MRTiledImageSet() {
     Poco::File workDir(cwd);
     if (workDir.exists() && workDir.isDirectory()) {

@@ -38,7 +38,10 @@ public:
     
   }
   
-  
+  void updateAnnotations(std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > _annotations) {
+    annotations = _annotations;
+  }
+
   void paint (juce::Graphics& g) override;
   
   bool keyPressed(const juce::KeyPress& key, juce::Component* originatingComponent) override;

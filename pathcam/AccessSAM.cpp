@@ -229,6 +229,9 @@ namespace pathCam {
     //generate segmentation for FOV
     auto output = fovTile.run_segmentation(_segID, false);
 
+    Mat outputMat;
+    output.download(outputMat);
+
     cuda::resize(output,output,fovRect.size());
     cuda::threshold(output,output,0,255,THRESH_BINARY);
     output.convertTo(output,CV_8U);

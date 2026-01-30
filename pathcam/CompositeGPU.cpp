@@ -386,7 +386,7 @@ namespace pathCam {
 
         for (int x = ul.x; x <= lr.x; ++x) {
           if ((xTileCount - 1) % (interval - 1) == 0) {
-            auto st = new SAMTile(id, {x - 1, y - 1}, accessSAM, 0, parent->SAMTileSize);
+            auto st = new SAMTile(id, {x - 1, y - 1}, accessSAM.get(), 0, parent->SAMTileSize);
 
             accessSAM->tiles.push_back(st);
             ++id;

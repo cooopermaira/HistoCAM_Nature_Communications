@@ -184,17 +184,6 @@ namespace pathCam {
     //   std::cout<<"write time: "<<totalTime<<"   total images: "<<totalImages<<std::endl;
     // }
 
-    if (parent->segmentWithSAM) {
-      auto start = std::chrono::high_resolution_clock::now();
-      //parent->as->initialize();
-      //parent->as->embed_SAM_tiles(false);
-      parent->as->load_model();
-
-
-      auto stop = std::chrono::high_resolution_clock::now();
-      std::cout << "SAM initialization runtime: " + std::to_string(
-        std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count()) << std::endl;;
-    }
 
     parent->compositing = false;
     parent->inferenceWait.set();

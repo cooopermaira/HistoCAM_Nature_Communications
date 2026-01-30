@@ -182,7 +182,7 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
 
         AffineTransform maskToCanvas = AffineTransform::scale(sx, sy).translated(bounds.getX(), bounds.getY());
 
-        auto annoColor = (*parent->annotate->annotations.get())[mask.first].get()->getColor();
+        auto annoColor = (*parent->annotate->activeAnnotations.get())[mask.first].get()->getColor();
         //Colour annoColor = parent->annotate
 
         g.reduceClipRegion(*jImg, maskToCanvas);
