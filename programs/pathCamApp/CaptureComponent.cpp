@@ -64,6 +64,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 
 void CaptureComponent::setup_listbox() {
   labelList = std::make_unique<StreamCamLabelList>(sCam,
+                                                 parent->annotate,
                                                  [this](int idx, const juce::String &label) {
                                                    Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
                                                    if (idx < 0 || idx >= (int)sCam->previousSlides.size())
@@ -71,6 +72,7 @@ void CaptureComponent::setup_listbox() {
                                                    auto mrImgSet = sCam->previousSlides[idx];
                                                    setImage(mrImgSet);
                                                    parent->annotate->setImage(mrImgSet);
+                                                   parent->annotate->update_active_annotations(idx);
                                                  });
 
   addAndMakeVisible(*labelList);

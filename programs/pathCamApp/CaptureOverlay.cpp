@@ -7,10 +7,41 @@
 
 #include "JuceHeader.h"
 
-CaptureOverlay::CaptureOverlay(CaptureComponent *parent,
-                 StringArray &iconNames,
-                 OwnedArray<Drawable> &iconsFromZipFile) : parent(parent) {
+bool StreamCamLabelList::slideHasMatchingAnnotation(int slideIndex, const juce::String &searchText) {
+  // Check if the slide label matches the search text
+  if (slideIndex >= 0 && slideIndex < sCam->get_num_slides()) {
+    juce::String slideLabel = sCam->get_slide_label(slideIndex);
+    if (slideLabel.containsIgnoreCase(searchText)) {
+      return true;
+    }
+  }
 
+  // Check if any annotation in the slide matches the search text
+  if (!annotateComp)
+    return false;
+
+  // Check if the slide index is valid in allSlideAnnotations
+  if (slideIndex < 0 || slideIndex >= (int) annotateComp->allSlideAnnotations.size())
+    return false;
+
+  auto slideAnnotations = annotateComp->allSlideAnnotations[slideIndex];
+  if (!slideAnnotations)
+    return false;
+
+  // Search through all annotations in this slide
+  for (const auto &anno: *slideAnnotations) {
+    if (anno && anno->getName().containsIgnoreCase(searchText)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+CaptureOverlay::CaptureOverlay(CaptureComponent *parent,
+                               StringArray &iconNames,
+                               OwnedArray<Drawable> &iconsFromZipFile) : parent(parent) {
   for (int i = 0; i < iconNames.size(); i++) {
     if (iconNames[i] == "record.svg") {
       recordButton.reset(new SvgButton("record", iconsFromZipFile[i]));
@@ -33,24 +64,23 @@ CaptureOverlay::CaptureOverlay(CaptureComponent *parent,
     if (parent->controlsOverlay->slideListButton) {
       parent->controlsOverlay->slideListButton->addListener(this);
     }
-
   }
 }
-void CaptureOverlay::resized()
-{
-  auto area = getLocalBounds().reduced (4);
-  if(parent->simulating || parent->recording){
+
+void CaptureOverlay::resized() {
+  auto area = getLocalBounds().reduced(4);
+  if (parent->simulating || parent->recording) {
     simulateButton->setVisible(false);
     recordButton->setVisible(false);
     stopButton->setVisible(true);
-    stopButton->setBounds(area.removeFromRight(100).reduced(20,0));
+    stopButton->setBounds(area.removeFromRight(100).reduced(20, 0));
     parent->controlsOverlay->slideListButton->setVisible(false);
     parent->labelList->setVisible(false);
-  }else{
+  } else {
     simulateButton->setVisible(true);
     if (parent->sCam) {
       parent->controlsOverlay->slideListButton->setVisible(true);
-    }else {
+    } else {
       parent->controlsOverlay->slideListButton->setVisible(false);
     }
 #ifdef WITH_SPINNAKER
@@ -59,31 +89,27 @@ void CaptureOverlay::resized()
     recordButton->setVisible(false);
 #endif
     stopButton->setVisible(false);
-    simulateButton->setBounds(area.removeFromRight(100).reduced(20,0));
-    recordButton->setBounds(area.removeFromRight(100).reduced(20,0));
+    simulateButton->setBounds(area.removeFromRight(100).reduced(20, 0));
+    recordButton->setBounds(area.removeFromRight(100).reduced(20, 0));
   }
 }
 
 
-void CaptureOverlay::buttonClicked(juce::Button* button)
-{
+void CaptureOverlay::buttonClicked(juce::Button *button) {
   if (button == parent->controlsOverlay->slideListButton.get()) {
     parent->labelList->refresh();
     parent->labelList->setVisible(!parent->labelList->isVisible());
   }
-  if (button == recordButton.get())
-  {
+  if (button == recordButton.get()) {
     parent->startRecording();
   }
-  if (button == simulateButton.get()){
+  if (button == simulateButton.get()) {
     parent->startSimulating();
   }
-  if (button == stopButton.get())
-  {
+  if (button == stopButton.get()) {
     parent->stop();
   }
 
   resized();
   parent->resized();
-
 }
