@@ -74,8 +74,8 @@ Component *AnnoListBoxModel::refreshComponentForRow(int rowNumber,
 
 
 void AnnoListComponent::newSelection() {
-  for (unsigned int i = 0; i < annotations->size(); i++) {
-    if ((*annotations)[i] == parent->getSelected())
+  for (unsigned int i = 0; i < filteredAnnotations->size(); i++) {
+    if ((*filteredAnnotations)[i] == parent->getSelected())
       listBox.selectRow(i);
   }
 }

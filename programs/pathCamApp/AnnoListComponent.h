@@ -66,21 +66,34 @@ private:
     
 };
 
-class AnnoListComponent : public Component {
+class AnnoListComponent : public Component, public juce::TextEditor::Listener {
 public:
 
   AnnoListComponent(AnnotateComponent *parent,
                     std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > _annotations,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile) : listBox(AnnoListBox(parent)), parent(parent), annotations(_annotations) {
-    
+
+    // Initialize filtered annotations to show all annotations initially
+    filteredAnnotations = _annotations;
+
     model.reset(new AnnoListBoxModel());
-    model->annotations = _annotations;
+    model->annotations = filteredAnnotations;
     model->parent = parent;
-    
+
     listBox.setModel(model.get());
     listBox.setMultipleSelectionEnabled(false);
     addAndMakeVisible(listBox);
+
+    // Setup search box
+    searchBox.setTextToShowWhenEmpty("Search annotations...", juce::Colours::grey);
+    searchBox.setMultiLine(false);
+    searchBox.setReturnKeyStartsNewLine(false);
+    searchBox.setScrollbarsShown(false);
+    searchBox.setCaretVisible(true);
+    searchBox.setPopupMenuEnabled(true);
+    searchBox.addListener(this);
+    addAndMakeVisible(searchBox);
     
     
     for (int i = 0; i < iconNames.size(); i++) {
@@ -110,8 +123,7 @@ public:
 
   void updateAnnotations(std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > _annotations) {
     annotations = _annotations;
-    model->annotations = _annotations;
-
+    filterAnnotations(searchBox.getText());
     listBox.updateContent();
     listBox.repaint();
   }
@@ -119,24 +131,52 @@ public:
   void updatelist(){
     listBox.updateContent();
   }
-  
+
   void newSelection();
-  
+
+  void filterAnnotations(const juce::String& searchText) {
+    if (searchText.isEmpty()) {
+      // If search is empty, show all annotations
+      filteredAnnotations = annotations;
+    } else {
+      // Filter annotations by name substring (case-insensitive)
+      auto newFiltered = std::make_shared<std::vector<std::shared_ptr<Annotation>>>();
+      for (const auto& anno : *annotations) {
+        if (anno->getName().containsIgnoreCase(searchText)) {
+          newFiltered->push_back(anno);
+        }
+      }
+      filteredAnnotations = newFiltered;
+    }
+    model->annotations = filteredAnnotations;
+    listBox.updateContent();
+    listBox.repaint();
+  }
+
+  void textEditorTextChanged(juce::TextEditor& editor) override {
+    filterAnnotations(editor.getText());
+  }
+
   void paint(Graphics &g) override {  }
-  
-  
+
+
   void resized() override {
     auto b = getLocalBounds().reduced(10);
+    auto searchArea = b.removeFromTop(30);
+    searchBox.setBounds(searchArea);
+    b.removeFromTop(5); // Add small gap
     listBox.setBounds(b);
   }
   
 private:
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
+  std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > filteredAnnotations;
   AnnoListBox listBox;
   std::unique_ptr < AnnoListBoxModel >  model;
+  juce::TextEditor searchBox;
 
   AnnotateComponent * parent;
-  
+
 };
 
 
