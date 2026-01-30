@@ -68,7 +68,7 @@ public:
   std::unique_ptr<AnnotateOverlay> annotateOverlay;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
     
-  AnnotateComponent *parent;
+  AnnotateComponent *annotateParent;
 
   
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AnnoViewComponent)

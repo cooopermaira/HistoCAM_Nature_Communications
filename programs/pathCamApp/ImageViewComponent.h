@@ -166,7 +166,6 @@ public:
 
   void refreshImage();
 
-protected:
   std::shared_ptr<MRTiledImageSet> MRImageSet;
   MainComponent *parent;
   std::atomic<bool> newData;

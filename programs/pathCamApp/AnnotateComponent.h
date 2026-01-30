@@ -79,8 +79,26 @@ public:
 #endif
 
   }
+
+  static std::shared_ptr<std::vector<std::shared_ptr<Annotation>>> restoreAnnotations(const std::shared_ptr<std::vector<std::shared_ptr<void>>>& erased)
+  {
+    auto out = std::make_shared<std::vector<std::shared_ptr<Annotation>>>();
+    out->reserve(erased->size());
+    for (auto const& v : *erased)
+      out->push_back(std::static_pointer_cast<Annotation>(v)); // safe if originally Annotation
+    return out;
+  }
+
+  static std::shared_ptr<std::vector<std::shared_ptr<void>>> eraseAnnotations(const std::shared_ptr<std::vector<std::shared_ptr<Annotation>>>& annos)
+  {
+    auto out = std::make_shared<std::vector<std::shared_ptr<void>>>();
+    out->reserve(annos->size());
+    for (auto const& a : *annos)
+      out->push_back(a); // implicit upcast shared_ptr<Annotation> -> shared_ptr<void>
+    return out;
+  }
   
-  void setImage(std::shared_ptr<MRTiledImageSet > image){  rightComponent->setImage(image); }
+  void setImage(std::shared_ptr<MRTiledImageSet > image);
   
   void refreshImage(){ rightComponent->refreshImage(); }
   
@@ -124,13 +142,7 @@ public:
   std::shared_ptr< Annotation > getSelected(){ return selected; }
   void setSelected(std::shared_ptr< Annotation > annotation){ selected = annotation; }
   
-  void removeSelected(){
-    auto it = std::find(annotations->begin(), annotations->end(), selected);
-    annotations->erase(it);
-    selected = NULL;
-    leftComponent->updatelist();
-    repaint();
-  }
+  void removeSelected();
 
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   std::shared_ptr< Annotation > selected;
