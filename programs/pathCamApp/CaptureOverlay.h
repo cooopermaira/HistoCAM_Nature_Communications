@@ -18,7 +18,7 @@ class StreamCamLabelList : public juce::Component,
                            public juce::TextEditor::Listener
 {
 public:
-  using OnClick = std::function<void (int index, const juce::String& label)>;
+  using OnClick = std::function<void (int index, const juce::String& label, bool matchedByAnnotation)>;
 
   StreamCamLabelList(std::shared_ptr<pathCam::StreamCam> sc, AnnotateComponent* annotateComp, OnClick onClickFn)
       : sCam(sc), annotateComp(annotateComp), onClick(std::move(onClickFn))
@@ -99,12 +99,13 @@ private:
       return;
 
     if (onClick)
-      onClick(actualSlideIndex, sCam->get_slide_label(actualSlideIndex));
+      onClick(actualSlideIndex, sCam->get_slide_label(actualSlideIndex), matchedByAnnotation[row]);
   }
 
   void updateFilteredIndices(const juce::String& searchText)
   {
     filteredIndices.clear();
+    matchedByAnnotation.clear();
 
     int numSlides = sCam->get_num_slides();
     for (int i = 0; i < numSlides; i++)
@@ -113,19 +114,35 @@ private:
       {
         // No search text - show all slides
         filteredIndices.push_back(i);
+        matchedByAnnotation.push_back(false);
       }
       else
       {
-        // Check if this slide has any annotation matching the search text
-        if (slideHasMatchingAnnotation(i, searchText))
+        // Check if slide label matches
+        bool labelMatches = false;
+        if (i >= 0 && i < sCam->get_num_slides()) {
+          juce::String slideLabel = sCam->get_slide_label(i);
+          labelMatches = slideLabel.containsIgnoreCase(searchText);
+        }
+
+        // Check if any annotation matches
+        bool annotationMatches = slideHasAnnotationMatch(i, searchText);
+
+        // Include slide if either label or annotation matches
+        if (labelMatches || annotationMatches)
         {
           filteredIndices.push_back(i);
+          // Mark as matched by annotation only if label didn't match but annotation did
+          matchedByAnnotation.push_back(!labelMatches && annotationMatches);
         }
       }
     }
   }
 
   bool slideHasMatchingAnnotation(int slideIndex, const juce::String& searchText);
+  bool slideHasAnnotationMatch(int slideIndex, const juce::String& searchText);
+
+  juce::String getCurrentSearchText() const { return searchBox.getText(); }
 
   void filterSlides(const juce::String& searchText)
   {
@@ -148,6 +165,7 @@ private:
   juce::ListBox listBox { "streamcam labels", this };
   juce::TextEditor searchBox;
   std::vector<int> filteredIndices;
+  std::vector<bool> matchedByAnnotation;
 };
 
 class CaptureOverlay final : public Component,

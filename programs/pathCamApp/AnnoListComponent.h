@@ -157,6 +157,11 @@ public:
     filterAnnotations(editor.getText());
   }
 
+  void setSearchText(const juce::String& text) {
+    searchBox.setText(text);
+    filterAnnotations(text);
+  }
+
   void paint(Graphics &g) override {  }
 
 

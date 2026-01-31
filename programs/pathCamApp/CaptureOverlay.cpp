@@ -17,6 +17,11 @@ bool StreamCamLabelList::slideHasMatchingAnnotation(int slideIndex, const juce::
   }
 
   // Check if any annotation in the slide matches the search text
+  return slideHasAnnotationMatch(slideIndex, searchText);
+}
+
+bool StreamCamLabelList::slideHasAnnotationMatch(int slideIndex, const juce::String &searchText) {
+  // Check if any annotation in the slide matches the search text
   if (!annotateComp)
     return false;
 

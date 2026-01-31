@@ -137,7 +137,7 @@ public:
 void MainComponent::setup_listbox() {
   labelList = std::make_unique<StreamCamLabelList>(sCam,
                                                    annotate,
-                                                   [this](int idx, const juce::String &label) {
+                                                   [this](int idx, const juce::String &label, bool matchedByAnnotation) {
                                                      Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
                                                      if (idx < 0 || idx >= (int) sCam->previousSlides.size())
                                                        return;
@@ -145,6 +145,17 @@ void MainComponent::setup_listbox() {
                                                      capture->setImage(mrImgSet);
                                                      annotate->setImage(mrImgSet);
                                                      annotate->update_active_annotations(idx);
+
+                                                     // If matched by annotation, switch to annotate view and copy search text
+                                                     if (matchedByAnnotation) {
+                                                       GuiEventHandler("annotate");
+
+                                                       // Copy search text from slide selector to annotation selector
+                                                       if (labelList && annotate->leftComponent) {
+                                                         juce::String searchText = labelList->getCurrentSearchText();
+                                                         annotate->leftComponent->setSearchText(searchText);
+                                                       }
+                                                     }
                                                    });
 
   addAndMakeVisible(*labelList);
