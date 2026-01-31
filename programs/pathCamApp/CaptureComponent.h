@@ -49,13 +49,6 @@ public:
   void resized() override{
     auto area = getLocalBounds();
 
-    const int panelWidth = (labelList && labelList->isVisible()) ? 100 : 0;
-    auto leftPanel = area.removeFromLeft(panelWidth);
-
-    if (labelList) {
-      labelList->setBounds(leftPanel);
-    }
-
     // IMPORTANT: lay out ImageViewComponent *inside remaining area*
     layoutIn(area);
 
@@ -108,7 +101,6 @@ public:
   }
 
 private:
-  std::unique_ptr<StreamCamLabelList> labelList;
   std::unique_ptr<CaptureOverlay> captureOverlay;
   std::unique_ptr<AIOverlay> aiOverlay;
   //std::unique_ptr<ReportOverlay> reportOverlay;

@@ -25,11 +25,6 @@ public:
         centerButton->addListener(this);
         //break;
       }
-      if (iconNames[i] == "slideList.svg") {
-        slideListButton.reset(new SvgButton("slides", iconsFromZipFile[i]));
-        //slideListButton->addListener(this);
-        addAndMakeVisible(*slideListButton);
-      }
     }
 
     addAndMakeVisible(*centerButton);
@@ -37,20 +32,18 @@ public:
 
   ~ImageViewOverlay() {
   }
+  juce::Rectangle<int> getCenterButtonBoundsLocal() const {
+    return centerButton ? centerButton->getBounds() : juce::Rectangle<int>();
+  }
+
 
   void resized() override {
     auto area = getLocalBounds().reduced(8);
-
     auto top = area.removeFromTop(area.getHeight() / 2);
-    auto bottom = area;
-
     centerButton->setBounds(top);
-    slideListButton->setBounds(bottom);
+
   }
 
-  std::unique_ptr<SvgButton> slideListButton;
-
-private:
   void buttonClicked(juce::Button *button) override;
 
   std::unique_ptr<SvgButton> centerButton;

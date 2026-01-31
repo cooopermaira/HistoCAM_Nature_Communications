@@ -63,20 +63,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 }
 
 void CaptureComponent::setup_listbox() {
-  labelList = std::make_unique<StreamCamLabelList>(sCam,
-                                                 parent->annotate,
-                                                 [this](int idx, const juce::String &label) {
-                                                   Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
-                                                   if (idx < 0 || idx >= (int)sCam->previousSlides.size())
-                                                     return;
-                                                   auto mrImgSet = sCam->previousSlides[idx];
-                                                   setImage(mrImgSet);
-                                                   parent->annotate->setImage(mrImgSet);
-                                                   parent->annotate->update_active_annotations(idx);
-                                                 });
-
-  addAndMakeVisible(*labelList);
-  labelList->setVisible(false);
+  parent->setup_listbox();
 }
 
 void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
@@ -141,7 +128,7 @@ void CaptureComponent::startRecording() {
     aiOverlay->set_sCam(spinpath->sCam);
     parent->sCam = spinpath->sCam;
     sCam = spinpath->sCam;
-    if (!labelList) {
+    if (!parent->labelList) {
       setup_listbox();
     }
   }
@@ -180,11 +167,10 @@ void CaptureComponent::startSimulating() {
     scopeRadius = sCam->get_scope_radius();
     aiOverlay->set_sCam(sCam);
     parent->sCam = sCam;
-    if (!labelList) {
-      if (!labelList) {
+      if (!parent->labelList) {
         setup_listbox();
       }
-    }
+
   }
 
   if (!inputPath.empty()) {

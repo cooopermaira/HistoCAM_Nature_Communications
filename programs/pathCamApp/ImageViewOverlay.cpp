@@ -7,10 +7,10 @@
 
 #include "JuceHeader.h"
 
-void ImageViewOverlay::buttonClicked(juce::Button* button)
-{
-    if (button == centerButton.get())
-    {
-      parent->zoomAndCenter();
-    }
+void ImageViewOverlay::buttonClicked(juce::Button *button) {
+  if (button == centerButton.get()) {
+    parent->zoomAndCenter();
+  }
 }
+
+

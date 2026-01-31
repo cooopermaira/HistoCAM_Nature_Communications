@@ -274,7 +274,6 @@ public:
     return (p - myview.getPosition()) * view2screenScale(myview);
   }
 
-private:
   juce::Image createCheckerboardImage(int width, int height, int squareSize,
                                       juce::Colour colour1, juce::Colour colour2);
 
@@ -293,7 +292,6 @@ private:
   static const int TARGET_FPS = 60;
   static const int MIN_REPAINT_INTERVAL_MS = 1000 / TARGET_FPS;
 
-protected:
   juce::Rectangle<int> oldBounds;
 
 

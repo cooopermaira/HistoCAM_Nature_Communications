@@ -7,7 +7,7 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
-class MainComponent final : public juce::Component, public DataObserver, private juce::Timer {
+class MainComponent final : public juce::Component, public DataObserver, private juce::Timer, public juce::Button::Listener {
   friend class LoadingThread;
   friend class CaptureComponent;
 
@@ -26,6 +26,8 @@ public:
 
   void resized() override;
 
+  void buttonClicked(juce::Button* button) override;
+
   void GuiEventHandler(std::string event);
 
   // ImageViewComponent *imageview;
@@ -33,6 +35,11 @@ public:
   std::shared_ptr<MRTiledImage> imagePyramid;
   CaptureComponent *capture;
   AnnotateComponent *annotate;
+
+  std::unique_ptr<StreamCamLabelList> labelList;
+  std::unique_ptr<SvgButton> slideListButton;
+
+  void setup_listbox();
 
   inline void update() override;
 

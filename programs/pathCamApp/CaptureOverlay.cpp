@@ -60,10 +60,6 @@ CaptureOverlay::CaptureOverlay(CaptureComponent *parent,
       simulateButton->addListener(this);
       addAndMakeVisible(*simulateButton);
     }
-
-    if (parent->controlsOverlay->slideListButton) {
-      parent->controlsOverlay->slideListButton->addListener(this);
-    }
   }
 }
 
@@ -74,15 +70,8 @@ void CaptureOverlay::resized() {
     recordButton->setVisible(false);
     stopButton->setVisible(true);
     stopButton->setBounds(area.removeFromRight(100).reduced(20, 0));
-    parent->controlsOverlay->slideListButton->setVisible(false);
-    parent->labelList->setVisible(false);
   } else {
     simulateButton->setVisible(true);
-    if (parent->sCam) {
-      parent->controlsOverlay->slideListButton->setVisible(true);
-    } else {
-      parent->controlsOverlay->slideListButton->setVisible(false);
-    }
 #ifdef WITH_SPINNAKER
     recordButton->setVisible(true);
 #else
@@ -92,14 +81,13 @@ void CaptureOverlay::resized() {
     simulateButton->setBounds(area.removeFromRight(100).reduced(20, 0));
     recordButton->setBounds(area.removeFromRight(100).reduced(20, 0));
   }
+
+  // Trigger MainComponent to update slideListButton and labelList visibility
+  parent->parent->resized();
 }
 
 
 void CaptureOverlay::buttonClicked(juce::Button *button) {
-  if (button == parent->controlsOverlay->slideListButton.get()) {
-    parent->labelList->refresh();
-    parent->labelList->setVisible(!parent->labelList->isVisible());
-  }
   if (button == recordButton.get()) {
     parent->startRecording();
   }
