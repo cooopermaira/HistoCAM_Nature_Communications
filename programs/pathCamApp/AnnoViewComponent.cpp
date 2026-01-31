@@ -46,7 +46,8 @@ bool AnnoViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *o
 }
 
 bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
-  if (event.mods.isShiftDown() && event.mods.isRightButtonDown()){
+  // Right click without shift: open dropdown menu for preconfigured class selection
+  if (event.mods.isRightButtonDown() && !event.mods.isShiftDown()){
     const auto clickView = screen2view(fPoint(event.x, event.y), *view);
 
     std::shared_ptr<PolygonAnnotation> hitPoly;
@@ -79,9 +80,8 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
     return true;
   }
 
-
-
-  if (event.mods.isRightButtonDown()) {
+  // Shift + Left click: add a point to polygon
+  if (event.mods.isLeftButtonDown() && event.mods.isShiftDown()) {
     if (annotateParent->getMode() == Annotation::_POLY) {
       std::shared_ptr<Annotation> new_annotation;
       new_annotation.reset(new PointClickPoly("Polygon"));
@@ -96,25 +96,10 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
       cast->add(screen2view(fPoint(event.x, event.y), *view));
       return true;
     }
-
-    /*if(parent->getMode() == Annotation::_SEG){
-      std::shared_ptr < Annotation > new_annotation;
-      new_annotation.reset(new PolygonAnnotation("SAM"));
-      parent->setSelected(new_annotation);
-      annotations->push_back(new_annotation);
-      parent->annotationsUpdated();
-      parent->setMode( Annotation::_NONE );
-    }
-
-    if(parent->getSelected() != NULL && parent->getSelected()->getType() == Annotation::_SEG){
-      PolygonAnnotation *cast = dynamic_cast < PolygonAnnotation * >(parent->getSelected().get());
-      cast->add(screen2view(fPoint(event.x, event.y), *view));
-      return true;
-    }*/
   }
 
-
-  if (event.mods.isLeftButtonDown()) {
+  // Left click without shift: select point for dragging
+  if (event.mods.isLeftButtonDown() && !event.mods.isShiftDown()) {
     if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_POLY) {
       PointClickPoly *cast = dynamic_cast<PointClickPoly *>(annotateParent->getSelected().get());
       if (cast->test(screen2view(fPoint(event.x, event.y), *view), screen2viewScale(*view))) {
