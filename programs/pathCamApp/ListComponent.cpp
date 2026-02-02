@@ -45,6 +45,7 @@ void ListComponent::resized() {
 
 void ListComponent::textEditorTextChanged(juce::TextEditor& editor)
 {
+  if(row_number >= (int)parent->annotations->size()) return;
   auto anno = (*parent->annotations)[row_number];
   anno->setName(editor.getText());
 }
@@ -54,6 +55,7 @@ void ListComponent::setData(int _row_number) {
 }
 
 void ListComponent::paint(Graphics &g) {
+  if(row_number >= (int)parent->annotations->size()) return;
   auto anno = (*parent->annotations)[row_number];
 
   if (parent->parent->getSelected() == anno){
@@ -61,7 +63,7 @@ void ListComponent::paint(Graphics &g) {
   }else{
     g.fillAll(Colours::white);
   }
-    
+
   auto bounds = getLocalBounds().reduced(2,2);
   
   
@@ -94,7 +96,7 @@ void ListComponent::paint(Graphics &g) {
     g.fillRect(bounds.removeFromRight(bounds.getHeight()));
     g.setColour(Colours::black);
     bounds.removeFromLeft(4);
-    g.drawText((*parent->annotations)[row_number]->getName(), bounds, Justification::centredLeft, true);
+    g.drawText(anno->getName(), bounds, Justification::centredLeft, true);
 
   }else{
     colorButton->setVisible(true);
@@ -111,6 +113,7 @@ void ListComponent::paint(Graphics &g) {
 
 
 void ListComponent::mouseDown(const juce::MouseEvent& event){
+  if(row_number >= (int)parent->annotations->size()) return;
   parent->listBoxItemClicked(row_number, event);
   resized();
 }
@@ -131,6 +134,7 @@ void ListComponent::messageBoxCallback(int result, ListComponent* caller)
 
 
 void ListComponent::buttonClicked(juce::Button* button){
+  if(row_number >= (int)parent->annotations->size()) return;
   if(button == colorButton.get()){
     auto colourSelector = std::make_unique<ColourSelector> (ColourSelector::showAlphaChannel
                                                             | ColourSelector::showColourAtTop
@@ -171,6 +175,7 @@ void ListComponent::buttonClicked(juce::Button* button){
 void ListComponent::changeListenerCallback (ChangeBroadcaster* source)
 {
   if (auto* cs = dynamic_cast<ColourSelector*> (source)){
+    if(row_number >= (int)parent->annotations->size()) return;
     auto anno = (*parent->annotations)[row_number];
     anno->setColor(cs->getCurrentColour());
     parent->parent->repaint();

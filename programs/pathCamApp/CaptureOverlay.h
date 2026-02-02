@@ -62,7 +62,6 @@ public:
     filterSlides(editor.getText());
   }
 
-private:
   // ListBoxModel
   int getNumRows() override
   {
