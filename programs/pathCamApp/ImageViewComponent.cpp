@@ -86,9 +86,7 @@ void ImageViewComponent::q_cache() {
     loadMRImageSetASAPEvent.set();
     MRImageSet->loadFromCacheQueued = true;
 
-    if (MRImageSet->inMemory) {
-      int k = 0;
-    }
+
     recentlyViewedSlides.push_unique(MRImageSet);
     parent->sCam->cacheAlert.set();
   }

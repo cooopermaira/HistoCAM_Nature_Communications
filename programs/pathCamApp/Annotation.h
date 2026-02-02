@@ -187,29 +187,102 @@ public:
   }
 
   void splitClosestEdge(fPoint p){
-    float min_distance = std::numeric_limits< float >::infinity();
-    int min_index = 0;
-    fPoint minPoint;
+    const float epsilon = 1e-3;  // Tolerance for comparing distances
 
+    struct EdgeInfo {
+      int index;
+      float distance;
+      fPoint closestPoint;
+      float projection_t;  // Parameter t: 0=start, 1=end, (0,1)=on segment
+    };
+
+    std::vector<EdgeInfo> edges;
+    float min_distance = std::numeric_limits<float>::infinity();
+
+    // Gather info about all edges
     for(unsigned int i=0; i < points.size(); i++){
       int n = (i+1)%points.size();
-      Line<float> line (points[i].getX(), points[i].getY(), points[n].getX(), points[n].getY());
-      fPoint pointOnLine;
-      float distance = line.getDistanceFromPoint (p, pointOnLine);
-      if(distance < min_distance){
-        min_distance = distance;
-        min_index = i;
+      Line<float> line(points[i].getX(), points[i].getY(), points[n].getX(), points[n].getY());
+      fPoint closestPoint;
+      float distance = line.getDistanceFromPoint(p, closestPoint);
+
+      // Calculate projection parameter t where closestPoint = A + t*(B-A)
+      fPoint A = points[i];
+      fPoint B = points[n];
+      fPoint AB(B.getX() - A.getX(), B.getY() - A.getY());
+      float ab_length_sq = AB.getX()*AB.getX() + AB.getY()*AB.getY();
+
+      float projection_t = 0.5f;  // Default to middle
+      if(ab_length_sq > epsilon) {
+        fPoint AP(p.getX() - A.getX(), p.getY() - A.getY());
+        projection_t = (AP.getX()*AB.getX() + AP.getY()*AB.getY()) / ab_length_sq;
+      }
+
+      edges.push_back({(int)i, distance, closestPoint, projection_t});
+      min_distance = std::min(min_distance, distance);
+    }
+
+    // Find all edges tied for minimum distance
+    std::vector<EdgeInfo> tied_edges;
+    for(const auto& edge : edges) {
+      if(edge.distance <= min_distance + epsilon) {
+        tied_edges.push_back(edge);
       }
     }
 
-    std::vector < fPoint > new_points;
+    int min_index = tied_edges[0].index;
+
+    // If multiple edges are tied, use tie-breaking logic
+    if(tied_edges.size() > 1) {
+      float best_score = std::numeric_limits<float>::infinity();
+
+      for(const auto& edge : tied_edges) {
+        float score = 0.0f;
+
+        // Primary criterion: prefer edges where projection is within [0,1]
+        // This means the point projects onto the actual segment, not just the extended line
+        if(edge.projection_t >= 0.0f && edge.projection_t <= 1.0f) {
+          // Point projects onto the segment - strongly prefer this
+          score = 0.0f;
+        } else if(edge.projection_t < 0.0f) {
+          // Closest point is the start vertex - penalize by distance from 0
+          score = 1000.0f - edge.projection_t;
+        } else {
+          // Closest point is the end vertex - penalize by distance from 1
+          score = 1000.0f + (edge.projection_t - 1.0f);
+        }
+
+        // Secondary criterion: if still tied (both project outside or both inside),
+        // prefer edge with projection closer to [0,1] range
+        if(std::abs(score - best_score) < epsilon) {
+          // Use projection_t proximity to [0,1] as tiebreaker
+          float t_dist_to_range = 0.0f;
+          if(edge.projection_t < 0.0f) {
+            t_dist_to_range = -edge.projection_t;
+          } else if(edge.projection_t > 1.0f) {
+            t_dist_to_range = edge.projection_t - 1.0f;
+          }
+
+          score += t_dist_to_range;
+        }
+
+        if(score < best_score) {
+          best_score = score;
+          min_index = edge.index;
+        }
+      }
+    }
+
+    // Insert the new point after the chosen edge's start vertex
+    std::vector<fPoint> new_points;
     for(unsigned int i=0; i < points.size(); i++){
       new_points.push_back(points[i]);
-      if(i==min_index){ new_points.push_back(p); }
+      if(i == (unsigned int)min_index){
+        new_points.push_back(p);
+      }
     }
 
     points = new_points;
-
   }
 
   bool test(fPoint clickInview, fPoint distance){
