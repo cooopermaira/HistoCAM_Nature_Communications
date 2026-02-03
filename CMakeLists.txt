@@ -102,12 +102,7 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)   # ensure static
 set(CLIPPER2_HI_PRECISION OFF CACHE BOOL "" FORCE)
 add_subdirectory(Clipper2/CPP)
 
-link_directories("/home/cm/src/onnxruntime/build_cuda/Release")
-#link_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/lib)
 link_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/lib)
-
-include_directories("/home/cm/src/onnxruntime/include")
-#include_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/include)
 include_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/TensorRT-10.14.1.48/include)
 
 add_subdirectory(CudaSift)
