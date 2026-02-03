@@ -356,6 +356,7 @@ namespace pathCam {
     auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
 
     parent->microscopeInput = false;
+    parent->captureTimeMS = t2;
     std::cout << "simulated microscope input lasted " << t2<<std::endl;
   }
 }

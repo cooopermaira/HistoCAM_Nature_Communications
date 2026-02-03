@@ -80,6 +80,7 @@ void CameraStream::run(){
       unsigned long i = 0;
       
       //Will run until killed
+      parent->startTime = std::chrono::high_resolution_clock::now();
       while (!interrupt){
         try{
 
@@ -192,7 +193,7 @@ void FileStream::run(){
     }
     myfile.write(image->get_Raw(), image_bytes);
     image->free_memory_RAW();
-    image->set_disk_file(image_path.toString());
+    // image->set_disk_file(image_path.toString());
     parent->IOlogger.information(Poco::format("Wrote: %s", image_path.toString()));
     
 
@@ -555,7 +556,8 @@ int SpinPath::run(){
 void SpinPath::stopCamera(){
   cameraStream->interrupt = true;
   fileStream->interrupt = true;
-  
+
+  sCam->captureTimeMS = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
   sCam->microscopeInput = false;
   std::cout << "Collection complete, processing " << std::endl;
   thread_cam.join();

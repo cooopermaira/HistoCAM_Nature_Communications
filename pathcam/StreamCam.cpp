@@ -961,6 +961,33 @@ namespace pathCam {
   }
 
   void StreamCam::cleanup_and_reset() {
+    std::vector<Point2i> AbCs(maxIndex);
+    std::vector<int> labels(maxIndex);
+    for (auto &img :images) {
+      if (img && img->index <= maxIndex) {
+        if (img->regInfo) {
+          if (!img->regInfo->wasAligned) {
+            // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
+            auto abc = img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords;
+            AbCs[img->index] = abc;
+          }else {
+            // Abc was aligned during BA, trust its coords
+            AbCs[img->index] = img->regInfo->absoluteCoords;
+          }
+          labels[img->index] = img->label;
+        }else {
+          if (img->label == Image::_UNDEREXP || img->label == Image::_LOWFEAT) {
+            if (img->index > 0) {
+              AbCs[img->index] = AbCs[img->index - 1];
+              labels[img->index] = labels[img->index - 1];
+            } //else it just stays (0,0) because that's what it inits to.
+          }else {
+            std::cout<<img->index<<" "<<Image::get_label(img->label)<<std::endl;
+          }
+        }
+      }
+    }
+
     //clean up all jobs (jobq 1 and 2)
     JobQ->pool->joinAll();
     for (int i = 0; i < JobQ->jobRefs.size(); ++i) {
@@ -1016,9 +1043,8 @@ namespace pathCam {
     maxIndex = -1;
 
     //store slide and reset slide member variable
+
     MRImageSet->detach();
-
-
     {
       Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
       previousSlides.push_back(std::move(MRImageSet));

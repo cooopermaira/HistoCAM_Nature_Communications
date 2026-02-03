@@ -184,7 +184,6 @@ namespace pathCam {
           waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(el.first);
           img->ownedTiles.insert(el.first);
         }
-
       }
       ++positionForNextWaitngFrame;
 
@@ -276,9 +275,7 @@ namespace pathCam {
 
     std::unordered_set<Image *> members = find_contributing_images();
     members.insert(root);
-    std::vector membersForRebuild(members.begin(),members.end());
-
-    std::cout<<"member frames "<<members.size()<<std::endl;
+    std::vector membersForRebuild(members.begin(), members.end());
 
 
     auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
@@ -314,25 +311,25 @@ namespace pathCam {
         members.insert(img);
       }
     }
-    auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(),members.end()));
+    auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
     auto start1 = std::chrono::high_resolution_clock::now();
-    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members,memberOverlaps,ftg->storedMatches);
+    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps, ftg->storedMatches);
     auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start1).count();
 
 
     for (auto m: matches) {
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-      // members.insert(m->image_1);
-      // members.insert(m->image_2);
-      //debug int k = 0;
-      ++m->image_1->matchCount;
-      ++m->image_2->matchCount;
-      for (int i = 0; i < m->good_matches.size(); ++i) {
-        if (m->inliers[i]) {
-          ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
+        // members.insert(m->image_1);
+        // members.insert(m->image_2);
+        //debug int k = 0;
+        ++m->image_1->matchCount;
+        ++m->image_2->matchCount;
+        for (int i = 0; i < m->good_matches.size(); ++i) {
+          if (m->inliers[i]) {
+            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
+          }
         }
-      }
       }
     }
     if (!graphConnectivityResult.success) {
@@ -348,6 +345,7 @@ namespace pathCam {
       for (int i = 0; i < img->keypoints.size(); ++i) {
         img->keypointsImageSpace[i].pt = img->keypoints[i].pt / parent->scale_factor;
       }
+      img->regInfo->wasAligned = true;
     }
 
     if (graphConnectivityResult.used_sift) {
@@ -388,6 +386,7 @@ namespace pathCam {
         (std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
+
 
   void MetricComposite::rebuild(const std::vector<Image *> &members) {
     for (auto &tileIdx: imagePyramid->liveTiles) {
@@ -611,12 +610,12 @@ namespace pathCam {
   size_t MetricComposite::consolidate_tile_ownership() {
     auto start = std::chrono::high_resolution_clock::now();
 
-    constexpr int dx[8] = { -1, 0, 1, -1, 1, -1, 0, 1 };
-    constexpr int dy[8] = { -1,-1,-1,  0, 0,  1, 1, 1 };
-    std::vector<std::pair<Point2i, Image*>> updates;
+    constexpr int dx[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+    constexpr int dy[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
+    std::vector<std::pair<Point2i, Image *> > updates;
 
-    for (auto &tileIdx : imagePyramid->liveTiles) {
-      std::unordered_map<Image*,int> neighborCount;
+    for (auto &tileIdx: imagePyramid->liveTiles) {
+      std::unordered_map<Image *, int> neighborCount;
       for (int i = 0; i < 8; ++i) {
         //this method of grabbing tiles returns null if it doesnt exist rather than creating it
         auto tileObj = imagePyramid->level[0]->tiles(tileIdx.x + dx[i], tileIdx.y + dy[i]);
@@ -630,31 +629,31 @@ namespace pathCam {
       auto myOwnerPresence = neighborCount[myTile->owner];
 
       int maxPresence = myOwnerPresence + 1;
-      std::vector<Image*> candidateOwners;
-      for (auto &[competingOwner,presence] : neighborCount) {
+      std::vector<Image *> candidateOwners;
+      for (auto &[competingOwner,presence]: neighborCount) {
         if (presence > maxPresence) {
           candidateOwners.clear();
           candidateOwners.push_back(competingOwner);
-        }else if (presence == maxPresence) {
+        } else if (presence == maxPresence) {
           candidateOwners.push_back(competingOwner);
         }
       }
 
       //max distance a tile could be from an img
       int bestDistance = (imageSize.width / 2 * imageSize.width / 2) + (imageSize.height / 2 * imageSize.height / 2);
-      Image* winner = myTile->owner;
-      for (auto & img : candidateOwners) {
-        auto dist = get_sqrd_center_distance_tile_to_img(img->regInfo->absoluteCoords,tileIdx);
+      Image *winner = myTile->owner;
+      for (auto &img: candidateOwners) {
+        auto dist = get_sqrd_center_distance_tile_to_img(img->regInfo->absoluteCoords, tileIdx);
         if (dist < bestDistance) {
           bestDistance = dist;
           winner = img;
         }
       }
       if (winner != myTile->owner) {
-        updates.emplace_back(tileIdx,winner);
+        updates.emplace_back(tileIdx, winner);
       }
     }
-    for (auto &[tileIdx,img] : updates) {
+    for (auto &[tileIdx,img]: updates) {
       imagePyramid->get_base_tile(tileIdx)->owner = img;
     }
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -672,7 +671,6 @@ namespace pathCam {
     //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
     //pretty close to the center of the frame
     if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.01f) {
-
       if (_to->owner->ownedTiles.size() < 12 && _img->ownedTiles.size() > 12) {
         //owner does not have sufficient presence and should be removed to reduce member image count
         return true;
@@ -686,45 +684,7 @@ namespace pathCam {
     //amount of motion blur is significantly different, choose clearest image
     return _to->owner->motionBlur > _img->motionBlur;
   }
-  //
-  // bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj>& to,
-  //                                        const Image* cand) const {
-  //
-  //   if (!to->owner) return true;
-  //   const Image* cur = to->owner;
-  //
-  //   const float curBlur = cur->motionBlur;
-  //   const float candBlur = cand->motionBlur;
-  //
-  //   // Require a minimum improvement in blur to replace, unless we are in a "nearly equal" band.
-  //   constexpr float blurReplaceMargin = 0.10f;  // <-- tune
-  //   constexpr float blurEqualBand     = 0.05f;
-  //
-  //   if (candBlur + blurReplaceMargin < curBlur) {
-  //     return true; // clearly better blur -> replace
-  //   }
-  //
-  //   if (cur->ownedTiles.size() < 12 && cand->ownedTiles.size() >= 12) {
-  //     return true;
-  //   }
-  //
-  //   // In the nearly-equal band, use center-distance, but still add a margin.
-  //   if (std::abs(curBlur - candBlur) < blurEqualBand) {
-  //     const auto curD = get_sqrd_center_distance_tile_to_img(cur->regInfo->absoluteCoords, to->index);
-  //     const auto candD = get_sqrd_center_distance_tile_to_img(cand->regInfo->absoluteCoords, to->index);
-  //
-  //     // Only replace if candidate is "meaningfully more central"
-  //     constexpr float centerImproveFactor = 0.80f; // cand must be <= 80% of current distance
-  //     if (candD < centerImproveFactor * curD) {
-  //       // also keep your "already near center" guard if desired
-  //       return (curD > 25 * parent->tileSize * parent->tileSize);
-  //     }
-  //     return false;
-  //   }
-  //
-  //   // Otherwise, if blur isn't clearly better, keep current owner
-  //   return false;
-  // }
+
 
 
   std::unordered_set<Image *> MetricComposite::find_contributing_images() const {

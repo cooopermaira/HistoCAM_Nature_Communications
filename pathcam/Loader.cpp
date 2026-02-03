@@ -34,9 +34,9 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
-    if (parent->recordingMode) {
-      image->write_to_path(true);
-    }
+    // if (parent->recordingMode) {
+    //   image->write_to_path(true);
+    // }
 
 
     image->index = image_index;

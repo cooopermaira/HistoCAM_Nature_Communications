@@ -123,6 +123,12 @@ public:
   std::atomic<bool> completed = false;
   int index;
 
+  std::vector<Point2i> AbCs;
+  static int frameHeight;
+  static int frameWidth;
+  static int scopeRadius;
+  float framesPerSecond;
+
   Poco::FastMutex mutex;
 
 

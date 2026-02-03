@@ -35,6 +35,7 @@ public:
   unsigned long index,matchedTo;
   bool successful,root,resolved,rootOfRoot;
   bool stayFixedDuringBundleAdjustment = false;
+  bool wasAligned = false;
   bool tryComposite = false;
   bool inCompositeQ = false;
   bool corrected = false;

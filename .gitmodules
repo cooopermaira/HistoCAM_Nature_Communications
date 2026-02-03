@@ -17,3 +17,6 @@
 [submodule "CudaSift"]
 	path = CudaSift
 	url = git@github.com:cooopermaira/CudaSift.git
+[submodule "Clipper2"]
+	path = Clipper2
+	url = https://github.com/AngusJohnson/Clipper2.git

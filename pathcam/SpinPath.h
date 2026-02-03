@@ -67,7 +67,7 @@ private:
   SystemPtr system;
   CameraList camList;
   
-  
+  std::chrono::time_point<std::chrono::high_resolution_clock> startTime;
   
   Poco::Path root_path;
   string captureSetName;

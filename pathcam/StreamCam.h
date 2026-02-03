@@ -122,6 +122,7 @@ namespace pathCam {
     Poco::FastMutex previousSlidesMutex;
 
     long cudaSiftTime = 0;
+    long captureTimeMS = 0;
 
     std::string inputFileOverride;
     std::string currentSlideLabel;
