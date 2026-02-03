@@ -210,7 +210,7 @@ namespace pathCam {
     //   i->rebuild(CompositeVoronoi::ORB_CPU);
     //
     // }
-    parent->align_and_rebuild();
+    // parent->align_and_rebuild();
   }
 
   void CompositeManager::save_components_to_disk() {

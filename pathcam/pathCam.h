@@ -37,14 +37,7 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 
 #include "cudaImage.h"
 #include "cudaSift.h"
-//#include "onnxruntime/core/session/onnxruntime_cxx_api.h"
 
-
-#include "cuda_bundle_adjustment_types.h"
-#include "cuda_bundle_adjustment.h"
-
-#include "eigen3/Eigen/src/Geometry/Quaternion.h"
-#include "samples/object_creator.h"
 #endif
 
 

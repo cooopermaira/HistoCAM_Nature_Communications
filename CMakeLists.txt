@@ -79,7 +79,6 @@ ELSEIF (WIN32)
     set(Python3_LIBRARY_DIR "C:/Program Files/Python311/libs")
     set(Python3_LIB "python311")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-
     #find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
     set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 
@@ -88,7 +87,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
 
 ENDIF ()
-
+find_package(CUDAToolkit REQUIRED)
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
@@ -107,8 +106,8 @@ include_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.
 add_subdirectory(CudaSift)
 include_directories(CudaSift)
 
-add_subdirectory(cuda-bundle-adjustment)
-include_directories(cuda-bundle-adjustment)
+#add_subdirectory(cuda-bundle-adjustment)
+#include_directories(cuda-bundle-adjustment)
 
 add_subdirectory(JUCE)
 
@@ -150,7 +149,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util #[[${TORCH_LIBRARIES} Python3::Python]] cudasift cuda_bundle_adjustment onnxruntime onnxruntime_providers_shared nvinfer)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util CUDA::cudart cudasift onnxruntime onnxruntime_providers_shared nvinfer)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

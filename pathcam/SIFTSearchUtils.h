@@ -173,10 +173,10 @@ namespace pathCam {
   class BundleAdjustmentIntegrator {
   public:
     BundleAdjustmentIntegrator() {
-      optimizer = cuba::CudaBundleAdjustment::create();
+      // optimizer = cuba::CudaBundleAdjustment::create();
     };
 
-    cuba::CudaBundleAdjustment::Ptr optimizer;
+    // cuba::CudaBundleAdjustment::Ptr optimizer;
 
 
     void run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images);
@@ -192,10 +192,10 @@ namespace pathCam {
 
 
     // Store vertex pointers to maintain ownership
-    std::unordered_map<int, cuba::PoseVertex *> poseVertices;
-    std::unordered_map<int, cuba::LandmarkVertex *> landmarkVertices;
-    std::vector<cuba::MonoEdge *> monoEdges;
-    std::vector<cuba::StereoEdge *> stereoEdges;
+    // std::unordered_map<int, cuba::PoseVertex *> poseVertices;
+    // std::unordered_map<int, cuba::LandmarkVertex *> landmarkVertices;
+    // std::vector<cuba::MonoEdge *> monoEdges;
+    // std::vector<cuba::StereoEdge *> stereoEdges;
   };
 }
 

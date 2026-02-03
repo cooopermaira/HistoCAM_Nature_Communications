@@ -554,7 +554,7 @@ void BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
 // landmarks are in res.x_x[Nc + lm]
 
 
-
+/*
   void BundleAdjustmentIntegrator::run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks,
                                                          const std::vector<Image *> &_images) {
     optimizer->clear();
@@ -629,4 +629,5 @@ void BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
 
     optimizer->optimize(100);
   }
+  */
 }

@@ -296,7 +296,7 @@ namespace pathCam {
     return devices[std::min(_priority, (int) devices.size() - 1)].index;
   }
 
-
+/*
   void StreamCam::align_and_rebuild() {
     if (composites.empty()) { return; }
 
@@ -394,6 +394,7 @@ namespace pathCam {
       }
     }
   }
+  */
 
 
   void StreamCam::load_delaunay_images_to_GPU(int _componentIndex) {
