@@ -32,13 +32,17 @@ namespace pathCam {
 
     int threads = 1;
 
+    JobQ = std::make_shared<JobQueue>(threads, threads, windowWidth);
+    JobQ->parent = this;
+    jqSecondary = std::make_shared<JobQueue>(6, 6, 0);
+
+    MRTiledImageSet::frameHeight = image_height;
+    MRTiledImageSet::frameWidth = image_width;
+    MRTiledImageSet::scopeRadius = scope_radius * 0.8f;
+
     minPixelDistanceBetweenFrames = 500;
     minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames, 2);
 
-
-    // Mat circleMaskFtExt((image_height * crop_factor) * scale_factor,
-    //     (image_width * crop_factor) * scale_factor, CV_8UC1,Scalar(0));
-    // circle(circleMaskFtExt,Point2i(circleMaskFtExt.cols/2,circleMaskFtExt.rows/2),scope_radius * scale_factor,Scalar(255),-1);
 
     load_blur_engine();
 
@@ -49,11 +53,6 @@ namespace pathCam {
 
     // cudaSetDevice(compositorCudaDevice);
 #endif
-
-    JobQ = std::make_shared<JobQueue>(threads, threads, windowWidth);
-    JobQ->parent = this;
-    jqSecondary = std::make_shared<JobQueue>(6, 6, 0);
-
 
     //lastFrame = Rect(0,0,image_width,image_height);
     circleMask = cv::Mat::zeros(image_height, image_width, CV_8U);
@@ -988,6 +987,8 @@ namespace pathCam {
         }
       }
     }
+
+    MRImageSet->framesPerMillisecond = float(maxIndex) / float(captureTimeMS);
 
     //clean up all jobs (jobq 1 and 2)
     JobQ->pool->joinAll();

@@ -37,6 +37,8 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 
 #include "cudaImage.h"
 #include "cudaSift.h"
+#include <clipper2/clipper.h>
+
 
 #endif
 

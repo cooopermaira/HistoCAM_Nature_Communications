@@ -94,6 +94,13 @@ INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
+set(CLIPPER2_UTILS OFF CACHE BOOL "" FORCE)
+set(CLIPPER2_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CLIPPER2_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)   # ensure static
+
+set(CLIPPER2_HI_PRECISION OFF CACHE BOOL "" FORCE)
+add_subdirectory(Clipper2/CPP)
 
 link_directories("/home/cm/src/onnxruntime/build_cuda/Release")
 #link_directories(${PROJECT_SOURCE_DIR}/onnxruntime-linux-aarch64-1.23.2/lib)
@@ -149,7 +156,7 @@ add_library(pathCamLib STATIC ${PATHCAM_FILES})
 
 include_directories(pathcam)
 
-target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util CUDA::cudart cudasift onnxruntime onnxruntime_providers_shared nvinfer)
+target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco::Util CUDA::cudart cudasift nvinfer Clipper2)
 
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})

@@ -124,10 +124,10 @@ public:
   int index;
 
   std::vector<Point2i> AbCs;
-  static int frameHeight;
-  static int frameWidth;
-  static int scopeRadius;
-  float framesPerSecond;
+  inline static int frameHeight = 0;
+  inline static int frameWidth = 0;
+  inline static int scopeRadius = 0;
+  float framesPerMillisecond;
 
   Poco::FastMutex mutex;
 
@@ -198,6 +198,8 @@ public:
     inMemory = true;
     std::cout << "uncached " << index << " in " << duration.count() << " ms" << std::endl;
   }
+
+  std::vector<Point2i> poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd);
 
 };
 

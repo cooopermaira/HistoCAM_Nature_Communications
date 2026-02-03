@@ -220,7 +220,7 @@ void MRTiledImage::uncache_from_disk() {
                                  cudaGetErrorString(cerr));
       }
 
-      int cpuDevice = cudaCpuDeviceId;
+      // int cpuDevice = cudaCpuDeviceId;
       int gpuDevice = 0;
       cudaGetDevice(&gpuDevice);
 
@@ -273,35 +273,12 @@ void MRTiledImage::uncache_from_disk() {
   }
 }
 
-// void MRTiledImage::cache_to_disk(std::string _cwd) {
-//   Poco::File cwd(_cwd);
-//   assert(cwd.exists() && cwd.isDirectory());
-//
-//   Poco::Path cachePath(_cwd);
-//   cachePath.makeDirectory();
-//   cachePath.setFileName(std::to_string(componentIndex));
-//   cachePath.setExtension("pcRawLayer");
-//
-//   int fd = open(cachePath.toString().c_str(), O_CREAT | O_EXCL | O_WRONLY, 0644);
-//   if (fd == -1) {
-//     throw std::runtime_error("file create failed");
-//   }
-//
-//   assert(liveTilesOrderedVec.empty());
-//   liveTilesOrderedVec = std::vector(liveTiles.begin(),liveTiles.end());
-//
-//   try {
-//     for (const auto& tileIndex : liveTilesOrderedVec) {
-//       auto tileObj = level[0]-> getTile(tileIndex);
-//       // assert(!tileObj->owner); //if this function is run outside normal use case, asserting this only limits functionality;
-//       tileObj->buf
-//     }
-//   }catch (...) {
-//
-//   }
-//
-//   close(fd);
-// }
+std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd) {
+  std::vector<std::vector<Point2i>> frameBoundaries;
+  frameBoundaries.reserve((msTimeEnd - msTimeStart + 10) * framesPerMillisecond);
+
+
+}
 
 
 void MRTiledImage::insertMat(cv::Mat &image_in, cv::Rect_<float> box) {
