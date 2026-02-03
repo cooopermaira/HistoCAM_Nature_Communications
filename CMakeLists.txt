@@ -195,6 +195,9 @@ IF (BUILD_PATHCAM_GUI)
             juce::juce_events
             juce::juce_graphics
             juce::juce_opengl
+            juce::juce_audio_basics
+            juce::juce_audio_devices
+            juce::juce_audio_formats
             ${TORCH_LIBRARIES} ${Python3_LIB}
     )
 
