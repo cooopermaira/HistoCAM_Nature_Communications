@@ -82,11 +82,6 @@ void ListComponent::paint(Graphics &g) {
                             juce::RectanglePlacement::centred, 1.0f);
   }
 
-  if( dynamic_cast < DictateAnnotation * > (anno.get()) != NULL){
-    parent->dictateIcon->drawWithin(g, bounds.removeFromLeft(bounds.getHeight()).toFloat(),
-                            juce::RectanglePlacement::centred, 1.0f);
-  }
-
   
   if (parent->parent->getSelected() != anno){
     colorButton->setVisible(false);

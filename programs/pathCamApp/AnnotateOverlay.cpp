@@ -23,12 +23,6 @@ void AnnotateOverlay::buttonClicked(juce::Button* button)
     parent->setSelected(NULL);
     repaint();
   }
-  if (button == dictateButton.get())
-  {
-    parent->toggleMode( Annotation::_DICT);
-    parent->setSelected(NULL);
-    repaint();
-  }
   if (button == measureButton.get())
   {
     parent->toggleMode( Annotation::_MEAS);
@@ -50,8 +44,5 @@ void AnnotateOverlay::paint (juce::Graphics& g)
   }
   if(parent->getMode() == Annotation::_MEAS){
     g.drawRect(measureButton->getBounds());
-  }
-  if(parent->getMode() == Annotation::_DICT){
-    g.drawRect(dictateButton->getBounds());
   }
 }

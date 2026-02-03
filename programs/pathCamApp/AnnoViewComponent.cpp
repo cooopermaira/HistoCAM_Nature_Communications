@@ -73,6 +73,7 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
                 hitPoly->setName(ci.name);
                 hitPoly->setColor(Colour(ci.r,ci.g,ci.b));
                 annotateParent->annotationsUpdated();
+                annotateParent->getListComp()->updatelist();
                 repaint();
             }
         });

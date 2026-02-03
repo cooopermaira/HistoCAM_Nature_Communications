@@ -57,7 +57,6 @@ private:
   juce::Drawable * polygonIcon;
   juce::Drawable * measureIcon;
   juce::Drawable * segmentIcon;
-  juce::Drawable * dictateIcon;
   juce::Drawable * trashIcon;
   
   
@@ -108,11 +107,7 @@ public:
       if(iconNames[i] == "segment.svg"){
         model->segmentIcon = iconsFromZipFile[i];
       }
-      
-      if(iconNames[i] == "dictate.svg"){
-        model->dictateIcon = iconsFromZipFile[i];
-      }
-      
+
       if(iconNames[i] == "trash.svg"){
         model->trashIcon = iconsFromZipFile[i];
       }

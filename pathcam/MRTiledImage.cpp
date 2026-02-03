@@ -10,6 +10,52 @@
 #include <sys/stat.h>
 
 //STATIC HELPER FUNCTIONS
+
+static std::vector<Point2i> generate_frame_vertices(const Point2i &Abc, unsigned label) {
+  std::vector<Point2i> result;
+  if (label == pathCam::Image::_4X || label == pathCam::Image::_10X || label == pathCam::Image::_20X || label ==
+      pathCam::Image::_40X) {
+    //rectangle
+    result.reserve(4);
+    result.push_back(Abc);
+    result.push_back(Abc + Point2i(MRTiledImageSet::frameWidth, 0));
+    result.push_back(Abc + Point2i(MRTiledImageSet::frameWidth, MRTiledImageSet::frameHeight));
+    result.push_back(Abc + Point2i(0, MRTiledImageSet::frameHeight));
+  } else if (label == pathCam::Image::_2X) {
+    //using octagon
+    auto centerPoint = Abc + Point2i(MRTiledImageSet::frameWidth / 2, MRTiledImageSet::frameHeight / 2);
+    const int r = MRTiledImageSet::scopeRadius;
+
+    // pick a chamfer amount. r/3 is a decent default; clamp so it never inverts.
+    int d = r / 3;
+    if (d < 1) d = 1;
+    if (d > r - 1) d = r - 1;
+
+    const int cx = centerPoint.x;
+    const int cy = centerPoint.y;
+
+    // CW order starting at top edge, moving rightward
+    result.reserve(8);
+
+    // Top edge (horizontal): from (cx - (r - d), cy - r) to (cx + (r - d), cy - r)
+    result.push_back(Point2i(cx - (r - d), cy - r)); // top-left (after chamfer)
+    result.push_back(Point2i(cx + (r - d), cy - r)); // top-right (before chamfer)
+
+    // Right side (vertical): from (cx + r, cy - (r - d)) to (cx + r, cy + (r - d))
+    result.push_back(Point2i(cx + r, cy - (r - d))); // upper-right chamfer point
+    result.push_back(Point2i(cx + r, cy + (r - d))); // lower-right chamfer point
+
+    // Bottom edge (horizontal)
+    result.push_back(Point2i(cx + (r - d), cy + r)); // bottom-right (after chamfer)
+    result.push_back(Point2i(cx - (r - d), cy + r)); // bottom-left  (before chamfer)
+
+    // Left side (vertical)
+    result.push_back(Point2i(cx - r, cy + (r - d))); // lower-left chamfer point
+    result.push_back(Point2i(cx - r, cy - (r - d))); // upper-left chamfer point
+  }
+  return result; //could be empty, idk. better check return value just sayin
+}
+
 static void write_all(int fd, const void *data, size_t size) {
   const char *p = static_cast<const char *>(data);
   size_t written = 0;
@@ -274,10 +320,25 @@ void MRTiledImage::uncache_from_disk() {
 }
 
 std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd) {
-  std::vector<std::vector<Point2i>> frameBoundaries;
+  assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
+
+  std::vector<std::vector<Point2i> > frameBoundaries;
   frameBoundaries.reserve((msTimeEnd - msTimeStart + 10) * framesPerMillisecond);
 
+  long firstFrame = msTimeStart * framesPerMillisecond;
+  long lastFrame = msTimeEnd * framesPerMillisecond;
 
+  for (long i = firstFrame; i <= lastFrame; ++i) {
+    auto res = generate_frame_vertices(AbCs[i], frameLabels[i]);
+    if (!res.empty()) {
+      frameBoundaries.push_back(res);
+    }
+  }
+
+  if (!frameBoundaries.empty()) {
+    return pathCam::poly_union_envelope::union_boundary_then_chord_simplify_CW(frameBoundaries);
+  }
+  return {};
 }
 
 

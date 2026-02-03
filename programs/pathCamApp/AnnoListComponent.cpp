@@ -53,6 +53,7 @@ Component *AnnoListBoxModel::refreshComponentForRow(int rowNumber,
     component = new ListComponent(this);
 
   component->setData(rowNumber);
+  component->resized();
   return component;
 }
 

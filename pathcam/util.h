@@ -1000,7 +1000,7 @@ static Path64 pickLargestOuter(const Paths64& sol) {
 
 // ------------------------- main function -------------------------
 
-std::vector<cv::Point2i> unionBoundaryThenChordSimplifyCW(const std::vector<std::vector<cv::Point2i>>& polysCW);
+std::vector<cv::Point2i> union_boundary_then_chord_simplify_CW(const std::vector<std::vector<cv::Point2i>>& polysCW);
 
 } // namespace poly_union_envelope
 }

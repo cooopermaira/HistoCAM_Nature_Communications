@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.22)
 project(pathCam)
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
 set(CMAKE_BUILD_TYPE Debug)
+
 
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "")
@@ -49,44 +57,9 @@ OPTION(ENABLE_ENCODINGS "" OFF)
 
 add_subdirectory(poco)
 
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # Linux-specific commands
-    message(STATUS "Building on Linux")
-endif ()
-
-
-IF (APPLE)
-    SET(Torch_DIR "/Users/coopermaira/libtorch_2.4.0")
-    add_compile_definitions(WITH_MPS)
-
-    SET(OpenCV_DIR "/opt/homebrew/libexec/opencv4/cmake")
-    IF (NOT OpenCV_DIR)
-        SET(OpenCV_DIR "/opt/local/libexec/opencv4/cmake")
-    ENDIF ()
-
-    set(Python3_INCLUDE_DIR "/opt/homebrew/Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/include/python3.12")
-    set(Python3_LIBRARY_DIR "/opt/homebrew/Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/lib")
-    set(Python3_LIB "/opt/homebrew//Cellar/python@3.12/3.12.5/Frameworks/Python.framework/Versions/3.12/lib/python3.12/config-3.12-darwin/libpython3.12.dylib")
-ELSEIF (WIN32)
-    SET(Torch_DIR "D:/libtorch-win-shared-with-deps-2.0.1+cu118/libtorch")
-    SET(CUDA_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
-    SET(CUDA_TOOLKIT_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
-    SET(CUDA_SDK_ROOT_DIR "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.8")
-
-    SET(OpenCV_DIR "C:/Users/Max Cooper/documents/opencv/install")
-
-    set(Python3_INCLUDE_DIR "C:/Program Files/Python311/Include")
-    set(Python3_LIBRARY_DIR "C:/Program Files/Python311/libs")
-    set(Python3_LIB "python311")
-elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    #find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-    set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
-
-    set(CMAKE_CUDA_ARCHITECTURES 121)
-    enable_language(CUDA)
-
-
-ENDIF ()
+set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
+set(CMAKE_CUDA_ARCHITECTURES 121)
+enable_language(CUDA)
 find_package(CUDAToolkit REQUIRED)
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
@@ -108,38 +81,21 @@ include_directories(${PROJECT_SOURCE_DIR}/TensorRT-10.14.1.48.Linux.aarch64-gnu.
 add_subdirectory(CudaSift)
 include_directories(CudaSift)
 
-#add_subdirectory(cuda-bundle-adjustment)
-#include_directories(cuda-bundle-adjustment)
-
 add_subdirectory(JUCE)
 
 IF (NOT OVERRRIDE_SPINNAKER)
-
-    IF (APPLE)
-        IF (EXISTS "/Applications/Spinnaker")
-        ENDIF ()
-    ELSEIF (WIN32)
-        IF (EXISTS "C:/Program Files/FLIR Systems/Spinnaker")
-            MESSAGE(STATUS "Spinnaker directory found")
-            SET(BUILD_SPINNAKER "" ON)
-            add_compile_definitions(WITH_SPINNAKER)
-            include_directories("C:/Program Files/FLIR Systems/Spinnaker/include")
-            SET(SPINNAKER_LIBRARIES "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/Spinnaker_v140.lib"
-                    "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinUpdate_v140.lib"
-                    "C:/Program Files/FLIR Systems/Spinnaker/lib64/vs2015/SpinVideo_v140.lib")
-        ENDIF ()
-    ELSE ()
-        IF (EXISTS "/opt/spinnaker")
-            SET(BUILD_SPINNAKER "" ON)
-            add_compile_definitions(WITH_SPINNAKER)
-            include_directories("/opt/spinnaker/include")
-            SET(SPINNAKER_LIBRARIES "/opt/spinnaker/lib/libSpinnaker.so" "/opt/spinnaker/lib/libSpinUpdate.so" "/opt/spinnaker/lib/libSpinVideo.so")
-        endif ()
-    ENDIF ()
+    IF (EXISTS "/opt/spinnaker")
+        SET(BUILD_SPINNAKER "" ON)
+        add_compile_definitions(WITH_SPINNAKER)
+        include_directories("/opt/spinnaker/include")
+        SET(SPINNAKER_LIBRARIES "/opt/spinnaker/lib/libSpinnaker.so" "/opt/spinnaker/lib/libSpinUpdate.so" "/opt/spinnaker/lib/libSpinVideo.so")
+    endif ()
 ENDIF ()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+#set(CMAKE_CXX_STANDARD 17)
+#set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+
 
 FILE(GLOB PATHCAM_FILES pathcam/*.h pathcam/*.cpp pathcam/*.cu)
 
@@ -244,28 +200,6 @@ IF (BUILD_PATHCAM_GUI)
 
 
     target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
-
-
-    if (MSVC)
-        file(GLOB DLL_FILES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.dll" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/RelWithDebInfo/*.pdb")
-
-        add_custom_command(TARGET pathCamApp
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy ${DLL_FILES}
-                $<TARGET_FILE_DIR:pathCamApp>)
-        file(GLOB TORCH_DLLS "${TORCH_INSTALL_PREFIX}/lib/*.dll")
-        add_custom_command(TARGET pathCamApp
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${TORCH_DLLS}
-                $<TARGET_FILE_DIR:pathCamApp>)
-        add_custom_command(TARGET debayer
-                POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                ${TORCH_DLLS}
-                $<TARGET_FILE_DIR:debayer>)
-    endif ()
-
 
 ENDIF ()
 

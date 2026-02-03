@@ -124,10 +124,14 @@ public:
   int index;
 
   std::vector<Point2i> AbCs;
+  std::vector<unsigned> frameLabels;
+  float framesPerMillisecond;
+  long captureTimeMS;
+
   inline static int frameHeight = 0;
   inline static int frameWidth = 0;
   inline static int scopeRadius = 0;
-  float framesPerMillisecond;
+
 
   Poco::FastMutex mutex;
 
