@@ -98,8 +98,8 @@ namespace pathCam {
     cleanup_and_reset();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::high_resolution_clock::now() - start);
-    std::cout << "total runtime " << duration.count() << std::endl;
+      std::chrono::high_resolution_clock::now() - start).count();
+    std::cout << "total runtime " << duration << std::endl;
     std::cout << "cudasift extract time " << cudaSiftTime << std::endl;
     std::cout << std::endl << std::endl;
 
@@ -151,8 +151,8 @@ namespace pathCam {
     currentSlideIndex = previousSlides.size();
     previousSlidesMutex.unlock();
 
-    if (_name == "") {
-      if (currentSlideLabel == "") {
+    if (_name.empty()) {
+      if (currentSlideLabel.empty()) {
         currentSlideLabel = std::to_string(currentSlideIndex);
       } else {
         currentSlideLabel = "";
@@ -163,7 +163,7 @@ namespace pathCam {
     return currentSlideLabel;
   }
 
-  Poco::Path StreamCam::make_working_directory() {
+  Poco::Path StreamCam::make_working_directory() const {
     assert(!currentSlideLabel.empty());
 
     // Build: <cwd>/<currentSlideLabel>/

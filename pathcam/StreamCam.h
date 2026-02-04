@@ -315,7 +315,7 @@ namespace pathCam {
 
     std::string get_slide_label() const{return currentSlideLabel;}
 
-    Poco::Path make_working_directory();
+    Poco::Path make_working_directory() const;
 
     int get_num_slides() const{return (int)previousSlides.size();}
 

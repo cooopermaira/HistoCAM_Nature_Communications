@@ -5,9 +5,16 @@
 //  Created by Brian Summa on 4/18/24.
 //
 
-#include <memory>
-
 #include "JuceHeader.h"
+
+#include <filesystem>
+
+inline std::filesystem::path makeTempWavInCwd(const std::string& prefix = "recording")
+{
+  namespace fs = std::filesystem;
+  fs::path p = fs::current_path() /(prefix + ".wav");
+  return p;
+}
 
 
 class sCamPocoRunnable : public Poco::Runnable {
@@ -55,14 +62,20 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   addAndMakeVisible(captureOverlay.get());
   aiOverlay.reset(new AIOverlay(this, iconNames, iconsFromZipFile));
   addAndMakeVisible(aiOverlay.get());
-  // reportOverlay.reset(new ReportOverlay(this, iconNames, iconsFromZipFile));
-  // addAndMakeVisible(reportOverlay.get());
 
   uncacheThread = std::thread(&ImageViewComponent::uncacher, this);
   cacheThread = std::thread(&ImageViewComponent::cacher, this);
+
+  auto start = std::chrono::high_resolution_clock::now();
+  if (parent->audioDictationOn) {
+    wavRecorder.init(1);
+  }
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+  std::chrono::high_resolution_clock::now() - start).count();
+  int k = 0;
 }
 
-void CaptureComponent::setup_listbox() {
+void CaptureComponent::setup_listbox() const {
   parent->setup_listbox();
 }
 
@@ -138,12 +151,18 @@ void CaptureComponent::startRecording() {
 
 #endif
 
-
-
   setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
 
   recentlyViewedSlides.push_unique(parent->MRimage);
+
+
+  if (parent->audioDictationOn) {
+    if (!wavRecorder.initialised) {
+      wavRecorder.init(1);
+    }
+    wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
+  }
 
   compositeThread.start(new bcamPocoRunnable(this));
   parent->startCompositingUIUpdates();
@@ -185,6 +204,13 @@ void CaptureComponent::startSimulating() {
   recentlyViewedSlides.push_unique(parent->MRimage);
 
 
+  if (parent->audioDictationOn) {
+    if (!wavRecorder.initialised) {
+      wavRecorder.init(1);
+    }
+    wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
+  }
+
   compositeThread.start(new sCamPocoRunnable(this));
   parent->startCompositingUIUpdates();
 
@@ -197,6 +223,14 @@ void CaptureComponent::startSimulating() {
 
 
 void CaptureComponent::stop() {
+  if (wavRecorder.isRecording()) {
+    wavRecorder.stop();
+    auto finalAudio = MRImageSet->cwd;
+    finalAudio.makeDirectory();
+    finalAudio.setFileName("dictation");
+    finalAudio.setExtension("wav");
+    wavRecorder.writeFile.moveFileTo(juce::File(finalAudio.toString()));
+  }
   if (recording) { stopRecording(); }
   if (simulating) { stopSimulating(); }
 }
