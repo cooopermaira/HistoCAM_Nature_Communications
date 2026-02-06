@@ -67,9 +67,9 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   cacheThread = std::thread(&ImageViewComponent::cacher, this);
 
   auto start = std::chrono::high_resolution_clock::now();
-  if (parent->audioDictationOn) {
-    wavRecorder.init(1);
-  }
+  // if (parent->audioDictationOn) {
+  //   wavRecorder.init(1);
+  // }
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
   std::chrono::high_resolution_clock::now() - start).count();
   int k = 0;

@@ -8,11 +8,19 @@
 #ifndef AnnotateComponent_h
 #define AnnotateComponent_h
 
+
 #include "JuceHeader.h"
 struct tsWord {
   std::string word;
   long startMS = 0;
   long endMS = 0;
+};
+
+struct AnnotationSpan
+{
+  std::string label;
+  int spanStartI = 0;
+  int spanEndI = 0;
 };
 
 class AnnotateComponent : public juce::Component {
@@ -30,6 +38,8 @@ public:
     voiceHandlerShouldContinue = false;
     voiceHandlerThread.join();
   }
+
+  void silly_test();
 
   AnnotateComponent(std::shared_ptr<fRectangle> view,
                     StringArray &iconNames,
@@ -55,6 +65,7 @@ public:
 
     voiceHandlerThread = std::thread(&AnnotateComponent::voice_annotation_handler,this);
 
+    silly_test();
 #if false
     {
       std::shared_ptr<SegmentAnnotation> temp = std::make_shared<SegmentAnnotation>("SAM");

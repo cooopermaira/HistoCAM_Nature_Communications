@@ -64,6 +64,8 @@ find_package(CUDAToolkit REQUIRED)
 
 INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
+find_package(CURL REQUIRED)
+
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
@@ -198,11 +200,11 @@ IF (BUILD_PATHCAM_GUI)
             juce::juce_audio_basics
             juce::juce_audio_devices
             juce::juce_audio_formats
-            ${TORCH_LIBRARIES} ${Python3_LIB}
+            CURL::libcurl
     )
 
 
-    target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+    target_compile_definitions(pathCamApp PRIVATE JUCE_DISPLAY_SPLASH_SCREEN=0 JUCE_WEB_BROWSER=0 JUCE_USE_CURL=1)
 
 ENDIF ()
 
