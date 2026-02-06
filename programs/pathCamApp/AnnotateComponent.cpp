@@ -415,7 +415,24 @@ void AnnotateComponent::voice_annotation_handler() {
     }
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     auto annoSpanVec = reduceToAnnotations_OpenAI(fullText);
-    int k = 0;
+
+    //make the polygon
+    for (auto &annospan : annoSpanVec) {
+      std::shared_ptr<MRTiledImageSet> mrImgSet;
+      {
+        Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
+        mrImgSet = parent->sCam->previousSlides[index];
+      }
+
+      long startMS = wordVec[annospan.spanStartI].startMS;
+      long endMS = wordVec[annospan.spanEndI].endMS;
+      auto polyAnnoVertices = mrImgSet->poly_annotation_from_time_interval(startMS,endMS);
+
+      Poco::FastMutex::ScopedLock lock(allSlideAnnotationMutex);
+      auto thisSlidesAnnotations = allSlideAnnotations[index];
+
+
+    }
   }
 
   newVoiceAnnotation.wait();

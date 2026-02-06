@@ -107,6 +107,8 @@ public:
   void update_active_annotations(int _index) {
     if (_index < 0) return;
 
+    Poco::FastMutex::ScopedLock lock(allSlideAnnotationMutex);
+
     if ((int)allSlideAnnotations.size() <= _index) {
       allSlideAnnotations.resize(_index + 1);
     }
@@ -167,6 +169,8 @@ public:
 
   std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > activeAnnotations;
   std::vector<std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > > allSlideAnnotations;
+
+  Poco::FastMutex allSlideAnnotationMutex;
 
   std::shared_ptr<Annotation> selected;
 
