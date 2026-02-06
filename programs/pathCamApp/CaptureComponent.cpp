@@ -223,9 +223,10 @@ void CaptureComponent::startSimulating() {
 
 
 void CaptureComponent::stop() {
+  Poco::Path finalAudio;
   if (wavRecorder.isRecording()) {
     wavRecorder.stop();
-    auto finalAudio = MRImageSet->cwd;
+    finalAudio = MRImageSet->cwd;
     finalAudio.makeDirectory();
     finalAudio.setFileName("dictation");
     finalAudio.setExtension("wav");
@@ -233,6 +234,12 @@ void CaptureComponent::stop() {
   }
   if (recording) { stopRecording(); }
   if (simulating) { stopSimulating(); }
+
+  if (parent->audioDictationOn) {
+    Poco::FastMutex::ScopedLock lock(parent->annotate->voiceAnnoMutex);
+    parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(finalAudio.toString())));
+    parent->annotate->newVoiceAnnotation.set();
+  }
 }
 
 void CaptureComponent::stopRecording() {

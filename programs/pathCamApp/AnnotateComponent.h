@@ -9,16 +9,32 @@
 #define AnnotateComponent_h
 
 #include "JuceHeader.h"
+struct tsWord {
+  std::string word;
+  long startMS = 0;
+  long endMS = 0;
+};
 
 class AnnotateComponent : public juce::Component {
 public:
   int segID = 0;
   MainComponent *parent;
 
+  std::thread voiceHandlerThread;
+  std::queue<std::pair<int,juce::File>> voiceAnnoOutstanding;
+  Poco::Event newVoiceAnnotation;
+  Poco::FastMutex voiceAnnoMutex;
+  std::atomic<bool> voiceHandlerShouldContinue = true;
+
+  ~AnnotateComponent() override {
+    voiceHandlerShouldContinue = false;
+    voiceHandlerThread.join();
+  }
+
   AnnotateComponent(std::shared_ptr<fRectangle> view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile,
-                    MainComponent *parent) : parent(parent), mode(Annotation::_NONE) {
+                    MainComponent *parent) : parent(parent), mode(Annotation::_NONE), newVoiceAnnotation(Poco::Event::EVENT_MANUALRESET){
     activeAnnotations.reset(new std::vector<std::shared_ptr<Annotation> >());
     allSlideAnnotations.push_back(activeAnnotations);
 
@@ -36,6 +52,8 @@ public:
 
     resizerBar.reset(new juce::StretchableLayoutResizerBar(&layout, 1, true));
     addChildComponent(resizerBar.get());
+
+    voiceHandlerThread = std::thread(&AnnotateComponent::voice_annotation_handler,this);
 
 #if false
     {
@@ -71,6 +89,9 @@ public:
     leftComponent->updatelist();
 #endif
   }
+
+  void voice_annotation_handler();
+
 
   void update_active_annotations(int _index) {
     if (_index < 0) return;

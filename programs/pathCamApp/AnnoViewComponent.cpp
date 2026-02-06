@@ -95,8 +95,10 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
     if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_POLY) {
       PointClickPoly *cast = dynamic_cast<PointClickPoly *>(annotateParent->getSelected().get());
       cast->add(screen2view(fPoint(event.x, event.y), *view));
-      return true;
     }
+
+    // Always consume shift+left click to prevent navigation interference
+    return true;
   }
 
   // Left click without shift: select point for dragging
@@ -113,6 +115,18 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
 }
 
 bool AnnoViewComponent::polyMouseDrag(const juce::MouseEvent &event) {
+  // If shift is held, consume the event to prevent navigation interference
+  if (event.mods.isShiftDown()) {
+    if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_POLY) {
+      PointClickPoly *cast = dynamic_cast<PointClickPoly *>(annotateParent->getSelected().get());
+      if (cast->isPointSelected()) {
+        cast->move(screen2view(fPoint(event.x, event.y), *view));
+      }
+    }
+    return true;
+  }
+
+  // Non-shift dragging for point selection
   if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_POLY) {
     PointClickPoly *cast = dynamic_cast<PointClickPoly *>(annotateParent->getSelected().get());
     if (cast->isPointSelected()) {
@@ -124,8 +138,17 @@ bool AnnoViewComponent::polyMouseDrag(const juce::MouseEvent &event) {
 }
 
 bool AnnoViewComponent::polyMouseUp(const juce::MouseEvent &event) {
+  // If shift is held, consume the event to prevent navigation interference
+  if (event.mods.isShiftDown()) {
+    if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_POLY) {
+      PointClickPoly *cast = dynamic_cast<PointClickPoly *>(annotateParent->getSelected().get());
+      cast->unSelect();
+    }
+    return true;
+  }
+
+  // Non-shift mouse up for point deselection
   if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_POLY) {
-    int q = annotateParent->getSelected()->getType();
     PointClickPoly *cast = dynamic_cast<PointClickPoly *>(annotateParent->getSelected().get());
     cast->unSelect();
     return true;
@@ -194,8 +217,10 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent &event) {
       Point3f point(temp.x, temp.y, 1.0);
       cast->add(point);
       //parent->parent->sCam->as->on_click(point);
-      return true;
     }
+
+    // Always consume shift+left click to prevent navigation interference
+    return true;
   }
 
   if (event.mods.isRightButtonDown() && event.mods.isShiftDown()) {
@@ -210,8 +235,10 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent &event) {
       Point3f point(temp.x, temp.y, 0.0);
       cast->add(point);
       //parent->parent->sCam->as->on_click(point);
-      return true;
     }
+
+    // Always consume shift+right click to prevent navigation interference
+    return true;
   }
 
   return false;
