@@ -65,7 +65,7 @@ private:
     
 };
 
-class AnnoListComponent : public Component, public juce::TextEditor::Listener {
+class AnnoListComponent : public Component, public juce::TextEditor::Listener, private juce::AsyncUpdater {
 public:
 
   AnnoListComponent(AnnotateComponent *parent,
@@ -122,6 +122,10 @@ public:
     listBox.updateContent();
     listBox.repaint();
   }
+
+  void requestListRefresh() {
+    triggerAsyncUpdate();
+  }
   
   void updatelist(){
     listBox.updateContent();
@@ -169,6 +173,11 @@ public:
   }
   
 private:
+  void handleAsyncUpdate() override
+  {
+    updatelist();           // runs on message thread
+  }
+
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > filteredAnnotations;
   AnnoListBox listBox;

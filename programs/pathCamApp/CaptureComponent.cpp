@@ -67,9 +67,9 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   cacheThread = std::thread(&ImageViewComponent::cacher, this);
 
   auto start = std::chrono::high_resolution_clock::now();
-  // if (parent->audioDictationOn) {
-  //   wavRecorder.init(1);
-  // }
+  if (parent->audioDictationOn) {
+    wavRecorder.init();
+  }
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
   std::chrono::high_resolution_clock::now() - start).count();
   int k = 0;
@@ -235,9 +235,11 @@ void CaptureComponent::stop() {
   if (recording) { stopRecording(); }
   if (simulating) { stopSimulating(); }
 
-  if (parent->audioDictationOn) {
+  //if (parent->audioDictationOn) {
+  if (true){
     Poco::FastMutex::ScopedLock lock(parent->annotate->voiceAnnoMutex);
-    parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(finalAudio.toString())));
+    // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(finalAudio.toString())));
+    parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
     parent->annotate->newVoiceAnnotation.set();
   }
 }

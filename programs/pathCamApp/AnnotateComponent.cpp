@@ -415,24 +415,44 @@ void AnnotateComponent::voice_annotation_handler() {
     }
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     auto annoSpanVec = reduceToAnnotations_OpenAI(fullText);
+    std::shared_ptr<MRTiledImageSet> mrImgSet;
+    {
+      Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
+      mrImgSet = parent->sCam->previousSlides[index];
+    }
+
+    if (annoSpanVec.empty()) {
+      continue;
+    }
+
+    allSlideAnnotationMutex.lock();
+    auto thisSlidesAnnotations = allSlideAnnotations[index];
+    allSlideAnnotationMutex.unlock();
 
     //make the polygon
     for (auto &annospan : annoSpanVec) {
-      std::shared_ptr<MRTiledImageSet> mrImgSet;
-      {
-        Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
-        mrImgSet = parent->sCam->previousSlides[index];
-      }
 
       long startMS = wordVec[annospan.spanStartI].startMS;
       long endMS = wordVec[annospan.spanEndI].endMS;
       auto polyAnnoVertices = mrImgSet->poly_annotation_from_time_interval(startMS,endMS);
 
-      Poco::FastMutex::ScopedLock lock(allSlideAnnotationMutex);
-      auto thisSlidesAnnotations = allSlideAnnotations[index];
+      // Create a new polygon annotation with the label
+      std::shared_ptr<PointClickPoly> polyAnno = std::make_shared<PointClickPoly>(annospan.label);
 
+      // Add each vertex from polyAnnoVertices
+      for (const auto& vertex : polyAnnoVertices) {
+        polyAnno->add(fPoint(vertex.x, vertex.y));
+      }
 
+      // Add the polygon annotation to this slide's annotations
+      thisSlidesAnnotations->push_back(polyAnno);
     }
+
+    // Update the list box if this is the current slide
+    if (thisSlidesAnnotations == activeAnnotations) {
+      leftComponent->requestListRefresh();
+    }
+
   }
 
   newVoiceAnnotation.wait();
