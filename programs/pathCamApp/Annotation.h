@@ -26,7 +26,7 @@ public:
 
   int getType();
 
-  void setName(juce::String _name){ name = _name;}
+  virtual void setName(juce::String _name){ name = _name;}
   void setColor(juce::Colour _color){ color = _color;}
 
 
@@ -325,6 +325,15 @@ private:
     int k = 0;
   }
 
+};
+
+class debugAnnotation : public PointClickPoly {
+public:
+  debugAnnotation(juce::String name): PointClickPoly(name){};
+
+  int firstNum,secondNum;
+
+  void setName(juce::String _name) override;
 };
 
 
