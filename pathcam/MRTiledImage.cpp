@@ -319,16 +319,20 @@ void MRTiledImage::uncache_from_disk() {
   }
 }
 
-std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd) {
+std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd) const {
   assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
-
-  std::vector<std::vector<Point2i> > frameBoundaries;
-  frameBoundaries.reserve((msTimeEnd - msTimeStart + 10) * framesPerMillisecond);
 
   long firstFrame = msTimeStart * framesPerMillisecond;
   long lastFrame = msTimeEnd * framesPerMillisecond;
 
-  for (long i = firstFrame; i <= lastFrame; ++i) {
+  return poly_annotations_from_frame_interval(firstFrame,lastFrame);
+}
+
+std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const {
+  std::vector<std::vector<Point2i> > frameBoundaries;
+  frameBoundaries.reserve(endFrameIdx - startFrameIdx + 1);
+
+  for (long i = startFrameIdx; i <= endFrameIdx; ++i) {
     auto res = generate_frame_vertices(AbCs[i], frameLabels[i]);
     if (!res.empty()) {
       frameBoundaries.push_back(res);

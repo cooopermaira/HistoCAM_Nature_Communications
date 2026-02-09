@@ -329,9 +329,10 @@ private:
 
 class debugAnnotation : public PointClickPoly {
 public:
-  debugAnnotation(juce::String name): PointClickPoly(name){};
+  debugAnnotation(juce::String name, std::shared_ptr<MRTiledImageSet> _mrImgSet): PointClickPoly(name),mrImgSet(_mrImgSet){};
 
   int firstNum,secondNum;
+  std::shared_ptr<MRTiledImageSet> mrImgSet;
 
   void setName(juce::String _name) override;
 };

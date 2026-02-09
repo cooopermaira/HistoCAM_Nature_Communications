@@ -203,7 +203,9 @@ public:
     std::cout << "uncached " << index << " in " << duration.count() << " ms" << std::endl;
   }
 
-  std::vector<Point2i> poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd);
+  std::vector<Point2i> poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd) const;
+
+  std::vector<Point2i> poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const;
 
 };
 

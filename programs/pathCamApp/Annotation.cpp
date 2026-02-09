@@ -64,6 +64,11 @@ void debugAnnotation::setName(juce::String _name) {
     path.clear();
     area = 0.0;
     unSelect();
+
+    auto polygon = mrImgSet->poly_annotations_from_frame_interval(firstNum,secondNum);
+    for (auto & p : polygon) {
+      add(fPoint(p.x,p.y));
+    }
   }
 
   // Always update the visible name
