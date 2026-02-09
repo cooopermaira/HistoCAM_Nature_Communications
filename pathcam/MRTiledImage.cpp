@@ -329,18 +329,20 @@ std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long ms
 }
 
 std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const {
-  std::vector<std::vector<Point2i> > frameBoundaries;
-  frameBoundaries.reserve(endFrameIdx - startFrameIdx + 1);
+  if (startFrameIdx >= endFrameIdx) {
+    std::vector<std::vector<Point2i> > frameBoundaries;
+    frameBoundaries.reserve(endFrameIdx - startFrameIdx + 1);
 
-  for (long i = startFrameIdx; i <= endFrameIdx; ++i) {
-    auto res = generate_frame_vertices(AbCs[i], frameLabels[i]);
-    if (!res.empty()) {
-      frameBoundaries.push_back(res);
+    for (long i = startFrameIdx; i <= endFrameIdx; ++i) {
+      auto res = generate_frame_vertices(AbCs[i], frameLabels[i]);
+      if (!res.empty()) {
+        frameBoundaries.push_back(res);
+      }
     }
-  }
 
-  if (!frameBoundaries.empty()) {
-    return pathCam::poly_union_envelope::union_boundary_then_chord_simplify_CW(frameBoundaries);
+    if (!frameBoundaries.empty()) {
+      return pathCam::poly_union_envelope::union_boundary_then_chord_simplify_CW(frameBoundaries);
+    }
   }
   return {};
 }
