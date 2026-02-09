@@ -16,12 +16,6 @@ struct tsWord {
   long endMS = 0;
 };
 
-struct AnnotationSpan
-{
-  std::string label;
-  int spanStartI = 0;
-  int spanEndI = 0;
-};
 
 class AnnotateComponent : public juce::Component {
 public:

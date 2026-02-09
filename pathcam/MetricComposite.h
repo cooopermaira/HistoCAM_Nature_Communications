@@ -14,7 +14,7 @@ namespace pathCam {
     class MetricComposite : public Composite {
     public:
         MetricComposite(StreamCam *parent, Size image_size, int componentIndex);
-        ~MetricComposite();
+        ~MetricComposite() override;
 
         void update() override;
 

@@ -235,10 +235,11 @@ void CaptureComponent::stop() {
   if (recording) { stopRecording(); }
   if (simulating) { stopSimulating(); }
 
-  //if (parent->audioDictationOn) {
+  // if (parent->audioDictationOn) {
   if (true){
     Poco::FastMutex::ScopedLock lock(parent->annotate->voiceAnnoMutex);
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(finalAudio.toString())));
+    // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/low_feat_10x/dictation.wav")));
     parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
     parent->annotate->newVoiceAnnotation.set();
   }
@@ -249,15 +250,14 @@ void CaptureComponent::stopRecording() {
   spinpath->stopCamera();
 #endif
 
-
-  compositeThread.join();
   recording = false;
+  compositeThread.join();
   repaint();
 }
 
 void CaptureComponent::stopSimulating() {
   simulating = false;
-  // parent->stopCompositingUIUpdates();
+  compositeThread.join();
   repaint();
 }
 

@@ -10,6 +10,18 @@
 
 #include "JuceHeader.h"
 
+
+struct AnnotationSpan
+{
+  std::string label;
+  int spanStartI = -1;
+  int spanEndI = -1;
+  long startMS = -1;
+  long endMS = -1;
+  long startFrameIdx = -1;
+  long endFrameIdx = -1;
+};
+
 class Annotation {
 public:
   enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
@@ -17,6 +29,7 @@ public:
   Annotation(juce::String name): name(name){
     color = colorbrewer[rand()%colorbrewer.size()];
   };
+  virtual ~Annotation() = default;
 
   juce::String getName() { return name; }
 
@@ -324,6 +337,13 @@ private:
     area = std::abs(area / 2.0);
     int k = 0;
   }
+
+};
+
+class VoicePointPoly : public PointClickPoly {
+public:
+  AnnotationSpan annospan;
+  VoicePointPoly(AnnotationSpan _annospan) : PointClickPoly(_annospan.label), annospan(std::move(_annospan)){};
 
 };
 

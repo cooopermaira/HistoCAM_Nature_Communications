@@ -155,8 +155,8 @@ std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File aud
   }
   return {};
 }
-static std::string buildResponsesRequestBody_JSON(const juce::String& text)
-{
+
+static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
   const juce::String systemMsg =
       "You convert pathology slide-review transcripts into a sequence of short annotation labels.\n"
       "Input: a single string 'text'.\n"
@@ -173,7 +173,7 @@ static std::string buildResponsesRequestBody_JSON(const juce::String& text)
       "8) Choose spans that tightly cover the evidence words for the idea (include necessary modifiers like 3+4).\n";
 
   // Helper to build {"type": "..."} objects for schema leaf nodes
-  auto makeTypeObj = [](const juce::String& t) -> juce::var {
+  auto makeTypeObj = [](const juce::String &t) -> juce::var {
     juce::DynamicObject::Ptr o(new juce::DynamicObject());
     o->setProperty("type", t);
     return {o.get()};
@@ -181,9 +181,9 @@ static std::string buildResponsesRequestBody_JSON(const juce::String& text)
 
   // --- Build item schema: {label, span_start_i, span_end_i}
   juce::DynamicObject::Ptr annProps(new juce::DynamicObject());
-  annProps->setProperty("label",        makeTypeObj("string"));
+  annProps->setProperty("label", makeTypeObj("string"));
   annProps->setProperty("span_start_i", makeTypeObj("integer"));
-  annProps->setProperty("span_end_i",   makeTypeObj("integer"));
+  annProps->setProperty("span_end_i", makeTypeObj("integer"));
 
   // required: ["label","span_start_i","span_end_i"]  (build array safely)
   juce::Array<juce::var> annRequiredArr;
@@ -262,121 +262,115 @@ static std::string openAIResponses_POST(const std::string &apiKey,
   return in->readEntireStreamAsString().toStdString();
 }
 
-static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::string& responsesJson)
-{
-    std::vector<AnnotationSpan> out;
+static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::string &responsesJson) {
+  std::vector<AnnotationSpan> out;
 
-    auto top = juce::JSON::parse(responsesJson);
-    if (!top.isObject()) {return out;}
+  auto top = juce::JSON::parse(responsesJson);
+  if (!top.isObject()) { return out; }
 
-    auto* topObj = top.getDynamicObject();
-    if (!topObj) {return out;}
+  auto *topObj = top.getDynamicObject();
+  if (!topObj) { return out; }
 
-    auto outputVar = topObj->getProperty("output");
-    auto* outArr = outputVar.getArray();
-    if (!outArr) {return out;}
+  auto outputVar = topObj->getProperty("output");
+  auto *outArr = outputVar.getArray();
+  if (!outArr) { return out; }
 
-    // 1) Find the first message
-    juce::var messageContentVar; // this will become the "content" array inside the message
-    for (const auto& item : *outArr)
-    {
-        auto* msgObj = item.getDynamicObject();
-        if (!msgObj) {continue;}
+  // 1) Find the first message
+  juce::var messageContentVar; // this will become the "content" array inside the message
+  for (const auto &item: *outArr) {
+    auto *msgObj = item.getDynamicObject();
+    if (!msgObj) { continue; }
 
-        if (msgObj->getProperty("type").toString() == "message"){
-            messageContentVar = msgObj->getProperty("content");
-            break;
+    if (msgObj->getProperty("type").toString() == "message") {
+      messageContentVar = msgObj->getProperty("content");
+      break;
+    }
+  }
+
+  auto *msgContentArr = messageContentVar.getArray();
+  if (!msgContentArr) { return out; }
+
+  // 2) Find output_text (or output_json if it ever appears)
+  juce::String payloadText;
+
+  for (const auto &c: *msgContentArr) {
+    auto *cobj = c.getDynamicObject();
+    if (!cobj) { continue; }
+
+    const auto ctype = cobj->getProperty("type").toString();
+
+    if (ctype == "output_text") {
+      // In your response, this is the JSON string
+      payloadText = cobj->getProperty("text").toString();
+      break;
+    } else if (ctype == "output_json") {
+      // Some responses may return JSON directly; handle it too.
+      auto jsonVar = cobj->getProperty("content");
+      auto *jsonObj = jsonVar.getDynamicObject();
+      if (jsonObj) {
+        // Parse annotations directly from jsonObj
+        auto annVar = jsonObj->getProperty("annotations");
+        auto *annArr = annVar.getArray();
+        if (!annArr) {
+          return out;
         }
-    }
 
-    auto* msgContentArr = messageContentVar.getArray();
-    if (!msgContentArr) {return out;}
+        out.reserve((size_t) annArr->size());
+        for (const auto &av: *annArr) {
+          auto *aobj = av.getDynamicObject();
+          if (!aobj) { continue; }
 
-    // 2) Find output_text (or output_json if it ever appears)
-    juce::String payloadText;
-
-    for (const auto& c : *msgContentArr)
-    {
-        auto* cobj = c.getDynamicObject();
-        if (!cobj) {continue;}
-
-        const auto ctype = cobj->getProperty("type").toString();
-
-        if (ctype == "output_text"){
-            // In your response, this is the JSON string
-            payloadText = cobj->getProperty("text").toString();
-            break;
+          AnnotationSpan a;
+          a.label = aobj->getProperty("label").toString().toStdString();
+          a.spanStartI = (int) aobj->getProperty("span_start_i");
+          a.spanEndI = (int) aobj->getProperty("span_end_i");
+          if (!a.label.empty()) {
+            out.push_back(std::move(a));
+          }
         }
-        else if (ctype == "output_json"){
-            // Some responses may return JSON directly; handle it too.
-            auto jsonVar = cobj->getProperty("content");
-            auto* jsonObj = jsonVar.getDynamicObject();
-            if (jsonObj)
-            {
-                // Parse annotations directly from jsonObj
-                auto annVar = jsonObj->getProperty("annotations");
-                auto* annArr = annVar.getArray();
-                if (!annArr) {
-                  return out;
-                }
-
-                out.reserve((size_t)annArr->size());
-                for (const auto& av : *annArr){
-
-                    auto* aobj = av.getDynamicObject();
-                    if (!aobj) {continue;}
-
-                    AnnotationSpan a;
-                    a.label = aobj->getProperty("label").toString().toStdString();
-                    a.spanStartI = (int)aobj->getProperty("span_start_i");
-                    a.spanEndI   = (int)aobj->getProperty("span_end_i");
-                    if (!a.label.empty()) {
-                      out.push_back(std::move(a));
-                    }
-                }
-                return out;
-            }
-        }
+        return out;
+      }
     }
+  }
 
-    if (payloadText.isEmpty()) {
-      return out;
-    }
-
-    // 3) payloadText is a JSON string like: {"annotations":[...]}
-    auto inner = juce::JSON::parse(payloadText);
-    if (!inner.isObject()) {
-      return out;
-    }
-
-    auto* innerObj = inner.getDynamicObject();
-    if (!innerObj) {
-      return out;
-    }
-
-    auto annVar = innerObj->getProperty("annotations");
-    auto* annArr = annVar.getArray();
-    if (!annArr) {
-      return out;
-    }
-
-    out.reserve((size_t)annArr->size());
-
-    for (const auto& av : *annArr){
-        auto* aobj = av.getDynamicObject();
-        if (!aobj) {continue;}
-
-        AnnotationSpan a;
-        a.label = aobj->getProperty("label").toString().toStdString();
-        a.spanStartI = (int)aobj->getProperty("span_start_i");
-        a.spanEndI   = (int)aobj->getProperty("span_end_i");
-
-        if (!a.label.empty()) {
-          out.push_back(std::move(a));
-        }
-    }
-
+  if (payloadText.isEmpty()) {
     return out;
+  }
+
+  // 3) payloadText is a JSON string like: {"annotations":[...]}
+  auto inner = juce::JSON::parse(payloadText);
+  if (!inner.isObject()) {
+    return out;
+  }
+
+  auto *innerObj = inner.getDynamicObject();
+  if (!innerObj) {
+    return out;
+  }
+
+  auto annVar = innerObj->getProperty("annotations");
+  auto *annArr = annVar.getArray();
+  if (!annArr) {
+    return out;
+  }
+
+  out.reserve((size_t) annArr->size());
+
+  for (const auto &av: *annArr) {
+    auto *aobj = av.getDynamicObject();
+    if (!aobj) { continue; }
+
+    AnnotationSpan a;
+    a.label = aobj->getProperty("label").toString().toStdString();
+    a.spanStartI = (int) aobj->getProperty("span_start_i");
+    a.spanEndI = (int) aobj->getProperty("span_end_i");
+
+    if (!a.label.empty()) {
+      out.push_back(std::move(a));
+    }
+  }
+
+  return out;
 }
 
 
@@ -413,8 +407,11 @@ void AnnotateComponent::voice_annotation_handler() {
       newVoiceAnnotation.wait();
       continue;
     }
+    auto start = std::chrono::high_resolution_clock::now();
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     auto annoSpanVec = reduceToAnnotations_OpenAI(fullText);
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    std::cout<<"full text: \""<<fullText<<"\" processed in "<<dur<<std::endl;
     std::shared_ptr<MRTiledImageSet> mrImgSet;
     {
       Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
@@ -430,17 +427,30 @@ void AnnotateComponent::voice_annotation_handler() {
     allSlideAnnotationMutex.unlock();
 
     //make the polygon
-    for (auto &annospan : annoSpanVec) {
+    for (auto &annospan: annoSpanVec) {
+      if (annospan.spanStartI < 0 || annospan.spanEndI < 0) {
+        std::cout << "bad text indices for annotation: " + annospan.label << std::endl;
+        continue;
+      }
 
-      long startMS = wordVec[annospan.spanStartI].startMS;
-      long endMS = wordVec[annospan.spanEndI].endMS;
-      auto polyAnnoVertices = mrImgSet->poly_annotation_from_time_interval(startMS,endMS);
+      annospan.endMS = wordVec[annospan.spanEndI].endMS;
+      annospan.startMS = wordVec[annospan.spanStartI].startMS;
+
+      long startFrameIndex, endFrameIndex;
+      auto polyAnnoVertices = mrImgSet->poly_annotation_from_time_interval(annospan.startMS,
+                                                                           annospan.endMS,
+                                                                           startFrameIndex,
+                                                                           endFrameIndex);
+
+      annospan.startFrameIdx = startFrameIndex;
+      annospan.endFrameIdx = endFrameIndex;
 
       // Create a new polygon annotation with the label
-      std::shared_ptr<PointClickPoly> polyAnno = std::make_shared<PointClickPoly>(annospan.label);
+      auto polyAnno = std::make_shared<VoicePointPoly>(annospan);
+      std::cout<<"annospan frame index: "<<annospan.startFrameIdx<<" "<<annospan.endFrameIdx<<std::endl;
 
       // Add each vertex from polyAnnoVertices
-      for (const auto& vertex : polyAnnoVertices) {
+      for (const auto &vertex: polyAnnoVertices) {
         polyAnno->add(fPoint(vertex.x, vertex.y));
       }
 
@@ -452,7 +462,6 @@ void AnnotateComponent::voice_annotation_handler() {
     if (thisSlidesAnnotations == activeAnnotations) {
       leftComponent->requestListRefresh();
     }
-
   }
 
   newVoiceAnnotation.wait();

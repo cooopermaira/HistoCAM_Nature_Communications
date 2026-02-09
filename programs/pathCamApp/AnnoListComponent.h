@@ -129,6 +129,7 @@ public:
   
   void updatelist(){
     listBox.updateContent();
+    listBox.repaint();
   }
 
   void newSelection();
