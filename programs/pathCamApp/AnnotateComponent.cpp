@@ -461,6 +461,7 @@ void AnnotateComponent::voice_annotation_handler() {
     // Update the list box if this is the current slide
     if (thisSlidesAnnotations == activeAnnotations) {
       leftComponent->requestListRefresh();
+      MessageManager::callAsync([this]{rightComponent->repaint();});
     }
   }
 
