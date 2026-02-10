@@ -67,7 +67,7 @@ void debugAnnotation::setName(juce::String _name) {
 
     auto polygon = mrImgSet->poly_annotations_from_frame_interval(firstNum,secondNum);
     for (auto & p : polygon) {
-      add(fPoint(p.x,p.y));
+      points.push_back(fPoint(p.x,p.y));
     }
   }
 

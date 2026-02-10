@@ -13,6 +13,9 @@
 
 std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc, unsigned label) const {
   std::vector<Point2i> result;
+  if (!(label == pathCam::Image::_2X || label == pathCam::Image::_4X || label == pathCam::Image::_10X || label == pathCam::Image::_20X || label ==
+      pathCam::Image::_40X)){return {};}
+
   auto scale = labelScaleLookup.at((int)label);
 
   if (label == pathCam::Image::_4X || label == pathCam::Image::_10X || label == pathCam::Image::_20X || label ==
@@ -29,10 +32,9 @@ std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc
     const int r = scale * MRTiledImageSet::scopeRadius;
 
     // pick a chamfer amount. r/3 is a decent default; clamp so it never inverts.
-    int d = r / 2.5;
+    int d = r / 2;
     if (d < 1) d = 1;
     if (d > r - 1) d = r - 1;
-
     const int cx = centerPoint.x;
     const int cy = centerPoint.y;
 

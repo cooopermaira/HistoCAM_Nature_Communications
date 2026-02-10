@@ -248,11 +248,13 @@ namespace pathCam {
       Path64 outer = pickLargestOuter(sol);
 
       std::vector<cv::Point2i> boundary = fromPath64(outer);
+
       removeDuplicateConsecutive(boundary);
       removeCollinear(boundary);
       ensureClockwise(boundary);
 
       if (boundary.size() < 3) return boundary;
+      return boundary;
 
       // Indices of boundary vertices that are "real"
       std::vector<int> keep;

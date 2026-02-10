@@ -185,6 +185,10 @@ public:
     }
   }
 
+  void direct_add(fPoint p) {
+    points.push_back(p);
+  }
+
   void add(fPoint p){
     if(points.size() == 0){
       path.startNewSubPath(p.getX(), p.getY());

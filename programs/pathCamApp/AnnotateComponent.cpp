@@ -455,7 +455,7 @@ void AnnotateComponent::voice_annotation_handler() {
 
       // Add each vertex from polyAnnoVertices
       for (const auto &vertex: polyAnnoVertices) {
-        polyAnno->add(fPoint(vertex.x, vertex.y));
+        polyAnno->direct_add(fPoint(vertex.x, vertex.y));
       }
 
       // Add the polygon annotation to this slide's annotations
