@@ -44,7 +44,7 @@ namespace pathCam {
     virtual ~Composite() = default;
 
     StreamCam *parent;
-    Image* root;
+    Image *root;
     Mat local_quality_score, composite_z_buffer, flat_field;
     Mat3f flat_field_composite;
     Mat4b composite;
@@ -57,8 +57,11 @@ namespace pathCam {
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
     bool xcMatchShouldContinue = true;
-    std::vector<std::shared_ptr<Match>> componentJoinMatches;
-
+    std::vector<std::shared_ptr<Match> > componentJoinMatches;
+    std::vector<Image *> landmarkFrames;
+    Image *xcRegLandmark = nullptr;
+    Point2f xcPwDist;
+    std::vector<std::tuple<Image*,Image*,std::vector<KeyPoint>,std::vector<KeyPoint>>> extraMatches;
 
     std::shared_ptr<MRTiledImage> imagePyramid;
 
@@ -67,7 +70,7 @@ namespace pathCam {
     int minTiley = 1000;
     int maxTiley = 0;
     int componentIndex = 0;
-    int componentMagLabel;
+    int componentMagLabel = -1;
     bool needsAlignment = false;
 
 #ifdef HAVE_OPENCV_CUDAARITHM
@@ -93,7 +96,6 @@ namespace pathCam {
     cuda::GpuMat cvtBuffer;
 
 
-
 #endif
     Mat circleMask;
 
@@ -104,13 +106,14 @@ namespace pathCam {
     std::vector<RegInfo *> contributingRegInfos;
     std::set<Image *> contributingImages;
     std::map<int, long> delaunayMembers;
-    std::queue<RegInfo*> staging;
+    std::queue<RegInfo *> staging;
 
 
     SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
 
     bool prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
-    bool prepare_4CPA(Image*img, Rect roi = Rect());
+
+    bool prepare_4CPA(Image *img, Rect roi = Rect());
 
     Size imageSize;
 
@@ -118,12 +121,13 @@ namespace pathCam {
 
     Composite(StreamCam *parent, Size image_size, int _componentIndex);
 
-    virtual void align_and_rebuild(){};
+    virtual void align_and_rebuild() {
+    };
 
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);
 
-    void stage(RegInfo* _ri){staging.push(_ri);}
+    void stage(RegInfo *_ri) { staging.push(_ri); }
 
     void establish_scale_at_root(Image *_rootImg);
 
@@ -137,9 +141,11 @@ namespace pathCam {
 
     void ff_correct_existing_tiles();
 
-    double get_scale() const {return imagePyramid->scale;}
+    double get_scale() const { return imagePyramid->scale; }
 
     void set_offset(const Point2f &_offset) const;
+
+    void correct_offset() const;
 
     void deduce_label();
 
@@ -160,8 +166,8 @@ namespace pathCam {
     Mat score_image_2X(int, int, int);
 
     void save_pyramid_as_image(std::string _fileName = "", bool _withGrid = false, bool _withGridAndIndexes = false,
-                           bool _withEffectedTiles = true, bool _outline = false,
-                           std::vector<Point2i> effectedTiles = {});
+                               bool _withEffectedTiles = true, bool _outline = false,
+                               std::vector<Point2i> effectedTiles = {});
   };
 
 
@@ -179,7 +185,6 @@ namespace pathCam {
     Mat freshMask;
     Mat ff;
     Mat convertHolding;
-
 
 
     Subdiv2D subdiv;
@@ -278,7 +283,7 @@ namespace pathCam {
 
     // void set_offset(const Point2f &_offset) const;
 
-//    void deduce_label();
+    //    void deduce_label();
 
     //void set_candidate_scale_ratios();
 
@@ -299,7 +304,6 @@ namespace pathCam {
     bool rebuildTile(Point2i tile, int sum);
 
     void notify_job_complete();
-
 
 
     void debug_draw_voronoi(Mat &img, Subdiv2D &subdiv, bool _drawPathInsteadOfFaces = false,

@@ -960,7 +960,26 @@ namespace pathCam {
     someoneWaitingOnJobCompleteEvent = false;
   }
 
+  bool StreamCam::create_mag_label_to_scale_lookup(std::unordered_map<int,float>& _lookup) {
+    std::vector<int> labels = {Image::_2X,Image::_4X,Image::_10X,Image::_20X,Image::_40X};
+    for (auto comp : composites) {
+      if (comp->get_scale() == 1) {
+        assert(!comp->candidateScaleRatios.empty());
+        for (int i = 0; i < labels.size(); ++i) {
+          _lookup[labels[i]] = 1 / comp->candidateScaleRatios[i];
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+
   void StreamCam::cleanup_and_reset() {
+
+    for (auto comp : composites) {
+      comp->correct_offset();
+    }
 
     std::vector<Point2i> AbCs(maxIndex + 1);
     std::vector<unsigned> frameLabels(maxIndex + 1);
@@ -969,11 +988,12 @@ namespace pathCam {
         if (img->regInfo) {
           if (!img->regInfo->wasAligned) {
             // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
-            auto abc = img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords;
+            auto abc = Point2f(img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
+            abc = get_AbC_relative_from_relative(img->regInfo->component_membership,abc,0);
             AbCs[img->index] = abc;
           }else {
             // Abc was aligned during BA, trust its coords
-            AbCs[img->index] = img->regInfo->absoluteCoords;
+            AbCs[img->index] = get_AbC_relative_from_relative(img->regInfo->component_membership,Point2f(img->regInfo->absoluteCoords),0);
           }
           frameLabels[img->index] = img->label;
         }else {
@@ -988,6 +1008,10 @@ namespace pathCam {
         }
       }
     }
+    std::unordered_map<int,float> labelScaleLookup;
+    create_mag_label_to_scale_lookup(labelScaleLookup);
+
+    MRImageSet->labelScaleLookup = labelScaleLookup;
     MRImageSet->AbCs = AbCs;
     MRImageSet->frameLabels = frameLabels;
     MRImageSet->framesPerMillisecond = float(maxIndex) / float(captureTimeMS);

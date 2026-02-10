@@ -38,7 +38,6 @@ public:
   bool wasAligned = false;
   bool tryComposite = false;
   bool inCompositeQ = false;
-  bool corrected = false;
   int component_membership;
   Point2i absoluteCoords;
   Point2i relativeCoords = Point2i(0.0, 0.0);

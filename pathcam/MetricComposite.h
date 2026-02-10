@@ -45,7 +45,7 @@ namespace pathCam {
         BundleAdjustmentIntegrator* bai;
 
         SiftData compSiftData;
-        std::vector<std::tuple<Image*,Image*,std::vector<KeyPoint>,std::vector<KeyPoint>>> extraMatches;
+
 
         int frameDelay;
         int positionForNextWaitngFrame = 0;

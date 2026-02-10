@@ -127,6 +127,16 @@ namespace pathCam {
     imagePyramid->set_offset(_offset);
   }
 
+  void Composite::correct_offset() const {
+    if (xcRegLandmark && xcRegLandmark->regInfo && xcRegLandmark->regInfo->wasAligned) {
+      auto queryAbC = xcPwDist + Point2f(xcRegLandmark->regInfo->absoluteCoords);
+      auto resultantPoint = parent->get_AbC_relative_from_relative(xcRegLandmark->regInfo->component_membership,
+                                                                   queryAbC, 0);
+
+      set_offset(resultantPoint / get_scale());
+    }
+  }
+
 
   void Composite::set_scale(double _scale, bool _ffCorrectExistingTiles) {
     imagePyramid->set_scale(_scale);

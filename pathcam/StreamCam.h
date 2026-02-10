@@ -309,6 +309,8 @@ namespace pathCam {
 
     void cleanup_and_reset();
 
+    bool create_mag_label_to_scale_lookup(std::unordered_map<int,float>& _lookup);
+
     void set_input_file(const std::string &_path){inputFileOverride = _path;}
 
     std::string set_slide_label(std::string name = "");

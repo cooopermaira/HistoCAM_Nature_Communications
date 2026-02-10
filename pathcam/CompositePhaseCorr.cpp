@@ -245,6 +245,8 @@ namespace pathCam {
     //calculate absolute coordinates of _rootImg in their component space
     Point2f pairwiseDistance = Point2f(homography[2], homography[5]);
 
+    auto theirComponent = parent->composites[theirComponentIndex];
+
     if (abs(relativeScale - 1.f) < 0.05) {
       //we're part of this component. suspend self, create a match and attempt registration.
       suspended = true;
@@ -274,8 +276,8 @@ namespace pathCam {
       sift_to_cvMatch(rootCopy,_rootImg,_target,inlierCount,inlierMask,kp1,kp2);
       FreeSiftData(rootCopy);
 
-      auto comp = std::dynamic_pointer_cast<MetricComposite>(parent->composites[theirComponentIndex]);
-      comp->extraMatches.emplace_back(_rootImg,_target,kp1,kp2);
+      theirComponent->extraMatches.emplace_back(_rootImg,_target,kp1,kp2);
+
       return true;
     }
     if (!_fullImageFtExtract) {
@@ -295,6 +297,9 @@ namespace pathCam {
     auto p = resultantPoint / scale;
     set_offset(resultantPoint / scale);
 
+    xcPwDist = pairwiseDistance;
+    xcRegLandmark = _target;
+    theirComponent->landmarkFrames.push_back(_target);
     std::cout<<"component "<<componentIndex<<" XC registered"<<std::endl;
     FreeSiftData(rootCopy);
     return true;

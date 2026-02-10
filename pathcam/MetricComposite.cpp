@@ -275,6 +275,9 @@ namespace pathCam {
 
     std::unordered_set<Image *> members = find_contributing_images();
     members.insert(root);
+    for (auto img : landmarkFrames) {
+      members.insert(img);
+    }
     std::vector membersForRebuild(members.begin(), members.end());
 
 

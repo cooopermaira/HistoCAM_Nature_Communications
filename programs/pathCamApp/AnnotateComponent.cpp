@@ -164,13 +164,16 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
       "Rules:\n"
       "1) Output ONLY JSON matching the provided schema.\n"
       "2) Produce 1..N annotations in the SAME ORDER the ideas appear in the transcript.\n"
-      "3) Each annotation corresponds to a contiguous span of the word list: span_start_i..span_end_i (inclusive).\n"
+      "3) Each annotation corresponds to a contiguous span of the word list: span_start_word..span_end_word (inclusive).\n"
       "4) Do NOT merge non-contiguous mentions: if topic A then B then A again, output three annotations.\n"
       "5) label must be 1-5 words.\n"
       "6) label is a semantic reduction / canonical phrase for the span. It DOES NOT need to be an exact substring.\n"
       "   Example: span contains 'Gleason pattern 3+4' -> label 'Gleason 3+4'.\n"
       "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive margin', 'Gleason 3+4').\n"
-      "8) Choose spans that tightly cover the evidence words for the idea (include necessary modifiers like 3+4).\n";
+      "8) Choose spans that tightly cover the evidence words for the idea (include necessary modifiers like 3+4).\n"
+  "9) span_start_word..span_end_word MUST include all words that justify the label, including qualifiers, numbers, and context words (e.g. \"pattern\", \"plus\"). Do not select a span shorter than the evidence phrase.\n"
+  "10) If multiple alternative interpretations of the SAME finding appear in close proximity (e.g. \"maybe\", \"probably\", \"versus\", \"favors\"), and a later statement clearly resolves or favors one, output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
+  "11) Before outputting JSON, verify that each label could be reconstructed by reading ONLY the words inside its span. If not, expand the span.";
 
   // Helper to build {"type": "..."} objects for schema leaf nodes
   auto makeTypeObj = [](const juce::String &t) -> juce::var {
@@ -179,17 +182,17 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
     return {o.get()};
   };
 
-  // --- Build item schema: {label, span_start_i, span_end_i}
+  // --- Build item schema: {label, span_start_word, span_end_word}
   juce::DynamicObject::Ptr annProps(new juce::DynamicObject());
   annProps->setProperty("label", makeTypeObj("string"));
-  annProps->setProperty("span_start_i", makeTypeObj("integer"));
-  annProps->setProperty("span_end_i", makeTypeObj("integer"));
+  annProps->setProperty("span_start_word", makeTypeObj("integer"));
+  annProps->setProperty("span_end_word", makeTypeObj("integer"));
 
-  // required: ["label","span_start_i","span_end_i"]  (build array safely)
+  // required: ["label","span_start_word","span_end_word"]  (build array safely)
   juce::Array<juce::var> annRequiredArr;
   annRequiredArr.add("label");
-  annRequiredArr.add("span_start_i");
-  annRequiredArr.add("span_end_i");
+  annRequiredArr.add("span_start_word");
+  annRequiredArr.add("span_end_word");
   juce::var annRequiredVar = annRequiredArr;
 
   juce::DynamicObject::Ptr annItem(new juce::DynamicObject());
@@ -228,10 +231,10 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
 
   // --- Root request body
   juce::DynamicObject::Ptr root(new juce::DynamicObject());
-  root->setProperty("model", "gpt-4o-mini");
+  root->setProperty("model", "gpt-5-mini");
   root->setProperty("instructions", systemMsg);
   root->setProperty("input", text);
-  root->setProperty("temperature", 0);
+  // root->setProperty("temperature", 0);
   root->setProperty("text", juce::var(textObj.get()));
 
   return juce::JSON::toString(juce::var(root.get()), true).toStdString();
@@ -322,8 +325,8 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
 
           AnnotationSpan a;
           a.label = aobj->getProperty("label").toString().toStdString();
-          a.spanStartI = (int) aobj->getProperty("span_start_i");
-          a.spanEndI = (int) aobj->getProperty("span_end_i");
+          a.spanStartI = (int) aobj->getProperty("span_start_word");
+          a.spanEndI = (int) aobj->getProperty("span_end_word");
           if (!a.label.empty()) {
             out.push_back(std::move(a));
           }
@@ -362,8 +365,8 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
 
     AnnotationSpan a;
     a.label = aobj->getProperty("label").toString().toStdString();
-    a.spanStartI = (int) aobj->getProperty("span_start_i");
-    a.spanEndI = (int) aobj->getProperty("span_end_i");
+    a.spanStartI = (int) aobj->getProperty("span_start_word");
+    a.spanEndI = (int) aobj->getProperty("span_end_word");
 
     if (!a.label.empty()) {
       out.push_back(std::move(a));
@@ -410,8 +413,9 @@ void AnnotateComponent::voice_annotation_handler() {
     auto start = std::chrono::high_resolution_clock::now();
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     auto annoSpanVec = reduceToAnnotations_OpenAI(fullText);
-    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-    std::cout<<"full text: \""<<fullText<<"\" processed in "<<dur<<std::endl;
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
+    std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
     std::shared_ptr<MRTiledImageSet> mrImgSet;
     {
       Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
@@ -447,7 +451,7 @@ void AnnotateComponent::voice_annotation_handler() {
 
       // Create a new polygon annotation with the label
       auto polyAnno = std::make_shared<VoicePointPoly>(annospan);
-      std::cout<<"annospan frame index: "<<annospan.startFrameIdx<<" "<<annospan.endFrameIdx<<std::endl;
+      std::cout << "annospan frame index: " << annospan.startFrameIdx << " " << annospan.endFrameIdx << std::endl;
 
       // Add each vertex from polyAnnoVertices
       for (const auto &vertex: polyAnnoVertices) {
@@ -461,7 +465,7 @@ void AnnotateComponent::voice_annotation_handler() {
     // Update the list box if this is the current slide
     if (thisSlidesAnnotations == activeAnnotations) {
       leftComponent->requestListRefresh();
-      MessageManager::callAsync([this]{rightComponent->repaint();});
+      MessageManager::callAsync([this] { rightComponent->repaint(); });
     }
   }
 
