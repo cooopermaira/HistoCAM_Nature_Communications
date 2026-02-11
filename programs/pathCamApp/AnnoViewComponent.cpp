@@ -325,8 +325,10 @@ void AnnoViewComponent::paint(juce::Graphics &g) {
   ImageViewComponent::paint(g); {
     const ScopedLock lock(mutex);
     for (unsigned int i = 0; i < annotations->size(); i++) {
-      (*annotations)[i]->paint(g, view->getPosition(), (*annotations)[i].get() == annotateParent->getSelected().get(),
-                               view2screenScale(*view));
+      bool isSelected = (*annotations)[i].get() == annotateParent->getSelected().get();
+      float alpha = isSelected ? annotateParent->selectedAlpha : annotateParent->unselectedAlpha;
+      (*annotations)[i]->paint(g, view->getPosition(), isSelected,
+                               view2screenScale(*view), alpha);
     }
   }
 }

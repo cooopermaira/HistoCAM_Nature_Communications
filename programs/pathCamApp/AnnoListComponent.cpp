@@ -74,6 +74,17 @@ Component *AnnoListBoxModel::refreshComponentForRow(int rowNumber,
 // }
 
 
+void AnnoListComponent::initAlphaSliders() {
+  selectedAlphaSlider.onValueChange = [this]() {
+    parent->selectedAlpha = (float)selectedAlphaSlider.getValue();
+    parent->rightComponent->repaint();
+  };
+  unselectedAlphaSlider.onValueChange = [this]() {
+    parent->unselectedAlpha = (float)unselectedAlphaSlider.getValue();
+    parent->rightComponent->repaint();
+  };
+}
+
 void AnnoListComponent::newSelection() {
   for (unsigned int i = 0; i < filteredAnnotations->size(); i++) {
     if ((*filteredAnnotations)[i] == parent->getSelected())

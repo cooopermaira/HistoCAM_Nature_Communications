@@ -93,6 +93,30 @@ public:
     searchBox.setPopupMenuEnabled(true);
     searchBox.addListener(this);
     addAndMakeVisible(searchBox);
+
+    // Selected annotation alpha slider
+    selectedAlphaSlider.setRange(0.0, 1.0, 0.01);
+    selectedAlphaSlider.setValue(0.5);
+    selectedAlphaSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    selectedAlphaSlider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
+    addAndMakeVisible(selectedAlphaSlider);
+
+    selectedAlphaLabel.setText("Selected Alpha", juce::dontSendNotification);
+    selectedAlphaLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(selectedAlphaLabel);
+
+    // Unselected annotation alpha slider
+    unselectedAlphaSlider.setRange(0.0, 1.0, 0.01);
+    unselectedAlphaSlider.setValue(0.5);
+    unselectedAlphaSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    unselectedAlphaSlider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
+    addAndMakeVisible(unselectedAlphaSlider);
+
+    unselectedAlphaLabel.setText("Unselected Alpha", juce::dontSendNotification);
+    unselectedAlphaLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(unselectedAlphaLabel);
+
+    initAlphaSliders();
     
     
     for (int i = 0; i < iconNames.size(); i++) {
@@ -169,7 +193,19 @@ public:
     auto b = getLocalBounds().reduced(10);
     auto searchArea = b.removeFromTop(30);
     searchBox.setBounds(searchArea);
-    b.removeFromTop(5); // Add small gap
+    b.removeFromTop(5);
+
+    auto unselectedLabelArea = b.removeFromBottom(18);
+    unselectedAlphaLabel.setBounds(unselectedLabelArea);
+    auto unselectedSliderArea = b.removeFromBottom(24);
+    unselectedAlphaSlider.setBounds(unselectedSliderArea);
+
+    auto selectedLabelArea = b.removeFromBottom(18);
+    selectedAlphaLabel.setBounds(selectedLabelArea);
+    auto selectedSliderArea = b.removeFromBottom(24);
+    selectedAlphaSlider.setBounds(selectedSliderArea);
+
+    b.removeFromBottom(5);
     listBox.setBounds(b);
   }
   
@@ -179,11 +215,18 @@ private:
     updatelist();           // runs on message thread
   }
 
+  void initAlphaSliders();
+
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > annotations;
   std::shared_ptr< std::vector < std::shared_ptr<  Annotation > > > filteredAnnotations;
   AnnoListBox listBox;
   std::unique_ptr < AnnoListBoxModel >  model;
   juce::TextEditor searchBox;
+
+  juce::Slider selectedAlphaSlider;
+  juce::Label selectedAlphaLabel;
+  juce::Slider unselectedAlphaSlider;
+  juce::Label unselectedAlphaLabel;
 
   AnnotateComponent * parent;
 

@@ -35,7 +35,7 @@ public:
 
   juce::Colour getColor(){ return color;}
 
-  virtual void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) {};
+  virtual void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) {};
 
   int getType();
 
@@ -71,7 +71,7 @@ public:
     return path.contains(p.getX(), p.getY());
   }
 
-  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {
     rebuildPath();
     juce::Path temp = path;
 
@@ -80,14 +80,10 @@ public:
 
     juce::Path::Iterator it(temp);
 
-    if(selected) {
-      g.setColour(color.withAlpha(0.5f));
-    }else {
-      g.setColour(juce::Colours::greenyellow.withAlpha(0.5f));
-    }
+    g.setColour(color.withAlpha(alpha));
       g.fillPath(temp);
     auto a = getArea();
-    if(points.size() > 2 && a > 0.01){
+    if(selected && points.size() > 2 && a > 0.01){
       std::string area = Poco::format("%.3f mm^2", a*pow(1.73*0.001,2));
       int text_width = g.getCurrentFont().getStringWidth(area);
       int text_height = g.getCurrentFont().getHeight();
@@ -154,8 +150,8 @@ public:
   PointClickPoly(juce::String name): PolygonAnnotation(name), selected(-1) {};
 
 
-  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
-    PolygonAnnotation::paint(g, offset, selected, scale);
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {
+    PolygonAnnotation::paint(g, offset, selected, scale, alpha);
     juce::Path temp = path;
 
     temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
@@ -366,7 +362,7 @@ class DictateAnnotation : public Annotation{
 public:
   DictateAnnotation(juce::String name): Annotation(name) {};
 
-  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {}
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {}
 
 };
 
@@ -377,8 +373,8 @@ public:
     fovUpperLeftCorner = {0,0};
   };
 
-  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
-    //PolygonAnnotation::paint(g, offset, selected, scale);
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {
+    //PolygonAnnotation::paint(g, offset, selected, scale, alpha);
     if (selected) {
       for (auto points : input) {
         juce::Point temp = juce::Point(points.x, points.y);
@@ -465,7 +461,7 @@ public:
     return measuring;
   }
 
-  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0)) override {
+  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {
     juce::Line <float> temp = line;
 
     temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));

@@ -171,9 +171,9 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
       "   Example: span contains 'Gleason pattern 3+4' -> label 'Gleason 3+4'.\n"
       "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive margin', 'Gleason 3+4').\n"
       "8) Choose spans that tightly cover the evidence words for the idea (include necessary modifiers like 3+4).\n"
-  "9) span_start_word..span_end_word MUST include all words that justify the label, including qualifiers, numbers, and context words (e.g. \"pattern\", \"plus\"). Do not select a span shorter than the evidence phrase.\n"
-  "10) If multiple alternative interpretations of the SAME finding appear in close proximity (e.g. \"maybe\", \"probably\", \"versus\", \"favors\"), and a later statement clearly resolves or favors one, output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
-  "11) Before outputting JSON, verify that each label could be reconstructed by reading ONLY the words inside its span. If not, expand the span.";
+      "9) span_start_word..span_end_word MUST include all words that justify the label, including qualifiers, numbers, and context words (e.g. \"pattern\", \"plus\"). Do not select a span shorter than the evidence phrase.\n"
+      "10) If multiple alternative interpretations of the SAME finding appear in close proximity (e.g. \"maybe\", \"probably\", \"versus\", \"favors\"), and a later statement clearly resolves or favors one, output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
+      "11) Before outputting JSON, verify that each label could be reconstructed by reading ONLY the words inside its span. If not, expand the span.";
 
   // Helper to build {"type": "..."} objects for schema leaf nodes
   auto makeTypeObj = [](const juce::String &t) -> juce::var {
@@ -231,7 +231,7 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
 
   // --- Root request body
   juce::DynamicObject::Ptr root(new juce::DynamicObject());
-  root->setProperty("model", "gpt-5-mini");
+  root->setProperty("model", "gpt-4o-mini");
   root->setProperty("instructions", systemMsg);
   root->setProperty("input", text);
   // root->setProperty("temperature", 0);
