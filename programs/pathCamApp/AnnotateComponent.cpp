@@ -353,14 +353,52 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
       "4) evidence_text MUST be copied verbatim from the transcript as a single contiguous substring.\n"
       "   Do not paraphrase it. Do not summarize it.\n"
       "5) evidence_text must include all words necessary to justify the label, including qualifiers, numbers, and context words.\n"
-      "6) If multiple alternative interpretations of the SAME finding appear in close proximity\n"
-      "   (e.g. 'maybe', 'probably', 'versus', 'favors'), and a later statement clearly resolves or favors one,\n"
-      "   output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
-      "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive surgical margin', 'Gleason 3+4').\n";
+      // "6) If multiple alternative interpretations of the SAME finding appear in close proximity\n"
+      // "   (e.g. 'maybe', 'probably', 'versus', 'favors'), and a later statement clearly resolves or favors one,\n"
+      // "   output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
+  "6) Revision/uncertainty merge rule (MUST follow):\n"
+"   Only merge multiple mentions into ONE annotation when the transcript explicitly presents them as alternative interpretations\n"
+"   or a correction/revision of the SAME finding, using uncertainty/revision markers such as:\n"
+"   \"maybe\", \"probably\", \"or\", \"versus\", \"favors\", \"could be\", \"cannot exclude\", \"actually\", \"no\", \"never mind\", \"on second thought\".\n"
+"   In that case, output exactly ONE annotation labeled with the FINAL favored interpretation (the last decisive claim in that discussion),\n"
+"   and evidence_text MUST be one contiguous verbatim substring spanning from the first mention through the final conclusion/revision.\n"
+"\n"
+"6a) Distinct-assertion split rule (MUST follow):\n"
+"    If the transcript asserts TWO different interpretations/values as separate findings WITHOUT the uncertainty/revision markers above\n"
+"    (often joined by \"and\", \"also\", \"as well as\", or stated in separate clauses/sentences), then output TWO annotations (one per finding).\n"
+"    Gleason-specific example: \"more Gleason 3 plus 4, and Gleason pattern 4 plus 3\" -> output both \"Gleason 3+4\" and \"Gleason 4+3\".\n"
+"\n"
+"6b) Forbidden adjacent-alternatives pattern (guardrail):\n"
+"    Do NOT output two adjacent annotations for the same finding when one is clearly an alternative/correction of the other per rule 6\n"
+"    (e.g. \"Gleason 3+3\" then \"Gleason 3+4\" with \"maybe/probably\"). If you would, merge them into ONE labeled with the final favored interpretation,\n"
+"    and evidence_text spanning both. Do NOT label with an earlier, less confident alternative if a later, more confident alternative is present.\n"
+"\n"
+  // "6c) FINAL label tie-break (MUST follow, especially for Gleason):\n"
+  // "    When a single discussion window contains multiple alternative values/grades (e.g. \"3 plus 3\" then \"maybe 3 plus 4\" then \"probably 3 plus 4\"),\n"
+  // "    the label MUST be the FINAL favored value stated in that window.\n"
+  // "    - If the word \"probably\" appears with a value, choose that value as the label.\n"
+  // "    - Otherwise if \"favors\" / \"most consistent with\" appears with a value, choose that value.\n"
+  // "    - Otherwise choose the LAST mentioned value in the window.\n"
+  // "    Do NOT label with an earlier, less confident alternative if a later, more confident alternative is present.\n"
+//   "6) Resolution / hedging merge rule (MUST follow):\n"
+// "   If the transcript discusses multiple alternative interpretations of the SAME finding in close proximity\n"
+// "   (e.g., 'maybe', 'probably', 'versus', 'favors', 'could be', 'cannot exclude') and later text favors one,\n"
+// "   you MUST output exactly ONE annotation for that finding.\n"
+// "   - Do NOT output separate annotations for the tentative early mention and the later resolved mention.\n"
+// "   - evidence_text MUST cover the entire discussion window from the first mention through the final resolved statement.\n"
+// "\n"
+// "6a) Close proximity definition: treat as the SAME discussion if alternatives occur within the same sentence OR within 25 words,\n"
+// "    and no new unrelated finding starts in between.\n"
+// "\n"
+// "6b) Gleason-specific rule: if multiple Gleason patterns/grades are mentioned close together (e.g., '3 plus 3' then 'maybe 3 plus 4'\n"
+// "    then 'probably 3 plus 4'), output ONE annotation labeled with the final favored Gleason grade.\n"
+// "    evidence_text MUST include the full Gleason discussion from the first Gleason mention through the final favored grade.\n"
 
+      "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive surgical margin', 'Gleason 3+4').\n"
+  "8) Before outputting JSON, check for adjacent alternative/correction duplicates (rule 6) and merge as required.\n";
   if (!preconfigAnnos.empty()) {
     systemMsg +=
-        "8) If any annotation can be adequately described using one of the following exact labels,\n"
+        "9) If any annotation can be adequately described using one of the following exact labels,\n"
         "   you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
 
     for (const auto &anno: preconfigAnnos) {
@@ -425,7 +463,7 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
   root->setProperty("model", "gpt-4o-mini");
   root->setProperty("instructions", systemMsg);
   root->setProperty("input", text);
-  // root->setProperty("temperature", 0);
+  root->setProperty("temperature", 0);
   root->setProperty("text", juce::var(textObj.get()));
 
   return juce::JSON::toString(juce::var(root.get()), true).toStdString();
@@ -720,16 +758,16 @@ void AnnotateComponent::voice_annotation_handler() {
     for (auto &annospan: annoSpanVec) {
       std::cout << annospan.label;
 
-      // if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
-      //   std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
-      //   for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
-      //     std::cout << wordVec[i].word;
-      //     if (i < annospan.spanEndI) {
-      //       std::cout << " ";
-      //     }
-      //   }
-      //   std::cout << "\"" << std::endl;
-      // }
+      if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
+        std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
+        for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
+          std::cout << wordVec[i].word;
+          if (i < annospan.spanEndI) {
+            std::cout << " ";
+          }
+        }
+        std::cout << "\"" << std::endl;
+      }
 
       if (!annospan.evidenceText.empty()) {
         std::cout << ", \"" << annospan.evidenceText << "\"" << std::endl;
@@ -793,7 +831,31 @@ void AnnotateComponent::voice_annotation_handler() {
 
 void AnnotateComponent::silly_test() {
   juce::File dictPath("/home/cm/Documents/data/low_feat_10x/dictation.wav");
+
+  auto start = std::chrono::high_resolution_clock::now();
   auto [fullText,wordVec] = send_transcribe_call(dictPath);
   auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, get_preconfig_anno());
+  auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+      count();
+  std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
+
+  for (auto &annospan: annoSpanVec) {
+    std::cout << annospan.label;
+
+    if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
+      std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
+      for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
+        std::cout << wordVec[i].word;
+        if (i < annospan.spanEndI) {
+          std::cout << " ";
+        }
+      }
+      std::cout << "\"" << std::endl;
+    }
+
+    // if (!annospan.evidenceText.empty()) {
+    //   std::cout << ", \"" << annospan.evidenceText << "\"" << std::endl;
+    // }
+  }
   int k = 0;
 }
