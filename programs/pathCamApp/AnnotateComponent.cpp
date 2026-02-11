@@ -7,6 +7,181 @@
 
 #include "JuceHeader.h"
 
+namespace {
+  std::string toLower(const std::string &s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    return out;
+  }
+
+  // ------------------------------------------------------------
+  // Helper: normalize string (lowercase + collapse spaces +
+  // strip leading/trailing whitespace)
+  // ------------------------------------------------------------
+  std::string normalize(const std::string &s) {
+    std::string out;
+    out.reserve(s.size());
+
+    bool prevSpace = false;
+
+    for (unsigned char c: s) {
+      if (std::isspace(c)) {
+        if (!prevSpace) {
+          out.push_back(' ');
+          prevSpace = true;
+        }
+      } else {
+        out.push_back(std::tolower(c));
+        prevSpace = false;
+      }
+    }
+
+    // trim
+    if (!out.empty() && out.front() == ' ')
+      out.erase(out.begin());
+    if (!out.empty() && out.back() == ' ')
+      out.pop_back();
+
+    return out;
+  }
+
+  // ------------------------------------------------------------
+  // Split on single spaces (as per your model rule)
+  // ------------------------------------------------------------
+  std::vector<std::string> splitWords(const std::string &s) {
+    std::vector<std::string> words;
+    size_t start = 0;
+
+    while (start < s.size()) {
+      size_t end = s.find(' ', start);
+      if (end == std::string::npos) {
+        words.push_back(s.substr(start));
+        break;
+      }
+      words.push_back(s.substr(start, end - start));
+      start = end + 1;
+    }
+
+    return words;
+  }
+
+  // ------------------------------------------------------------
+  // Compute word index from byte offset
+  // ------------------------------------------------------------
+  int byteOffsetToWordIndex(const std::string &s, size_t bytePos) {
+    int count = 0;
+    for (size_t i = 0; i < bytePos && i < s.size(); ++i)
+      if (s[i] == ' ')
+        ++count;
+    return count;
+  }
+}
+
+void resolveEvidenceSpans(const std::string &originalText,
+                          std::vector<AnnotationSpan> &annotations) {
+  if (originalText.empty())
+    return;
+
+  size_t searchStartByte = 0;
+
+  // Pre-split transcript tokens once (for token matching)
+  const auto transcriptTokens = splitWords(originalText);
+  const auto normalizedTranscript = normalize(originalText);
+
+  for (auto &ann: annotations) {
+    if (ann.evidenceText.empty())
+      continue;
+
+    // ---------------------------------------------
+    // 1) Exact substring match
+    // ---------------------------------------------
+    size_t pos = originalText.find(ann.evidenceText, searchStartByte);
+
+    if (pos != std::string::npos) {
+      int startWord = byteOffsetToWordIndex(originalText, pos);
+      int endWord = byteOffsetToWordIndex(originalText,
+                                          pos + ann.evidenceText.size() - 1);
+
+      ann.spanStartI = startWord;
+      ann.spanEndI = endWord;
+
+      searchStartByte = pos + ann.evidenceText.size();
+      continue;
+    }
+
+    // ---------------------------------------------
+    // 2) Normalized exact match
+    // ---------------------------------------------
+    const std::string normalizedEvidence = normalize(ann.evidenceText);
+
+    size_t normPos = normalizedTranscript.find(
+      normalizedEvidence,
+      normalize(originalText.substr(0, searchStartByte)).size()
+    );
+
+    if (normPos != std::string::npos) {
+      // Need to map normalized position back to original
+      // Simplest deterministic approach:
+      // perform token-based match instead (more reliable mapping)
+    }
+
+    // ---------------------------------------------
+    // 3) Token sequence match (contiguous)
+    // ---------------------------------------------
+    const auto evidenceTokens = splitWords(ann.evidenceText);
+
+    if (!evidenceTokens.empty()) {
+      const size_t tSize = transcriptTokens.size();
+      const size_t eSize = evidenceTokens.size();
+
+      for (size_t i = 0; i + eSize <= tSize; ++i) {
+        bool match = true;
+
+        for (size_t j = 0; j < eSize; ++j) {
+          if (toLower(transcriptTokens[i + j]) !=
+              toLower(evidenceTokens[j])) {
+            match = false;
+            break;
+          }
+        }
+
+        if (match) {
+          ann.spanStartI = static_cast<int>(i);
+          ann.spanEndI = static_cast<int>(i + eSize - 1);
+
+          // advance search start
+          // convert word index to byte offset
+          size_t bytePos = 0;
+          int wordCount = 0;
+
+          while (bytePos < originalText.size() &&
+                 wordCount < ann.spanEndI + 1) {
+            if (originalText[bytePos] == ' ')
+              ++wordCount;
+            ++bytePos;
+          }
+
+          searchStartByte = bytePos;
+          break;
+        }
+      }
+    }
+
+    // If all methods fail, annotation remains with -1 indices
+  }
+}
+
+std::vector<std::string> AnnotateComponent::get_preconfig_anno() {
+  if (parent && parent->sCam) {
+    return parent->sCam->get_preconfig_anno_labels();
+  }
+  return {
+    "Gleason 3+3", "Gleason 3+4", "Gleason 4+3", "Gleason 4+4", "Gleason 4+5", "Gleason 5+4",
+    "positive surgical margin", "seminal vesicle invasion", "perineural invasion", "extraprostatic extension"
+  };
+}
+
 void AnnotateComponent::removeSelected() {
   if (!selected)
     return;
@@ -376,8 +551,7 @@ static std::string openAIResponses_POST(const std::string &apiKey,
   return in->readEntireStreamAsString().toStdString();
 }
 
-static std::vector<AnnotationSpan>
-parseAnnotationsFromResponses(const std::string &responsesJson) {
+static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::string &responsesJson) {
   std::vector<AnnotationSpan> out;
 
   auto top = juce::JSON::parse(responsesJson);
@@ -496,14 +670,25 @@ std::vector<AnnotationSpan> reduceToAnnotations_OpenAI(const std::string &text,
   std::string apiKey(
     "REDACTED_OPENAI_API_KEY");
 
-  const std::string body = buildResponsesRequestBody_JSON2(text, preconfigAnnos);
+  bool run_gpt_5 = false;
+
+  const std::string body = run_gpt_5
+                             ? buildResponsesRequestBody_JSON(text, preconfigAnnos)
+                             : buildResponsesRequestBody_JSON2(text, preconfigAnnos);
+
 
   const std::string resp = openAIResponses_POST(apiKey, body, 60000);
   if (resp.empty()) {
     return {};
   }
 
-  return parseAnnotationsFromResponses(resp);
+  auto pResp = parseAnnotationsFromResponses(resp);
+  if (run_gpt_5) {
+    return pResp;
+  } else {
+    resolveEvidenceSpans(text,pResp);
+    return pResp;
+  }
 }
 
 void AnnotateComponent::voice_annotation_handler() {
@@ -527,7 +712,7 @@ void AnnotateComponent::voice_annotation_handler() {
     }
     auto start = std::chrono::high_resolution_clock::now();
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
-    auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, parent->sCam->get_preconfig_anno_labels());
+    auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, get_preconfig_anno());
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
         count();
 
@@ -535,21 +720,20 @@ void AnnotateComponent::voice_annotation_handler() {
     for (auto &annospan: annoSpanVec) {
       std::cout << annospan.label;
 
-      if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
-        std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
-        for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
-          std::cout << wordVec[i].word;
-          if (i < annospan.spanEndI) {
-            std::cout << " ";
-          }
-        }
-        std::cout << "\"" << std::endl;
-      }
+      // if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
+      //   std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
+      //   for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
+      //     std::cout << wordVec[i].word;
+      //     if (i < annospan.spanEndI) {
+      //       std::cout << " ";
+      //     }
+      //   }
+      //   std::cout << "\"" << std::endl;
+      // }
 
       if (!annospan.evidenceText.empty()) {
-        std::cout<<", \""<<annospan.evidenceText<<"\""<<std::endl;
+        std::cout << ", \"" << annospan.evidenceText << "\"" << std::endl;
       }
-
     }
     std::shared_ptr<MRTiledImageSet> mrImgSet;
     {
@@ -610,6 +794,6 @@ void AnnotateComponent::voice_annotation_handler() {
 void AnnotateComponent::silly_test() {
   juce::File dictPath("/home/cm/Documents/data/low_feat_10x/dictation.wav");
   auto [fullText,wordVec] = send_transcribe_call(dictPath);
-  auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, parent->sCam->get_preconfig_anno_labels());
+  auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, get_preconfig_anno());
   int k = 0;
 }

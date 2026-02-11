@@ -35,6 +35,8 @@ public:
 
   void silly_test();
 
+  std::vector<std::string> get_preconfig_anno();
+
   AnnotateComponent(std::shared_ptr<fRectangle> view,
                     StringArray &iconNames,
                     OwnedArray<Drawable> &iconsFromZipFile,
