@@ -127,6 +127,7 @@ namespace pathCam {
     std::string inputFileOverride;
     std::string currentSlideLabel;
     int currentSlideIndex;
+    int numSlides = 0;
 
     cv::Rect_<float> lastFrame;
     int lastComponentIndex;
@@ -253,7 +254,7 @@ namespace pathCam {
 #ifdef HAVE_OPENCV_CUDAARITHM
     int GPU_select_cuda_device(int _priority = 0);
 
-    void align_and_rebuild();
+    // void align_and_rebuild();
 
     void load_delaunay_images_to_GPU(int _componentIndex);
 
@@ -317,11 +318,19 @@ namespace pathCam {
 
     std::string get_slide_label() const{return currentSlideLabel;}
 
+    std::string get_slide_label(int slideIdx);
+
     Poco::Path make_working_directory() const;
 
-    int get_num_slides() const{return (int)previousSlides.size();}
+    int get_num_slides() const {return numSlides;}
 
-    std::string get_slide_label(int slideIdx);
+    std::vector<std::string> get_preconfig_anno_labels() const {
+      std::vector<std::string> res(preconfiguredAnnoLabels.size());
+      for (int i = 0; i < preconfiguredAnnoLabels.size(); ++i) {
+        res[i] = preconfiguredAnnoLabels[i].name;
+      }
+      return res;
+    }
 
     bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID, int _slideIdx);
 

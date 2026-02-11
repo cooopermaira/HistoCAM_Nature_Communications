@@ -20,6 +20,7 @@ struct AnnotationSpan
   long endMS = -1;
   long startFrameIdx = -1;
   long endFrameIdx = -1;
+  std::string evidenceText;
 };
 
 class Annotation {

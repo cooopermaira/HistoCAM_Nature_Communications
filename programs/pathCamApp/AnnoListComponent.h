@@ -152,18 +152,19 @@ public:
   }
   
   void updatelist(){
-    listBox.updateContent();
-    listBox.repaint();
+    filterAnnotations(searchBox.getText());
   }
 
   void newSelection();
 
   void filterAnnotations(const juce::String& searchText) {
+    auto sortByName = [](const std::shared_ptr<Annotation>& a, const std::shared_ptr<Annotation>& b) {
+      return a->getName().compareIgnoreCase(b->getName()) < 0;
+    };
+
     if (searchText.isEmpty()) {
-      // If search is empty, show all annotations
       filteredAnnotations = annotations;
     } else {
-      // Filter annotations by name substring (case-insensitive)
       auto newFiltered = std::make_shared<std::vector<std::shared_ptr<Annotation>>>();
       for (const auto& anno : *annotations) {
         if (anno->getName().containsIgnoreCase(searchText)) {
@@ -172,6 +173,7 @@ public:
       }
       filteredAnnotations = newFiltered;
     }
+    std::sort(filteredAnnotations->begin(), filteredAnnotations->end(), sortByName);
     model->annotations = filteredAnnotations;
     listBox.updateContent();
     listBox.repaint();

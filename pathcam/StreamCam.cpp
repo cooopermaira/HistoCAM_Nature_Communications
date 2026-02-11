@@ -1078,6 +1078,7 @@ namespace pathCam {
     {
       Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
       previousSlides.push_back(std::move(MRImageSet));
+      ++numSlides;
     }
     cacheAlert.set();
 

@@ -156,8 +156,109 @@ std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File aud
   return {};
 }
 
-static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
-  const juce::String systemMsg =
+
+static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
+                                                   const std::vector<std::string> &preconfigAnnos) {
+  juce::String systemMsg =
+      "You convert pathology slide-review transcripts into a sequence of short annotation labels.\n"
+      "Input: a single string 'text'.\n"
+      "\n"
+      "Your task:\n"
+      "Extract 1..N distinct pathology findings mentioned in the transcript, in the SAME ORDER they appear.\n"
+      "\n"
+      "For each finding, output:\n"
+      "- label: a 1-5 word canonical pathology phrase.\n"
+      "- evidence_text: the exact contiguous substring from the transcript that supports this label.\n"
+      "\n"
+      "Rules:\n"
+      "1) Output ONLY JSON matching the provided schema.\n"
+      "2) Do NOT merge non-contiguous mentions: if topic A then B then A again, output three annotations.\n"
+      "3) label must be a concise semantic reduction of the finding.\n"
+      "   Example: transcript contains 'Gleason pattern 3 plus 4' -> label 'Gleason 3+4'.\n"
+      "4) evidence_text MUST be copied verbatim from the transcript as a single contiguous substring.\n"
+      "   Do not paraphrase it. Do not summarize it.\n"
+      "5) evidence_text must include all words necessary to justify the label, including qualifiers, numbers, and context words.\n"
+      "6) If multiple alternative interpretations of the SAME finding appear in close proximity\n"
+      "   (e.g. 'maybe', 'probably', 'versus', 'favors'), and a later statement clearly resolves or favors one,\n"
+      "   output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
+      "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive surgical margin', 'Gleason 3+4').\n";
+
+  if (!preconfigAnnos.empty()) {
+    systemMsg +=
+        "8) If any annotation can be adequately described using one of the following exact labels,\n"
+        "   you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
+
+    for (const auto &anno: preconfigAnnos) {
+      systemMsg += "   - " + juce::String(anno) + "\n";
+    }
+  }
+
+  // Helper to build {"type": "..."} objects for schema leaf nodes
+  auto makeTypeObj = [](const juce::String &t) -> juce::var {
+    juce::DynamicObject::Ptr o(new juce::DynamicObject());
+    o->setProperty("type", t);
+    return {o.get()};
+  };
+
+  // --- Build item schema: {label, evidence_text}
+  juce::DynamicObject::Ptr annProps(new juce::DynamicObject());
+  annProps->setProperty("label", makeTypeObj("string"));
+  annProps->setProperty("evidence_text", makeTypeObj("string"));
+
+  juce::Array<juce::var> annRequiredArr;
+  annRequiredArr.add("label");
+  annRequiredArr.add("evidence_text");
+  juce::var annRequiredVar = annRequiredArr;
+
+  juce::DynamicObject::Ptr annItem(new juce::DynamicObject());
+  annItem->setProperty("type", "object");
+  annItem->setProperty("properties", juce::var(annProps.get()));
+  annItem->setProperty("required", annRequiredVar);
+  annItem->setProperty("additionalProperties", false);
+
+
+  juce::DynamicObject::Ptr annotationsProp(new juce::DynamicObject());
+  annotationsProp->setProperty("type", "array");
+  annotationsProp->setProperty("items", juce::var(annItem.get()));
+
+  // --- Root schema: { annotations: [...] }
+  juce::DynamicObject::Ptr rootProps(new juce::DynamicObject());
+  rootProps->setProperty("annotations", juce::var(annotationsProp.get()));
+
+  juce::Array<juce::var> rootRequiredArr;
+  rootRequiredArr.add("annotations");
+  juce::var rootRequiredVar = rootRequiredArr;
+
+  juce::DynamicObject::Ptr schemaObj(new juce::DynamicObject());
+  schemaObj->setProperty("type", "object");
+  schemaObj->setProperty("properties", juce::var(rootProps.get()));
+  schemaObj->setProperty("required", rootRequiredVar);
+  schemaObj->setProperty("additionalProperties", false);
+
+  // --- Responses: text.format
+  juce::DynamicObject::Ptr formatObj(new juce::DynamicObject());
+  formatObj->setProperty("type", "json_schema");
+  formatObj->setProperty("name", "annotation_extraction");
+  formatObj->setProperty("strict", true);
+  formatObj->setProperty("schema", juce::var(schemaObj.get()));
+
+  juce::DynamicObject::Ptr textObj(new juce::DynamicObject());
+  textObj->setProperty("format", juce::var(formatObj.get()));
+
+  // --- Root request body
+  juce::DynamicObject::Ptr root(new juce::DynamicObject());
+  root->setProperty("model", "gpt-4o-mini");
+  root->setProperty("instructions", systemMsg);
+  root->setProperty("input", text);
+  // root->setProperty("temperature", 0);
+  root->setProperty("text", juce::var(textObj.get()));
+
+  return juce::JSON::toString(juce::var(root.get()), true).toStdString();
+}
+
+static std::string buildResponsesRequestBody_JSON(const juce::String &text,
+                                                  const std::vector<std::string> &preconfigAnnos) {
+  juce::String systemMsg =
       "You convert pathology slide-review transcripts into a sequence of short annotation labels.\n"
       "Input: a single string 'text'.\n"
       "Define the transcript word list as: split 'text' on single spaces. Indices refer to this list (0-based).\n"
@@ -170,10 +271,20 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
       "6) label is a semantic reduction / canonical phrase for the span. It DOES NOT need to be an exact substring.\n"
       "   Example: span contains 'Gleason pattern 3+4' -> label 'Gleason 3+4'.\n"
       "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive margin', 'Gleason 3+4').\n"
-      "8) Choose spans that tightly cover the evidence words for the idea (include necessary modifiers like 3+4).\n"
-      "9) span_start_word..span_end_word MUST include all words that justify the label, including qualifiers, numbers, and context words (e.g. \"pattern\", \"plus\"). Do not select a span shorter than the evidence phrase.\n"
+      "8) Choose spans that fully cover the evidence words for the idea (include necessary modifiers like \"3+4\").\n"
+      "9) span_start_word through span_end_word MUST include all words that justify the label, including qualifiers, numbers, and context words (e.g. \"pattern\", \"plus\"). Do not select a span shorter than the evidence phrase.\n"
       "10) If multiple alternative interpretations of the SAME finding appear in close proximity (e.g. \"maybe\", \"probably\", \"versus\", \"favors\"), and a later statement clearly resolves or favors one, output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
-      "11) Before outputting JSON, verify that each label could be reconstructed by reading ONLY the words inside its span. If not, expand the span.";
+      "11) Before outputting JSON, verify for each label that the words indexed by span_start_word through span_end_word include all thoughts and discussion attributable to that label. If not, expand the span.";
+
+  if (!preconfigAnnos.empty()) {
+    systemMsg +=
+        "12) If any annotation can be adequately described using one of the following exact labels,\n"
+        "    you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
+
+    for (const auto &anno: preconfigAnnos) {
+      systemMsg += "    - " + juce::String(anno) + "\n";
+    }
+  }
 
   // Helper to build {"type": "..."} objects for schema leaf nodes
   auto makeTypeObj = [](const juce::String &t) -> juce::var {
@@ -231,7 +342,7 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text) {
 
   // --- Root request body
   juce::DynamicObject::Ptr root(new juce::DynamicObject());
-  root->setProperty("model", "gpt-4o-mini");
+  root->setProperty("model", "gpt-5-mini");
   root->setProperty("instructions", systemMsg);
   root->setProperty("input", text);
   // root->setProperty("temperature", 0);
@@ -265,7 +376,8 @@ static std::string openAIResponses_POST(const std::string &apiKey,
   return in->readEntireStreamAsString().toStdString();
 }
 
-static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::string &responsesJson) {
+static std::vector<AnnotationSpan>
+parseAnnotationsFromResponses(const std::string &responsesJson) {
   std::vector<AnnotationSpan> out;
 
   auto top = juce::JSON::parse(responsesJson);
@@ -278,11 +390,12 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
   auto *outArr = outputVar.getArray();
   if (!outArr) { return out; }
 
-  // 1) Find the first message
-  juce::var messageContentVar; // this will become the "content" array inside the message
+  // 1) Find first message
+  juce::var messageContentVar;
+
   for (const auto &item: *outArr) {
     auto *msgObj = item.getDynamicObject();
-    if (!msgObj) { continue; }
+    if (!msgObj) continue;
 
     if (msgObj->getProperty("type").toString() == "message") {
       messageContentVar = msgObj->getProperty("content");
@@ -293,46 +406,68 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
   auto *msgContentArr = messageContentVar.getArray();
   if (!msgContentArr) { return out; }
 
-  // 2) Find output_text (or output_json if it ever appears)
   juce::String payloadText;
 
+  // ------------------------------------------------------------
+  // Helper lambda: parse annotations array into AnnotationSpan
+  // ------------------------------------------------------------
+  auto parseAnnotationArray = [&](juce::Array<juce::var> *annArr) {
+    if (!annArr) return;
+
+    out.reserve((size_t) annArr->size());
+
+    for (const auto &av: *annArr) {
+      auto *aobj = av.getDynamicObject();
+      if (!aobj) continue;
+
+      AnnotationSpan a;
+      a.label = aobj->getProperty("label").toString().toStdString();
+
+      // ---- NEW FLEXIBLE HANDLING ----
+
+      auto spanStartVar = aobj->getProperty("span_start_word");
+      auto spanEndVar = aobj->getProperty("span_end_word");
+      auto evidenceVar = aobj->getProperty("evidence_text");
+
+      const bool hasSpan =
+          !spanStartVar.isVoid() && !spanEndVar.isVoid();
+
+      const bool hasEvidence =
+          !evidenceVar.isVoid() &&
+          evidenceVar.toString().isNotEmpty();
+
+      if (hasSpan) {
+        a.spanStartI = (int) spanStartVar;
+        a.spanEndI = (int) spanEndVar;
+      } else if (hasEvidence) {
+        a.evidenceText = evidenceVar.toString().toStdString();
+      }
+
+      if (!a.label.empty()) {
+        out.push_back(std::move(a));
+      }
+    }
+  };
+
+  // 2) Extract either output_text or output_json
   for (const auto &c: *msgContentArr) {
     auto *cobj = c.getDynamicObject();
-    if (!cobj) { continue; }
+    if (!cobj) continue;
 
     const auto ctype = cobj->getProperty("type").toString();
 
     if (ctype == "output_text") {
-      // In your response, this is the JSON string
       payloadText = cobj->getProperty("text").toString();
       break;
     } else if (ctype == "output_json") {
-      // Some responses may return JSON directly; handle it too.
       auto jsonVar = cobj->getProperty("content");
       auto *jsonObj = jsonVar.getDynamicObject();
-      if (jsonObj) {
-        // Parse annotations directly from jsonObj
-        auto annVar = jsonObj->getProperty("annotations");
-        auto *annArr = annVar.getArray();
-        if (!annArr) {
-          return out;
-        }
+      if (!jsonObj) return out;
 
-        out.reserve((size_t) annArr->size());
-        for (const auto &av: *annArr) {
-          auto *aobj = av.getDynamicObject();
-          if (!aobj) { continue; }
-
-          AnnotationSpan a;
-          a.label = aobj->getProperty("label").toString().toStdString();
-          a.spanStartI = (int) aobj->getProperty("span_start_word");
-          a.spanEndI = (int) aobj->getProperty("span_end_word");
-          if (!a.label.empty()) {
-            out.push_back(std::move(a));
-          }
-        }
-        return out;
-      }
+      auto annVar = jsonObj->getProperty("annotations");
+      auto *annArr = annVar.getArray();
+      parseAnnotationArray(annArr);
+      return out;
     }
   }
 
@@ -340,48 +475,28 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
     return out;
   }
 
-  // 3) payloadText is a JSON string like: {"annotations":[...]}
+  // 3) Parse JSON string inside output_text
   auto inner = juce::JSON::parse(payloadText);
-  if (!inner.isObject()) {
-    return out;
-  }
+  if (!inner.isObject()) return out;
 
   auto *innerObj = inner.getDynamicObject();
-  if (!innerObj) {
-    return out;
-  }
+  if (!innerObj) return out;
 
   auto annVar = innerObj->getProperty("annotations");
   auto *annArr = annVar.getArray();
-  if (!annArr) {
-    return out;
-  }
 
-  out.reserve((size_t) annArr->size());
-
-  for (const auto &av: *annArr) {
-    auto *aobj = av.getDynamicObject();
-    if (!aobj) { continue; }
-
-    AnnotationSpan a;
-    a.label = aobj->getProperty("label").toString().toStdString();
-    a.spanStartI = (int) aobj->getProperty("span_start_word");
-    a.spanEndI = (int) aobj->getProperty("span_end_word");
-
-    if (!a.label.empty()) {
-      out.push_back(std::move(a));
-    }
-  }
+  parseAnnotationArray(annArr);
 
   return out;
 }
 
 
-std::vector<AnnotationSpan> reduceToAnnotations_OpenAI(const std::string &text) {
+std::vector<AnnotationSpan> reduceToAnnotations_OpenAI(const std::string &text,
+                                                       const std::vector<std::string> &preconfigAnnos) {
   std::string apiKey(
     "REDACTED_OPENAI_API_KEY");
 
-  const std::string body = buildResponsesRequestBody_JSON(text);
+  const std::string body = buildResponsesRequestBody_JSON2(text, preconfigAnnos);
 
   const std::string resp = openAIResponses_POST(apiKey, body, 60000);
   if (resp.empty()) {
@@ -412,10 +527,30 @@ void AnnotateComponent::voice_annotation_handler() {
     }
     auto start = std::chrono::high_resolution_clock::now();
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
-    auto annoSpanVec = reduceToAnnotations_OpenAI(fullText);
+    auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, parent->sCam->get_preconfig_anno_labels());
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
         count();
+
     std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
+    for (auto &annospan: annoSpanVec) {
+      std::cout << annospan.label;
+
+      if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
+        std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
+        for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
+          std::cout << wordVec[i].word;
+          if (i < annospan.spanEndI) {
+            std::cout << " ";
+          }
+        }
+        std::cout << "\"" << std::endl;
+      }
+
+      if (!annospan.evidenceText.empty()) {
+        std::cout<<", \""<<annospan.evidenceText<<"\""<<std::endl;
+      }
+
+    }
     std::shared_ptr<MRTiledImageSet> mrImgSet;
     {
       Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
@@ -473,8 +608,8 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  juce::File dictPath("/home/cm/Documents/data/blur_test/config/0/dictation.wav");
+  juce::File dictPath("/home/cm/Documents/data/low_feat_10x/dictation.wav");
   auto [fullText,wordVec] = send_transcribe_call(dictPath);
-  auto annoSpanVec = reduceToAnnotations_OpenAI(fullText);
+  auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, parent->sCam->get_preconfig_anno_labels());
   int k = 0;
 }
