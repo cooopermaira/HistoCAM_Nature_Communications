@@ -299,7 +299,7 @@ namespace pathCam {
 
     xcPwDist = pairwiseDistance;
     xcRegLandmark = _target;
-    theirComponent->landmarkFrames.push_back(_target);
+    theirComponent->add_landmark_frame(_target);
     std::cout<<"component "<<componentIndex<<" XC registered"<<std::endl;
     FreeSiftData(rootCopy);
     return true;

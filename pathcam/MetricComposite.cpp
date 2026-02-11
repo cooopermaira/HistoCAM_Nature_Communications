@@ -699,4 +699,15 @@ namespace pathCam {
     }
     return members;
   }
+
+  void MetricComposite::add_landmark_frame(Image* img) {
+    landmarkFrames.push_back(img);
+    if (!img->subsequentMatchLaunched) {
+      img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
+      img->subsequentMatchLaunched = true;
+      ++outstandingCMS_jobs;
+      auto cms = new ComponentMatchSearch(parent, img, this);
+      parent->jqSecondary->add_runnable(cms);
+    }
+  }
 }

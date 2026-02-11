@@ -98,6 +98,12 @@ namespace pathCam {
       bool success = false; // connected achieved?
       bool used_sift = false; // whether we had to allow SIFT to succeed
       std::vector<ImgId> promoted_nodes; // nodes that were non-member and must become member
+
+      // Each entry is a list of node ids that are MEMBERS in that island.
+      std::vector<std::vector<ImgId>> member_islands;
+
+      // Optional: closure of each island through allowed edges (members+nonmembers)
+      std::vector<std::vector<ImgId>> island_closures;
     };
 
   public:
@@ -415,6 +421,74 @@ namespace pathCam {
       return path;
     }
 
+    // std::vector<int> bfsClosureFromComp(int seed_comp,
+    //                                const std::vector<int>& comp,
+    //                                bool allow_sift) const
+    // {
+    //   std::vector<char> seen(adj_.size(), 0);
+    //   std::deque<int> q;
+    //
+    //   // initialize frontier with ALL nodes that are in this comp AND are members?
+    //   // Better: start with ALL nodes whose comp == seed_comp AND are members.
+    //   for (int i = 0; i < (int)adj_.size(); ++i) {
+    //     if (comp[i] == seed_comp && member_[i]) { // or working_member if you pass it
+    //       seen[i] = 1;
+    //       q.push_back(i);
+    //     }
+    //   }
+    //
+    //   while (!q.empty()) {
+    //     int u = q.front(); q.pop_front();
+    //     for (const auto& e : adj_[u]) {
+    //       if (!edgeAllowed(e, allow_sift)) continue;
+    //       int v = e.to;
+    //       if (seen[v]) continue;
+    //       seen[v] = 1;
+    //       q.push_back(v);
+    //     }
+    //   }
+    //
+    //   std::vector<int> out;
+    //   for (int i = 0; i < (int)seen.size(); ++i) if (seen[i]) out.push_back(i);
+    //   return out;
+    // }
+
+
+    void fillFailureIslands(PromotionResult& res,
+                        const std::vector<bool>& working_member,
+                        bool allow_sift) const
+    {
+      auto comp = memberComponents(working_member, allow_sift);
+
+      // Map comp_id -> list of member node indices
+      std::unordered_map<int, std::vector<int>> islands;
+      islands.reserve(adj_.size());
+
+      for (int i = 0; i < (int)working_member.size(); ++i) {
+        if (!working_member[i]) continue;
+        islands[comp[i]].push_back(i);
+      }
+
+      // Emit in stable order (optional)
+      std::vector<int> comp_ids;
+      comp_ids.reserve(islands.size());
+      for (auto& kv : islands) comp_ids.push_back(kv.first);
+      std::sort(comp_ids.begin(), comp_ids.end());
+
+      res.member_islands.clear();
+      res.member_islands.reserve(comp_ids.size());
+
+      for (int cid : comp_ids) {
+        std::vector<ImgId> island;
+        island.reserve(islands[cid].size());
+        for (int idx : islands[cid]) island.push_back(idx_to_id_[idx]);
+        res.member_islands.push_back(std::move(island));
+      }
+
+      // Optional closures (see below)
+    }
+
+
     PromotionResult connectByPromotingGreedy(std::vector<bool> &working_member, bool allow_sift) const {
       PromotionResult res;
 
@@ -458,6 +532,8 @@ namespace pathCam {
           res.success = false;
           res.used_sift = allow_sift;
           res.promoted_nodes.clear();
+
+          fillFailureIslands(res, working_member, allow_sift);
           return res;
         }
 

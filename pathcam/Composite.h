@@ -124,6 +124,8 @@ namespace pathCam {
     virtual void align_and_rebuild() {
     };
 
+    virtual void add_landmark_frame(Image* img){};
+
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);
 

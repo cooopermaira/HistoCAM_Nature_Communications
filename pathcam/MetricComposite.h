@@ -34,6 +34,8 @@ namespace pathCam {
 
         size_t consolidate_tile_ownership();
 
+        void add_landmark_frame(Image *img) override;
+
         [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const;
 
         std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});
