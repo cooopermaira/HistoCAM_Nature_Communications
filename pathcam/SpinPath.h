@@ -58,10 +58,22 @@ public:
     virtual void run();
 };
 
+class SerialStream : public Poco::Runnable {
+public:
+  SpinPath* parent;
+  std::atomic<bool> interrupt{false};
+
+  SerialStream(SpinPath* parent) : parent(parent){}
+  ~SerialStream() {}
+  virtual void run() override;
+};
+
+
 class SpinPath{
   friend class CameraStream;
   friend class FileStream;
   friend class ProcessStream;
+  friend class SerialStream;
 private:
   CameraPtr pCam;
   SystemPtr system;
@@ -81,14 +93,19 @@ private:
  CameraStream * cameraStream;
  FileStream  * fileStream;
  ProcessStream* processStream;
+ SerialStream* serialStream{nullptr};
 
-  Poco::Thread thread_cam, thread_file, thread_sCam;
+  Poco::Thread thread_cam, thread_file, thread_sCam, thread_serial;
   
   Poco::FastMutex cache_mutex;
   Poco::FastMutex caputure_set_mutex;
   
   std::queue < cache_element > * cache;
-  
+
+  int serial_fd{-1}; // linux fd for /dev/ttyUSB0
+  std::mutex label_mu;
+  std::string latest_label{"02"}; //make latest label always start at 2 will correct whenever obj is changed
+
   size_t thread_safe_cache_size(){
     size_t result;
     cache_mutex.lock();
@@ -115,6 +132,11 @@ public:
 
   void add_observer(DataObserver* new_observer) {
       sCam->add_observer(new_observer);
+  }
+
+  std::string getObjectiveLabel() {     // thread safe label storage
+    std::lock_guard<std::mutex> lk(label_mu);
+    return latest_label;
   }
 
   std::shared_ptr < MRTiledImageSet > get_image_reference() {

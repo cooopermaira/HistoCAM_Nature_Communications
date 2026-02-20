@@ -39,7 +39,7 @@ public:
   std::unique_ptr<StreamCamLabelList> labelList;
   std::unique_ptr<SvgButton> slideListButton;
 
-  bool audioDictationOn = false;
+  bool audioDictationOn = true;
 
   void setup_listbox();
 

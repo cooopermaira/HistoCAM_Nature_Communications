@@ -12,6 +12,11 @@
 #include <sstream>
 #include <string>
 #include <queue>
+#include <fcntl.h>
+#include <unistd.h>
+#include <termios.h>
+#include <cstring>
+
 //#include <Python.h>
 
 

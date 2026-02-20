@@ -138,7 +138,6 @@ void CameraStream::run(){
           parent->camlogger.error("Error: %s", e.what());
         }
       }
-      
       parent->pCam->EndAcquisition();
     }
     catch (Spinnaker::Exception& e){
@@ -524,6 +523,89 @@ int SpinPath::PrintDeviceInfo(INodeMap& nodeMap){
   return result;
 }
 
+static speed_t baudToSpeed(int baud) {
+  switch (baud){
+    case 9600: return B9600;
+    case 115200: return B115200;
+    default: throw std::runtime_error("Unsupported baud");
+    }
+}
+
+static int openSerial(const char* device, int baud) {
+  int fd = ::open(device,O_RDWR | O_NOCTTY);
+  if (fd < 0) throw std::runtime_error(std::string("open: ") + std::strerror(errno));
+
+  termios tty{};
+  if(tcgetattr(fd, &tty) !=0) {
+    ::close(fd);
+    throw std::runtime_error(std::string("tcgetattr: ") + std::strerror(errno));
+  }
+
+  speed_t spd = baudToSpeed(baud);
+  cfsetispeed(&tty, spd);
+  cfsetospeed(&tty, spd);
+
+  tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;
+  tty.c_iflag = 0;
+  tty.c_lflag = 0;
+  tty.c_oflag = 0;
+
+  tty.c_cc[VMIN] = 0;
+  tty.c_cc[VTIME] = 1;
+
+  tty.c_cflag |= (CLOCAL | CREAD);
+  tty.c_cflag &= (PARENB | PARODD);
+  tty.c_cflag &= ~CSTOPB;
+  tty.c_cflag &= ~CRTSCTS;
+
+  if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+    ::close(fd);
+    throw std::runtime_error(std::string("tcsetattr: ") + std::strerror(errno));
+  }
+
+  return fd;
+}
+
+void SerialStream::run() {
+
+  try {
+    parent -> serial_fd = openSerial("/dev/ttyUSB0", 9600);
+  } catch (...){
+    std::lock_guard<std::mutex> lk(parent->label_mu);
+    parent->latest_label = "SERIAL_OPEN_ERROR";
+    return;
+  }
+
+  std::string line;
+  line.reserve(128);
+  char buf[256];
+
+  while (!interrupt.load(std::memory_order_relaxed)) {
+    int n = ::read(parent->serial_fd, buf, sizeof(buf));
+    if (n<= 0) continue;
+
+    for (int i = 0; i < n; ++i) {
+      char c = buf[i];
+      if (c == '\n') {
+        if (line.size() > 0 && line[line.size() -1] == '\r')
+          line.erase(line.size()-1);
+
+        if (!line.empty()) {
+          std::lock_guard<std::mutex> lk(parent->label_mu);
+          parent->latest_label = line;
+        }
+        line.clear();
+      } else {
+        line.push_back(c);
+        if (line.size() > 1024) line.clear();
+      }
+    }
+  }
+  if (parent->serial_fd >= 0) {
+    ::close(parent->serial_fd);
+    parent->serial_fd = -1;
+  }
+}
 
 int SpinPath::run(){
   
@@ -535,14 +617,20 @@ int SpinPath::run(){
       setRootPath(root_path);
       newCaptureSet();
     cameraStream = new CameraStream(this);
-    fileStream =  new FileStream(this);
+    // fileStream =  new FileStream(this);
     //processStream = new ProcessStream(this);
     
     thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
     thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
     thread_cam.start(*cameraStream);
-    thread_file.start(*fileStream);
+    // thread_file.start(*fileStream);
+
+    serialStream = new SerialStream(this);
+    thread_serial.setOSPriority(Poco::Thread::getMaxOSPriority());
+    thread_serial.start(*serialStream);
+
     sCam->microscopeInput = true;
+
     // thread_sCam.start(*processStream);
     // thread_sCam.join();
     sCam->spin_run();
@@ -555,7 +643,8 @@ int SpinPath::run(){
 
 void SpinPath::stopCamera(){
   cameraStream->interrupt = true;
-  fileStream->interrupt = true;
+  // fileStream->interrupt = true;
+  if (serialStream) serialStream->interrupt = true;
 
   sCam->captureTimeMS = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startTime).count();
   sCam->microscopeInput = false;
@@ -563,6 +652,12 @@ void SpinPath::stopCamera(){
   thread_cam.join();
   thread_file.join();
   //thread_sCam.join();
+
+  if (serialStream) {
+    thread_serial.join();
+    delete serialStream;
+    serialStream = nullptr;
+  }
   
   delete cameraStream;
   delete fileStream;
