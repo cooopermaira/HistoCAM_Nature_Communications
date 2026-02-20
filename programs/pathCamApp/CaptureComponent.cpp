@@ -291,8 +291,8 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
       ready = true;
 #else
       //selecting input
-      parent->fc.reset(new FileChooser("Choose an image to open...", File("/home/cm/Documents/data/blur_test/config/"),
-                                       "*.png,*.jpeg,*.tiff"));
+      parent->fc.reset(new FileChooser("Choose an input file...", File("/home/cm/Documents/data/"),
+                                       "*.txt"));
 
       parent->fc->launchAsync(FileBrowserComponent::openMode
                               | FileBrowserComponent::canSelectFiles,

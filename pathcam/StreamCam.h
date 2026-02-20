@@ -208,6 +208,7 @@ namespace pathCam {
     std::atomic<int> matchableCount = 0;
     std::atomic<int> regCount = 0;
 
+
     std::vector<DataObserver *> observers;
 
     Poco::Thread disk_thread, Q_thread, composite_thread, postprocessor_thread,inference_thread;
@@ -224,7 +225,6 @@ namespace pathCam {
     bool outstandingBlurInference = false;
     std::queue<Image*> blurMeticQ;
     std::vector<Image*> blurImagesInProcess;
-    int frames = 0, iters = 0;
 
     // v DEBUG v
     // void increment_match_counter(bool trueForUpFalserDown,long imgIdx);
@@ -346,7 +346,7 @@ namespace pathCam {
 
     std::vector<RegInfo*> get_reg_ref(const std::vector<unsigned long>&);
 
-    RegInfo* get_reg_ref(unsigned long image_idx);
+    RegInfo* get_reg_ref(long image_idx);
 
     std::vector<Image *> get_component_image_refs(unsigned long component);
 

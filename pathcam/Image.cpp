@@ -369,7 +369,7 @@ namespace pathCam {
       return;
     }
 
-    label = _UNKNOWN;
+    label = _NOLABEL;
     return;
   }
 
@@ -500,7 +500,7 @@ namespace pathCam {
   }
 
   void Image::allocate_memory_RAW() {
-    if (raw_buffer == 0) {
+    if (!raw_buffer) {
       // if (mempool) {
       //   raw_buffer = reinterpret_cast<char *>(mempool->get());
       // } else {
