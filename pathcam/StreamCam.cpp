@@ -653,7 +653,7 @@ namespace pathCam {
     return temp;
   };
 
-  RegInfo *StreamCam::get_reg_ref(unsigned long image_idx) {
+  RegInfo *StreamCam::get_reg_ref(long image_idx) {
     RegInfo *temp;
     reg_results_mutex.readLock();
     temp = reg_results[image_idx];

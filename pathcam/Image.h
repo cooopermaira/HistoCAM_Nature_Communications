@@ -32,7 +32,7 @@ namespace pathCam {
     int blurPatch = 1024;
 
     enum {
-      _NOLABEL = 0, _2X, _4X, _10X, _20X, _40X, _UNKNOWN, _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _MOTION_BLUR
+      _NOLABEL = 0, _2X, _4X, _10X, _20X, _40X, /*_UNKNOWN,*/ _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _MOTION_BLUR
     };
     unsigned int label;
     int vertexId;
@@ -139,9 +139,9 @@ namespace pathCam {
         case _40X:
           return "40x";
           break;
-        case _UNKNOWN:
-          return "Unknown";
-          break;
+        // case _UNKNOWN:
+        //   return "Unknown";
+        //   break;
         case _LOWFEAT:
           return "Low Features";
           break;

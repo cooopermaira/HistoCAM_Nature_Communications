@@ -170,6 +170,8 @@ namespace pathCam {
         continue;
       }
 
+      if (image->label != Image::_NOLABEL && image->label != previous->label){continue;}
+
       auto m = std::make_shared<Match>(previous,image);
       matcher.match(m);
 
@@ -183,7 +185,7 @@ namespace pathCam {
       }
 
       if (result == 1) {
-        if (std::abs(m->t_x) < image->width / 1 && std::abs(m->t_y) < image->height / 1) {
+        if (std::abs(m->t_x) < image->width / 1.1 && std::abs(m->t_y) < image->height / 1.1) {
           //parent->set_match(image_idx, prev_idx, m);
 
           //this should all be in the damn constructor

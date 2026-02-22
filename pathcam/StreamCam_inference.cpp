@@ -56,7 +56,6 @@ namespace pathCam {
       blurMutex.unlock();
       return;
     }
-    ++iters;
 
     blurImagesInProcess.clear();
 
@@ -65,7 +64,6 @@ namespace pathCam {
       blurMeticQ.pop();
     }
     blurMutex.unlock();
-    frames+=blurImagesInProcess.size();
 
     const size_t step = 128 * 128 * sizeof(float);
     for (int i = 0; i < blurImagesInProcess.size(); ++i) {

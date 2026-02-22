@@ -30,7 +30,7 @@ namespace pathCam {
       successful = false;
       image->label = Image::_BAD_FILE;
       std::cout << "Image failed to load" << std::endl;
-      parent->loaderCount--;
+      --parent->loaderCount;
       jobComplete.set();
       return;
     }
@@ -111,7 +111,7 @@ namespace pathCam {
       extractor->compute(image->get_reg_image(), image->keypoints, image->descriptors);
     } else {
       //if (image->label == Image::_2X) {
-      if (false){
+      if (false) {
         detector->detectAndCompute(image->get_reg_image(),
                                    image->parent->circleMask, image->keypoints,
                                    image->descriptors);

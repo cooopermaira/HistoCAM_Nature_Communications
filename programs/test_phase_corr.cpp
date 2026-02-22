@@ -762,7 +762,21 @@ void onGroupCallbackTest(const std::string &dir, const std::array<std::string, 5
   int k = 0;
 }
 
+// int main(int argc, char **argv) {
+//   std::string dir = argv[1];
+//   groupMagnificationsPerCase(dir, onGroupCallbackTest);
+// }
+
 int main(int argc, char **argv) {
-  std::string dir = argv[1];
-  groupMagnificationsPerCase(dir, onGroupCallbackTest);
+  std::string file = argv[1];
+  pathCam::Image img(6464,4852,2100);
+  img.set_disk_file(Poco::Path(file));
+  img.load_raw_from_disk();
+  Mat raw8(img.height,img.width,CV_8UC1,img.get_Raw());
+  Mat rawDebayer,raw32,view;
+  cvtColor(raw8,rawDebayer,COLOR_BayerBG2GRAY);
+
+  rawDebayer.convertTo(raw32,CV_32F);
+
+  int k = 0;
 }

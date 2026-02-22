@@ -115,11 +115,15 @@ target_link_libraries(pathCamLib ${OpenCV_LIBS} Poco::Foundation Poco::XML Poco:
 IF (BUILD_SPINNAKER)
     target_link_libraries(pathCamLib ${SPINNAKER_LIBRARIES})
 ENDIF ()
+add_executable(test programs/test.cpp)
 
-IF (BUILD_TEST)
-    add_executable(test programs/test.cpp)
-    target_link_libraries(test pathCamLib)
-ENDIF ()
+target_include_directories(test PRIVATE ${OpenCV_INCLUDE_DIRS})
+
+target_link_libraries(test PRIVATE ${OpenCV_LIBS})
+#IF (BUILD_TEST)
+#    add_executable(test programs/test.cpp)
+#    target_link_libraries(test pathCamLib)
+#ENDIF ()
 
 add_executable(old_process_list_xml programs/old_process_list_xml.cpp)
 target_link_libraries(old_process_list_xml pathCamLib)
