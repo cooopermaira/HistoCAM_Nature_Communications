@@ -61,11 +61,11 @@ public:
 class SerialStream : public Poco::Runnable {
 public:
   SpinPath* parent;
-  std::atomic<bool> interrupt{false};
+  // std::atomic<bool> interrupt{false};
 
   SerialStream(SpinPath* parent) : parent(parent){}
-  ~SerialStream() {}
-  virtual void run() override;
+  ~SerialStream() override {}
+  void run() override;
 };
 
 
@@ -104,7 +104,7 @@ private:
 
   int serial_fd{-1}; // linux fd for /dev/ttyUSB0
   std::mutex label_mu;
-  std::string latest_label{"02"}; //make latest label always start at 2 will correct whenever obj is changed
+  std::string latest_label{""}; //make latest label always start at 2 will correct whenever obj is changed
 
   size_t thread_safe_cache_size(){
     size_t result;

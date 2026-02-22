@@ -9,6 +9,7 @@
 
 #include <filesystem>
 
+
 inline std::filesystem::path makeTempWavInCwd(const std::string& prefix = "recording")
 {
   namespace fs = std::filesystem;
@@ -72,6 +73,33 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
   }
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
   std::chrono::high_resolution_clock::now() - start).count();
+
+#ifdef WITH_SPINNAKER
+  if (!spinpath) {
+    spinpath.reset(new pathCam::SpinPath(config));
+    spinpath->add_observer(parent);
+    scopeRadius = spinpath->sCam->get_scope_radius();
+    aiOverlay->set_sCam(spinpath->sCam);
+    parent->sCam = spinpath->sCam;
+    sCam = spinpath->sCam;
+    if (!parent->labelList) {
+      setup_listbox();
+    }
+  }
+
+
+#endif
+  if (!sCam) {
+    sCam = std::make_shared<pathCam::StreamCam>(config);
+    sCam->add_observer(parent);
+    scopeRadius = sCam->get_scope_radius();
+    aiOverlay->set_sCam(sCam);
+    parent->sCam = sCam;
+    if (!parent->labelList) {
+      setup_listbox();
+    }
+
+  }
   int k = 0;
 }
 
@@ -146,8 +174,8 @@ void CaptureComponent::startRecording() {
     }
   }
   //aiOverlay->set_sCam(bcam->sCam);
-  spinpath->sCam->set_slide_label();
-  parent->MRimage = spinpath->sCam->get_MRimage_reference();
+  sCam->set_slide_label();
+  parent->MRimage = sCam->get_MRimage_reference();
 
 #endif
 
@@ -157,7 +185,7 @@ void CaptureComponent::startRecording() {
   recentlyViewedSlides.push_unique(parent->MRimage);
 
 
-  if (parent->audioDictationOn) {
+  if (/*parent->audioDictationOn*/false) {
     if (!wavRecorder.initialised) {
       wavRecorder.init(1);
     }

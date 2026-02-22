@@ -66,6 +66,7 @@ INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
 
 find_package(CURL REQUIRED)
 
+#list(PREPEND CMAKE_PREFIX_PATH "/usr/local")
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
