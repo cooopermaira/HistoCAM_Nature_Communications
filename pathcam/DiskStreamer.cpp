@@ -323,6 +323,17 @@ namespace pathCam {
     return BayerImage;
   }
 
+  std::string extractAfterFirstDash(const std::string& filename)
+  {
+    size_t dashPos = filename.find('_');
+
+    if (dashPos == std::string::npos)
+      return "";
+
+    return filename.substr(dashPos + 1);
+  }
+
+
 
   DiskReader::DiskReader(StreamCam *parent) : parent(parent) {
     parent->microscopeInput = true;
@@ -347,6 +358,9 @@ namespace pathCam {
     while (infile >> imageFile) {
       Image *image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
       image->set_disk_file(imageFile);
+      Poco::Path f(imageFile);
+      auto label = extractAfterFirstDash(f.getBaseName());
+      image->set_observed_label(label);
       parent->pass_image(image, image_index);
       ++image_index;
 

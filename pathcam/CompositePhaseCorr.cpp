@@ -217,6 +217,16 @@ namespace pathCam {
 
       if (numMatches > 0) {
         auto matchedComp = parent->composites[_target->regInfo->component_membership];
+        if (_rootImg->labelObserved) {
+          //set against known scale diff
+          auto v1 = Image::get_mpp(_rootImg->label);
+          auto v2 = Image::get_mpp(_target->label);
+          float scale = v1 / v2;
+          if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
+            validHomography = true;
+
+          }
+        }
         for (auto scale: matchedComp->candidateScaleRatios) {
           scale = 1 / scale;
           if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
@@ -225,9 +235,20 @@ namespace pathCam {
           }
         }
       }
-      if (!validHomography && count < maxAttempts && xcMatchShouldContinue) {
-        shuffle_sift_data(rootCopy);
+      if (!validHomography) {
+        if (_rootImg->labelObserved) {
+          //set it in the middle and break
+          homography[0] = homography[4] = Image::get_mpp(_rootImg->label) / Image::get_mpp(_target->label);
+          homography[2] = imageSize.width * ( 1 - homography[0]) / 2;
+          homography[5] = imageSize.height * ( 1 - homography[0]) / 2;
+          validHomography = true;
+          break;
+        }
+        if (count < maxAttempts && xcMatchShouldContinue) {
+          shuffle_sift_data(rootCopy);
+        }
       }
+
     }
 
     if (!validHomography) {
@@ -293,7 +314,7 @@ namespace pathCam {
     _rootImg->regInfo->rootHomographies.emplace_back(resultantPoint, scale);
 
     assert(scale > 0);
-    set_scale(scale,true);
+    set_scale(scale,!flatfieldKnown);
     auto p = resultantPoint / scale;
     set_offset(resultantPoint / scale);
 

@@ -117,6 +117,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
   cv::Rect_<float> frameBox;
   bool showAsCircle;
   std::string magLabel;
+  float lastScale;
 
 #ifdef WITH_SPINNAKER
   if (recording) {
@@ -127,7 +128,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
   if (simulating) {
     int ignore;
-    sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel);
+    sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel, lastScale);
   }
 
   if (!simulating && !recording) { return; }
@@ -141,7 +142,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
   if (showAsCircle) {
     auto center = bounds.getCentre();
-    fPoint radius = scopeRadius * view2screenScale(*view) * scale;;
+    fPoint radius = scopeRadius * view2screenScale(*view) * scale * lastScale;
     center -= radius;
     g.drawEllipse(center.getX(), center.getY(), 2 * radius.getX(), 2 * radius.getY(), 3);
   } else {

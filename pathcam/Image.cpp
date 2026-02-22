@@ -373,20 +373,23 @@ namespace pathCam {
     return;
   }
 
-  bool Image::decide_label_and_blur() {
-    //this function will return false if image fails PRELIMINARY blur test. Image might still be blurry
-    if (!in_memory()) {
-      throw std::invalid_argument("image not in memory during decide_label_and_blur()");
+  void Image::set_observed_label(const std::string &_label) {
+    if (_label == "02") {
+      label = _2X;
+      labelObserved = true;
+    }else if (_label == "04") {
+      label = _4X;
+      labelObserved = true;
+    }else if (_label == "10") {
+      label = _10X;
+      labelObserved = true;
+    }else if (_label == "20") {
+      label = _20X;
+      labelObserved = true;
+    }else if (_label == "40") {
+      label = _40X;
+      labelObserved = true;
     }
-
-
-    find_label();
-
-    if (label == _2X || label == _4X) {
-      return motionBlur > 500.0;
-    }
-
-    return true;
   }
 
   void Image::manually_set_label() {

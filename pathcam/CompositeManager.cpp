@@ -284,7 +284,9 @@ namespace pathCam {
     _regInfo->accessMutex.lock();
     assert(_regInfo->inCompositeQ);
     _regInfo->inCompositeQ = false;
-    _regInfo->image->label = parent->composites[_regInfo->component_membership]->componentMagLabel;
+    if (!_regInfo->image->labelObserved) {
+      _regInfo->image->label = parent->composites[_regInfo->component_membership]->componentMagLabel;
+    }
     parent->composites[_regInfo->component_membership]->stage(_regInfo);
     _regInfo->accessMutex.unlock();
   }

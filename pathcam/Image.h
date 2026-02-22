@@ -45,6 +45,7 @@ namespace pathCam {
     bool cudaBufferReady;
     bool blurSet = false;
     bool hasBeenInMemory = false;
+    bool labelObserved = false;
 
     bool subsequentMatchLaunched = false;
     bool fullKeyPoints = false;
@@ -94,6 +95,21 @@ namespace pathCam {
       buffer_mutex.unlock();
     }
 
+    static float get_mpp(unsigned int _label) {
+      switch (_label) {
+        case _2X:
+          return 3.45f;
+        case _4X:
+          return 1.73f;
+        case _10X:
+          return 0.69f;
+        case _20X:
+          return 0.35;
+        default:
+          return 0;
+      }
+    }
+
 #ifdef HAVE_OPENCV_CUDAARITHM
     void prepare_blur_check_statics() const;
     static void cleanup_blur_check_statics();
@@ -108,7 +124,7 @@ namespace pathCam {
 
     bool is_4x();
 
-    bool decide_label_and_blur();
+    void set_observed_label(const std::string& _label);
 
     void find_label();
 

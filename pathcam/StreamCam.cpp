@@ -197,21 +197,23 @@ namespace pathCam {
   }
 
   void StreamCam::update_last_frame(cv::Rect_<float> _rectInScale1Space, bool _showAsCircle, int _component_index,
-                                    std::string _label) {
+                                    std::string _label, float _scale) {
     lastFrameMutex.lock();
     lastFrame = _rectInScale1Space;
     lastComponentIndex = _component_index;
     showAsCircle = _showAsCircle;
     lastLabel = _label;
+    lastScale = _scale;
     lastFrameMutex.unlock();
   }
 
   void StreamCam::get_last_frame(cv::Rect_<float> &_rectInBaseSpace, bool &_showAsCircle, int &_lastComponentIndex,
-                                 std::string &_magLabel) {
+                                 std::string &_magLabel, float &_lastScale) {
     lastFrameMutex.lock();
     _lastComponentIndex = lastComponentIndex;
     _showAsCircle = showAsCircle;
     _rectInBaseSpace = lastFrame;
+    _lastScale = lastScale;
     _magLabel = lastLabel;
     lastFrameMutex.unlock();
   }
@@ -679,19 +681,6 @@ namespace pathCam {
     return component_index;
   }
 
-  // void StreamCam::increment_match_counter(bool trueForUpFalserDown,long imgIdx) {
-  //   resize_mmatch_mutex.writeLock();
-  //   if (imgIdx + 50 >= matchablesIncremented.size() ) {
-  //     matchablesIncremented.resize(imgIdx + 1000);
-  //     matchablesDecremented.resize(imgIdx + 1000);
-  //   }
-  //   if (trueForUpFalserDown) {
-  //     ++matchablesIncremented[imgIdx];
-  //   }else {
-  //     ++matchablesDecremented[imgIdx];
-  //   }
-  //   resize_mmatch_mutex.unlock();
-  // }
 
   void StreamCam::add_new_component(unsigned long image_index, Size image_size, unsigned int component_index) {
     auto ri = reg_results[image_index];
@@ -705,6 +694,9 @@ namespace pathCam {
     component_mutex.lock();
     composites.push_back(component);
 
+    ri->image = get_image_ref(ri->index);
+    component->root = ri->image;
+
     if (composites.size() == 1) {
       //first component added
       ri->rootOfRoot = true;
@@ -714,8 +706,7 @@ namespace pathCam {
       //this is saying "unknown scale" - will be determined later
       component->set_scale(0);
     }
-    ri->image = get_image_ref(ri->index);
-    component->root = ri->image;
+
     component->set_offset(Point2f(0, 0));
 
     ri->set_abc({0, 0}, component_index, true);

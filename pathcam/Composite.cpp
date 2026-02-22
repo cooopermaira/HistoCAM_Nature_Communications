@@ -152,6 +152,11 @@ namespace pathCam {
 
 
   void Composite::deduce_label() {
+    if (root->labelObserved) {
+      componentMagLabel = root->label;
+      get_flatfield();
+      return;
+    }
     if (componentIndex == 0) {
       componentMagLabel = parent->initialLabel;
       get_flatfield();
@@ -567,7 +572,7 @@ namespace pathCam {
       bool showAsCircle = (componentMagLabel == Image::_2X);
 
       parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
-                                Image::get_label(componentMagLabel));
+                                Image::get_label(componentMagLabel), get_scale());
 
       parent->notify_observers();
 

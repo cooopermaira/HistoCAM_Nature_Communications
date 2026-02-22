@@ -133,6 +133,7 @@ namespace pathCam {
     int lastComponentIndex;
     std::string lastLabel;
     bool showAsCircle;
+    float lastScale;
 
     bool microscopeInput;
     bool recordingMode = false;
@@ -275,10 +276,10 @@ namespace pathCam {
     void set_flatfield(int label, const cuda::GpuMat& ffGpu);
 
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index,
-                           std::string _label);
+                           std::string _label, float _scale);
 
     void get_last_frame(cv::Rect_<float> &_rectInBaseSpace, bool &showAsCircle, int &_lastComponentIndex,
-                        std::string &_magLabel);
+                        std::string &_magLabel, float &_lastScale);
 
     void pass_image(Image *, unsigned long _image_index = 0, bool saveImg = false);
 

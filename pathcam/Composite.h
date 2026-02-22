@@ -53,7 +53,7 @@ namespace pathCam {
     Poco::FastMutex update_mutex;
 
     int joinedTo;
-    bool suspended = false;
+    std::atomic<bool> suspended = false;
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
     bool xcMatchShouldContinue = true;

@@ -59,7 +59,39 @@ int extractSortableValue2(const std::string &str) {
 
   return std::stoi(str.substr(secondDash + 1, period - secondDash - 1));
 }
+unsigned long extractSortableValue3(const std::string& filename)
+{
+  // Get just the filename if a full path was passed
+  size_t lastSlash = filename.find_last_of("/\\");
+  std::string name = (lastSlash == std::string::npos)
+                     ? filename
+                     : filename.substr(lastSlash + 1);
 
+  // Remove extension
+  size_t dotPos = name.find_last_of('.');
+  if (dotPos != std::string::npos)
+    name = name.substr(0, dotPos);
+
+  // Find underscore
+  size_t underscorePos = name.find('_');
+  if (underscorePos == std::string::npos)
+    return 0;  // fallback if malformed
+
+  std::string importantPart = name.substr(0, underscorePos);
+
+  return std::stoul(importantPart);
+}
+bool customComparator3(const pathCam::Image* lhs,
+                       const pathCam::Image* rhs)
+{
+  unsigned long lhsVal =
+      extractSortableValue3(lhs->image_file.getFileName());
+
+  unsigned long rhsVal =
+      extractSortableValue3(rhs->image_file.getFileName());
+
+  return lhsVal < rhsVal;
+}
 bool customComparator2(const pathCam::Image *lhs, const pathCam::Image *rhs) {
   unsigned long lhsVal = extractSortableValue2(lhs->image_file.getFileName());
   unsigned long rhsVal = extractSortableValue2(rhs->image_file.getFileName());
@@ -189,9 +221,14 @@ int main(int argc, char *argv[]) {
 
     if (renameFiles || makeInput) {
       try {
-        std::sort(images.begin(), images.end(), customComparator2);
-      }catch(...){
-        std::sort(images.begin(), images.end(), customComparator);
+        std::sort(images.begin(),images.end(),customComparator3);
+      }
+      catch (...) {
+        try {
+          std::sort(images.begin(), images.end(), customComparator2);
+        }catch(...){
+          std::sort(images.begin(), images.end(), customComparator);
+        }
       }
     }
 
