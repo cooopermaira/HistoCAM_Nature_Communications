@@ -1074,6 +1074,7 @@ namespace pathCam {
     cacheAlert.set();
 
     assert(set_slide_label().empty());
+    pathcamReady = true;
   }
 
   StreamCam::~StreamCam() {

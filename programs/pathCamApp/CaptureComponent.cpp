@@ -317,7 +317,7 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
 #ifdef WITH_SPINNAKER
       //open camera barcode reader
       procedureMode = 1;
-      ready = true;
+      ready = sCam->pathcamReady;
 #else
       //selecting input
       parent->fc.reset(new FileChooser("Choose an input file...", File("/home/cm/Documents/data/"),
@@ -334,7 +334,28 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
 
 #ifdef WITH_SPINNAKER
       if (!ready) {
-        std::cout << "slide barcode not read" << std::endl;
+        std::cout << "not read" << std::endl;
+
+        // Brief red flash overlay
+        struct FlashOverlay : public juce::Component, public juce::Timer {
+          FlashOverlay(juce::Component* parent) {
+            parent->addAndMakeVisible(this);
+            setBounds(parent->getLocalBounds());
+            setAlwaysOnTop(true);
+            startTimer(150);
+          }
+          void paint(juce::Graphics& g) override {
+            g.setColour(juce::Colour::fromFloatRGBA(1.0f, 0.0f, 0.0f, 0.4f));
+            g.fillRect(getLocalBounds());
+          }
+          void timerCallback() override {
+            stopTimer();
+            if (auto* p = getParentComponent()) p->removeChildComponent(this);
+            delete this;
+          }
+        };
+        new FlashOverlay(this);
+
         return true;
       }
       startRecording();
@@ -342,6 +363,7 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
       startSimulating();
 #endif
       ready = false;
+      sCam->pathcamReady = false;
       procedureMode = 2;
       return true;
     }
