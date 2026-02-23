@@ -21,6 +21,8 @@ public:
   unsigned int ImageWidth, ImageHeight;
   std::shared_ptr<pathCam::StreamCam> sCam;
 
+  juce::File cwd;
+
   //==============================================================================
   void paint(juce::Graphics &g) override;
 

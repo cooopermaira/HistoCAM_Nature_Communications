@@ -121,6 +121,8 @@ namespace pathCam {
     Poco::FastMutex CudaSiftGlobalUseMutex;
     Poco::FastMutex previousSlidesMutex;
 
+    Poco::Path givenWorkingDirectory;
+
     long cudaSiftTime = 0;
     long captureTimeMS = 0;
 

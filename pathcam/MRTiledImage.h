@@ -28,7 +28,7 @@ public:
   bool suspended = false;
   cv::Rect_<float> bounds;
   int tile_size, magLabel, componentIndex = 0;
-  double scale;
+  float scale;
   Point2f offset;
   Poco::Event scaleSet;
   pathCam::StreamCam *parent;
@@ -117,6 +117,7 @@ public:
   std::string labelName;
   Poco::Path cwd;
 
+  std::atomic<bool> headerWritten = false;
   std::atomic<bool> inMemory = true;
   std::atomic<bool> loadFromCacheQueued = false;
   std::atomic<bool> cachedToDisk = false;
@@ -179,6 +180,10 @@ public:
 
   void detach();
 
+  void write_cache_header();
+
+  void read_slide_header();
+
   void cache_to_disk() {
     auto start = std::chrono::high_resolution_clock::now();
     for (auto &mrImg: MRImages) {
@@ -186,6 +191,8 @@ public:
       mrImg->cache_to_disk(cwd.toString());
       assert(!mrImg->inMemory);
     }
+    write_cache_header();
+
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     cachedToDisk = true;
     inMemory = false;

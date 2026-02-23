@@ -139,7 +139,7 @@ namespace pathCam {
                                 const std::vector<uint8_t> &inlierMask, std::vector<
                                   KeyPoint> &keypoints1, std::vector<KeyPoint> &keypoints2);
 
-    void set_scale(double _scale, bool _ffCorrectExistingTiles = false);
+    void set_scale(float _scale, bool _ffCorrectExistingTiles = false);
 
     void ff_correct_existing_tiles();
 

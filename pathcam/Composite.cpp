@@ -138,7 +138,7 @@ namespace pathCam {
   }
 
 
-  void Composite::set_scale(double _scale, bool _ffCorrectExistingTiles) {
+  void Composite::set_scale(float _scale, bool _ffCorrectExistingTiles) {
     imagePyramid->set_scale(_scale);
     update_mutex.lock();
     deduce_label();
@@ -172,15 +172,15 @@ namespace pathCam {
       return;
     }
 
-    double initialComponentTrueScale = parent->labelScales[parent->composites[0]->componentMagLabel];
-    double selfTrueScale = imagePyramid->scale * initialComponentTrueScale;
+    float initialComponentTrueScale = parent->labelScales[parent->composites[0]->componentMagLabel];
+    float selfTrueScale = imagePyramid->scale * initialComponentTrueScale;
 
-    double closest = parent->labelScales[0];
-    double minDiff = std::abs(selfTrueScale - parent->labelScales[0]);
+    float closest = parent->labelScales[0];
+    float minDiff = std::abs(selfTrueScale - parent->labelScales[0]);
 
     // Find the closest value
     for (int i = 1; i < parent->labelScales.size(); i++) {
-      double diff = std::abs(selfTrueScale - parent->labelScales[i]);
+      float diff = std::abs(selfTrueScale - parent->labelScales[i]);
       if (diff < minDiff) {
         minDiff = diff;
         closest = parent->labelScales[i];
@@ -219,7 +219,7 @@ namespace pathCam {
     cudaFree(buffer);
 
     ffGPU.convertTo(ffGPU,CV_32F);
-    double scale = 1 / 240.0;
+    float scale = 1 / 240.0;
     cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
 
     parent->set_flatfield(componentMagLabel,ffGPU);

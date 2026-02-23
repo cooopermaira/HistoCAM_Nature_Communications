@@ -89,6 +89,12 @@ static void read_all(int fd, void *data, size_t size) {
     readBytes += static_cast<size_t>(n);
   }
 }
+static void write_string(int fd, const std::string& str){
+  uint32_t length = static_cast<uint32_t>(str.size());
+
+  write_all(fd, &length, sizeof(length));
+  write_all(fd, str.data(), length);
+}
 
 std::vector<TileQuery> MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect_<int> screen, bool pullFromBase) {
   if (pullFromBase) {
@@ -323,6 +329,101 @@ void MRTiledImage::uncache_from_disk() {
   }
 }
 
+void MRTiledImageSet::write_cache_header() {
+  if (headerWritten){return;}
+
+  // Build header file path
+  Poco::File cwd1(cwd);
+  if (!cwd1.exists() || !cwd1.isDirectory()) {
+    throw std::runtime_error("cache_to_disk: cwd invalid: " + cwd.toString());
+  }
+
+  std::string headerPath = cwd.toString() + "slide.pcHdr";
+
+  int fd = ::open(headerPath.c_str(),
+                  O_CREAT | O_TRUNC | O_WRONLY,
+                  0644);
+
+  if (fd == -1) {
+    throw std::runtime_error(
+        std::string("header create failed: ") +
+        headerPath + " : " + std::strerror(errno));
+  }
+
+
+  try {
+    // MRImageSet metadata
+    auto numImages = static_cast<uint16_t>(MRImages.size());
+    write_all(fd, &numImages, sizeof(uint16_t));
+
+    //MRTiledImageSet bounds
+    write_all(fd,&bounds.x,sizeof(bounds.x));//float
+    write_all(fd,&bounds.y,sizeof(bounds.y));//float
+    write_all(fd,&bounds.width,sizeof(bounds.width));//float
+    write_all(fd,&bounds.height,sizeof(bounds.height));//float
+
+    write_string(fd,labelName);
+
+    // AbCs
+    assert(frameLabels.size() == AbCs.size());
+    auto numFrames = static_cast<uint16_t>(AbCs.size());
+    write_all(fd,&numFrames,sizeof(numFrames));
+    for (const auto& abc : AbCs) {
+      int32_t x = static_cast<int32_t>(abc.x);
+      int32_t y = static_cast<int32_t>(abc.y);
+
+      write_all(fd, &x, sizeof(int32_t));
+      write_all(fd, &y, sizeof(int32_t));
+    }
+    for (const auto& fl : frameLabels) {
+      auto fl8 = static_cast<uint8_t>(fl);
+      write_all(fd,&fl8,sizeof(fl8));
+    }
+
+    //scale lookup
+    auto slSize = static_cast<uint8_t>(labelScaleLookup.size());
+    write_all(fd, &slSize,sizeof(slSize));
+    for (const auto& [label,scale] : labelScaleLookup) {
+      auto label8 = static_cast<uint8_t>(label);
+      write_all(fd,&label8,sizeof(label8));
+      write_all(fd,&scale,sizeof(scale));//float
+    }
+
+    // per MRImage metadata
+    for (const auto& mrImg : MRImages) {
+      //MRTiledImage scale and mag label
+      write_all(fd, &mrImg->scale, sizeof(mrImg->scale));//float
+      uint8_t magLabel = static_cast<uint8_t>(mrImg->magLabel);
+      write_all(fd, &magLabel,sizeof(magLabel));
+
+      //MRTiledImage bounds
+      write_all(fd,&mrImg->bounds.x,sizeof(mrImg->bounds.x));//float
+      write_all(fd,&mrImg->bounds.y,sizeof(mrImg->bounds.y));//float
+      write_all(fd,&mrImg->bounds.width,sizeof(mrImg->bounds.width));//float
+      write_all(fd,&mrImg->bounds.height,sizeof(mrImg->bounds.height));//float
+
+      const auto& tiles = mrImg->liveTilesOrderedVec;
+      uint16_t numTiles = static_cast<uint16_t>(tiles.size());
+      write_all(fd, &numTiles, sizeof(numTiles));
+
+      for (const auto& tileIndex : tiles) {
+        int32_t x = static_cast<int32_t>(tileIndex.x);
+        int32_t y = static_cast<int32_t>(tileIndex.y);
+
+        write_all(fd, &x, sizeof(int32_t));
+        write_all(fd, &y, sizeof(int32_t));
+      }
+    }
+
+    ::close(fd);
+    headerWritten = true;
+  }
+  catch (...) {
+    ::close(fd);
+    throw;
+  }
+}
+
 std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const {
   assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
 
@@ -382,8 +483,8 @@ void MRTiledImageSet::update_bounds() {
     auto imageMaxX = imageMinX + image->scale * image->bounds.width;
     auto imageMaxY = imageMinY + image->scale * image->bounds.height;
 
-    maxX = max(double(maxX), imageMaxX);
-    maxY = max(double(maxY), imageMaxY);
+    maxX = max(maxX, imageMaxX);
+    maxY = max(maxY, imageMaxY);
   }
 
   bounds.x = minX;
