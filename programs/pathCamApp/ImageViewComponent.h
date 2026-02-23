@@ -198,6 +198,8 @@ public:
 
   void adjust_MRImageSet(int mode);
 
+  void save_slide_set() const;
+
   void cacher();
 
   void uncacher();

@@ -38,7 +38,8 @@ namespace pathCam {
 
     MRTiledImageSet::frameHeight = image_height;
     MRTiledImageSet::frameWidth = image_width;
-    MRTiledImageSet::scopeRadius = scope_radius * 0.8f;
+    MRTiledImageSet::scopeRadius = scope_radius * 0.7f;
+    MRTiledImageSet::tileSize = tileSize;
 
     minPixelDistanceBetweenFrames = 500;
     minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames, 2);
@@ -167,7 +168,8 @@ namespace pathCam {
     assert(!currentSlideLabel.empty());
 
     // Build: <cwd>/<currentSlideLabel>/
-    Poco::Path p = Poco::Path::current();
+    Poco::Path p = givenWorkingDirectory;
+    p.makeDirectory();
     p.pushDirectory(currentSlideLabel);
     p.makeDirectory(); // ensures trailing slash; does NOT create on disk
 

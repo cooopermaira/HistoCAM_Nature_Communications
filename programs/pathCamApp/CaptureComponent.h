@@ -473,7 +473,6 @@ public:
     }
   }
 
-private:
     WavRecorder wavRecorder;
   std::unique_ptr<CaptureOverlay> captureOverlay;
   std::unique_ptr<AIOverlay> aiOverlay;

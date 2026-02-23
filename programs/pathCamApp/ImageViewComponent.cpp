@@ -79,6 +79,13 @@ void ImageViewComponent::cacher() {
   }
 }
 
+void ImageViewComponent::save_slide_set() const {
+  Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
+  for (auto &mrImg: parent->sCam->previousSlides) {
+    mrImg->cache_to_disk();
+  }
+}
+
 void ImageViewComponent::q_cache() {
   if (!MRImageSet->inMemory && !MRImageSet->loadFromCacheQueued) {
     Poco::FastMutex::ScopedLock lock(loadASAPMutex);
@@ -314,7 +321,7 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
 
   //Define buffer space from the edges
   if (mrImages.size() > 0 && shadeClasses) {
-    auto sCam = mrImages[0]->parent;
+    auto sCam = parent->sCam;
     int paddingX = 100;
     int paddingY = 150;
     int squareSize = 30; // Size of the square

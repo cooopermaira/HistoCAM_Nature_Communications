@@ -136,6 +136,23 @@ public:
         }
       }
     }
+
+    // Sort by label alphabetically
+    std::vector<size_t> order(filteredIndices.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
+      return sCam->get_slide_label(filteredIndices[a]).compareIgnoreCase(
+             sCam->get_slide_label(filteredIndices[b])) < 0;
+    });
+
+    std::vector<int> sortedIndices(filteredIndices.size());
+    std::vector<bool> sortedMatched(matchedByAnnotation.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+      sortedIndices[i] = filteredIndices[order[i]];
+      sortedMatched[i] = matchedByAnnotation[order[i]];
+    }
+    filteredIndices = std::move(sortedIndices);
+    matchedByAnnotation = std::move(sortedMatched);
   }
 
   bool slideHasMatchingAnnotation(int slideIndex, const juce::String& searchText);

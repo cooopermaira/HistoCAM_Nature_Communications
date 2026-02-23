@@ -36,7 +36,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config) : con
   addChildComponent(annotate);
 
   cwd = juce::File("/home/");
-  dirFilter = std::make_unique<juce::WildcardFileFilter>("", "*", "Directories");
+  dirFilter = std::make_unique<juce::WildcardFileFilter>("*", "*", "All Files");
   dirBrowser = std::make_unique<juce::FileBrowserComponent>(
     juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
     cwd, dirFilter.get(), nullptr);
@@ -305,6 +305,7 @@ void MainComponent::confirmDirectorySelection() {
       selected = dirBrowser->getRoot();
     if (cwd != selected) {
       cwd = selected;
+      capture->save_slide_set();
       sCam->new_case_reset();
       sCam->givenWorkingDirectory = cwd.getFullPathName().toStdString();
       capture->setImage(nullptr);
@@ -328,10 +329,29 @@ void MainComponent::findSlideDirectories() {
 
 void MainComponent::load_case(std::vector<juce::File> slideDirs) {
   if (slideDirs.empty()){return;}
+  Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
   for (auto &p :slideDirs) {
     auto slide = std::make_shared<MRTiledImageSet>();
     slide->cwd = p.getFullPathName().toStdString();
+    slide->read_slide_header();
+    sCam->previousSlides.push_back(slide);
+    ++sCam->numSlides;
   }
+  // Switch to capture view first so components are visible
+  GuiEventHandler("capture");
+
+  // Set image after visible so zoomAndCenter works
+  capture->setImage(sCam->previousSlides[0]);
+  annotate->setImage(sCam->previousSlides[0]);
+  capture->fixAspectRatio();
+
+  // Ensure the slide label list is available
+  if (!labelList)
+    setup_listbox();
+  if (labelList)
+    labelList->refresh();
+
+  resized();
 }
 
 void MainComponent::GuiEventHandler(std::string event) {

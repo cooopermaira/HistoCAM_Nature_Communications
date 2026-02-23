@@ -106,7 +106,7 @@ private:
 };
 
 
-class MRTiledImageSet {
+class MRTiledImageSet : public std::enable_shared_from_this<MRTiledImageSet>{
   friend class ImageViewComponent;
   friend class CaptureComponent;
 
@@ -133,6 +133,7 @@ public:
   inline static int frameHeight = 0;
   inline static int frameWidth = 0;
   inline static int scopeRadius = 0;
+  inline static int tileSize = 0;
 
 
   Poco::FastMutex mutex;
@@ -140,10 +141,10 @@ public:
 
   MRTiledImageSet() {};
   ~MRTiledImageSet() {
-    Poco::File workDir(cwd);
-    if (workDir.exists() && workDir.isDirectory()) {
-      workDir.remove(true);
-    }
+    // Poco::File workDir(cwd);
+    // if (workDir.exists() && workDir.isDirectory()) {
+    //   workDir.remove(true);
+    // }
   }
 
 
@@ -180,7 +181,7 @@ public:
 
   void detach();
 
-  void write_cache_header();
+  void write_slide_header();
 
   void read_slide_header();
 
@@ -191,7 +192,7 @@ public:
       mrImg->cache_to_disk(cwd.toString());
       assert(!mrImg->inMemory);
     }
-    write_cache_header();
+    write_slide_header();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     cachedToDisk = true;

@@ -13,10 +13,11 @@
 
 std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc, unsigned label) const {
   std::vector<Point2i> result;
-  if (!(label == pathCam::Image::_2X || label == pathCam::Image::_4X || label == pathCam::Image::_10X || label == pathCam::Image::_20X || label ==
-      pathCam::Image::_40X)){return {};}
+  if (!(label == pathCam::Image::_2X || label == pathCam::Image::_4X || label == pathCam::Image::_10X || label ==
+        pathCam::Image::_20X || label ==
+        pathCam::Image::_40X)) { return {}; }
 
-  auto scale = labelScaleLookup.at((int)label);
+  auto scale = labelScaleLookup.at((int) label);
 
   if (label == pathCam::Image::_4X || label == pathCam::Image::_10X || label == pathCam::Image::_20X || label ==
       pathCam::Image::_40X) {
@@ -89,7 +90,8 @@ static void read_all(int fd, void *data, size_t size) {
     readBytes += static_cast<size_t>(n);
   }
 }
-static void write_string(int fd, const std::string& str){
+
+static void write_string(int fd, const std::string &str) {
   uint32_t length = static_cast<uint32_t>(str.size());
 
   write_all(fd, &length, sizeof(length));
@@ -153,8 +155,7 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd) {
       liveTilesOrderedVec.assign(liveTiles.begin(), liveTiles.end());
       // std::sort(liveTilesOrderedVec.begin(), liveTilesOrderedVec.end()); // if tileIndex is sortable
 
-
-      const size_t tileSize = parent->tileSize;
+      auto tileSize = MRTiledImageSet::tileSize;
       const size_t bytesPerTile = tileSize * tileSize * 4; // RGBA8
       const size_t numTiles = liveTilesOrderedVec.size();
 
@@ -250,7 +251,7 @@ void MRTiledImage::uncache_from_disk() {
 
 
   try {
-    const size_t tileSize = parent->tileSize;
+    const auto tileSize = MRTiledImageSet::tileSize;
     const size_t bytesPerTile = tileSize * tileSize * 4; // RGBA8
     const size_t numTiles = liveTilesOrderedVec.size();
 
@@ -329,25 +330,26 @@ void MRTiledImage::uncache_from_disk() {
   }
 }
 
-void MRTiledImageSet::write_cache_header() {
-  if (headerWritten){return;}
+void MRTiledImageSet::write_slide_header() {
+  if (headerWritten) { return; }
 
-  // Build header file path
   Poco::File cwd1(cwd);
-  if (!cwd1.exists() || !cwd1.isDirectory()) {
-    throw std::runtime_error("cache_to_disk: cwd invalid: " + cwd.toString());
+
+  if (!cwd1.exists()) {
+    cwd1.createDirectories(); // creates full path recursively
+  } else if (!cwd1.isDirectory()) {
+    throw std::runtime_error("cache_to_disk: path exists but is not a directory: " + cwd.toString());
   }
 
   std::string headerPath = cwd.toString() + "slide.pcHdr";
-
   int fd = ::open(headerPath.c_str(),
                   O_CREAT | O_TRUNC | O_WRONLY,
                   0644);
 
   if (fd == -1) {
     throw std::runtime_error(
-        std::string("header create failed: ") +
-        headerPath + " : " + std::strerror(errno));
+      std::string("header create failed: ") +
+      headerPath + " : " + std::strerror(errno));
   }
 
 
@@ -357,56 +359,62 @@ void MRTiledImageSet::write_cache_header() {
     write_all(fd, &numImages, sizeof(uint16_t));
 
     //MRTiledImageSet bounds
-    write_all(fd,&bounds.x,sizeof(bounds.x));//float
-    write_all(fd,&bounds.y,sizeof(bounds.y));//float
-    write_all(fd,&bounds.width,sizeof(bounds.width));//float
-    write_all(fd,&bounds.height,sizeof(bounds.height));//float
+    write_all(fd, &bounds.x, sizeof(bounds.x)); //float
+    write_all(fd, &bounds.y, sizeof(bounds.y)); //float
+    write_all(fd, &bounds.width, sizeof(bounds.width)); //float
+    write_all(fd, &bounds.height, sizeof(bounds.height)); //float
 
-    write_string(fd,labelName);
+    write_string(fd, labelName);
 
     // AbCs
     assert(frameLabels.size() == AbCs.size());
     auto numFrames = static_cast<uint16_t>(AbCs.size());
-    write_all(fd,&numFrames,sizeof(numFrames));
-    for (const auto& abc : AbCs) {
+    write_all(fd, &numFrames, sizeof(numFrames));
+    for (const auto &abc: AbCs) {
       int32_t x = static_cast<int32_t>(abc.x);
       int32_t y = static_cast<int32_t>(abc.y);
 
       write_all(fd, &x, sizeof(int32_t));
       write_all(fd, &y, sizeof(int32_t));
     }
-    for (const auto& fl : frameLabels) {
+    for (const auto &fl: frameLabels) {
       auto fl8 = static_cast<uint8_t>(fl);
-      write_all(fd,&fl8,sizeof(fl8));
+      write_all(fd, &fl8, sizeof(fl8));
     }
 
     //scale lookup
     auto slSize = static_cast<uint8_t>(labelScaleLookup.size());
-    write_all(fd, &slSize,sizeof(slSize));
-    for (const auto& [label,scale] : labelScaleLookup) {
+    write_all(fd, &slSize, sizeof(slSize));
+    for (const auto &[label,scale]: labelScaleLookup) {
       auto label8 = static_cast<uint8_t>(label);
-      write_all(fd,&label8,sizeof(label8));
-      write_all(fd,&scale,sizeof(scale));//float
+      write_all(fd, &label8, sizeof(label8));
+      write_all(fd, &scale, sizeof(scale)); //float
     }
 
     // per MRImage metadata
-    for (const auto& mrImg : MRImages) {
+    for (const auto &mrImg: MRImages) {
       //MRTiledImage scale and mag label
-      write_all(fd, &mrImg->scale, sizeof(mrImg->scale));//float
+      write_all(fd, &mrImg->scale, sizeof(mrImg->scale)); //float
+      write_all(fd,&mrImg->offset.x,sizeof(float));
+      write_all(fd,&mrImg->offset.y,sizeof(float));
+
       uint8_t magLabel = static_cast<uint8_t>(mrImg->magLabel);
-      write_all(fd, &magLabel,sizeof(magLabel));
+      write_all(fd, &magLabel, sizeof(magLabel));
+
+      uint8_t compIdx = static_cast<uint8_t>(mrImg->componentIndex);
+      write_all(fd,&compIdx,sizeof(compIdx));
 
       //MRTiledImage bounds
-      write_all(fd,&mrImg->bounds.x,sizeof(mrImg->bounds.x));//float
-      write_all(fd,&mrImg->bounds.y,sizeof(mrImg->bounds.y));//float
-      write_all(fd,&mrImg->bounds.width,sizeof(mrImg->bounds.width));//float
-      write_all(fd,&mrImg->bounds.height,sizeof(mrImg->bounds.height));//float
+      write_all(fd, &mrImg->bounds.x, sizeof(mrImg->bounds.x)); //float
+      write_all(fd, &mrImg->bounds.y, sizeof(mrImg->bounds.y)); //float
+      write_all(fd, &mrImg->bounds.width, sizeof(mrImg->bounds.width)); //float
+      write_all(fd, &mrImg->bounds.height, sizeof(mrImg->bounds.height)); //float
 
-      const auto& tiles = mrImg->liveTilesOrderedVec;
+      const auto &tiles = mrImg->liveTilesOrderedVec;
       uint16_t numTiles = static_cast<uint16_t>(tiles.size());
       write_all(fd, &numTiles, sizeof(numTiles));
 
-      for (const auto& tileIndex : tiles) {
+      for (const auto &tileIndex: tiles) {
         int32_t x = static_cast<int32_t>(tileIndex.x);
         int32_t y = static_cast<int32_t>(tileIndex.y);
 
@@ -417,173 +425,161 @@ void MRTiledImageSet::write_cache_header() {
 
     ::close(fd);
     headerWritten = true;
-  }
-  catch (...) {
+  } catch (...) {
     ::close(fd);
     throw;
   }
 }
 
-void read_slide_header(const std::string& directory)
-{
-    std::string headerPath = directory + "slide.pcHdr";
+void MRTiledImageSet::read_slide_header() {
+  Poco::Path dir(cwd);
+  dir.makeDirectory();      // ensures trailing slash semantics
+  dir.append("slide.pcHdr");
 
-    int fd = ::open(headerPath.c_str(), O_RDONLY);
-    if (fd == -1) {
-        throw std::runtime_error(
-            std::string("header open failed: ") +
-            headerPath + " : " + std::strerror(errno));
+  std::string headerPath = dir.toString();
+  int fd = ::open(headerPath.c_str(), O_RDONLY);
+  if (fd == -1) {
+    throw std::runtime_error(
+      std::string("header open failed: ") +
+      headerPath + " : " + std::strerror(errno));
+  }
+
+  try {
+    // ===============================
+    // MRImageSet metadata
+    // ===============================
+
+    uint16_t numImages;
+    read_all(fd, &numImages, sizeof(numImages));
+    MRImages.reserve(numImages);
+
+    // ===============================
+    // MRTiledImageSet bounds
+    // ===============================
+
+    read_all(fd, &bounds.x, sizeof(float));
+    read_all(fd, &bounds.y, sizeof(float));
+    read_all(fd, &bounds.width, sizeof(float));
+    read_all(fd, &bounds.height, sizeof(float));
+
+    // ===============================
+    // labelName (length-prefixed string)
+    // ===============================
+
+    uint32_t labelLen;
+    read_all(fd, &labelLen, sizeof(labelLen));
+
+    labelName.resize(labelLen);
+    read_all(fd, labelName.data(), labelLen);
+
+    // ===============================
+    // AbCs
+    // ===============================
+
+    uint16_t numFrames;
+    read_all(fd, &numFrames, sizeof(numFrames));
+
+    AbCs.reserve(numFrames);
+
+    for (uint16_t i = 0; i < numFrames; ++i) {
+      int32_t x, y;
+      read_all(fd, &x, sizeof(int32_t));
+      read_all(fd, &y, sizeof(int32_t));
+      AbCs.emplace_back(x, y);
     }
 
-    try
-    {
-        // ===============================
-        // MRImageSet metadata
-        // ===============================
+    frameLabels.reserve(numFrames);
 
-        uint16_t numImages;
-        read_all(fd, &numImages, sizeof(numImages));
-
-        // ===============================
-        // MRTiledImageSet bounds
-        // ===============================
-
-        float bounds_x, bounds_y, bounds_w, bounds_h;
-        read_all(fd, &bounds_x, sizeof(float));
-        read_all(fd, &bounds_y, sizeof(float));
-        read_all(fd, &bounds_w, sizeof(float));
-        read_all(fd, &bounds_h, sizeof(float));
-
-        // ===============================
-        // labelName (length-prefixed string)
-        // ===============================
-
-        uint32_t labelLen;
-        read_all(fd, &labelLen, sizeof(labelLen));
-
-        std::string labelName;
-        labelName.resize(labelLen);
-        read_all(fd, labelName.data(), labelLen);
-
-        // ===============================
-        // AbCs
-        // ===============================
-
-        uint16_t numFrames;
-        read_all(fd, &numFrames, sizeof(numFrames));
-
-        std::vector<cv::Point2i> AbCs;
-        AbCs.reserve(numFrames);
-
-        for (uint16_t i = 0; i < numFrames; ++i)
-        {
-            int32_t x, y;
-            read_all(fd, &x, sizeof(int32_t));
-            read_all(fd, &y, sizeof(int32_t));
-            AbCs.emplace_back(x, y);
-        }
-
-        std::vector<uint8_t> frameLabels;
-        frameLabels.reserve(numFrames);
-
-        for (uint16_t i = 0; i < numFrames; ++i)
-        {
-            uint8_t fl;
-            read_all(fd, &fl, sizeof(fl));
-            frameLabels.push_back(fl);
-        }
-
-        // ===============================
-        // scale lookup
-        // ===============================
-
-        uint8_t slSize;
-        read_all(fd, &slSize, sizeof(slSize));
-
-        std::unordered_map<uint8_t, float> labelScaleLookup;
-
-        for (uint8_t i = 0; i < slSize; ++i)
-        {
-            uint8_t label;
-            float scale;
-
-            read_all(fd, &label, sizeof(label));
-            read_all(fd, &scale, sizeof(scale));
-
-            labelScaleLookup[label] = scale;
-        }
-
-        // ===============================
-        // Per MRImage metadata
-        // ===============================
-
-        struct MRImageHeader
-        {
-            float scale;
-            uint8_t magLabel;
-            float bounds_x, bounds_y, bounds_w, bounds_h;
-            std::vector<cv::Point2i> tiles;
-        };
-
-        std::vector<MRImageHeader> images;
-        images.reserve(numImages);
-
-        for (uint16_t i = 0; i < numImages; ++i)
-        {
-            MRImageHeader hdr;
-
-            read_all(fd, &hdr.scale, sizeof(float));
-            read_all(fd, &hdr.magLabel, sizeof(uint8_t));
-
-            read_all(fd, &hdr.bounds_x, sizeof(float));
-            read_all(fd, &hdr.bounds_y, sizeof(float));
-            read_all(fd, &hdr.bounds_w, sizeof(float));
-            read_all(fd, &hdr.bounds_h, sizeof(float));
-
-            uint16_t numTiles;
-            read_all(fd, &numTiles, sizeof(numTiles));
-
-            hdr.tiles.reserve(numTiles);
-
-            for (uint16_t t = 0; t < numTiles; ++t)
-            {
-                int32_t x, y;
-                read_all(fd, &x, sizeof(int32_t));
-                read_all(fd, &y, sizeof(int32_t));
-                hdr.tiles.emplace_back(x, y);
-            }
-
-            images.push_back(std::move(hdr));
-        }
-
-        ::close(fd);
-
-        // At this point:
-        // All variables exist locally:
-        // numImages
-        // bounds_x/y/w/h
-        // labelName
-        // AbCs
-        // frameLabels
-        // labelScaleLookup
-        // images (vector of per-MRImage metadata)
-
+    for (uint16_t i = 0; i < numFrames; ++i) {
+      uint8_t fl;
+      read_all(fd, &fl, sizeof(fl));
+      frameLabels.push_back(fl);
     }
-    catch (...)
-    {
-        ::close(fd);
-        throw;
+
+    // ===============================
+    // scale lookup
+    // ===============================
+
+    uint8_t slSize;
+    read_all(fd, &slSize, sizeof(slSize));
+
+    for (uint8_t i = 0; i < slSize; ++i) {
+      uint8_t label;
+      float scale;
+
+      read_all(fd, &label, sizeof(label));
+      read_all(fd, &scale, sizeof(scale));
+
+      labelScaleLookup[label] = scale;
     }
+
+    // ===============================
+    // Per MRImage metadata
+    // ===============================
+    for (uint16_t i = 0; i < numImages; ++i) {
+      auto mrImg = std::make_shared<MRTiledImage>(nullptr,tileSize);
+
+      read_all(fd, &mrImg->scale, sizeof(float));
+      read_all(fd,&mrImg->offset.x,sizeof(float));
+      read_all(fd,&mrImg->offset.y,sizeof(float));
+
+      uint8_t tmp;
+      read_all(fd, &tmp, sizeof(uint8_t));
+      mrImg->magLabel = tmp;
+      read_all(fd,&tmp,sizeof(uint8_t));
+      mrImg->componentIndex = tmp;
+
+      read_all(fd, &mrImg->bounds.x, sizeof(float));
+      read_all(fd, &mrImg->bounds.y, sizeof(float));
+      read_all(fd, &mrImg->bounds.width, sizeof(float));
+      read_all(fd, &mrImg->bounds.height, sizeof(float));
+
+      uint16_t numTiles;
+      read_all(fd, &numTiles, sizeof(numTiles));
+
+      mrImg->liveTilesOrderedVec.reserve(numTiles);
+
+      for (uint16_t t = 0; t < numTiles; ++t) {
+        int32_t x, y;
+        read_all(fd, &x, sizeof(int32_t));
+        read_all(fd, &y, sizeof(int32_t));
+        mrImg->liveTilesOrderedVec.emplace_back(x, y);
+      }
+      mrImg->liveTiles.insert(mrImg->liveTilesOrderedVec.begin(),mrImg->liveTilesOrderedVec.end());
+
+      auto logicSize = tileSize;
+      while (logicSize < mrImg->bounds.width && logicSize < mrImg->bounds.height && log2(tileSize) - mrImg->level.size() >= 2 ) {
+        auto level = std::make_shared<TiledImage>(mrImg,tileSize,logicSize,mrImg->level.size());
+        mrImg->level.push_back(level);
+        logicSize = 2 * logicSize;
+      }
+      Poco::Path cachePath(cwd);
+      cachePath.makeDirectory();
+      cachePath.setFileName(std::to_string(mrImg->componentIndex));
+      cachePath.setExtension("pcRawLayer");
+      mrImg->strCachePath = cachePath.toString();
+      mrImg->uncache_from_disk();
+      mrImg->MRImageSet = shared_from_this();
+      MRImages.push_back(mrImg);
+    }
+
+    ::close(fd);
+
+  } catch (...) {
+    ::close(fd);
+    throw;
+  }
 }
 
 
-std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const {
+std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
+  long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const {
   assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
 
   startFrameIdx = msTimeStart * framesPerMillisecond;
   endFrameIdx = msTimeEnd * framesPerMillisecond;
 
-  return poly_annotations_from_frame_interval(startFrameIdx,endFrameIdx);
+  return poly_annotations_from_frame_interval(startFrameIdx, endFrameIdx);
 }
 
 std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const {
