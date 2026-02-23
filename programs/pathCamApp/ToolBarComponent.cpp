@@ -43,6 +43,8 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
           keepFramesToggle.setToggleState(mainComp->keepFrames, juce::dontSendNotification);
           keepFramesToggle.onClick = [this]() {
             mainComponent->keepFrames = keepFramesToggle.getToggleState();
+            if (mainComponent->sCam)
+              mainComponent->sCam->keepFrames = mainComponent->keepFrames;
           };
           addAndMakeVisible(keepFramesToggle);
 

@@ -310,6 +310,7 @@ void MainComponent::confirmDirectorySelection() {
       capture->setImage(nullptr);
       annotate->setImage(nullptr);
       findSlideDirectories();
+      sCam->keepFrames = keepFrames;
     }
   }
 }

@@ -203,6 +203,7 @@ namespace pathCam {
     int windowWidth = 3;
     int maxIndex = -1;
 
+    std::atomic<bool> keepFrames = true;
     std::atomic<bool> compositing = true;
     std::atomic<bool> tileEmbeddingComplete = false;
     std::atomic<int> components = 0;
