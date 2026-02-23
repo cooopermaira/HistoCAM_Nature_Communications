@@ -35,6 +35,14 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config) : con
   addChildComponent(capture);
   addChildComponent(annotate);
 
+  cwd = juce::File("/home/");
+  dirFilter = std::make_unique<juce::WildcardFileFilter>("", "*", "Directories");
+  dirBrowser = std::make_unique<juce::FileBrowserComponent>(
+      juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+      cwd, dirFilter.get(), nullptr);
+  dirBrowser->addListener(this);
+  addAndMakeVisible(*dirBrowser);
+
   // Initialize slideListButton
   for (int i = 0; i < iconNames.size(); i++) {
     if (iconNames[i] == "slideList.svg") {
@@ -202,6 +210,8 @@ void MainComponent::resized() {
   // imageview->setBounds(b);
   capture->setBounds(b);
   annotate->setBounds(b);
+  if (dirBrowser)
+    dirBrowser->setBounds(b);
 
   // Position slideListButton as floating overlay below the centerButton
   // controlsOverlay is at (panelWidth + 20, 20) with centerButton at top 60px
@@ -277,6 +287,24 @@ void MainComponent::loadImageDialog(const FileChooser &fc) {
 }
 
 
+void MainComponent::selectionChanged() {
+  if (dirBrowser) {
+    auto selected = dirBrowser->getSelectedFile(0);
+    if (selected.isDirectory() && cwd != selected) {
+      cwd = selected;
+      sCam->new_case_reset();
+      sCam->givenWorkingDirectory = cwd.getFullPathName().toStdString();
+      capture->setImage(nullptr);
+      annotate->setImage(nullptr);
+
+    }
+  }
+}
+
+void MainComponent::fileClicked(const juce::File&, const juce::MouseEvent&) {}
+void MainComponent::fileDoubleClicked(const juce::File&) {}
+void MainComponent::browserRootChanged(const juce::File&) {}
+
 void MainComponent::GuiEventHandler(std::string event) {
   if (event == "open") {
     fc.reset(new FileChooser("Choose an image to open...", File::getCurrentWorkingDirectory(),
@@ -292,10 +320,9 @@ void MainComponent::GuiEventHandler(std::string event) {
   if (event == "home") {
     {
       const ScopedLock lock(mutex);
-      // imageview->setVisible(true);
-      // imageview->fixAspectRatio();
       capture->setVisible(false);
       annotate->setVisible(false);
+      if (dirBrowser) dirBrowser->setVisible(true);
     }
     resized();
   }
@@ -305,8 +332,8 @@ void MainComponent::GuiEventHandler(std::string event) {
       const ScopedLock lock(mutex);
       capture->setVisible(true);
       capture->fixAspectRatio();
-      // imageview->setVisible(false);
       annotate->setVisible(false);
+      if (dirBrowser) dirBrowser->setVisible(false);
     }
     resized();
   }
@@ -316,8 +343,8 @@ void MainComponent::GuiEventHandler(std::string event) {
       const ScopedLock lock(mutex);
       annotate->setVisible(true);
       annotate->fixAspectRatio();
-      // imageview->setVisible(false);
       capture->setVisible(false);
+      if (dirBrowser) dirBrowser->setVisible(false);
     }
     resized();
   }

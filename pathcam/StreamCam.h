@@ -313,6 +313,11 @@ namespace pathCam {
 
     void cleanup_and_reset();
 
+    void new_case_reset() {
+      Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
+      previousSlides.clear();
+    }
+
     bool create_mag_label_to_scale_lookup(std::unordered_map<int,float>& _lookup);
 
     void set_input_file(const std::string &_path){inputFileOverride = _path;}

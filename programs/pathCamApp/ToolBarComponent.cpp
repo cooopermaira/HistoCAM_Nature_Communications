@@ -38,16 +38,27 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
             mainComponent->audioDictationOn = audioDictationToggle.getToggleState();
           };
           addAndMakeVisible(audioDictationToggle);
-          setSize(200, 60);
+
+          keepFramesToggle.setButtonText("Keep Frames");
+          keepFramesToggle.setToggleState(mainComp->keepFrames, juce::dontSendNotification);
+          keepFramesToggle.onClick = [this]() {
+            mainComponent->keepFrames = keepFramesToggle.getToggleState();
+          };
+          addAndMakeVisible(keepFramesToggle);
+
+          setSize(200, 90);
         }
 
         void resized() override
         {
-          audioDictationToggle.setBounds(getLocalBounds().reduced(10));
+          auto b = getLocalBounds().reduced(10);
+          audioDictationToggle.setBounds(b.removeFromTop(30));
+          keepFramesToggle.setBounds(b.removeFromTop(30));
         }
 
       private:
         juce::ToggleButton audioDictationToggle;
+        juce::ToggleButton keepFramesToggle;
         MainComponent* mainComponent;
       };
 

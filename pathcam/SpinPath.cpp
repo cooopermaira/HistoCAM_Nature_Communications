@@ -101,6 +101,7 @@ namespace pathCam {
             auto label = parent->getObjectiveLabel();
             if (!label.empty()) {
               str = std::to_string(i) + "_" + label + ".Raw";
+              image->set_observed_label(label);
             } else {
               str = std::to_string(i) + ".Raw";
             }

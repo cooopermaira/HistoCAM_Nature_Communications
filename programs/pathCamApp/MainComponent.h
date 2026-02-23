@@ -7,7 +7,7 @@
  This component lives inside our window, and this is where you should put all
  your controls and content.
  */
-class MainComponent final : public juce::Component, public DataObserver, private juce::Timer, public juce::Button::Listener {
+class MainComponent final : public juce::Component, public DataObserver, private juce::Timer, public juce::Button::Listener, public juce::FileBrowserListener {
   friend class LoadingThread;
   friend class CaptureComponent;
 
@@ -42,6 +42,7 @@ public:
   std::unique_ptr<SvgButton> slideListButton;
 
   bool audioDictationOn = false;
+  bool keepFrames = true;
 
   void setup_listbox();
 
@@ -87,6 +88,13 @@ private:
   //std::shared_ptr< pathCam::StreamCam > bcam;
 
   std::unique_ptr<FileChooser> fc;
+
+  std::unique_ptr<juce::WildcardFileFilter> dirFilter;
+  std::unique_ptr<juce::FileBrowserComponent> dirBrowser;
+  void selectionChanged() override;
+  void fileClicked(const juce::File&, const juce::MouseEvent&) override;
+  void fileDoubleClicked(const juce::File&) override;
+  void browserRootChanged(const juce::File&) override;
 
   ToolbarComponent *toolbar;
 

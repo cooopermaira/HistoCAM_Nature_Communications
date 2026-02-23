@@ -298,7 +298,7 @@ void CaptureComponent::set_input(const FileChooser &fc) {
     ready = true;
     if (MRImageSet) {
       // parent->imageview->setImage(nullptr);
-      parent->capture->setImage(nullptr); //parent->capture is just this
+      /*parent->capture->*/setImage(nullptr); //literally this
       parent->annotate->setImage(nullptr);
     }
     captureOverlay->resized();

@@ -424,6 +424,159 @@ void MRTiledImageSet::write_cache_header() {
   }
 }
 
+void read_slide_header(const std::string& directory)
+{
+    std::string headerPath = directory + "slide.pcHdr";
+
+    int fd = ::open(headerPath.c_str(), O_RDONLY);
+    if (fd == -1) {
+        throw std::runtime_error(
+            std::string("header open failed: ") +
+            headerPath + " : " + std::strerror(errno));
+    }
+
+    try
+    {
+        // ===============================
+        // MRImageSet metadata
+        // ===============================
+
+        uint16_t numImages;
+        read_all(fd, &numImages, sizeof(numImages));
+
+        // ===============================
+        // MRTiledImageSet bounds
+        // ===============================
+
+        float bounds_x, bounds_y, bounds_w, bounds_h;
+        read_all(fd, &bounds_x, sizeof(float));
+        read_all(fd, &bounds_y, sizeof(float));
+        read_all(fd, &bounds_w, sizeof(float));
+        read_all(fd, &bounds_h, sizeof(float));
+
+        // ===============================
+        // labelName (length-prefixed string)
+        // ===============================
+
+        uint32_t labelLen;
+        read_all(fd, &labelLen, sizeof(labelLen));
+
+        std::string labelName;
+        labelName.resize(labelLen);
+        read_all(fd, labelName.data(), labelLen);
+
+        // ===============================
+        // AbCs
+        // ===============================
+
+        uint16_t numFrames;
+        read_all(fd, &numFrames, sizeof(numFrames));
+
+        std::vector<cv::Point2i> AbCs;
+        AbCs.reserve(numFrames);
+
+        for (uint16_t i = 0; i < numFrames; ++i)
+        {
+            int32_t x, y;
+            read_all(fd, &x, sizeof(int32_t));
+            read_all(fd, &y, sizeof(int32_t));
+            AbCs.emplace_back(x, y);
+        }
+
+        std::vector<uint8_t> frameLabels;
+        frameLabels.reserve(numFrames);
+
+        for (uint16_t i = 0; i < numFrames; ++i)
+        {
+            uint8_t fl;
+            read_all(fd, &fl, sizeof(fl));
+            frameLabels.push_back(fl);
+        }
+
+        // ===============================
+        // scale lookup
+        // ===============================
+
+        uint8_t slSize;
+        read_all(fd, &slSize, sizeof(slSize));
+
+        std::unordered_map<uint8_t, float> labelScaleLookup;
+
+        for (uint8_t i = 0; i < slSize; ++i)
+        {
+            uint8_t label;
+            float scale;
+
+            read_all(fd, &label, sizeof(label));
+            read_all(fd, &scale, sizeof(scale));
+
+            labelScaleLookup[label] = scale;
+        }
+
+        // ===============================
+        // Per MRImage metadata
+        // ===============================
+
+        struct MRImageHeader
+        {
+            float scale;
+            uint8_t magLabel;
+            float bounds_x, bounds_y, bounds_w, bounds_h;
+            std::vector<cv::Point2i> tiles;
+        };
+
+        std::vector<MRImageHeader> images;
+        images.reserve(numImages);
+
+        for (uint16_t i = 0; i < numImages; ++i)
+        {
+            MRImageHeader hdr;
+
+            read_all(fd, &hdr.scale, sizeof(float));
+            read_all(fd, &hdr.magLabel, sizeof(uint8_t));
+
+            read_all(fd, &hdr.bounds_x, sizeof(float));
+            read_all(fd, &hdr.bounds_y, sizeof(float));
+            read_all(fd, &hdr.bounds_w, sizeof(float));
+            read_all(fd, &hdr.bounds_h, sizeof(float));
+
+            uint16_t numTiles;
+            read_all(fd, &numTiles, sizeof(numTiles));
+
+            hdr.tiles.reserve(numTiles);
+
+            for (uint16_t t = 0; t < numTiles; ++t)
+            {
+                int32_t x, y;
+                read_all(fd, &x, sizeof(int32_t));
+                read_all(fd, &y, sizeof(int32_t));
+                hdr.tiles.emplace_back(x, y);
+            }
+
+            images.push_back(std::move(hdr));
+        }
+
+        ::close(fd);
+
+        // At this point:
+        // All variables exist locally:
+        // numImages
+        // bounds_x/y/w/h
+        // labelName
+        // AbCs
+        // frameLabels
+        // labelScaleLookup
+        // images (vector of per-MRImage metadata)
+
+    }
+    catch (...)
+    {
+        ::close(fd);
+        throw;
+    }
+}
+
+
 std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const {
   assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
 
