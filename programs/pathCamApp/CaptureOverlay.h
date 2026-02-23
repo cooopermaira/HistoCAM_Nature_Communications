@@ -141,8 +141,8 @@ public:
     std::vector<size_t> order(filteredIndices.size());
     std::iota(order.begin(), order.end(), 0);
     std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
-      return sCam->get_slide_label(filteredIndices[a]).compareIgnoreCase(
-             sCam->get_slide_label(filteredIndices[b])) < 0;
+      return sCam->get_slide_label(filteredIndices[a]) <
+             sCam->get_slide_label(filteredIndices[b]);
     });
 
     std::vector<int> sortedIndices(filteredIndices.size());
