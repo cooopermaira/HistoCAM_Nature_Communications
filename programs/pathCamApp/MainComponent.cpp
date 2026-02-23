@@ -38,10 +38,12 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config) : con
   cwd = juce::File("/home/");
   dirFilter = std::make_unique<juce::WildcardFileFilter>("", "*", "Directories");
   dirBrowser = std::make_unique<juce::FileBrowserComponent>(
-      juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-      cwd, dirFilter.get(), nullptr);
-  dirBrowser->addListener(this);
+    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+    cwd, dirFilter.get(), nullptr);
   addAndMakeVisible(*dirBrowser);
+  dirSelectButton.setButtonText("Select");
+  dirSelectButton.addListener(this);
+  addAndMakeVisible(dirSelectButton);
 
   // Initialize slideListButton
   for (int i = 0; i < iconNames.size(); i++) {
@@ -145,7 +147,8 @@ public:
 void MainComponent::setup_listbox() {
   labelList = std::make_unique<StreamCamLabelList>(sCam,
                                                    annotate,
-                                                   [this](int idx, const juce::String &label, bool matchedByAnnotation) {
+                                                   [this](int idx, const juce::String &label,
+                                                          bool matchedByAnnotation) {
                                                      Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
                                                      if (idx < 0 || idx >= (int) sCam->previousSlides.size())
                                                        return;
@@ -210,8 +213,13 @@ void MainComponent::resized() {
   // imageview->setBounds(b);
   capture->setBounds(b);
   annotate->setBounds(b);
-  if (dirBrowser)
+  if (dirBrowser) {
     dirBrowser->setBounds(b);
+    // Place the select button at the bottom-right, aligned with the path bar
+    const int btnW = 80, btnH = 24, margin = 4;
+    dirSelectButton.setBounds(b.getRight() - btnW - margin, b.getBottom() - btnH - margin, btnW, btnH);
+    dirSelectButton.setVisible(dirBrowser->isVisible());
+  }
 
   // Position slideListButton as floating overlay below the centerButton
   // controlsOverlay is at (panelWidth + 20, 20) with centerButton at top 60px
@@ -277,6 +285,9 @@ void MainComponent::buttonClicked(juce::Button *button) {
       resized(); // Update layout to account for labelList visibility change
     }
   }
+  if (button == &dirSelectButton) {
+    confirmDirectorySelection();
+  }
 }
 
 void MainComponent::loadImageDialog(const FileChooser &fc) {
@@ -287,23 +298,40 @@ void MainComponent::loadImageDialog(const FileChooser &fc) {
 }
 
 
-void MainComponent::selectionChanged() {
+void MainComponent::confirmDirectorySelection() {
   if (dirBrowser) {
     auto selected = dirBrowser->getSelectedFile(0);
-    if (selected.isDirectory() && cwd != selected) {
+    if (!selected.isDirectory())
+      selected = dirBrowser->getRoot();
+    if (cwd != selected) {
       cwd = selected;
       sCam->new_case_reset();
       sCam->givenWorkingDirectory = cwd.getFullPathName().toStdString();
       capture->setImage(nullptr);
       annotate->setImage(nullptr);
-
+      findSlideDirectories();
     }
   }
 }
 
-void MainComponent::fileClicked(const juce::File&, const juce::MouseEvent&) {}
-void MainComponent::fileDoubleClicked(const juce::File&) {}
-void MainComponent::browserRootChanged(const juce::File&) {}
+void MainComponent::findSlideDirectories() {
+  std::vector<juce::File> slideDirs;
+  for (const auto &entry: juce::RangedDirectoryIterator(cwd, false, "*", juce::File::findDirectories)) {
+    juce::File subdir = entry.getFile();
+    if (subdir.getChildFile("slide.pcHdr").existsAsFile())
+      slideDirs.push_back(subdir);
+  }
+
+  load_case(slideDirs);
+}
+
+void MainComponent::load_case(std::vector<juce::File> slideDirs) {
+  if (slideDirs.empty()){return;}
+  for (auto &p :slideDirs) {
+    auto slide = std::make_shared<MRTiledImageSet>();
+    slide->cwd = p.getFullPathName().toStdString();
+  }
+}
 
 void MainComponent::GuiEventHandler(std::string event) {
   if (event == "open") {
