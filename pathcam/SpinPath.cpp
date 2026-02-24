@@ -380,13 +380,6 @@ namespace pathCam {
       pCam->Gain.SetValue(0);
       cout << pCam->Gain.GetValue() << endl;
 
-      /*//turn auto gain off, set value to 0
-      CEnumerationPtr gainAuto = nodeMap.GetNode("GainAuto");
-      gainAuto->SetIntValue(gainAuto->GetEntryByName("Off")->GetValue());
-      CFloatPtr gainValue = nodeMap.GetNode("Gain");
-      gainValue->SetValue(0);
-      cout<<gainValue->GetValue()<<endl;*/
-
       // set gamma value to 0
       pCam->GammaEnable.SetValue(false);
 
@@ -398,7 +391,9 @@ namespace pathCam {
       pCam->BalanceWhiteAuto.SetValue(Spinnaker::BalanceWhiteAutoEnums::BalanceWhiteAuto_Off);
       //Select red channel balance ratio and set to 1.5
       pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Red);
-      pCam->BalanceRatio.SetValue(1.5);
+      pCam->BalanceRatio.SetValue(1.7);
+      pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Blue);
+      pCam->BalanceRatio.SetValue(2.5);
     } catch (Spinnaker::Exception &e) {
       camlogger.error(Poco::format("Error Spinning up camera: %s", e.what()));
       result = -1;

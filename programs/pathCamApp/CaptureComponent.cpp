@@ -122,7 +122,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 #ifdef WITH_SPINNAKER
   if (recording) {
     int ignore;
-    spinpath->sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel);
+    spinpath->sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel, lastScale); // added lastScale to avoid build error, not sure if the final argument should be something else
   }
 #endif
 
@@ -272,6 +272,7 @@ void CaptureComponent::stop() {
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
     parent->annotate->newVoiceAnnotation.set();
   }
+  save_slide_set();
 }
 
 void CaptureComponent::stopRecording() {

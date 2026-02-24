@@ -188,7 +188,7 @@ public:
   void cache_to_disk() {
     auto start = std::chrono::high_resolution_clock::now();
     for (auto &mrImg: MRImages) {
-      assert(mrImg->inMemory);
+      if(!mrImg->inMemory){continue;}
       mrImg->cache_to_disk(cwd.toString());
       assert(!mrImg->inMemory);
     }

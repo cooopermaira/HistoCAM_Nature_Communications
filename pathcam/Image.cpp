@@ -389,6 +389,7 @@ namespace pathCam {
     }else if (_label == "40") {
       label = _40X;
       labelObserved = true;
+      std::cout<<"WARNING 40X"<<std::endl;
     }
   }
 

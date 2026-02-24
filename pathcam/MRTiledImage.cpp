@@ -215,13 +215,13 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd) {
     for (auto &tileIndex: liveTilesOrderedVec) {
       auto tileObj = level[0]->getTile(tileIndex);
       if (!tileObj) {
-        throw std::runtime_error("getTile returned null");
+        continue;
       }
 
       Poco::FastMutex::ScopedLock lock(tileObj->mutex);
 
       if (!tileObj->buf) {
-        throw std::runtime_error("tileObj->buf is null");
+        continue;
       }
 
       cudaFree(tileObj->buf);
@@ -341,7 +341,9 @@ void MRTiledImageSet::write_slide_header() {
     throw std::runtime_error("cache_to_disk: path exists but is not a directory: " + cwd.toString());
   }
 
-  std::string headerPath = cwd.toString() + "slide.pcHdr";
+  cwd.makeDirectory();
+  cwd.append("slide.pcHdr");
+  std::string headerPath = cwd.toString();
   int fd = ::open(headerPath.c_str(),
                   O_CREAT | O_TRUNC | O_WRONLY,
                   0644);
@@ -395,14 +397,14 @@ void MRTiledImageSet::write_slide_header() {
     for (const auto &mrImg: MRImages) {
       //MRTiledImage scale and mag label
       write_all(fd, &mrImg->scale, sizeof(mrImg->scale)); //float
-      write_all(fd,&mrImg->offset.x,sizeof(float));
-      write_all(fd,&mrImg->offset.y,sizeof(float));
+      write_all(fd, &mrImg->offset.x, sizeof(float));
+      write_all(fd, &mrImg->offset.y, sizeof(float));
 
       uint8_t magLabel = static_cast<uint8_t>(mrImg->magLabel);
       write_all(fd, &magLabel, sizeof(magLabel));
 
       uint8_t compIdx = static_cast<uint8_t>(mrImg->componentIndex);
-      write_all(fd,&compIdx,sizeof(compIdx));
+      write_all(fd, &compIdx, sizeof(compIdx));
 
       //MRTiledImage bounds
       write_all(fd, &mrImg->bounds.x, sizeof(mrImg->bounds.x)); //float
@@ -433,10 +435,11 @@ void MRTiledImageSet::write_slide_header() {
 
 void MRTiledImageSet::read_slide_header() {
   Poco::Path dir(cwd);
-  dir.makeDirectory();      // ensures trailing slash semantics
+  dir.makeDirectory(); // ensures trailing slash semantics
   dir.append("slide.pcHdr");
 
   std::string headerPath = dir.toString();
+  std::cout << "reading " + headerPath << std::endl;
   int fd = ::open(headerPath.c_str(), O_RDONLY);
   if (fd == -1) {
     throw std::runtime_error(
@@ -517,17 +520,26 @@ void MRTiledImageSet::read_slide_header() {
     // Per MRImage metadata
     // ===============================
     for (uint16_t i = 0; i < numImages; ++i) {
-      auto mrImg = std::make_shared<MRTiledImage>(nullptr,tileSize);
+      auto mrImg = std::make_shared<MRTiledImage>(nullptr, tileSize);
 
       read_all(fd, &mrImg->scale, sizeof(float));
-      read_all(fd,&mrImg->offset.x,sizeof(float));
-      read_all(fd,&mrImg->offset.y,sizeof(float));
+      read_all(fd, &mrImg->offset.x, sizeof(float));
+      read_all(fd, &mrImg->offset.y, sizeof(float));
 
       uint8_t tmp;
       read_all(fd, &tmp, sizeof(uint8_t));
       mrImg->magLabel = tmp;
-      read_all(fd,&tmp,sizeof(uint8_t));
+      read_all(fd, &tmp, sizeof(uint8_t));
       mrImg->componentIndex = tmp;
+      Poco::Path cachePath(cwd);
+      cachePath.makeDirectory();
+      cachePath.setFileName(std::to_string(mrImg->componentIndex));
+      cachePath.setExtension("pcRawLayer");
+
+      if (cachePath.toString().find("/2/1.pcRawLayer") != std::string::npos){
+        int k = 0;
+      }
+      std::cout << "file " << cachePath.toString() << std::endl;
 
       read_all(fd, &mrImg->bounds.x, sizeof(float));
       read_all(fd, &mrImg->bounds.y, sizeof(float));
@@ -545,18 +557,16 @@ void MRTiledImageSet::read_slide_header() {
         read_all(fd, &y, sizeof(int32_t));
         mrImg->liveTilesOrderedVec.emplace_back(x, y);
       }
-      mrImg->liveTiles.insert(mrImg->liveTilesOrderedVec.begin(),mrImg->liveTilesOrderedVec.end());
+      mrImg->liveTiles.insert(mrImg->liveTilesOrderedVec.begin(), mrImg->liveTilesOrderedVec.end());
 
       auto logicSize = tileSize;
-      while (logicSize < mrImg->bounds.width && logicSize < mrImg->bounds.height && log2(tileSize) - mrImg->level.size() >= 2 ) {
-        auto level = std::make_shared<TiledImage>(mrImg,tileSize,logicSize,mrImg->level.size());
+      while (logicSize < mrImg->bounds.width && logicSize < mrImg->bounds.height && log2(tileSize) - mrImg->level.size()
+             >= 2) {
+        auto level = std::make_shared<TiledImage>(mrImg, tileSize, logicSize, mrImg->level.size());
         mrImg->level.push_back(level);
         logicSize = 2 * logicSize;
       }
-      Poco::Path cachePath(cwd);
-      cachePath.makeDirectory();
-      cachePath.setFileName(std::to_string(mrImg->componentIndex));
-      cachePath.setExtension("pcRawLayer");
+
       mrImg->strCachePath = cachePath.toString();
       mrImg->uncache_from_disk();
       mrImg->MRImageSet = shared_from_this();
@@ -564,8 +574,8 @@ void MRTiledImageSet::read_slide_header() {
     }
 
     ::close(fd);
-
   } catch (...) {
+    std::cout << "read failed" << std::endl;
     ::close(fd);
     throw;
   }

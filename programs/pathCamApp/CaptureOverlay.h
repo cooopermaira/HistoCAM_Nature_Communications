@@ -54,6 +54,7 @@ public:
   // Call this when StreamCam label list changes.
   void refresh()
   {
+    auto val = searchBox.getText().toStdString();
     filterSlides(searchBox.getText());
   }
 
@@ -162,6 +163,7 @@ public:
 
   void filterSlides(const juce::String& searchText)
   {
+    // if (searchText.isEmpty()){return;}
     updateFilteredIndices(searchText);
     listBox.updateContent();
     listBox.repaint();
