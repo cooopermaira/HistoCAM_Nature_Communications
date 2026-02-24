@@ -329,14 +329,17 @@ void MainComponent::findSlideDirectories() {
 
 void MainComponent::load_case(std::vector<juce::File> slideDirs) {
   if (slideDirs.empty()){return;}
-  Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
-  for (auto &p :slideDirs) {
-    auto slide = std::make_shared<MRTiledImageSet>();
-    slide->cwd = p.getFullPathName().toStdString();
-    slide->read_slide_header();
-    sCam->previousSlides.push_back(slide);
-    ++sCam->numSlides;
+  {
+    Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
+    for (auto &p :slideDirs) {
+      auto slide = std::make_shared<MRTiledImageSet>();
+      slide->cwd = p.getFullPathName().toStdString();
+      slide->read_slide_header();
+      sCam->previousSlides.push_back(slide);
+      ++sCam->numSlides;
+    }
   }
+
   // Switch to capture view first so components are visible
   GuiEventHandler("capture");
 
