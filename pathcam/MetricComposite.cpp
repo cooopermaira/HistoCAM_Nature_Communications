@@ -145,7 +145,7 @@ namespace pathCam {
       assert(img->regInfo);
 
       staging.pop();
-
+      ++memberCount;
 
       update_Bbox_no_composite({ri});
 
@@ -466,21 +466,6 @@ namespace pathCam {
     successfullyAligned = true;
   }
 
-  void MetricComposite::search_and_absorb_other_components() {
-    for (auto &m: componentJoinMatches) {
-      Image *myMember, *theirMember;
-      if (m->image_1->regInfo->component_membership == componentIndex) {
-        myMember = m->image_1;
-        theirMember = m->image_2;
-      } else {
-        myMember = m->image_2;
-        theirMember = m->image_1;
-      }
-      if (theirMember->regInfo->component_membership != componentIndex) {
-        //absorb it, which means change all the members' registrations
-      }
-    }
-  }
 
 
   void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad,

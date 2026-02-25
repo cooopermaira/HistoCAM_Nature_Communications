@@ -224,7 +224,7 @@ namespace pathCam {
           float scale = v1 / v2;
           if (abs(scale - homography[0]) < 0.05 * scale && abs(scale - homography[4]) < 0.05 * scale) {
             validHomography = true;
-
+            break;
           }
         }
         for (auto scale: matchedComp->candidateScaleRatios) {
@@ -236,14 +236,14 @@ namespace pathCam {
         }
       }
       if (!validHomography) {
-        if (_rootImg->labelObserved) {
-          //set it in the middle and break
-          homography[0] = homography[4] = Image::get_mpp(_rootImg->label) / Image::get_mpp(_target->label);
-          homography[2] = imageSize.width * ( 1 - homography[0]) / 2;
-          homography[5] = imageSize.height * ( 1 - homography[0]) / 2;
-          validHomography = true;
-          break;
-        }
+        // if (_rootImg->labelObserved) {
+        //   //set it in the middle and break
+        //   homography[0] = homography[4] = Image::get_mpp(_rootImg->label) / Image::get_mpp(_target->label);
+        //   homography[2] = imageSize.width * ( 1 - homography[0]) / 2;
+        //   homography[5] = imageSize.height * ( 1 - homography[0]) / 2;
+        //   validHomography = true;
+        //   break;
+        // }
         if (count < maxAttempts && xcMatchShouldContinue) {
           shuffle_sift_data(rootCopy);
         }

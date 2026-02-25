@@ -63,6 +63,9 @@ namespace pathCam {
       votes.push_back(v);
     }
 
+    if (index == 101) {
+      int k = 0;
+    }
     if (outstandingPolls == 0 && matchSearchComplete) {
       count_votes();
     }
@@ -124,6 +127,9 @@ namespace pathCam {
 
     resolved = true;
     parent->push_compositeQ(this);
+    if (index > 100 && component_membership == 0) {
+      int k = 0;
+    }
 
     {
       Poco::Mutex::ScopedLock lock(rAccessMutex);

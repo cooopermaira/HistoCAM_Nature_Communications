@@ -687,7 +687,6 @@ namespace pathCam {
   void StreamCam::add_new_component(unsigned long image_index, Size image_size, unsigned int component_index) {
 
     auto ri = reg_results[image_index];
-    std::shared_ptr<MetricComposite> component;
 
     {
       Poco::FastMutex::ScopedLock lock1(ri->accessMutex);
@@ -697,7 +696,8 @@ namespace pathCam {
       ri->stayFixedDuringBundleAdjustment = true;
       ri->root = true;
 
-      component = std::make_shared<MetricComposite>(this, image_size, component_index);
+      std::shared_ptr<MetricComposite> component = std::make_shared<MetricComposite>(this, image_size, component_index);
+      component->joinedTo = component_index;
 
       composites.push_back(component);
       component->root = ri->image;

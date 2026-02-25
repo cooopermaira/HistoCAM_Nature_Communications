@@ -133,24 +133,40 @@ namespace pathCam {
       }
     }
 
-    component->ftg->accessMutex.lock();
-    for (auto &match: matches) {
-      if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
-        auto theirComp = std::dynamic_pointer_cast<MetricComposite>
-            (parent->composites[match->image_1->regInfo->component_membership]);
-        if (!theirComp) {
-          throw std::runtime_error("not a metric composite");
-        }
-        if (component->componentMagLabel == theirComp->componentMagLabel || component->componentMagLabel == Image::_NOLABEL || theirComp->componentMagLabel == Image::_NOLABEL) {
-          // these two components should actually be the same component. we will suspend one and join to the other
-          //  component->componentJoinMatches.push_back(match);
-          //  theirComp->componentJoinMatches.push_back(match);
-        }
-      } else {
+    //store INTRA component matches
+    {
+      Poco::FastMutex::ScopedLock lock(component->ftg->accessMutex);
+      for (auto &match : matches) {
         component->ftg->store_match(match);
+        if (match->image_1->regInfo->component_membership != component->componentIndex) {
+          component->relatedComponents.insert(match->image_1->regInfo->component_membership);
+        }
+        if (match->image_2->regInfo->component_membership != component->componentIndex) {
+          component->relatedComponents.insert(match->image_2->regInfo->component_membership);
+        }
       }
     }
-    component->ftg->accessMutex.unlock();
+    //
+    // //store INTER component matches
+    // for (auto &match : matches) {
+    //   if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
+    //     auto theirComp = std::dynamic_pointer_cast<MetricComposite>
+    //         (parent->composites[match->image_1->regInfo->component_membership]);
+    //     if (!theirComp) {
+    //       throw std::runtime_error("not a metric composite");
+    //     }
+    //     Poco::FastMutex::ScopedLock lock(theirComp->ftg->accessMutex);
+    //     if (match->image_1->regInfo->component_membership != theirComp->componentIndex) {
+    //       theirComp->relatedComponents.insert(match->image_1->regInfo->component_membership);
+    //     }
+    //     if (match->image_2->regInfo->component_membership != component->componentIndex) {
+    //       theirComp->relatedComponents.insert(match->image_2->regInfo->component_membership);
+    //     }
+    //     theirComp->ftg->store_match(match);
+    //   }
+    // }
+
+
     --component->outstandingCMS_jobs;
     if (component->alignmentHasBegun) {
       throw std::runtime_error("CMS jobs still running after CompositeManager thought they were done");
@@ -180,6 +196,9 @@ namespace pathCam {
     int mostMatches = 0;
     long bestMatch = -1;
 
+    if (image_index == 101) {
+      int k = 0;
+    }
     for (long prev_idx = image_idx - 1; prev_idx >= 0; --prev_idx) {
       Image *previous = parent->get_image_ref(prev_idx);
 
@@ -208,6 +227,7 @@ namespace pathCam {
           Point2i abc;
           int compIdx;
           if (previous->regInfo->poll_abc(m,abc,compIdx)) {
+            image->regInfo->matchSearchComplete = true;
             image->regInfo->vote_abc(m,abc,compIdx);
           }
 
@@ -226,7 +246,7 @@ namespace pathCam {
           image->image_file.getBaseName()<<")" << std::endl;
     }else {
       //check end
-      if (!image->regInfo->resolved) {
+      if (!image->regInfo->resolved && image->regInfo->outstandingPolls == 0 && image->regInfo->matchSearchComplete) {
         image->regInfo->count_votes();
       }
     }

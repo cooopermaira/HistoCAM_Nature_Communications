@@ -53,11 +53,11 @@ namespace pathCam {
     Poco::FastMutex update_mutex;
 
     int joinedTo;
+    std::unordered_set<int> relatedComponents;
     std::atomic<bool> suspended = false;
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
     bool xcMatchShouldContinue = true;
-    std::vector<std::shared_ptr<Match> > componentJoinMatches;
     std::vector<Image *> landmarkFrames;
     Image *xcRegLandmark = nullptr;
     Point2f xcPwDist;
@@ -72,6 +72,7 @@ namespace pathCam {
     int componentIndex = 0;
     int componentMagLabel = -1;
     bool needsAlignment = false;
+    int memberCount = 0;
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     cuda::GpuMat diffGPU;
