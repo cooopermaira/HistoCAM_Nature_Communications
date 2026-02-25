@@ -197,6 +197,9 @@ public:
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     cachedToDisk = true;
     inMemory = false;
+
+    int k = 0;
+
     std::cout << "cached " << index << " in " << duration.count() << " ms" << std::endl;
   };
 

@@ -482,6 +482,8 @@ void BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
     if (img->regInfo->root) { ++rootCount; continue; }
     imageToCam[img->index] = camIdx++;
   }
+
+
   assert(rootCount == 1);
 
   const int Nc = camIdx;

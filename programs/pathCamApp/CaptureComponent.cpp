@@ -186,7 +186,7 @@ void CaptureComponent::startRecording() {
   recentlyViewedSlides.push_unique(parent->MRimage);
 
 
-  if (/*parent->audioDictationOn*/false) {
+  if (parent->audioDictationOn) {
     if (!wavRecorder.initialised) {
       wavRecorder.init(1);
     }

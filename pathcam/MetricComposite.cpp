@@ -341,6 +341,7 @@ namespace pathCam {
     }
     std::cout<<componentIndex<<" members before "<<members.size()<<std::endl;
     members = reduce_members_through_competition(members);
+    members.insert(root);
     std::cout<<componentIndex<<" members after "<<members.size()<<std::endl;
 
     std::vector membersForRebuild(members.begin(), members.end());
