@@ -9,8 +9,7 @@
 #include "pathCam.h"
 
 namespace pathCam {
-    class FeatureTrackGenerator;
-    class BundleAdjustmentIntegrator;
+
     class MetricComposite : public Composite {
     public:
         MetricComposite(StreamCam *parent, Size image_size, int componentIndex);
@@ -41,10 +40,9 @@ namespace pathCam {
         std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});
 
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
-        std::vector<Image*> memberFrames;
 
-        FeatureTrackGenerator* ftg;
-        BundleAdjustmentIntegrator* bai;
+        std::unordered_set<Image *> reduce_members_through_competition(std::unordered_set<Image *> _members) const;
+
 
         SiftData compSiftData;
 
@@ -58,9 +56,7 @@ namespace pathCam {
         bool successfullyAligned = false;
         // bool componentSiftDataInit = false;
 
-        std::atomic<int> outstandingCMS_jobs = 0;
         std::atomic<bool> xcInProgress = false;
-        std::atomic<bool> alignmentHasBegun = false;
 
         std::shared_ptr<TiledImage> baseImage;
 

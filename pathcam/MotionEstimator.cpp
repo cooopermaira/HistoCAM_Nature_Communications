@@ -76,17 +76,15 @@ namespace pathCam {
 
   void RegInfo::count_votes() {
     if (!votes.empty()) {
-      if (votes.size() > 1) {
-        int k = 0;
-      }
+
       sort(votes.begin(),votes.end(),
     [](const vote& a, const vote& b){return a.m->inlierCount > b.m->inlierCount;});
-      int R = image->parent->tileSize * 2;                // tune this
-      int minCluster = 3;       // tune this
-      vote winningVote;
 
+      int R = image->parent->tileSize * 2;
+      int minCluster = 3;
       int bestClusterScore = -1;
       int bestClusterIndex = -1;
+      vote winningVote;
 
       for (size_t i = 0; i < votes.size(); ++i) {
 
@@ -111,6 +109,7 @@ namespace pathCam {
           }
         }
       }
+
       if (bestClusterIndex != -1) {
         winningVote = votes[bestClusterIndex];
       }else {
@@ -125,17 +124,10 @@ namespace pathCam {
       }
     }else {
       absoluteCoords = {0,0};
-      std::cout<<index<<" ran empty"<<std::endl;
-      if (index == 1) {
-        int k = 0;
-      }
     }
 
     resolved = true;
     parent->push_compositeQ(this);
-    if (index > 100 && component_membership == 0) {
-      int k = 0;
-    }
 
     {
       Poco::Mutex::ScopedLock lock(rAccessMutex);

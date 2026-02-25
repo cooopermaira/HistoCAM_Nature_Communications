@@ -587,6 +587,7 @@ namespace pathCam {
       thread_cam.start(*cameraStream);
       // thread_file.start(*fileStream);
 
+      sCam->fileSaveFolders.push_back(Poco::Path(captureSetName));
       sCam->microscopeInput = true;
 
       // thread_sCam.start(*processStream);
@@ -633,7 +634,7 @@ namespace pathCam {
     ss << time.day() << time.hour();
     ss << time.minute() << time.millisecond();
 
-    caputure_set_mutex.lock();
+    Poco::FastMutex::ScopedLock lock(caputure_set_mutex);
     captureSetName = ss.str();
 
     Poco::Path capture_path = getRootPath();
@@ -642,6 +643,5 @@ namespace pathCam {
     Poco::File tmpDir(capture_path);
     tmpDir.createDirectories();
 
-    caputure_set_mutex.unlock();
   }
 }

@@ -152,13 +152,13 @@ namespace pathCam {
 
     void process_match(long _srcImgIdx, long _dstImgIdx, const DMatch &_match);
 
-    void store_match(std::shared_ptr<Match> _match) { storedMatches.push_back(_match); }
+    void store_match(std::shared_ptr<Match> _match) { storedMatches.insert(_match); }
 
     std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image *> &images);
 
     Poco::FastMutex accessMutex;
 
-    std::vector<std::shared_ptr<Match> > storedMatches;
+    std::unordered_set<std::shared_ptr<Match> > storedMatches;
 
   private:
     int getOrCreateFeatureIndex(const ImageFeaturePair &_pair);

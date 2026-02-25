@@ -122,6 +122,7 @@ namespace pathCam {
     Poco::FastMutex previousSlidesMutex;
 
     Poco::Path givenWorkingDirectory;
+    std::vector<Poco::Path> fileSaveFolders;
 
     long cudaSiftTime = 0;
     long captureTimeMS = 0;
@@ -293,6 +294,14 @@ namespace pathCam {
 
     void clear_buffer(int _image_idx);
 
+    void clear_disk_frames() const {
+      for (auto &p : fileSaveFolders) {
+        if (Poco::File dir(p); dir.exists()) {
+          dir.remove(true);
+        }
+      }
+    }
+
     void set_scale_and_offset(unsigned int component_index, double scale, Point2f offset) {
       scaleRepoMutex.lock();
       scaleRepo[component_index] = {scale, offset};
@@ -382,7 +391,7 @@ namespace pathCam {
 
     void run_agg_classify();
 
-
+    std::shared_ptr<Composite> joined_to_root(const std::shared_ptr<Composite>& query) const;
 
 
   };

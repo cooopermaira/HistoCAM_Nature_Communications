@@ -194,7 +194,7 @@ namespace pathCam {
 
   std::string StreamCam::get_slide_label(int slideIdx) {
     Poco::FastMutex::ScopedLock lock(previousSlidesMutex);
-    if (previousSlides.size() <= slideIdx){return "";}
+    if (previousSlides.size() <= slideIdx) { return ""; }
     return previousSlides[slideIdx]->labelName;
   }
 
@@ -299,105 +299,105 @@ namespace pathCam {
     return devices[std::min(_priority, (int) devices.size() - 1)].index;
   }
 
-/*
-  void StreamCam::align_and_rebuild() {
-    if (composites.empty()) { return; }
+  /*
+    void StreamCam::align_and_rebuild() {
+      if (composites.empty()) { return; }
 
-    std::thread([this]() { load_delaunay_images_to_GPU(0); }).detach();
+      std::thread([this]() { load_delaunay_images_to_GPU(0); }).detach();
 
-    while (true) {
-      if (sfm->tracksReady()) {
-        //we're ready
-        auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
-
-
-        sfm->bai->optimizer->clear();
-        sfm->bai->run_bundle_adjustment(tracks, sfm->imagesProcessed);
+      while (true) {
+        if (sfm->tracksReady()) {
+          //we're ready
+          auto tracks = sfm->ftg->generateCurrentTracks(sfm->imagesProcessed);
 
 
-        double maxX = 0;
-        double maxY = 0;
-        for (auto &comp: composites) {
-          if (comp->needsAlignment) {
-            for (auto &img: comp->contributingImages) {
-              if (!img->regInfo->stayFixedDuringBundleAdjustment) {
-                auto pv = sfm->bai->optimizer->poseVertex(img->index);
-                if (img->regInfo->root && !img->regInfo->rootOfRoot) {
-                  comp->set_scale(pv->t[2] / 10000);
-                  Point2f coords(-pv->t[0], -pv->t[1]);
+          sfm->bai->optimizer->clear();
+          sfm->bai->run_bundle_adjustment(tracks, sfm->imagesProcessed);
 
-                  //this is where the offset is officially set for a component. This happens nowhere else.
-                  comp->set_offset({0, 0});
-                  auto offset = get_AbC_relative_from_relative(
-                    0, coords, img->regInfo->component_membership);
-                  comp->set_offset(offset);
-                  composites[img->regInfo->component_membership]->deduce_label();
 
-                  Point2f pointInBaseSpace(-pv->t[0], -pv->t[1]);
-                  auto val = img->debugInitialGuess - pointInBaseSpace;
-                  val.x = abs(val.x);
-                  val.y = abs(val.y);
-                  if (val.x > 500 || val.y > 500) {
-                    int k = 0;
+          double maxX = 0;
+          double maxY = 0;
+          for (auto &comp: composites) {
+            if (comp->needsAlignment) {
+              for (auto &img: comp->contributingImages) {
+                if (!img->regInfo->stayFixedDuringBundleAdjustment) {
+                  auto pv = sfm->bai->optimizer->poseVertex(img->index);
+                  if (img->regInfo->root && !img->regInfo->rootOfRoot) {
+                    comp->set_scale(pv->t[2] / 10000);
+                    Point2f coords(-pv->t[0], -pv->t[1]);
+
+                    //this is where the offset is officially set for a component. This happens nowhere else.
+                    comp->set_offset({0, 0});
+                    auto offset = get_AbC_relative_from_relative(
+                      0, coords, img->regInfo->component_membership);
+                    comp->set_offset(offset);
+                    composites[img->regInfo->component_membership]->deduce_label();
+
+                    Point2f pointInBaseSpace(-pv->t[0], -pv->t[1]);
+                    auto val = img->debugInitialGuess - pointInBaseSpace;
+                    val.x = abs(val.x);
+                    val.y = abs(val.y);
+                    if (val.x > 500 || val.y > 500) {
+                      int k = 0;
+                    }
+                  } else {
+                    Point2f pointInBaseSpace(-pv->t[0], -pv->t[1]);
+                    auto val = img->debugInitialGuess - pointInBaseSpace;
+                    val.x = abs(val.x);
+                    val.y = abs(val.y);
+                    if (val.x > 500 || val.y > 500) {
+                      int k = 0;
+                    }
+
+                    img->regInfo->set_AbC_local_from_relative(0, pointInBaseSpace);
+
+                    //debug
+                    double diffx = abs(img->absoluteCoords.x - img->regInfo->absoluteCoords.x);
+                    double diffy = abs(img->absoluteCoords.y - img->regInfo->absoluteCoords.y);
+                    if (diffx > maxX) {
+                      maxX = diffx;
+                    }
+                    if (diffy > maxY) {
+                      maxY = diffy;
+                    }
+
+                    img->absoluteCoords.x = img->regInfo->absoluteCoords.x;
+                    img->absoluteCoords.y = img->regInfo->absoluteCoords.y;
                   }
-                } else {
-                  Point2f pointInBaseSpace(-pv->t[0], -pv->t[1]);
-                  auto val = img->debugInitialGuess - pointInBaseSpace;
-                  val.x = abs(val.x);
-                  val.y = abs(val.y);
-                  if (val.x > 500 || val.y > 500) {
-                    int k = 0;
+                  if (comp->componentIndex == 0) {
+                    pv->t[2] = 10000;
                   }
-
-                  img->regInfo->set_AbC_local_from_relative(0, pointInBaseSpace);
-
-                  //debug
-                  double diffx = abs(img->absoluteCoords.x - img->regInfo->absoluteCoords.x);
-                  double diffy = abs(img->absoluteCoords.y - img->regInfo->absoluteCoords.y);
-                  if (diffx > maxX) {
-                    maxX = diffx;
-                  }
-                  if (diffy > maxY) {
-                    maxY = diffy;
-                  }
-
-                  img->absoluteCoords.x = img->regInfo->absoluteCoords.x;
-                  img->absoluteCoords.y = img->regInfo->absoluteCoords.y;
+                  //pv->fixed = true;
+                  img->regInfo->stayFixedDuringBundleAdjustment = true;
                 }
-                if (comp->componentIndex == 0) {
-                  pv->t[2] = 10000;
-                }
-                //pv->fixed = true;
-                img->regInfo->stayFixedDuringBundleAdjustment = true;
               }
             }
           }
+
+          // for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
+          //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
+          // }
+
+          std::cout << maxX << " " << maxY << std::endl;
+
+          break;
         }
+      }
 
-        // for (const auto &stat: sfm->bai->optimizer->batchStatistics()) {
-        //   std::printf("iter: %2d, chi2: %.6f\n", stat.iteration + 1, stat.chi2);
-        // }
-
-        std::cout << maxX << " " << maxY << std::endl;
-
-        break;
+      cudaSetDevice(compositorCudaDevice);
+      for (int i = 0; i < composites.size(); ++i) {
+        if (i < composites.size() - 1 && composites[i + 1]->needsAlignment) {
+          //load next component while we rebuild this one
+          int ii = i + 1;
+          std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
+        }
+        if (composites[i]->needsAlignment) {
+          //composites[i]->rebuild();
+          //composites[i]->rebuild_and_initialize_SAM();
+        }
       }
     }
-
-    cudaSetDevice(compositorCudaDevice);
-    for (int i = 0; i < composites.size(); ++i) {
-      if (i < composites.size() - 1 && composites[i + 1]->needsAlignment) {
-        //load next component while we rebuild this one
-        int ii = i + 1;
-        std::thread([this,ii]() { this->load_delaunay_images_to_GPU(ii); }).detach();
-      }
-      if (composites[i]->needsAlignment) {
-        //composites[i]->rebuild();
-        //composites[i]->rebuild_and_initialize_SAM();
-      }
-    }
-  }
-  */
+    */
 
 
   void StreamCam::load_delaunay_images_to_GPU(int _componentIndex) {
@@ -685,7 +685,6 @@ namespace pathCam {
 
 
   void StreamCam::add_new_component(unsigned long image_index, Size image_size, unsigned int component_index) {
-
     auto ri = reg_results[image_index];
 
     {
@@ -697,7 +696,7 @@ namespace pathCam {
       ri->root = true;
 
       std::shared_ptr<MetricComposite> component = std::make_shared<MetricComposite>(this, image_size, component_index);
-      component->joinedTo = component_index;
+      component->joinedTo = component;
 
       composites.push_back(component);
       component->root = ri->image;
@@ -712,6 +711,23 @@ namespace pathCam {
     }
 
     ri->count_votes();
+  }
+
+  std::shared_ptr<Composite> StreamCam::joined_to_root(const std::shared_ptr<Composite> &query) const {
+    if (!query) {
+      throw std::runtime_error("null composite");
+    }
+
+    std::shared_ptr<Composite> ans = query;
+    std::unordered_set<unsigned> visitedSet;
+
+    while (ans->joinedTo != ans) {
+      if (!visitedSet.insert(ans->componentIndex).second) {
+        throw std::runtime_error("cycle detected");
+      }
+      ans = ans->joinedTo;
+    }
+    return ans;
   }
 
   //demo
@@ -951,9 +967,9 @@ namespace pathCam {
     someoneWaitingOnJobCompleteEvent = false;
   }
 
-  bool StreamCam::create_mag_label_to_scale_lookup(std::unordered_map<int,float>& _lookup) {
-    std::vector<int> labels = {Image::_2X,Image::_4X,Image::_10X,Image::_20X,Image::_40X};
-    for (auto comp : composites) {
+  bool StreamCam::create_mag_label_to_scale_lookup(std::unordered_map<int, float> &_lookup) {
+    std::vector<int> labels = {Image::_2X, Image::_4X, Image::_10X, Image::_20X, Image::_40X};
+    for (auto comp: composites) {
       if (comp->get_scale() == 1) {
         assert(!comp->candidateScaleRatios.empty());
         for (int i = 0; i < labels.size(); ++i) {
@@ -967,39 +983,39 @@ namespace pathCam {
 
 
   void StreamCam::cleanup_and_reset() {
-
-    for (auto comp : composites) {
+    for (auto comp: composites) {
       comp->correct_offset();
     }
 
     std::vector<Point2i> AbCs(maxIndex + 1);
     std::vector<unsigned> frameLabels(maxIndex + 1);
-    for (auto &img :images) {
+    for (auto &img: images) {
       if (img && img->index <= maxIndex) {
         if (img->regInfo) {
           if (!img->regInfo->wasAligned) {
             // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
             auto abc = Point2f(img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
-            abc = get_AbC_relative_from_relative(img->regInfo->component_membership,abc,0);
+            abc = get_AbC_relative_from_relative(img->regInfo->component_membership, abc, 0);
             AbCs[img->index] = abc;
-          }else {
+          } else {
             // Abc was aligned during BA, trust its coords
-            AbCs[img->index] = get_AbC_relative_from_relative(img->regInfo->component_membership,Point2f(img->regInfo->absoluteCoords),0);
+            AbCs[img->index] = get_AbC_relative_from_relative(img->regInfo->component_membership,
+                                                              Point2f(img->regInfo->absoluteCoords), 0);
           }
           frameLabels[img->index] = img->label;
-        }else {
+        } else {
           if (img->label == Image::_UNDEREXP || img->label == Image::_LOWFEAT) {
             if (img->index > 0) {
               AbCs[img->index] = AbCs[img->index - 1];
               frameLabels[img->index] = frameLabels[img->index - 1];
             } //else it just stays (0,0) because that's what it inits to.
-          }else {
-            std::cout<<img->index<<" "<<Image::get_label(img->label)<<std::endl;
+          } else {
+            std::cout << img->index << " " << Image::get_label(img->label) << std::endl;
           }
         }
       }
     }
-    std::unordered_map<int,float> labelScaleLookup;
+    std::unordered_map<int, float> labelScaleLookup;
     create_mag_label_to_scale_lookup(labelScaleLookup);
 
     MRImageSet->labelScaleLookup = labelScaleLookup;

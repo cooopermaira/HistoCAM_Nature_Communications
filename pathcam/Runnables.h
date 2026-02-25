@@ -137,6 +137,8 @@ namespace pathCam {
     void push_remaining_tiles_for_inference();
 
     void submit_outstanding_jobs();
+
+    void combine_components() const;
   };
 
   class RegistrationRunnable : public RunnableIntermediate {
@@ -328,16 +330,16 @@ namespace pathCam {
     virtual void run1();
     void run() override;
 
-    void build_reg_info(Image* img);
+    void build_reg_info(Image* img) const;
   };
 
   class ComponentMatchSearch : public RunnableIntermediate {
   public:
     StreamCam *parent;
     Image *image;
-    MetricComposite* component;
+    Composite* component;
 
-    ComponentMatchSearch(StreamCam *_parent, Image *_image,MetricComposite *_component) : parent(_parent),component(_component),
+    ComponentMatchSearch(StreamCam *_parent, Image *_image,Composite *_component) : parent(_parent),component(_component),
                                                               image(_image),
                                                               RunnableIntermediate(_image->index, 0) {};
     void run() override;

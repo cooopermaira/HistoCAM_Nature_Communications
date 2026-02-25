@@ -136,6 +136,7 @@ namespace pathCam {
       Poco::FastMutex::ScopedLock lock(component->ftg->accessMutex);
       for (auto &match : matches) {
         component->ftg->store_match(match);
+
         if (match->image_1->regInfo->component_membership != component->componentIndex) {
           component->relatedComponents.insert(match->image_1->regInfo->component_membership);
         }
@@ -144,25 +145,25 @@ namespace pathCam {
         }
       }
     }
-    //
-    // //store INTER component matches
-    // for (auto &match : matches) {
-    //   if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
-    //     auto theirComp = std::dynamic_pointer_cast<MetricComposite>
-    //         (parent->composites[match->image_1->regInfo->component_membership]);
-    //     if (!theirComp) {
-    //       throw std::runtime_error("not a metric composite");
-    //     }
-    //     Poco::FastMutex::ScopedLock lock(theirComp->ftg->accessMutex);
-    //     if (match->image_1->regInfo->component_membership != theirComp->componentIndex) {
-    //       theirComp->relatedComponents.insert(match->image_1->regInfo->component_membership);
-    //     }
-    //     if (match->image_2->regInfo->component_membership != component->componentIndex) {
-    //       theirComp->relatedComponents.insert(match->image_2->regInfo->component_membership);
-    //     }
-    //     theirComp->ftg->store_match(match);
-    //   }
-    // }
+
+    //store INTER component matches
+    for (auto &match : matches) {
+      if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
+        auto theirComp = std::dynamic_pointer_cast<MetricComposite>
+            (parent->composites[match->image_1->regInfo->component_membership]);
+        if (!theirComp) {
+          throw std::runtime_error("not a metric composite");
+        }
+        Poco::FastMutex::ScopedLock lock(theirComp->ftg->accessMutex);
+        if (match->image_1->regInfo->component_membership != theirComp->componentIndex) {
+          theirComp->relatedComponents.insert(match->image_1->regInfo->component_membership);
+        }
+        if (match->image_2->regInfo->component_membership != component->componentIndex) {
+          theirComp->relatedComponents.insert(match->image_2->regInfo->component_membership);
+        }
+        theirComp->ftg->store_match(match);
+      }
+    }
 
 
     --component->outstandingCMS_jobs;
@@ -171,7 +172,7 @@ namespace pathCam {
     }
   }
 
-  void MatchRunnable::build_reg_info(Image *img) {
+  void MatchRunnable::build_reg_info(Image *img) const {
     auto t = parent->get_reg_ref(image_idx);
     Poco::FastMutex::ScopedLock lock(t->accessMutex);
 

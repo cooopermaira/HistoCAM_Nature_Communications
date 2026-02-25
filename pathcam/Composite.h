@@ -18,6 +18,8 @@
 
 
 namespace pathCam {
+  class FeatureTrackGenerator;
+  class BundleAdjustmentIntegrator;
   template<typename T>
   struct PointCompare {
     inline bool operator()(const T &p1, const T &p2) {
@@ -52,9 +54,14 @@ namespace pathCam {
     Rect_<float> tiledImageBounds;
     Poco::FastMutex update_mutex;
 
-    int joinedTo;
+    std::shared_ptr<Composite> joinedTo;
     std::unordered_set<int> relatedComponents;
+
+    std::atomic<bool> alignmentHasBegun = false;
     std::atomic<bool> suspended = false;
+    std::atomic<int> outstandingCMS_jobs = 0;
+    std::vector<std::shared_ptr<Composite>> absorbedComponents;
+
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
     bool xcMatchShouldContinue = true;
@@ -74,13 +81,13 @@ namespace pathCam {
     bool needsAlignment = false;
     int memberCount = 0;
 
+
 #ifdef HAVE_OPENCV_CUDAARITHM
     cuda::GpuMat diffGPU;
     cuda::GpuMat xp1;
     cuda::GpuMat xp2;
     cuda::GpuMat binaryCompare;
 
-    long long bigx = 0, bigy = 0;
     cuda::GpuMat meshGridX;
     cuda::GpuMat meshGridY;
     cuda::GpuMat rectMaskGPU;
@@ -109,6 +116,11 @@ namespace pathCam {
     std::map<int, long> delaunayMembers;
     std::queue<RegInfo *> staging;
 
+    std::vector<Image*> memberFrames;
+    std::unordered_set<Image *> contributingFrames, newContributingFrames;
+
+    FeatureTrackGenerator* ftg;
+    BundleAdjustmentIntegrator* bai;
 
     SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
 

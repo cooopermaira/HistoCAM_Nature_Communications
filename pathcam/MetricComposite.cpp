@@ -76,7 +76,7 @@ namespace pathCam {
   }
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
-    parent, image_size, _componentIndex), ftg(new FeatureTrackGenerator) {
+    parent, image_size, _componentIndex){
     frameDelay = 10;
     waitingFrames.resize(frameDelay, {nullptr, {}});
     //compositeImage = imagePyramid->level[0];
@@ -145,7 +145,6 @@ namespace pathCam {
       assert(img->regInfo);
 
       staging.pop();
-      ++memberCount;
 
       update_Bbox_no_composite({ri});
 
@@ -264,6 +263,15 @@ namespace pathCam {
   }
 
   void MetricComposite::align_and_rebuild() {
+    for (auto & loser : absorbedComponents) {
+      ftg->storedMatches.insert(loser->ftg->storedMatches.begin(),loser->ftg->storedMatches.end());
+      for (auto &img : loser->landmarkFrames) {
+        landmarkFrames.push_back(img);
+      }
+      loser->root->regInfo->root = false;
+    }
+
+
     auto start = std::chrono::high_resolution_clock::now();
     // int consolidateCount = 0;
     // while (consolidate_tile_ownership()) {
@@ -273,17 +281,69 @@ namespace pathCam {
     ig = new ImageGraph();
     //bai = new BundleAdjustmentIntegrator();
 
-    std::unordered_set<Image *> members = find_contributing_images();
+    std::unordered_set<Image *> members = contributingFrames;
     members.insert(root);
     for (auto img : landmarkFrames) {
       members.insert(img);
     }
-    std::vector membersForRebuild(members.begin(), members.end());
-
-
     auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
-    std::vector<Match *> memberMatches;
+    std::unordered_map<Image*, std::vector<std::shared_ptr<Match>>> adjacency;
 
+    for (auto& m : matches){
+      adjacency[m->image_1].push_back(m);
+      adjacency[m->image_2].push_back(m);
+    }
+    std::queue<Image*> q;
+
+    // Seed with confirmed members
+    for (auto img : members) {
+      img->regInfo->component_membership = componentIndex;
+      q.push(img);
+    }
+
+    while (!q.empty()) {
+      Image* img = q.front();
+      q.pop();
+
+      for (auto m : adjacency[img]) {
+
+        Image* other;
+        Point2i offset;
+
+        if (m->image_1 == img) {
+          other = m->image_2;
+          offset = Point2i(m->t_x, m->t_y);
+        } else {
+          other = m->image_1;
+          offset = Point2i(-m->t_x, -m->t_y);
+        }
+
+        // If not yet assigned
+        if (other->regInfo->component_membership != componentIndex) {
+
+          other->regInfo->component_membership = componentIndex;
+          other->regInfo->absoluteCoords =
+              img->regInfo->absoluteCoords + offset;
+
+          members.insert(other);
+          q.push(other);
+        }
+      }
+    }
+
+    int iii = 0;
+    for (auto &img : newContributingFrames) {
+      if(img->regInfo->component_membership != componentIndex) {
+        ++iii;
+        auto v = adjacency[img];
+        std::cout<<img->index<<std::endl;
+      }
+    }
+    std::cout<<componentIndex<<" members before "<<members.size()<<std::endl;
+    members = reduce_members_through_competition(members);
+    std::cout<<componentIndex<<" members after "<<members.size()<<std::endl;
+
+    std::vector membersForRebuild(members.begin(), members.end());
 
     for (auto m: matches) {
       ig->addEdge(m->image_1->index, m->image_2->index, ImageGraph::EdgeKind::ORB);
@@ -316,7 +376,7 @@ namespace pathCam {
     }
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
     auto start1 = std::chrono::high_resolution_clock::now();
-    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps, ftg->storedMatches);
+    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps, std::vector(ftg->storedMatches.begin(),ftg->storedMatches.end()));
     auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start1).count();
 
@@ -401,12 +461,9 @@ namespace pathCam {
 
     for (auto &img: members) {
       auto affectedTilesWithStatus = calculate_affected_tiles_with_status(img->regInfo->absoluteCoords);
+
       for (auto &p: affectedTilesWithStatus) {
         if (p.second == TileObj::singleFrameCoverage) {
-          auto ul = p.first * parent->tileSize;
-          assert(img->regInfo->absoluteCoords.x <= ul.x && img->regInfo->absoluteCoords.y <= ul.y &&
-            img->regInfo->absoluteCoords.x + imageSize.width >= ul.x + parent->tileSize &&
-            img->regInfo->absoluteCoords.y + imageSize.height >= ul.y + parent->tileSize);
           auto tileObj = imagePyramid->get_base_tile(p.first);
           if (image_improves_tile(tileObj, img)) {
             tileObj->owner = img;
@@ -466,6 +523,29 @@ namespace pathCam {
     successfullyAligned = true;
   }
 
+  std::unordered_set<Image *> MetricComposite::reduce_members_through_competition(std::unordered_set<Image *> _members) const {
+    for (auto &tileIdx: imagePyramid->liveTiles) {
+      auto to = imagePyramid->get_base_tile(tileIdx);
+      to->owner = nullptr;
+    }
+    auto liveTilesCopy = imagePyramid->liveTiles;
+    imagePyramid->liveTiles.clear();
+
+    for (auto &img: _members) {
+      auto affectedTilesWithStatus = calculate_affected_tiles_with_status(img->regInfo->absoluteCoords);
+
+      for (auto &p: affectedTilesWithStatus) {
+        if (p.second == TileObj::singleFrameCoverage) {
+          auto tileObj = imagePyramid->get_base_tile(p.first);
+          if (image_improves_tile(tileObj, img)) {
+            tileObj->owner = img;
+            imagePyramid->liveTiles.insert(p.first);
+          }
+        }
+      }
+    }
+    return find_contributing_images();
+  }
 
 
   void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad,
@@ -477,7 +557,7 @@ namespace pathCam {
       img->load_raw_from_disk(alertDoubleLoad); //freed in ComponentMatchSearch::run()
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
-      auto cms = new ComponentMatchSearch(parent, img, this);
+      const auto cms = new ComponentMatchSearch(parent, img, this);
       parent->jqSecondary->add_runnable(cms);
     }
     //lock mutex against component wide flatfielding

@@ -16,10 +16,10 @@ int lastMC = 0, countDown = 100;
 bool hasBeenNonZero = false;
 
 
-
 namespace pathCam {
   CompositeManager::CompositeManager(StreamCam *parent) : parent(parent), successful(false),
-                                                          rebuildJobsOutstanding(true) {};
+                                                          rebuildJobsOutstanding(true) {
+  };
 
   void CompositeManager::run() {
     unsigned long duration = 0;
@@ -114,6 +114,7 @@ namespace pathCam {
           mc->xcMatchShouldContinue = false;
           mc->update();
         }
+        mc->contributingFrames = mc->find_contributing_images();
       });
     }
 
@@ -123,17 +124,26 @@ namespace pathCam {
     parent->notify_observers();
     threads.clear();
 
+    combine_components();
+
     auto tAlign = std::chrono::high_resolution_clock::now();
 
-
     for (auto &comp: parent->composites) {
-      if (comp->suspended) { continue; }
+      if (comp->suspended) {
+        comp->imagePyramid->suspended = true;
+        continue;
+      }
       auto mc = std::dynamic_pointer_cast<MetricComposite>(comp);
 
       threads.emplace_back([mc]() {
         auto t1 = std::chrono::high_resolution_clock::now();
         while (mc->outstandingCMS_jobs > 0 || mc->xcInProgress) {
           Poco::Thread::sleep(50);
+        }
+        for (auto &comp : mc->absorbedComponents) {
+          while (comp->outstandingCMS_jobs > 0) {
+            Poco::Thread::sleep(50);
+          }
         }
         mc->alignmentHasBegun = true;
         auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).
@@ -170,20 +180,7 @@ namespace pathCam {
     push_remaining_tiles_for_inference();
 
 
-
     //save_components_to_disk();
-
-    // if (parent->recordingMode) {
-    //   long totalTime = 0;
-    //   int totalImages = 0;
-    //   for (auto &img:parent->images) {
-    //     if (!img){continue;}
-    //     totalTime += img->blurTime;
-    //     ++totalImages;
-    //   }
-    //   std::cout<<"write time: "<<totalTime<<"   total images: "<<totalImages<<std::endl;
-    // }
-
 
     parent->compositing = false;
     parent->inferenceWait.set();
@@ -198,9 +195,9 @@ namespace pathCam {
   }
 
   void CompositeManager::submit_outstanding_jobs() {
-    if (parent->maxIndex < 0){return;}
+    if (parent->maxIndex < 0) { return; }
     for (int i = parent->maxIndex + 1; i <= parent->maxIndex + parent->windowWidth; ++i) {
-      parent->JobQ->update_job_readiness(2,i);
+      parent->JobQ->update_job_readiness(2, i);
     }
   }
 
@@ -227,19 +224,21 @@ namespace pathCam {
     }
     if (!hasBeenNonZero) { return; }
 
-    if (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 || parent->matchableCount == 0
-      || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
+    if (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 || parent->
+        matchableCount == 0
+        || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
       return;
     }
 
-    if (parent->matchableCount == lastMC) {//matchableCount has changed in how long now??
+    if (parent->matchableCount == lastMC) {
+      //matchableCount has changed in how long now??
       --countDown;
       if (countDown > 0) {
         return;
       }
       countDown = 100;
-
-    } else {//ok, matchableCount changed so things are still going on
+    } else {
+      //ok, matchableCount changed so things are still going on
       lastMC = parent->matchableCount;
       countDown = 100;
       return;
@@ -269,16 +268,81 @@ namespace pathCam {
     }
     for (int i = 0; i <= parent->maxIndex; ++i) {
       if (parent->matchablesIncremented[i] != 1) {
-        std::cout<<i<<" incremented "<<parent->matchablesIncremented[i]<<" times"<<std::endl;
+        std::cout << i << " incremented " << parent->matchablesIncremented[i] << " times" << std::endl;
       }
       if (parent->matchablesDecremented[i] != 1) {
-        std::cout<<i<<" decremented "<<parent->matchablesDecremented[i]<<" times"<<std::endl;
+        std::cout << i << " decremented " << parent->matchablesDecremented[i] << " times" << std::endl;
       }
     }
     //parent->compositing = false;
     int k = 0;
   }
 
+  void CompositeManager::combine_components() const {
+    for (auto &comp: parent->composites) {
+      // Only process roots
+      if (comp->joinedTo != comp)
+        continue;
+
+      auto rootA = comp;
+
+      for (auto cIdx: comp->relatedComponents) {
+        auto rootB = parent->joined_to_root(parent->composites[cIdx]);
+
+        // Skip if already unified
+        if (rootA->componentIndex == rootB->componentIndex)
+          continue;
+
+        std::shared_ptr<Composite> big;
+        std::shared_ptr<Composite> small;
+
+        // Special Rule: component 0 always wins
+        if (rootA->componentIndex == 0) {
+          big = rootA;
+          small = rootB;
+        } else if (rootB->componentIndex == 0) {
+          big = rootB;
+          small = rootA;
+        } else {
+          // Normal union-by-size
+          if (rootA->memberCount >= rootB->memberCount) {
+            big = rootA;
+            small = rootB;
+          } else {
+            big = rootB;
+            small = rootA;
+          }
+        }
+
+        // Merge data into winner
+        big->absorbedComponents.push_back(small);
+        big->absorbedComponents.insert(big->absorbedComponents.end(),
+          small->absorbedComponents.begin(),small->absorbedComponents.end());
+
+        big->newContributingFrames.insert(
+          small->contributingFrames.begin(),
+          small->contributingFrames.end());
+
+        big->newContributingFrames.insert(
+          small->newContributingFrames.begin(),
+          small->newContributingFrames.end());
+
+        big->memberCount += small->memberCount;
+
+        // Perform union
+        small->joinedTo = big;
+
+        // Suspend loser
+        small->suspended = true;
+
+        // Ensure winner is not suspended
+        big->suspended = false;
+
+        // Continue with updated root
+        rootA = big;
+      }
+    }
+  }
 
   void CompositeManager::stage(RegInfo *_regInfo) const {
     _regInfo->accessMutex.lock();

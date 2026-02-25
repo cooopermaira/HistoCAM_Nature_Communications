@@ -192,6 +192,9 @@ void CaptureComponent::startRecording() {
     }
     wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
   }
+  if (!parent->keepFrames) {
+    sCam->clear_disk_frames();
+  }
 
   compositeThread.start(new bcamPocoRunnable(this));
   parent->startCompositingUIUpdates();

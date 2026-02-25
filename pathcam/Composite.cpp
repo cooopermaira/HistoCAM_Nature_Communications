@@ -1168,7 +1168,7 @@ namespace pathCam {
   Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : parent(parent),
     componentIndex(_componentIndex), imageSize(image_size),
     root_offset(0.0, 0.0),
-    max_offset(0.0, 0.0) {
+    max_offset(0.0, 0.0) , ftg(new FeatureTrackGenerator) {
     //flat_field = parent->flat_field2X;
 
     imagePyramid = std::make_shared<MRTiledImage>(parent);
