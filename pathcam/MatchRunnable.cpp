@@ -103,9 +103,16 @@ namespace pathCam {
       if (!previous->is_good()) {continue;}
       if (image->label != Image::_NOLABEL && previous->label != Image::_NOLABEL && image->label != previous->label){continue;}
 
-      Rect me(image->regInfo->absoluteCoords - Point2i(200,200),image->regInfo->absoluteCoords + Point2i(image->width+200,image->height+200));
-      Rect them(previous->regInfo->absoluteCoords - Point2i(200,200),previous->regInfo->absoluteCoords + Point2i(previous->width+200,previous->height+200));
-      if ((me & them).empty()){continue;}
+      // auto meP1 = image->regInfo->absoluteCoords - Point2i(200,200);
+      // auto meP2 = image->regInfo->absoluteCoords + Point2i(image->width+200,image->height+200);
+      // Rect me(parent->get_AbC_relative_from_relative(image->regInfo->component_membership,meP1,0),
+      //   parent->get_AbC_relative_from_relative(image->regInfo->component_membership,meP2,0));
+      //
+      // auto themP1 = previous->regInfo->absoluteCoords - Point2i(200,200);
+      // auto themP2 = previous->regInfo->absoluteCoords + Point2i(previous->width+200,previous->height+200);
+      // Rect them(parent->get_AbC_relative_from_relative(previous->regInfo->component_membership,themP1,0),
+      //   parent->get_AbC_relative_from_relative(previous->regInfo->component_membership,themP2,0));
+      // if ((me & them).empty()){continue;}
 
       auto m = std::make_shared<Match>(previous, image);
       matcher.match(m);
@@ -135,9 +142,9 @@ namespace pathCam {
           throw std::runtime_error("not a metric composite");
         }
         if (component->componentMagLabel == theirComp->componentMagLabel || component->componentMagLabel == Image::_NOLABEL || theirComp->componentMagLabel == Image::_NOLABEL) {
-          //these two components should actually be the same component. we will suspend one and join to the other
-          // component->componentJoinMatches.push_back(match);
-          // theirComp->componentJoinMatches.push_back(match);
+          // these two components should actually be the same component. we will suspend one and join to the other
+          //  component->componentJoinMatches.push_back(match);
+          //  theirComp->componentJoinMatches.push_back(match);
         }
       } else {
         component->ftg->store_match(match);
@@ -150,7 +157,86 @@ namespace pathCam {
     }
   }
 
+  void MatchRunnable::build_reg_info(Image *img) {
+    auto t = parent->get_reg_ref(image_idx);
+    Poco::FastMutex::ScopedLock lock(t->accessMutex);
+
+    t->index = img->index;
+    t->root = false;
+    t->image = img;
+    img->regInfo = t;
+  }
+
   void MatchRunnable::run() {
+    Image *image = parent->get_image_ref(image_idx);
+    int votes = 0;
+
+    if (!image->is_good()) {
+      return;
+    }
+    build_reg_info(image);
+
+    auto matcher = DescriptorMatcher(parent->matcher_type);
+    int mostMatches = 0;
+    long bestMatch = -1;
+
+    for (long prev_idx = image_idx - 1; prev_idx >= 0; --prev_idx) {
+      Image *previous = parent->get_image_ref(prev_idx);
+
+      if (previous == nullptr || !previous->is_good()) {
+        continue;
+      }
+
+      if (image->label != Image::_NOLABEL && image->label != previous->label){continue;}
+
+      auto m = std::make_shared<Match>(previous,image);
+      matcher.match(m);
+
+      int result = MotionEstimator::findHomography(m, parent->estimator_type, 10);
+
+      if (m->good_matches.size() > mostMatches) {
+        mostMatches = m->good_matches.size();
+        bestMatch = prev_idx;
+        image->regInfo->bestMatch = bestMatch;
+        image->regInfo->numBestMatches = mostMatches;
+      }
+
+      if (result == 1) {
+        if (std::abs(m->t_x) < image->width / 1.1 && std::abs(m->t_y) < image->height / 1.1) {
+          successful = true;
+
+          Point2i abc;
+          int compIdx;
+          if (previous->regInfo->poll_abc(m,abc,compIdx)) {
+            image->regInfo->vote_abc(m,abc,compIdx);
+          }
+
+          votes += m->inlierCount;
+          if (votes > RegInfo::featureQuorum) {
+            break;
+          }
+        }
+      }
+    }
+    image->regInfo->matchSearchComplete = true;
+
+    if (!successful) {
+      auto component_index = parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
+      std::cout << "component " << component_index << " spawning from frame " << image_index << " (" <<
+          image->image_file.getBaseName()<<")" << std::endl;
+    }else {
+      //check end
+      if (!image->regInfo->resolved) {
+        image->regInfo->count_votes();
+      }
+    }
+
+    --parent->matchableCount;
+    jobComplete.set();
+    successful = true;
+  }
+
+  void MatchRunnable::run1() {
     Image *image = parent->get_image_ref(image_idx);
 
     if (!image->is_good()) {
@@ -162,6 +248,7 @@ namespace pathCam {
     long bestMatch = -1;
 
     auto tempReg = parent->get_reg_ref(image_idx);
+
 
     for (long prev_idx = image_idx - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
@@ -203,6 +290,10 @@ namespace pathCam {
           auto rj = new RegistrationRunnable(parent, tempReg);
           parent->JobQ->add_runnable(rj);
           successful = true;
+
+          if (image_idx - prev_idx > 30) {
+            std::cout<<image_index<<" to "<<prev_idx<<" suspicious"<<std::endl;
+          }
           break;
         }
       }

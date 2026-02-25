@@ -5,6 +5,8 @@
 //  Created by Brian Summa on 11/1/22.
 //
 
+#include <filesystem>
+
 #include "pathCam.h"
 
 
@@ -14,7 +16,7 @@ namespace pathCam {
 
     auto them = parent->get_reg_ref(matchedTo);
     Point2i theirAbCs;
-    unsigned int componentMembership;
+    int componentMembership;
 
     if(them->get_abc(this, theirAbCs, componentMembership)){
       Point2i myAbCs = relativeCoords + theirAbCs;
@@ -22,7 +24,21 @@ namespace pathCam {
     }
   }
 
-  bool RegInfo::get_abc(pathCam::RegInfo *caller, Point2i &_absoluteCoords, unsigned int &_componentMembership) {
+  bool RegInfo::poll_abc(std::shared_ptr<Match> m, Point2i &_absoluteCoords, int &_componentMembership) {
+    ++outstandingPolls;
+    Poco::Mutex::ScopedLock lock(rAccessMutex);
+
+    if (resolved) {
+      _absoluteCoords = absoluteCoords;
+      _componentMembership = component_membership;
+      return true;
+    }
+
+    pollers.push_back(m);
+    return false;
+  }
+
+  bool RegInfo::get_abc(pathCam::RegInfo *caller, Point2i &_absoluteCoords, int &_componentMembership) {
     accessMutex.lock();
 
     if (resolved) {
@@ -38,6 +54,85 @@ namespace pathCam {
     return false;
   }
 
+  void RegInfo::vote_abc(std::shared_ptr<Match> m, Point2i _absoluteCoords, int _componentMembership) {
+    --outstandingPolls;
+    {
+      Poco::Mutex::ScopedLock lock(rAccessMutex);
+
+      vote v(_componentMembership,_absoluteCoords,m);
+      votes.push_back(v);
+    }
+
+    if (outstandingPolls == 0 && matchSearchComplete) {
+      count_votes();
+    }
+
+  }
+
+  void RegInfo::count_votes() {
+    if (!votes.empty()) {
+      if (votes.size() > 1) {
+        int k = 0;
+      }
+      sort(votes.begin(),votes.end(),
+    [](const vote& a, const vote& b){return a.m->inlierCount > b.m->inlierCount;});
+      int R = image->parent->tileSize * 2;                // tune this
+      int minCluster = 3;       // tune this
+      vote winningVote;
+
+      int bestClusterScore = -1;
+      int bestClusterIndex = -1;
+
+      for (size_t i = 0; i < votes.size(); ++i) {
+
+        int clusterCount = 0;
+        int clusterScore = 0;
+
+        for (size_t j = 0; j < votes.size(); ++j) {
+
+          int dx = (votes[i].abc.x - votes[i].m->t_x) - (votes[j].abc.x - votes[j].m->t_x);
+          int dy = (votes[i].abc.y - votes[i].m->t_y) - (votes[j].abc.y - votes[j].m->t_y);
+
+          if (dx*dx + dy*dy <= R*R) {
+            clusterCount++;
+            clusterScore += votes[j].m->inlierCount;
+          }
+        }
+
+        if (clusterCount >= minCluster) {
+          if (clusterScore > bestClusterScore) {
+            bestClusterScore = clusterScore;
+            bestClusterIndex = i;
+          }
+        }
+      }
+      if (bestClusterIndex != -1) {
+        winningVote = votes[bestClusterIndex];
+      }else {
+        winningVote = votes[0];
+      }
+      matchedTo = winningVote.m->image_1->index;
+      absoluteCoords = winningVote.abc - Point2i(winningVote.m->t_x,winningVote.m->t_y);
+      component_membership = winningVote.componentIndex;
+      {
+        Poco::Mutex::ScopedLock lock(winningVote.m->image_1->regInfo->rAccessMutex);
+        winningVote.m->image_1->regInfo->children.push_back(this);
+      }
+    }else {
+      absoluteCoords = {0,0};
+    }
+
+    resolved = true;
+    parent->push_compositeQ(this);
+
+    {
+      Poco::Mutex::ScopedLock lock(rAccessMutex);
+      for (auto & m : pollers) {
+        m->image_2->regInfo->vote_abc(m,absoluteCoords,component_membership);
+      }
+    }
+  }
+
   void RegInfo::set_abc(Point2f _absoluteCoords, int _componentMembership, bool queue_for_compositing) {
 
     _absoluteCoords.x = std::round(_absoluteCoords.x);
@@ -49,7 +144,7 @@ namespace pathCam {
     waitOnResolve.set();
     accessMutex.unlock();
 
-    auto image = parent->get_image_ref(index);
+    // image = parent->get_image_ref(index);
     image->regInfo = this;
     image->absoluteCoords = Point2i(absoluteCoords.x,absoluteCoords.y);
 
@@ -196,11 +291,12 @@ namespace pathCam {
     m->t_x = a2 * (1.0 / m->image_2->get_reg_scale());
     m->t_y = d2 * (1.0 / m->image_2->get_reg_scale());
     m->scale = (a + d) / 2;
-    if (std::abs(m->scale - 1.0) > 0.02) {
+    if (std::abs(m->scale - 1.0) > 0.05) {
       //multiresolution matches are not handled here. reject and allow this to be found elsewhere
       return -1;
     }
 
+    m->inlierCount = std::accumulate(m->inliers.begin(),m->inliers.end(),0);
     return 1;
   }
 

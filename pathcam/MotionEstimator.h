@@ -15,7 +15,8 @@ class StreamCam;
 
 class MotionEstimator{
 public:
-  
+
+
   MotionEstimator(){};
 
   static int findHomography(std::shared_ptr<Match> m, int estimator_type, int requiredGoodMatches,
@@ -30,9 +31,17 @@ public:
 
 class RegInfo{
 public:
+  inline static int featureQuorum = 100;
+  struct vote {
+    int componentIndex;
+    Point2i abc;
+    std::shared_ptr<Match> m;
+  };
+
   StreamCam* parent;
   Image* image;
   unsigned long index,matchedTo;
+  bool matchSearchComplete = false;
   bool successful,root,resolved,rootOfRoot;
   bool stayFixedDuringBundleAdjustment = false;
   bool wasAligned = false;
@@ -42,13 +51,17 @@ public:
   Point2i absoluteCoords;
   Point2i relativeCoords = Point2i(0.0, 0.0);
   Poco::FastMutex accessMutex;
+  Poco::Mutex rAccessMutex;
   Poco::Event waitOnResolve;
   std::vector<RegInfo*> callersWaiting, children;
   std::vector<std::pair<unsigned int, Match*>> componentCallersWaiting;
   std::vector<std::pair<Point2f,double>> rootHomographies;
+  std::vector<vote> votes;
+  std::vector<std::shared_ptr<Match>> pollers;
 
   int bestMatch;
   int numBestMatches = 0;
+  std::atomic<int> outstandingPolls = 0;
   
   RegInfo(StreamCam* parent, bool successful=false, Point2f absoluteCoords=Point2f(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
   successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root), parent(parent),
@@ -57,9 +70,15 @@ public:
 
   void attempt_absolute_reg(bool queue_for_compositing);
 
-  bool get_abc(RegInfo* caller, Point2i &_absoluteCoords, unsigned int& _componentMembership);
+  bool get_abc(RegInfo* caller, Point2i &_absoluteCoords, int &_componentMembership);
+
+  bool poll_abc(std::shared_ptr<Match> m, Point2i &_absoluteCoords, int &_componentMembership);
 
   void set_abc(Point2f _absoluteCoords, int _componentMembership, bool queue_for_compositing);
+
+  void vote_abc(std::shared_ptr<Match> m, Point2i _absoluteCoords, int _componentMembership);
+
+  void count_votes();
 
   void set_waiting_component(unsigned int componentIndex, Match* m);
 

@@ -612,7 +612,7 @@ namespace pathCam {
       parent->resize_mmatch_mutex.unlock();
       return {0,0};
     }
-    Point2d actualDistance(myImage->absoluteCoords.x - theirImage->absoluteCoords.x,myImage->absoluteCoords.y - theirImage->absoluteCoords.y);
+    Point2d actualDistance(myImage->regInfo->absoluteCoords.x - theirImage->regInfo->absoluteCoords.x,myImage->regInfo->absoluteCoords.y - theirImage->regInfo->absoluteCoords.y);
     Point2d matchedDistance = {m1->t_x,m1->t_y};
     auto res = actualDistance - matchedDistance;
 /*

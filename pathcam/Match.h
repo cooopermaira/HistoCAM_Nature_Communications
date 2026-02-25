@@ -21,6 +21,7 @@ public:
 
   int mostMatches = 0;
   int numMatches = 0;
+  int inlierCount = 0;
   
   
   std::vector<DMatch> good_matches;

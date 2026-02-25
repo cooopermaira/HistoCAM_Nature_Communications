@@ -325,7 +325,10 @@ namespace pathCam {
                                                                                parent(parent),
                                                                                image_idx(image_idx) {};
 
-    virtual void run();
+    virtual void run1();
+    void run() override;
+
+    void build_reg_info(Image* img);
   };
 
   class ComponentMatchSearch : public RunnableIntermediate {

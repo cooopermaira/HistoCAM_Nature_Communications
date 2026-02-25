@@ -685,35 +685,33 @@ namespace pathCam {
 
 
   void StreamCam::add_new_component(unsigned long image_index, Size image_size, unsigned int component_index) {
+
     auto ri = reg_results[image_index];
-    ri->component_membership = component_index;
-    ri->index = image_index;
-    ri->matchedTo = image_index; //this is a root image, it has no match
-    ri->stayFixedDuringBundleAdjustment = true;
+    std::shared_ptr<MetricComposite> component;
 
-    //auto *temp = new CompositeVoronoi(this, image_size, component_index);
-    auto component = std::make_shared<MetricComposite>(this, image_size, component_index);
-    component_mutex.lock();
-    composites.push_back(component);
+    {
+      Poco::FastMutex::ScopedLock lock1(ri->accessMutex);
+      Poco::FastMutex::ScopedLock lock2(component_mutex);
 
-    ri->image = get_image_ref(ri->index);
-    component->root = ri->image;
+      ri->component_membership = component_index;
+      ri->stayFixedDuringBundleAdjustment = true;
+      ri->root = true;
 
-    if (composites.size() == 1) {
-      //first component added
-      ri->rootOfRoot = true;
-      //this becomes the base scale
-      component->set_scale(1);
-    } else {
-      //this is saying "unknown scale" - will be determined later
-      component->set_scale(0);
+      component = std::make_shared<MetricComposite>(this, image_size, component_index);
+
+      composites.push_back(component);
+      component->root = ri->image;
+
+      if (composites.size() == 1) {
+        ri->rootOfRoot = true;
+        component->set_scale(1);
+      } else {
+        component->set_scale(0);
+      }
+      component->set_offset(Point2f(0, 0));
     }
 
-    component->set_offset(Point2f(0, 0));
-
-    ri->set_abc({0, 0}, component_index, true);
-
-    component_mutex.unlock();
+    ri->count_votes();
   }
 
   //demo

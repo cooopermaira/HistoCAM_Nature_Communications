@@ -194,8 +194,8 @@ namespace pathCam {
       }
 
       //if (imagePyramid->scale > 0) {
-      float x = (imagePyramid->offset.x + img->absoluteCoords.x) * imagePyramid->scale;
-      float y = (imagePyramid->offset.y + img->absoluteCoords.y) * imagePyramid->scale;
+      float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
+      float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
       float w = parent->image_width * imagePyramid->scale;
       float h = parent->image_height * imagePyramid->scale;
       bool showAsCircle = (componentMagLabel == Image::_2X);
@@ -592,7 +592,7 @@ namespace pathCam {
     int sqScopeRad = parent->scope_radius * parent->scope_radius * 0.7;
     for (int i = 0; i < images.size() - 1; ++i) {
       for (int j = i + 1; j < images.size(); ++j) {
-        mDistance = images[i]->absoluteCoords - images[j]->absoluteCoords;
+        mDistance = images[i]->regInfo->absoluteCoords - images[j]->regInfo->absoluteCoords;
 
         if (componentMagLabel == Image::_2X) {
           if (pow(mDistance.x, 2) + pow(mDistance.y, 2) < sqScopeRad) {

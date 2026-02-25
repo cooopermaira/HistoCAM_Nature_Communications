@@ -35,7 +35,7 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config) : con
   addChildComponent(capture);
   addChildComponent(annotate);
 
-  cwd = juce::File("/home/pathcam/pcamdata/save_and_load/");
+  cwd = juce::File("/home/");
   dirFilter = std::make_unique<juce::WildcardFileFilter>("*", "*", "All Files");
   dirBrowser = std::make_unique<juce::FileBrowserComponent>(
     juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
