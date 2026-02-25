@@ -82,17 +82,17 @@ protected:
   int main(const ArgVec& args){
     if (!_helpRequested)
     {
-      int i = 0;
-      while (i < 100) {
-        if (!bcam) {
-          bcam = new StreamCam(configPtr());
-        }
-        bcam->run();
-        delete bcam;
-        bcam = nullptr;
-        std::cout<<i++<<std::endl;
-      }
-      // if(!bcam->run()){ return Application::EXIT_SOFTWARE; }
+      // int i = 0;
+      // while (i < 100) {
+      //   if (!bcam) {
+      //     bcam = new StreamCam(configPtr());
+      //   }
+      //   bcam->run();
+      //   delete bcam;
+      //   bcam = nullptr;
+      //   std::cout<<i++<<std::endl;
+      // }
+      if(!bcam->run()){ return Application::EXIT_SOFTWARE; }
     }
     return Application::EXIT_OK;
   }

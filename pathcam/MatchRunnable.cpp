@@ -10,8 +10,8 @@
 
 namespace pathCam {
   struct SiftScratchTLS {
-    float*  d_ptr        = nullptr;
-    size_t  numFloats    = 0;
+    float *d_ptr = nullptr;
+    size_t numFloats = 0;
 
     ~SiftScratchTLS() {
       if (d_ptr) {
@@ -27,8 +27,7 @@ namespace pathCam {
   inline size_t RequiredSiftScratchFloats(
     int imgW, int imgH,
     int numOctaves,
-    bool scaleUp)
-  {
+    bool scaleUp) {
     //const int nd = NUM_SCALES + 3;
     const int nd = 8;
 
@@ -38,25 +37,24 @@ namespace pathCam {
     auto align128 = [](int x) { return (x + 127) & ~127; };
 
     int p = align128(w);
-    size_t size    = static_cast<size_t>(h) * p;
+    size_t size = static_cast<size_t>(h) * p;
     size_t sizeTmp = static_cast<size_t>(nd) * h * p;
 
     for (int i = 0; i < numOctaves; ++i) {
       w >>= 1;
       h >>= 1;
       int p2 = align128(w);
-      size    += static_cast<size_t>(h) * p2;
+      size += static_cast<size_t>(h) * p2;
       sizeTmp += static_cast<size_t>(nd) * h * p2;
     }
 
     return size + sizeTmp; // total floats
   }
 
-  inline float* EnsureSiftScratch(
+  inline float *EnsureSiftScratch(
     int imgW, int imgH,
     int numOctaves,
-    bool scaleUp)
-  {
+    bool scaleUp) {
     const size_t required =
         RequiredSiftScratchFloats(imgW, imgH, numOctaves, scaleUp);
 
@@ -85,7 +83,7 @@ namespace pathCam {
 
   void ComponentMatchSearch::run() {
     auto matcher = DescriptorMatcher(parent->matcher_type);
-    std::vector<std::shared_ptr<Match>> matches;
+    std::vector<std::shared_ptr<Match> > matches;
 
     // image->siftMutex.lock();
     // image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
@@ -118,7 +116,7 @@ namespace pathCam {
       matcher.match(m);
 
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 30)) {
-        m->numMatches = std::accumulate(m->inliers.begin(),m->inliers.end(),0);
+        m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
         //forward match to feature track generator (ftg)
 
         {
@@ -196,9 +194,6 @@ namespace pathCam {
     int mostMatches = 0;
     long bestMatch = -1;
 
-    if (image_index == 101) {
-      int k = 0;
-    }
     for (long prev_idx = image_idx - 1; prev_idx >= 0; --prev_idx) {
       Image *previous = parent->get_image_ref(prev_idx);
 
@@ -206,9 +201,9 @@ namespace pathCam {
         continue;
       }
 
-      if (image->label != Image::_NOLABEL && image->label != previous->label){continue;}
+      if (image->label != Image::_NOLABEL && image->label != previous->label) { continue; }
 
-      auto m = std::make_shared<Match>(previous,image);
+      auto m = std::make_shared<Match>(previous, image);
       matcher.match(m);
 
       int result = MotionEstimator::findHomography(m, parent->estimator_type, 10);
@@ -224,15 +219,19 @@ namespace pathCam {
         if (std::abs(m->t_x) < image->width / 1.1 && std::abs(m->t_y) < image->height / 1.1) {
           successful = true;
 
-          Point2i abc;
-          int compIdx;
-          if (previous->regInfo->poll_abc(m,abc,compIdx)) {
-            image->regInfo->matchSearchComplete = true;
-            image->regInfo->vote_abc(m,abc,compIdx);
-          }
-
           votes += m->inlierCount;
           if (votes > RegInfo::featureQuorum) {
+            image->regInfo->matchSearchComplete = true;
+          }
+          ++image->regInfo->outstandingPolls;
+
+          Point2i abc;
+          int compIdx;
+          if (previous->regInfo->poll_abc(m, abc, compIdx)) {
+            image->regInfo->vote_abc(m, abc, compIdx);
+          }
+
+          if (image->regInfo->matchSearchComplete) {
             break;
           }
         }
@@ -243,12 +242,7 @@ namespace pathCam {
     if (!successful) {
       auto component_index = parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
       std::cout << "component " << component_index << " spawning from frame " << image_index << " (" <<
-          image->image_file.getBaseName()<<")" << std::endl;
-    }else {
-      //check end
-      if (!image->regInfo->resolved && image->regInfo->outstandingPolls == 0 && image->regInfo->matchSearchComplete) {
-        image->regInfo->count_votes();
-      }
+          image->image_file.getBaseName() << ")" << std::endl;
     }
 
     --parent->matchableCount;
@@ -277,9 +271,9 @@ namespace pathCam {
         continue;
       }
 
-      if (image->label != Image::_NOLABEL && image->label != previous->label){continue;}
+      if (image->label != Image::_NOLABEL && image->label != previous->label) { continue; }
 
-      auto m = std::make_shared<Match>(previous,image);
+      auto m = std::make_shared<Match>(previous, image);
       matcher.match(m);
 
       int result = MotionEstimator::findHomography(m, parent->estimator_type, 10);
@@ -312,7 +306,7 @@ namespace pathCam {
           successful = true;
 
           if (image_idx - prev_idx > 30) {
-            std::cout<<image_index<<" to "<<prev_idx<<" suspicious"<<std::endl;
+            std::cout << image_index << " to " << prev_idx << " suspicious" << std::endl;
           }
           break;
         }
@@ -323,7 +317,7 @@ namespace pathCam {
     if (!successful) {
       auto component_index = parent->add_new_component_Q(image_idx, cv::Size(image->width, image->height));
       std::cout << "component " << component_index << " spawning from frame " << image_index << " (" <<
-          image->image_file.getBaseName()<<")" << std::endl;
+          image->image_file.getBaseName() << ")" << std::endl;
     }
 
     // parent->increment_match_counter(false,image_index);

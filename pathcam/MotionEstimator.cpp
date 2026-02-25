@@ -25,7 +25,8 @@ namespace pathCam {
   }
 
   bool RegInfo::poll_abc(std::shared_ptr<Match> m, Point2i &_absoluteCoords, int &_componentMembership) {
-    ++outstandingPolls;
+    // ++outstandingPolls;
+
     Poco::Mutex::ScopedLock lock(rAccessMutex);
 
     if (resolved) {
@@ -55,9 +56,10 @@ namespace pathCam {
   }
 
   void RegInfo::vote_abc(std::shared_ptr<Match> m, Point2i _absoluteCoords, int _componentMembership) {
-    --outstandingPolls;
+
     {
       Poco::Mutex::ScopedLock lock(rAccessMutex);
+      --outstandingPolls;
 
       vote v(_componentMembership,_absoluteCoords,m);
       votes.push_back(v);
@@ -123,6 +125,10 @@ namespace pathCam {
       }
     }else {
       absoluteCoords = {0,0};
+      std::cout<<index<<" ran empty"<<std::endl;
+      if (index == 1) {
+        int k = 0;
+      }
     }
 
     resolved = true;
