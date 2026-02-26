@@ -315,7 +315,6 @@ namespace pathCam {
 
     assert(scale > 0);
     set_scale(scale,!flatfieldKnown);
-    auto p = resultantPoint / scale;
     set_offset(resultantPoint / scale);
 
     xcPwDist = pairwiseDistance;
@@ -327,6 +326,8 @@ namespace pathCam {
   }
 
   void Composite::establish_scale_at_root(Image *_rootImg) {
+    Poco::FastMutex::ScopedLock lock(parent->component_mutex);
+
     //find most recent resolved frame
     if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
       mostRcntRslv) {
@@ -365,8 +366,38 @@ namespace pathCam {
         }
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
-        establish_scale_between_pairs(_rootImg, mostRcntRslv, false);
-        return;
+        if (establish_scale_between_pairs(_rootImg, mostRcntRslv, false)) {
+          return;
+        }
+        if (mostRcntRslv->labelObserved) {
+          //get matched-to frames absolute coordinates
+          Point2f theirAbC(mostRcntRslv->regInfo->absoluteCoords.x, mostRcntRslv->regInfo->absoluteCoords.y);
+          auto theirComponentIndex = mostRcntRslv->regInfo->component_membership;
+          auto theirComponent = parent->composites[theirComponentIndex];
+
+          auto scale = Image::get_mpp(_rootImg->label) / Image::get_mpp(mostRcntRslv->label);
+
+
+          //calculate absolute coordinates of _rootImg in their component space
+          auto px = imageSize.width * ( 1.f - scale) / 2.f;
+          auto py = imageSize.height * ( 1.f - scale) / 2.f;
+          Point2f pairwiseDistance = Point2f(px,py);
+          Point2f queryAbC = pairwiseDistance + theirAbC;
+
+          //convert queryAbC to base component spce
+          auto resultantPoint = parent->get_AbC_relative_from_relative(theirComponentIndex, queryAbC, 0);
+
+          scale *= theirComponent->get_scale();
+          assert(scale > 0);
+          set_scale(scale,!flatfieldKnown);
+          set_offset(resultantPoint / scale);
+
+          xcPwDist = pairwiseDistance;
+          xcRegLandmark = mostRcntRslv;
+          theirComponent->add_landmark_frame(mostRcntRslv);
+          std::cout<<"component "<<componentIndex<<" XC registered by label based guess"<<std::endl;
+          return;
+        }
       }
     }
     std::cout<<"xc registration failed for component "<<componentIndex<<std::endl;

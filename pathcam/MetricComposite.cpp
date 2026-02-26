@@ -340,10 +340,8 @@ namespace pathCam {
         std::cout<<img->index<<std::endl;
       }
     }
-    std::cout<<componentIndex<<" members before "<<members.size()<<std::endl;
     members = reduce_members_through_competition(members);
     members.insert(root);
-    std::cout<<componentIndex<<" members after "<<members.size()<<std::endl;
 
     std::vector membersForRebuild(members.begin(), members.end());
 
@@ -363,6 +361,13 @@ namespace pathCam {
     auto graphConnectivityResult = ig->computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
       std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
+      // for (auto &isl:graphConnectivityResult.member_islands) {
+      //   for (auto &mem:isl) {
+      //     auto adj = adjacency[parent->get_image_ref(mem)];
+      //     int k = 0;
+      //   }
+      //   int k = 0;
+      // }
       return;
     }
 
@@ -397,13 +402,7 @@ namespace pathCam {
         }
       }
     }
-    if (!graphConnectivityResult.success) {
-      std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
-      // for (auto img : members) {
-      //   std::cout<<img->index<<" "<<img->matchCount<<std::endl;
-      // }
-      return;
-    }
+
 
     for (auto &img: members) {
       img->keypointsImageSpace.resize(img->keypoints.size());

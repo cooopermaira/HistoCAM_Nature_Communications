@@ -161,6 +161,10 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
 
 void CaptureComponent::startRecording() {
+  if (compositeThread.isRunning()){
+    std::cout << "Composite thread still running — ignoring start request\n";
+    return;
+  }
   recording = true;
 #ifdef WITH_SPINNAKER
   if (!spinpath) {
@@ -206,8 +210,9 @@ void CaptureComponent::startRecording() {
 }
 
 void CaptureComponent::startSimulating() {
-  if (compositeThread.isRunning()) {
-    compositeThread.join();
+  if (compositeThread.isRunning()){
+    std::cout << "Composite thread still running — ignoring start request\n";
+    return;
   }
 
   simulating = true;
