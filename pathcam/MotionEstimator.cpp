@@ -117,6 +117,7 @@ namespace pathCam {
       }
       matchedTo = winningVote.m->image_1->index;
       absoluteCoords = winningVote.abc - Point2i(winningVote.m->t_x,winningVote.m->t_y);
+      relativeCoords = Point2i(winningVote.m->t_x,winningVote.m->t_y);
       component_membership = winningVote.componentIndex;
       {
         Poco::Mutex::ScopedLock lock(winningVote.m->image_1->regInfo->rAccessMutex);

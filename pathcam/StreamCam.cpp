@@ -694,6 +694,7 @@ namespace pathCam {
       ri->component_membership = component_index;
       ri->stayFixedDuringBundleAdjustment = true;
       ri->root = true;
+      ri->matchedTo = ri->index;
 
       std::shared_ptr<MetricComposite> component = std::make_shared<MetricComposite>(this, image_size, component_index);
       component->joinedTo = component;
@@ -994,7 +995,7 @@ namespace pathCam {
         if (img->regInfo) {
           if (!img->regInfo->wasAligned) {
             // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
-            auto abc = Point2f(img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
+            auto abc = Point2f(-img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
             abc = get_AbC_relative_from_relative(img->regInfo->component_membership, abc, 0);
             AbCs[img->index] = abc;
           } else {

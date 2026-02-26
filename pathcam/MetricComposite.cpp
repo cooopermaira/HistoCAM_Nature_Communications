@@ -322,8 +322,9 @@ namespace pathCam {
         if (other->regInfo->component_membership != componentIndex) {
 
           other->regInfo->component_membership = componentIndex;
-          other->regInfo->absoluteCoords =
-              img->regInfo->absoluteCoords + offset;
+          other->regInfo->absoluteCoords = img->regInfo->absoluteCoords - offset;
+          other->regInfo->matchedTo = img->index;
+          other->regInfo->relativeCoords = offset;
 
           members.insert(other);
           q.push(other);
