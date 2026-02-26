@@ -82,7 +82,8 @@ void ImageViewComponent::cacher() {
 void ImageViewComponent::save_slide_set() const {
   Poco::FastMutex::ScopedLock lock(parent->sCam->previousSlidesMutex);
   for (auto &mrImg: parent->sCam->previousSlides) {
-    mrImg->cache_to_disk();
+    if (mrImg->cachedToDisk){continue;}
+    mrImg->cache_to_disk(true);
   }
 }
 

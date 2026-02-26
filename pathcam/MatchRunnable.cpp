@@ -220,7 +220,7 @@ namespace pathCam {
         if (std::abs(m->t_x) < image->width / 1.1 && std::abs(m->t_y) < image->height / 1.1) {
 
           votes += m->inlierCount;
-          if (votes > 50) {
+          if (votes > RegInfo::minimumVote) {
             successful = true;
           }
 
@@ -244,13 +244,12 @@ namespace pathCam {
     }
     image->regInfo->matchSearchComplete = true;
     {
-      Poco::Mutex::ScopedLockWithUnlock lock(image->regInfo->rAccessMutex);
+      Poco::Mutex::ScopedLock lock(image->regInfo->rAccessMutex);
       if (!image->regInfo->resolved && image->regInfo->outstandingPolls == 0 && successful) {
-        image->regInfo->rAccessMutex.unlock();
+        //you reached minimumVote but you didnt reach featureQuorum
         image->regInfo->count_votes();
       }
     }
-
 
 
     if (!successful) {

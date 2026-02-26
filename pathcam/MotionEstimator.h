@@ -32,6 +32,7 @@ public:
 class RegInfo{
 public:
   inline static int featureQuorum = 100;
+  inline static int minimumVote = 50;
   struct vote {
     int componentIndex;
     Point2i abc;

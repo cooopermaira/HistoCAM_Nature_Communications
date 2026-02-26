@@ -73,7 +73,7 @@ public:
 
   int get_class_for_tile(std::tuple<int, int, unsigned> _tile);
 
-  void cache_to_disk(const std::string &_cwd);
+  void cache_to_disk(const std::string &_cwd, bool _keepInMemory = false);
 
   void uncache_from_disk();
 
@@ -185,20 +185,17 @@ public:
 
   void read_slide_header();
 
-  void cache_to_disk() {
+  void cache_to_disk(bool _keepInMemory = false) {
     auto start = std::chrono::high_resolution_clock::now();
     for (auto &mrImg: MRImages) {
       if(!mrImg->inMemory){continue;}
-      mrImg->cache_to_disk(cwd.toString());
-      assert(!mrImg->inMemory);
+      mrImg->cache_to_disk(cwd.toString(), _keepInMemory);
     }
     write_slide_header();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start);
     cachedToDisk = true;
-    inMemory = false;
-
-    int k = 0;
+    inMemory = _keepInMemory;
 
     std::cout << "cached " << index << " in " << duration.count() << " ms" << std::endl;
   };

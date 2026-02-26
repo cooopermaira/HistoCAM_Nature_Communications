@@ -103,6 +103,11 @@ namespace pathCam {
     std::cout << "composite loop time: " + std::to_string(duration) << std::endl;
 
 
+    // *******************************************************
+//    ******************** BEGIN POST PROCESSING  ********************
+  // *******************************************************
+
+
     //process delayed frames
     std::vector<std::thread> threads;
     for (auto &comp: parent->composites) {
@@ -281,8 +286,9 @@ namespace pathCam {
   void CompositeManager::combine_components() const {
     for (auto &comp: parent->composites) {
       // Only process roots
-      if (comp->joinedTo != comp)
+      if (comp->joinedTo != comp || comp->suspended) {
         continue;
+      }
 
       auto rootA = comp;
 
@@ -290,8 +296,9 @@ namespace pathCam {
         auto rootB = parent->joined_to_root(parent->composites[cIdx]);
 
         // Skip if already unified
-        if (rootA->componentIndex == rootB->componentIndex)
+        if (rootA->componentIndex == rootB->componentIndex || rootB->suspended) {
           continue;
+        }
 
         std::shared_ptr<Composite> big;
         std::shared_ptr<Composite> small;

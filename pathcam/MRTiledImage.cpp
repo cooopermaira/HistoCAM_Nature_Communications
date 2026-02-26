@@ -129,7 +129,7 @@ int MRTiledImage::get_class_for_tile(std::tuple<int, int, unsigned> _tile) {
   return -1;
 }
 
-void MRTiledImage::cache_to_disk(const std::string &_cwd) {
+void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
   if (!cachedToDisk) {
     Poco::File cwd(_cwd);
     if (!cwd.exists() || !cwd.isDirectory()) {
@@ -190,15 +190,18 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd) {
         }
 
         write_all(fd, tileObj->buf, bytesPerTile);
-        cudaFree(tileObj->buf);
-        tileObj->buf = nullptr;
-        tileObj->image.release();
-        if (tileObj->destroyPreferredObj) {
-          tileObj->destroyPreferredObj(tileObj->preferredObj);
+
+        if (!_keepInMemory) {
+          cudaFree(tileObj->buf);
+          tileObj->buf = nullptr;
+          tileObj->image.release();
+          if (tileObj->destroyPreferredObj) {
+            tileObj->destroyPreferredObj(tileObj->preferredObj);
+          }
+          tileObj->usingPreferred = false;
+          tileObj->preferredObj = nullptr;
+          tileObj->destroyPreferredObj = nullptr;
         }
-        tileObj->usingPreferred = false;
-        tileObj->preferredObj = nullptr;
-        tileObj->destroyPreferredObj = nullptr;
       }
 
 
@@ -210,7 +213,7 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd) {
       throw;
     }
     cachedToDisk = true;
-  } else {
+  } else if (!_keepInMemory){
     assert(!liveTilesOrderedVec.empty());
     for (auto &tileIndex: liveTilesOrderedVec) {
       auto tileObj = level[0]->getTile(tileIndex);
@@ -237,11 +240,14 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd) {
   }
 
   auto parentSP = level[0]->parent.lock();
-  for (int i = 1; i < level.size() - 3; ++i) {
-    level[i].reset(new TiledImage(parentSP, tile_size, tile_size * (1 << i), i));
+
+  if (!_keepInMemory) {
+    for (int i = 1; i < level.size() - 3; ++i) {
+      level[i].reset(new TiledImage(parentSP, tile_size, tile_size * (1 << i), i));
+    }
   }
   cudaDeviceSynchronize();
-  inMemory = false;
+  inMemory = _keepInMemory;
 }
 
 void MRTiledImage::uncache_from_disk() {

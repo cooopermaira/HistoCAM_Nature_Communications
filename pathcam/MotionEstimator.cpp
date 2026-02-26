@@ -67,10 +67,8 @@ namespace pathCam {
       for (const auto & vote : votes) {
         totalVotes += vote.m->inlierCount;
       }
-      if (totalVotes > 50) {
+      if (totalVotes > minimumVote) {
         count_votes();
-      }else {
-        parent->add_new_component_Q(index,Size(image->width, image->height));
       }
     }
 
