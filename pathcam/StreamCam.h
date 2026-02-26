@@ -120,6 +120,7 @@ namespace pathCam {
     Poco::FastMutex blurMutex;
     Poco::FastMutex CudaSiftGlobalUseMutex;
     Poco::FastMutex previousSlidesMutex;
+    Poco::Mutex componentQmutex;
 
     Poco::Path givenWorkingDirectory;
     std::vector<Poco::Path> fileSaveFolders;

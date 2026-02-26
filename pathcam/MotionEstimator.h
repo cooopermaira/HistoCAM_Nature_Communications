@@ -80,6 +80,8 @@ public:
 
   void count_votes();
 
+  void cast_requested_votes();
+
   void set_waiting_component(unsigned int componentIndex, Match* m);
 
   void set_AbC_local_from_relative(unsigned int _relativeComponentSpace,Point2f _AbCInRelativeSpace);

@@ -25,8 +25,6 @@ namespace pathCam {
   }
 
   bool RegInfo::poll_abc(std::shared_ptr<Match> m, Point2i &_absoluteCoords, int &_componentMembership) {
-    // ++outstandingPolls;
-
     Poco::Mutex::ScopedLock lock(rAccessMutex);
 
     if (resolved) {
@@ -56,7 +54,6 @@ namespace pathCam {
   }
 
   void RegInfo::vote_abc(std::shared_ptr<Match> m, Point2i _absoluteCoords, int _componentMembership) {
-
     {
       Poco::Mutex::ScopedLock lock(rAccessMutex);
       --outstandingPolls;
@@ -65,11 +62,16 @@ namespace pathCam {
       votes.push_back(v);
     }
 
-    if (index == 101) {
-      int k = 0;
-    }
     if (outstandingPolls == 0 && matchSearchComplete) {
-      count_votes();
+      int totalVotes = 0;
+      for (const auto & vote : votes) {
+        totalVotes += vote.m->inlierCount;
+      }
+      if (totalVotes > 50) {
+        count_votes();
+      }else {
+        parent->add_new_component_Q(index,Size(image->width, image->height));
+      }
     }
 
   }
@@ -130,11 +132,13 @@ namespace pathCam {
     resolved = true;
     parent->push_compositeQ(this);
 
-    {
-      Poco::Mutex::ScopedLock lock(rAccessMutex);
-      for (auto & m : pollers) {
-        m->image_2->regInfo->vote_abc(m,absoluteCoords,component_membership);
-      }
+    cast_requested_votes();
+  }
+
+  void RegInfo::cast_requested_votes() {
+    Poco::Mutex::ScopedLock lock(rAccessMutex);
+    for (auto & m : pollers) {
+      m->image_2->regInfo->vote_abc(m,absoluteCoords,component_membership);
     }
   }
 
@@ -302,6 +306,9 @@ namespace pathCam {
     }
 
     m->inlierCount = std::accumulate(m->inliers.begin(),m->inliers.end(),0);
+    // if (m->inlierCount < requiredGoodMatches) {
+    //   return -1;
+    // }
     return 1;
   }
 

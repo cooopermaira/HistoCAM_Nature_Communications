@@ -678,6 +678,7 @@ namespace pathCam {
   }
 
   int StreamCam::add_new_component_Q(unsigned long image_index, Size image_size) {
+    Poco::Mutex::ScopedLock lock(componentQmutex);
     auto component_index = increment_and_get_components();
     newComponentQ.push({image_index, image_size, component_index});
     return component_index;
@@ -711,7 +712,9 @@ namespace pathCam {
       component->set_offset(Point2f(0, 0));
     }
 
-    ri->count_votes();
+    ri->resolved = true;
+    push_compositeQ(ri);
+    ri->cast_requested_votes();
   }
 
   std::shared_ptr<Composite> StreamCam::joined_to_root(const std::shared_ptr<Composite> &query) const {
