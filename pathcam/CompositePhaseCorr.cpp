@@ -128,6 +128,10 @@ namespace pathCam {
       cudaMemcpy(sd.d_data, sd.h_data, sd.numPts * sizeof(SiftPoint), cudaMemcpyHostToDevice);
   }
 
+  void Composite::join_and_suspend(Image *img, Point2i _relativeCoords) {
+
+  }
+
 
   bool Composite::establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract) {
     SiftData rootCopy,compareCopy;
@@ -364,6 +368,23 @@ namespace pathCam {
             return;
           }
         }
+        suspended = true;
+        imagePyramid->suspended = true;
+        _rootImg->load_raw_from_disk();
+
+        for (auto &p: imagePyramid->liveTiles) {
+          auto tObj = imagePyramid->level[0]->getTile(p.x, p.y);
+          tObj.reset();
+        }
+
+        auto myRegInfo = _rootImg->regInfo;
+
+        myRegInfo->root = false;
+        myRegInfo->stayFixedDuringBundleAdjustment = false;
+        myRegInfo->matchedTo = mostRcntRslv->index;
+        myRegInfo->relativeCoords = mostRcntRslv->regInfo->absoluteCoords - regionInMySpace.tl();
+        myRegInfo->attempt_absolute_reg(true);
+        std::cout<<"component "<< componentIndex <<" suspended and added to component via projection"<<std::endl;
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
         if (establish_scale_between_pairs(_rootImg, mostRcntRslv, false)) {

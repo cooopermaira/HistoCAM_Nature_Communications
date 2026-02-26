@@ -146,6 +146,26 @@ namespace pathCam {
 
       staging.pop();
 
+      if (img->labelObserved) {
+        ++observedLabels[img->label];
+        int maxObservations = 0;
+        unsigned winner = componentMagLabel;
+        for (auto &[label,observationCount] : observedLabels) {
+          if (observationCount > maxObservations) {
+            maxObservations = observationCount;
+            winner = label;
+          }
+        }
+        if (winner != componentMagLabel) {
+          componentMagLabel = winner;
+
+          Poco::FastMutex::ScopedLock lock(update_mutex);
+          get_flatfield();
+          imagePyramid->set_mag_label(componentMagLabel);
+          parent->MRImageSet->sort_by_scale();
+        }
+      }
+
       update_Bbox_no_composite({ri});
 
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {img, {}};
@@ -361,6 +381,9 @@ namespace pathCam {
     auto graphConnectivityResult = ig->computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
       std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
+      if (observedLabels.size() > 1) {
+        rebuild(membersForRebuild);
+      }
       // for (auto &isl:graphConnectivityResult.member_islands) {
       //   for (auto &mem:isl) {
       //     auto adj = adjacency[parent->get_image_ref(mem)];

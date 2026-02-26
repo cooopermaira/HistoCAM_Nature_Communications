@@ -81,6 +81,8 @@ namespace pathCam {
     bool needsAlignment = false;
     int memberCount = 0;
 
+    std::unordered_map<unsigned int, int> observedLabels;
+
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     cuda::GpuMat diffGPU;
@@ -143,6 +145,8 @@ namespace pathCam {
                                         Point2f absCoord);
 
     void stage(RegInfo *_ri) { staging.push(_ri); }
+
+    void join_and_suspend(Image* img, Point2i _relativeCoords);
 
     void establish_scale_at_root(Image *_rootImg);
 
