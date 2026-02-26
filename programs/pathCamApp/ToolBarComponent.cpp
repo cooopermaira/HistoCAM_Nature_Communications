@@ -36,6 +36,9 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
           audioDictationToggle.setToggleState(mainComp->audioDictationOn, juce::dontSendNotification);
           audioDictationToggle.onClick = [this]() {
             mainComponent->audioDictationOn = audioDictationToggle.getToggleState();
+            if (mainComponent->audioDictationOn && !mainComponent->capture->wavRecorder.initialised) {
+              mainComponent->capture->wavRecorder.init();
+            }
           };
           addAndMakeVisible(audioDictationToggle);
 
