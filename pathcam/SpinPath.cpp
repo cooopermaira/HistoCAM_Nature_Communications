@@ -96,7 +96,8 @@ namespace pathCam {
             pathCam::Image *image = new pathCam::Image(parent->sCam->image_width, parent->sCam->image_height,
                                                        parent->sCam->get_scope_radius());
             image->copy_in(pResultImage->GetData());
-            //image->increment_smart_pointer();
+            image->increment_smart_pointer();
+
             std::string str;
             auto label = parent->getObjectiveLabel();
             if (!label.empty()) {
@@ -114,8 +115,13 @@ namespace pathCam {
 
             image_path.append(Poco::Path(str));
             image->set_disk_file(image_path);
+
+            {
+              Poco::FastMutex::ScopedLock lock(parent->cache_mutex);
+              parent->cache.push(image);
+            }
             parent->sCam->pass_image(image, i, true);
-            i++;
+            ++i;
             //image->free_memory_RAW();
           }
 
@@ -134,51 +140,21 @@ namespace pathCam {
   void FileStream::run() {
     parent->IOlogger.information("*** FILE IO ***");
 
-    Poco::Thread::sleep(200);
-
-    interrupt = false;
-
-    while (!interrupt || !parent->cache->empty()) {
+    while (!interrupt) {
       parent->IOlogger.information("loading next image");
 
       if (parent->thread_safe_cache_size() == 0) {
-        Poco::Thread::sleep(100);
+        Poco::Thread::sleep(50);
         continue;
       }
       parent->cache_mutex.lock();
-      cache_element front = parent->cache->front();
-      parent->cache->pop();
+      const auto image = parent->cache.front();
+      parent->cache.pop();
       parent->cache_mutex.unlock();
-      Image *image = front.image;
-      std::string name = front.name + ".Raw";
 
-      size_t image_bytes = image->width * image->height;
-      Poco::Path image_path = parent->getRootPath();
-
-      parent->caputure_set_mutex.lock();
-      image_path.append(Poco::Path(parent->captureSetName));
-      parent->caputure_set_mutex.unlock();
-      image_path.append(Poco::Path(name));
-      image->set_disk_file(image_path);
-
-      std::string test = image_path.toString();
-
-      //std::cout << image_path.toString() << "\n";
-      /*
-      Mat image_Mat = cv::Mat(Size(image->height,image->width), CV_8U, image->get_Raw(), Mat::AUTO_STEP);
-      cvtColor(image_Mat, image_Mat, COLOR_BayerBG2BGR);
-      std::string namep = front.name + ".png";
-      imwrite(namep, image_Mat);
-      */
-      std::fstream myfile;
-      myfile = std::fstream(image_path.toString(), std::ios::out | std::ios::binary);
-      if (myfile.fail()) {
-        throw new exception;
-      }
-      myfile.write(image->get_Raw(), image_bytes);
+      image->write_to_path(true);
       image->free_memory_RAW();
-      // image->set_disk_file(image_path.toString());
-      parent->IOlogger.information(Poco::format("Wrote: %s", image_path.toString()));
+
     }
   }
 
@@ -191,7 +167,6 @@ namespace pathCam {
                                                          IOChannel(new SimpleFileChannel),
                                                          IOlogger(Poco::Logger::get("IOLogger")) {
     sCam = std::make_shared<StreamCam>(config);
-    cache = new std::queue<cache_element>();
     camlogger.setChannel(camChannel);
     camChannel->setProperty("path", "camera.log");
     camChannel->setProperty("rotation", "2 K");
@@ -579,13 +554,13 @@ namespace pathCam {
       setRootPath(root_path);
       newCaptureSet();
       cameraStream = new CameraStream(this);
-      // fileStream =  new FileStream(this);
+      fileStream =  new FileStream(this);
       //processStream = new ProcessStream(this);
 
       thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
       thread_file.setOSPriority(Poco::Thread::getMaxOSPriority());
       thread_cam.start(*cameraStream);
-      // thread_file.start(*fileStream);
+      thread_file.start(*fileStream);
 
       sCam->fileSaveFolders.push_back(Poco::Path(captureSetName));
       sCam->microscopeInput = true;
@@ -601,7 +576,7 @@ namespace pathCam {
 
   void SpinPath::stopCamera() {
     cameraStream->interrupt = true;
-    // fileStream->interrupt = true;
+    fileStream->interrupt = true;
     // if (serialStream) serialStream->interrupt = true;
 
     sCam->captureTimeMS = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -609,7 +584,7 @@ namespace pathCam {
     sCam->microscopeInput = false;
     std::cout << "Collection complete, processing " << std::endl;
     thread_cam.join();
-    // thread_file.join();
+    thread_file.join();
     //thread_sCam.join();
 
     // if (serialStream) {
@@ -619,7 +594,7 @@ namespace pathCam {
     // }
 
     delete cameraStream;
-    // delete fileStream;
+    delete fileStream;
     //delete processStream;
 
     spinDownCamera();

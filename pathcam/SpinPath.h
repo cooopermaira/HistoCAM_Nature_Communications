@@ -24,11 +24,6 @@ namespace pathCam{
 
 class SpinPath;
 
-typedef struct cache_element{
-  pathCam::Image * image;
-  std::string name;
-} cache_element;
-
 
 class CameraStream: public Poco::Runnable{
 public:
@@ -100,22 +95,19 @@ private:
   Poco::FastMutex cache_mutex;
   Poco::FastMutex caputure_set_mutex;
   
-  std::queue < cache_element > * cache;
+  std::queue < Image* > cache;
 
   int serial_fd{-1}; // linux fd for /dev/ttyUSB0
   std::mutex label_mu;
-  std::string latest_label{""}; //make latest label always start at 2 will correct whenever obj is changed
+  std::string latest_label; //make latest label always start at 2 will correct whenever obj is changed
 
-  size_t thread_safe_cache_size(){
-    size_t result;
-    cache_mutex.lock();
-    result = cache->size();
-    cache_mutex.unlock();
-    return result;
+
+  size_t thread_safe_cache_size() {
+    Poco::FastMutex::ScopedLock lock(cache_mutex);
+    return cache.size();
   }
   
 public:
-  //std::shared_ptr<StreamCam> sCam;
   std::shared_ptr<StreamCam> sCam;
   SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();

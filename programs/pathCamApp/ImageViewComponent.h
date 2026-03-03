@@ -114,8 +114,10 @@ public:
   UniqueFifo<std::shared_ptr<MRTiledImageSet>> recentlyViewedSlides;
 
   std::vector<juce::Colour> levelColors = {
-    Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
-    Colour(243, 249, 243)
+    /*Colour(66, 91, 176), Colour(120, 154, 175), Colour(190, 217, 201),
+    Colour(243, 249, 243)*/
+    Colour(0, 255, 0), Colour(255, 255, 0), Colour(255, 0, 0),
+    Colour(211, 211, 211) //20x green, 10x yellow, 4x red, 2x gray
   };
   //==============================================================================
   ImageViewComponent(std::shared_ptr<fRectangle> view,

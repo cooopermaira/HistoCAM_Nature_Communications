@@ -91,7 +91,7 @@ namespace pathCam {
       buffer_mutex.lock();
       allocate_memory_RAW();
       memcpy(raw_buffer, buffer, width * height);
-      reference_count++;
+      ++reference_count;
       buffer_mutex.unlock();
     }
 
