@@ -22,33 +22,10 @@ namespace pathCam {
       ptrHandlingMode->SetIntValue(ptrHandlingModeEntry->GetValue());
       const std::string bufferModeName = ptrHandlingMode->GetCurrentEntry()->GetDisplayName().c_str();
       cout << endl << endl << "*** Buffer Handling Mode has been set to " << bufferModeName << " ***" << endl;
-      //
-      // Set acquisition mode to continuous
-      //
-      // *** NOTES ***
-      // Because the example acquires and saves 10 images, setting acquisition
-      // mode to continuous lets the example finish. If set to single frame
-      // or multiframe (at a lower number of images), the example would just
-      // hang. This would happen because the example has been written to
-      // acquire 10 images while the camera would have been programmed to
-      // retrieve less than that.
-      //
-      // Setting the value of an enumeration node is slightly more complicated
-      // than other node types. Two nodes must be retrieved: first, the
-      // enumeration node is retrieved from the nodemap; and second, the entry
-      // node is retrieved from the enumeration node. The integer value of the
-      // entry node is then set as the new value of the enumeration node.
-      //
-      // Notice that both the enumeration and the entry nodes are checked for
-      // availability and readability/writability. Enumeration nodes are
-      // generally readable and writable whereas their entry nodes are only
-      // ever readable.
-      //
-      // Retrieve enumeration node from nodemap
+
       Spinnaker::GenApi::INodeMap &iNodeMap = parent->pCam->GetNodeMap();
       CEnumerationPtr ptrAcquisitionMode = iNodeMap.GetNode("AcquisitionMode");
-      if (!IsReadable(ptrAcquisitionMode) ||
-          !IsWritable(ptrAcquisitionMode)) {
+      if (!IsReadable(ptrAcquisitionMode) || !IsWritable(ptrAcquisitionMode)) {
         cout << "Unable to set acquisition mode to continuous (enum retrieval). Aborting..." << endl << endl;
         //throw exception
       }
@@ -59,7 +36,14 @@ namespace pathCam {
         cout << "Unable to get or set acquisition mode to continuous (entry retrieval). Aborting..." << endl << endl;
         //throw exception
       }
-      CEnumerationPtr bufferLength = iNodeMap.GetNode("TransferQueueMaxBlockCount");
+
+      CEnumerationPtr bufferMode = sNodeMap.GetNode("StreamBufferCountMode");
+      bufferMode->SetIntValue(bufferMode->GetEntryByName("Manual")->GetValue());
+
+      CIntegerPtr bufferCount = sNodeMap.GetNode("StreamBufferCountManual");
+      bufferCount->SetValue(128);
+
+      //CEnumerationPtr bufferLength = iNodeMap.GetNode("TransferQueueMaxBlockCount");
 
       // Retrieve integer value from entry node
       const int64_t acquisitionModeContinuous = ptrAcquisitionModeContinuous->GetValue();
@@ -81,7 +65,7 @@ namespace pathCam {
       while (!interrupt) {
         try {
           //pResultImage is on the camera
-          ImagePtr pResultImage = parent->pCam->GetNextImage(1000);
+          ImagePtr pResultImage = parent->pCam->GetNextImage(3000);
 
           if (pResultImage->IsIncomplete()) {
             parent->camlogger.warning(Poco::format("Image incomplete: %s",
@@ -125,13 +109,17 @@ namespace pathCam {
             //image->free_memory_RAW();
           }
 
-          pResultImage->Release();
+
         } catch (Spinnaker::Exception &e) {
+          std::cout << "error 1 "<<e.what() << std::endl;
           parent->camlogger.error("Error: %s", e.what());
         }
       }
       parent->pCam->EndAcquisition();
+      parent->cameraDone = true;
+      std::cout << "camera stream terminated" << std::endl;
     } catch (Spinnaker::Exception &e) {
+      std::cout << "error 2"<< e.what() << std::endl;
       parent->camlogger.error("Error: %s", e.what());
       return;
     }
@@ -140,21 +128,26 @@ namespace pathCam {
   void FileStream::run() {
     parent->IOlogger.information("*** FILE IO ***");
 
-    while (!interrupt) {
+    int i = 0;
+    while (!interrupt || !parent->cameraDone || parent->thread_safe_cache_size() > 0) {
       parent->IOlogger.information("loading next image");
+      {
+        Poco::FastMutex::ScopedLock lock(parent->cache_mutex);
+        while (!parent->cache.empty()) {
+          const auto image = parent->cache.front();
+          parent->cache.pop();
 
+          image->write_to_path(true);
+          image->free_memory_RAW();
+
+          if ((i++) % 100 == 0) {
+            std::cout << "wrote image " << i << std::endl;
+          }
+        }
+      }
       if (parent->thread_safe_cache_size() == 0) {
         Poco::Thread::sleep(50);
-        continue;
       }
-      parent->cache_mutex.lock();
-      const auto image = parent->cache.front();
-      parent->cache.pop();
-      parent->cache_mutex.unlock();
-
-      image->write_to_path(true);
-      image->free_memory_RAW();
-
     }
   }
 
@@ -342,6 +335,8 @@ namespace pathCam {
       camlogger.information("Acquisition mode set to continuous...");
       cout << "Acquisition mode set to continuous..." << endl;
 
+      pCam->GevSCPSPacketSize.SetValue(9000);
+
       // Set exposure time to 1500 us
       // Turn off auto exposure
       pCam->ExposureAuto.SetValue(Spinnaker::ExposureAutoEnums::ExposureAuto_Off);
@@ -464,7 +459,8 @@ namespace pathCam {
       default: throw std::runtime_error("Unsupported baud");
     }
   }
-  static int openSerial(const char* device, int baud) {
+
+  static int openSerial(const char *device, int baud) {
     int fd = ::open(device, O_RDWR | O_NOCTTY | O_NONBLOCK);
     if (fd < 0)
       throw std::runtime_error(std::string("open: ") + std::strerror(errno));
@@ -490,7 +486,7 @@ namespace pathCam {
     tty.c_lflag = 0;
     tty.c_oflag = 0;
 
-    tty.c_cc[VMIN]  = 0;
+    tty.c_cc[VMIN] = 0;
     tty.c_cc[VTIME] = 1;
 
     if (tcsetattr(fd, TCSANOW, &tty) != 0) {
@@ -554,7 +550,7 @@ namespace pathCam {
       setRootPath(root_path);
       newCaptureSet();
       cameraStream = new CameraStream(this);
-      fileStream =  new FileStream(this);
+      fileStream = new FileStream(this);
       //processStream = new ProcessStream(this);
 
       thread_cam.setOSPriority(Poco::Thread::getMaxOSPriority());
@@ -593,8 +589,12 @@ namespace pathCam {
     //   serialStream = nullptr;
     // }
 
+
     delete cameraStream;
+    cameraStream = nullptr;
+
     delete fileStream;
+    fileStream = nullptr;
     //delete processStream;
 
     spinDownCamera();
@@ -617,6 +617,5 @@ namespace pathCam {
 
     Poco::File tmpDir(capture_path);
     tmpDir.createDirectories();
-
   }
 }

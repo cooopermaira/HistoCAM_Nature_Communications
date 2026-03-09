@@ -460,10 +460,10 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
 
   // --- Root request body
   juce::DynamicObject::Ptr root(new juce::DynamicObject());
-  root->setProperty("model", "gpt-4o-mini");
+  root->setProperty("model", "gpt-5-mini");
   root->setProperty("instructions", systemMsg);
   root->setProperty("input", text);
-  root->setProperty("temperature", 0);
+  // root->setProperty("temperature", 0);
   root->setProperty("text", juce::var(textObj.get()));
 
   return juce::JSON::toString(juce::var(root.get()), true).toStdString();
@@ -830,7 +830,7 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  juce::File dictPath("/home/cm/Documents/data/low_feat_10x/dictation.wav");
+  juce::File dictPath("/home/pathcam/pcamdata/save_and_load/Andrew_2_26/0/dictation.wav");
 
   auto start = std::chrono::high_resolution_clock::now();
   auto [fullText,wordVec] = send_transcribe_call(dictPath);

@@ -243,7 +243,7 @@ namespace pathCam {
 
     file = std::fstream(image_file.toString(), std::ios::out | std::ios::binary);
     if (file.fail()) {
-      throw new std::exception;
+      throw std::runtime_error("Image::write_to_path failed");
     }
     file.write(get_Raw(), width * height);
 
