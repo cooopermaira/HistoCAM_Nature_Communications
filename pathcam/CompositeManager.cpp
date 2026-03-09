@@ -166,7 +166,7 @@ namespace pathCam {
     for (auto img: parent->images) {
       if (!img) { continue; }
       if (img->get_Raw() || img->get_raw_cuda()) {
-        std::cout << img->index << std::endl;
+        std::cout << img->index << " not freed"<<std::endl;
       }
     }
 

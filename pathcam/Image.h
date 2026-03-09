@@ -85,14 +85,13 @@ namespace pathCam {
 
     cv::Mat full_image_asMat();
 
-    void increment_smart_pointer() { reference_count++; }
+    void increment_smart_pointer() { ++reference_count; }
 
     void copy_in(void *buffer) {
-      buffer_mutex.lock();
+      Poco::FastMutex::ScopedLock lock(buffer_mutex);
       allocate_memory_RAW();
       memcpy(raw_buffer, buffer, width * height);
       ++reference_count;
-      buffer_mutex.unlock();
     }
 
     static float get_mpp(unsigned int _label) {

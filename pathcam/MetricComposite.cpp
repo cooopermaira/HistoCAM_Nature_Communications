@@ -353,13 +353,13 @@ namespace pathCam {
     }
 
     int iii = 0;
-    for (auto &img : newContributingFrames) {
-      if(img->regInfo->component_membership != componentIndex) {
-        ++iii;
-        auto v = adjacency[img];
-        std::cout<<img->index<<std::endl;
-      }
-    }
+    // for (auto &img : newContributingFrames) {
+    //   if(img->regInfo->component_membership != componentIndex) {
+    //     ++iii;
+    //     auto v = adjacency[img];
+    //     std::cout<<img->index<<std::endl;
+    //   }
+    // }
     members = reduce_members_through_competition(members);
     members.insert(root);
 

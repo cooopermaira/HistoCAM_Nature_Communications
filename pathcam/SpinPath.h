@@ -108,6 +108,7 @@ private:
   }
   
 public:
+  std::atomic<bool> cameraDone = false;
   std::shared_ptr<StreamCam> sCam;
   SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();

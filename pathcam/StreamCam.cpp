@@ -1014,7 +1014,7 @@ namespace pathCam {
               frameLabels[img->index] = frameLabels[img->index - 1];
             } //else it just stays (0,0) because that's what it inits to.
           } else {
-            std::cout << img->index << " " << Image::get_label(img->label) << std::endl;
+            std::cout << img->index << " " << Image::get_label(img->label) <<"no reginfo but non black label" <<std::endl;
           }
         }
       }
