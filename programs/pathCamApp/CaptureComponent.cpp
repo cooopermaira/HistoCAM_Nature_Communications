@@ -10,10 +10,9 @@
 #include <filesystem>
 
 
-inline std::filesystem::path makeTempWavInCwd(const std::string& prefix = "recording")
-{
+inline std::filesystem::path makeTempWavInCwd(const std::string &prefix = "recording") {
   namespace fs = std::filesystem;
-  fs::path p = fs::current_path() /(prefix + ".wav");
+  fs::path p = fs::current_path() / (prefix + ".wav");
   return p;
 }
 
@@ -72,7 +71,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
     wavRecorder.init();
   }
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-  std::chrono::high_resolution_clock::now() - start).count();
+    std::chrono::high_resolution_clock::now() - start).count();
 
 #ifdef WITH_SPINNAKER
   if (!spinpath) {
@@ -95,10 +94,9 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
     scopeRadius = sCam->get_scope_radius();
     aiOverlay->set_sCam(sCam);
     parent->sCam = sCam;
-    if (!parent->labelList) {
+    if (!parent->labelList && parent->annotate) {
       setup_listbox();
     }
-
   }
   int k = 0;
 }
@@ -122,7 +120,8 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 #ifdef WITH_SPINNAKER
   if (recording) {
     int ignore;
-    spinpath->sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel, lastScale); // added lastScale to avoid build error, not sure if the final argument should be something else
+    spinpath->sCam->get_last_frame(frameBox, showAsCircle, ignore, magLabel, lastScale);
+    // added lastScale to avoid build error, not sure if the final argument should be something else
   }
 #endif
 
@@ -161,7 +160,7 @@ void CaptureComponent::drawSlide(juce::Graphics &g, float scale) {
 
 
 void CaptureComponent::startRecording() {
-  if (compositeThread.isRunning()){
+  if (compositeThread.isRunning()) {
     std::cout << "Composite thread still running — ignoring start request\n";
     return;
   }
@@ -174,9 +173,9 @@ void CaptureComponent::startRecording() {
     aiOverlay->set_sCam(spinpath->sCam);
     parent->sCam = spinpath->sCam;
     sCam = spinpath->sCam;
-    if (!parent->labelList) {
-      setup_listbox();
-    }
+  }
+  if (!parent->labelList && parent->annotate) {
+    setup_listbox();
   }
   //aiOverlay->set_sCam(bcam->sCam);
   sCam->set_slide_label();
@@ -210,7 +209,7 @@ void CaptureComponent::startRecording() {
 }
 
 void CaptureComponent::startSimulating() {
-  if (compositeThread.isRunning()){
+  if (compositeThread.isRunning()) {
     std::cout << "Composite thread still running — ignoring start request\n";
     return;
   }
@@ -223,10 +222,9 @@ void CaptureComponent::startSimulating() {
     scopeRadius = sCam->get_scope_radius();
     aiOverlay->set_sCam(sCam);
     parent->sCam = sCam;
-      if (!parent->labelList) {
-        setup_listbox();
-      }
-
+  }
+  if (!parent->labelList && parent->annotate) {
+    setup_listbox();
   }
 
   if (!inputPath.empty()) {
@@ -273,9 +271,9 @@ void CaptureComponent::stop() {
   if (simulating) { stopSimulating(); }
 
   if (parent->audioDictationOn) {
-  // if (true){
+    // if (true){
     Poco::FastMutex::ScopedLock lock(parent->annotate->voiceAnnoMutex);
-    parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(finalAudio.toString())));
+    parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index, juce::File(finalAudio.toString())));
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/low_feat_10x/dictation.wav")));
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
     parent->annotate->newVoiceAnnotation.set();
@@ -307,7 +305,8 @@ void CaptureComponent::set_input(const FileChooser &fc) {
     ready = true;
     if (MRImageSet) {
       // parent->imageview->setImage(nullptr);
-      /*parent->capture->*/setImage(nullptr); //literally this
+      /*parent->capture->*/
+      setImage(nullptr); //literally this
       parent->annotate->setImage(nullptr);
     }
     captureOverlay->resized();
@@ -347,19 +346,21 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
 
         // Brief red flash overlay
         struct FlashOverlay : public juce::Component, public juce::Timer {
-          FlashOverlay(juce::Component* parent) {
+          FlashOverlay(juce::Component *parent) {
             parent->addAndMakeVisible(this);
             setBounds(parent->getLocalBounds());
             setAlwaysOnTop(true);
             startTimer(150);
           }
-          void paint(juce::Graphics& g) override {
+
+          void paint(juce::Graphics &g) override {
             g.setColour(juce::Colour::fromFloatRGBA(1.0f, 0.0f, 0.0f, 0.4f));
             g.fillRect(getLocalBounds());
           }
+
           void timerCallback() override {
             stopTimer();
-            if (auto* p = getParentComponent()) p->removeChildComponent(this);
+            if (auto *p = getParentComponent()) p->removeChildComponent(this);
             delete this;
           }
         };
