@@ -1,11 +1,14 @@
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <bits/regex_error.h>
+#include <cuda_runtime.h>
 
 #include "opencv2/calib3d.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
+#include <NvInfer.h>
 
 #include "opencv2/core/cuda.hpp"
 #include "opencv2/cudaarithm.hpp"
@@ -15,33 +18,39 @@
 
 #include <opencv2/stitching/detail/matchers.hpp>
 #include <opencv2/stitching/detail/camera.hpp>
+
 #include "opencv2/core.hpp"
 
 using namespace cv;
+using namespace nvinfer1;
 
 cv::Mat hann;
 
-std::pair<float, float> meanStdDev(const std::vector<float>& values)
-{
+class nvLogger : public ILogger {
+  void log(Severity s, const char *msg) noexcept override {
+    if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
+  }
+} nvlogger;
+
+std::pair<float, float> meanStdDev(const std::vector<float> &values) {
   const size_t n = values.size();
   if (n == 0)
     return {0.0f, 0.0f};
 
   float mean = 0.0f;
-  float M2   = 0.0f;
-  size_t k   = 0;
+  float M2 = 0.0f;
+  size_t k = 0;
 
-  for (float x : values)
-  {
+  for (float x: values) {
     ++k;
-    float delta  = x - mean;
-    mean        += delta / k;
+    float delta = x - mean;
+    mean += delta / k;
     float delta2 = x - mean;
-    M2          += delta * delta2;
+    M2 += delta * delta2;
   }
 
-  float variance = (n > 1) ? (M2 / (n - 1)) : 0.0f;  // sample variance
-  float stddev   = std::sqrt(variance);
+  float variance = (n > 1) ? (M2 / (n - 1)) : 0.0f; // sample variance
+  float stddev = std::sqrt(variance);
 
   return {mean, stddev};
 }
@@ -149,25 +158,39 @@ float estimateAdditionalGaussianBlurSigma(
 
 Mat log_mag_dft(Mat img) {
   assert(img.rows == hann.rows && img.cols == hann.cols && img.depth() == CV_32F && img.channels() == 1);
-  multiply(img,hann,img);
-  Mat planes[] = {img,Mat(img.rows,img.cols,CV_32F,Scalar(0))};
-  Mat complexI,mag;
-  merge(planes,2,complexI);
+  multiply(img, hann, img);
+  Mat planes[] = {img, Mat(img.rows, img.cols,CV_32F, Scalar(0))};
+  Mat complexI, mag;
+  merge(planes, 2, complexI);
 
-  dft(complexI,complexI);
+  dft(complexI, complexI);
 
-  split(complexI,planes);
-  magnitude(planes[0],planes[1],mag);
-  add(Scalar(1e-6),mag,mag);
-  log(mag,mag);
+  split(complexI, planes);
+  magnitude(planes[0], planes[1], mag);
+  add(Scalar(1e-6), mag, mag);
+  log(mag, mag);
 
-  GaussianBlur(mag,mag,Size(3,3),3,3);
+  GaussianBlur(mag, mag, Size(3, 3), 3, 3);
   Mat res;
-  normalize(mag,res, 0,255,NORM_MINMAX,CV_8U);
+  normalize(mag, res, 0, 255, NORM_MINMAX,CV_8U);
   return res;
 }
 
-std::pair<float, float> run_for_img_pair(const Mat& blurMat, const Mat& sharpMat,int roiSize) {
+static std::vector<char> readFile(const std::string &p) {
+  std::ifstream f(p, std::ios::binary);
+  if (!f) {
+    std::cerr << "Open failed: " << p << "\n";
+    std::exit(1);
+  }
+  f.seekg(0, std::ios::end);
+  size_t sz = f.tellg();
+  f.seekg(0, std::ios::beg);
+  std::vector<char> buf(sz);
+  f.read(buf.data(), sz);
+  return buf;
+}
+
+std::pair<float, float> run_for_img_pair(const Mat &blurMat, const Mat &sharpMat, int roiSize) {
   int increment = 20;
   std::vector<float> scores;
   Mat display;
@@ -189,35 +212,89 @@ std::pair<float, float> run_for_img_pair(const Mat& blurMat, const Mat& sharpMat
 
 
 int main(int argc, char **argv) {
+  int maxBlurBatchSize = 64;
+  char *blurInputs = nullptr;
+  float *blurOutputs = nullptr;
+  cudaStream_t blurStream{};
+  auto dBlob = readFile("/home/cm/Documents/data/blur_test/train/blur_dft_cnn_uint8.engine");
+
+  IRuntime *bRuntime = createInferRuntime(nvlogger);
+  auto blurEngine = bRuntime->deserializeCudaEngine(dBlob.data(), dBlob.size());
+  delete bRuntime;
+
+  assert(blurEngine);
+  auto blurCtx = blurEngine->createExecutionContext();
+  cudaStreamCreate(&blurStream);
+
+  cudaMalloc(&blurInputs, 128 * 128 * maxBlurBatchSize * sizeof(float));
+  cudaMalloc(&blurOutputs, maxBlurBatchSize * sizeof(float));
+
+  blurCtx->setInputTensorAddress("input", blurInputs);
+  blurCtx->setOutputTensorAddress("output", blurOutputs);
+
   int roiSize = 1 * 128;
-  cv::createHanningWindow(hann, Size(roiSize, roiSize), CV_32F);
 
-  std::string file = argv[1];
-  for (int i = 1; i < 2900; i+=30) {
-    std::ostringstream oss;
-    oss << std::setw(6) << std::setfill('0') << i;
-    std::string fileName = oss.str()+".png";
+  auto path = std::filesystem::path(argv[1]);
+  std::vector<std::filesystem::path> tiffFiles;
 
-    std::string blurImg = file + "/blur/images/" + fileName;
-    std::string sharpImg = file + "/sharp/images/" + fileName;
-
-    Mat blurMat = imread(blurImg);
-    Mat sharpMat = imread(sharpImg);
-
-    cvtColor(blurMat, blurMat, COLOR_BGR2GRAY);
-    cvtColor(sharpMat, sharpMat, COLOR_BGR2GRAY);
-
-    blurMat.convertTo(blurMat,CV_32FC1);
-    sharpMat.convertTo(sharpMat,CV_32FC1);
-
-    auto [mean,stddv] = run_for_img_pair(blurMat,sharpMat,roiSize);
-    std::cout<<fileName + " "<<mean<<" "<<stddv<<std::endl;
+  for (const auto &entry: std::filesystem::directory_iterator(path)) {
+    if (entry.path().extension() == ".tiff")
+      tiffFiles.push_back(entry.path());
   }
 
+  const size_t totalTiffs = tiffFiles.size();
 
+  int count = 0;
+  std::vector<float> results;
 
+  for (size_t i = 0; i < totalTiffs; ++i) {
+    const auto &file = tiffFiles[i];
 
+    auto dft = imread(file.string(), cv::IMREAD_UNCHANGED);
 
+    cudaMemcpy(
+      blurInputs + count * 128 * 128 * sizeof(float),
+      dft.data,
+      128 * 128 * sizeof(float),
+      cudaMemcpyHostToDevice
+    );
 
-  // std::cout<<mean<<" "<<stddv<<std::endl;
+    ++count;
+
+    const bool batchFull = (count >= maxBlurBatchSize);
+    const bool isLastTiff = (i == totalTiffs - 1);
+
+    if (batchFull || isLastTiff) {
+      // Run inference with batch size = count
+      blurCtx->setInputShape("input", Dims4{count, 1, 128, 128});
+      blurCtx->enqueueV3(blurStream);
+
+      cudaStreamSynchronize(blurStream);
+
+      // copy outputs
+      std::vector<float> batchOut(count);
+      cudaMemcpy(batchOut.data(), blurOutputs,
+                 count * sizeof(float),
+                 cudaMemcpyDeviceToHost);
+
+      results.insert(results.end(), batchOut.begin(), batchOut.end());
+
+      count = 0;
+    }
+  }
+
+  float max = 0;
+  float min = 1;
+  for (size_t i = 0; i < results.size(); ++i) {
+    results[i] = 1.f/ (1.f + std::exp(-results[i]));
+    if (results[i] < min) {
+      min = results[i];
+    }
+    if (results[i] > max) {
+      max = results[i];
+    }
+  }
+  std::cout<<max<<" "<<min<<std::endl;
+  auto [mean,stddv] = meanStdDev(results);
+  std::cout<<mean<<" "<<stddv<<std::endl;
 }

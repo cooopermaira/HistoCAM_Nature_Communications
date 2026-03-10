@@ -273,14 +273,33 @@ namespace pathCam {
         imwrite(r.toString(), image->blurDFT);
       }
     }
+
+    // Mat img32f;
+    // cvtColor(color,img,COLOR_BGR2GRAY);
+    // img.convertTo(img32f,CV_32F);
+    // r.pushDirectory("dft");
+    //
+    // for (int x = 100; x < image->width - Image::blurPatch; x += 100) {
+    //   for (int y = 100; y < image->height - Image::blurPatch; y += 100) {
+    //     Rect roi(x,y,Image::blurPatch,Image::blurPatch);
+    //     image->check_blur_async(img32f(roi),false);
+    //     std::string fn = image->image_file.getBaseName() + std::to_string(x)+"_" + std::to_string(y);
+    //     r.setFileName(fn);
+    //     r.setExtension("tiff");
+    //     imwrite(r.toString(), image->blurDFT);
+    //   }
+    // }
   }
 
 
   void DebayerRunnable::run() {
     image->index = image_index;
 
+    // process_debayer(image, true, {2000, 2000},
+    //                 true, 0.125, true, 1);
     process_debayer(image, true, {2000, 2000},
-                    true, 0.125, true, 1);
+                true, 0.125, true, 1);
+
   }
 
 

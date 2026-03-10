@@ -24,30 +24,45 @@ namespace pathCam{
 
 class SpinPath;
 
+  template <class F>
+void retry(int attempts, std::chrono::milliseconds delay, F&& fn){
+    for (int i = 0; i < attempts; ++i){
+      try{
+        fn();
+        return;
+      }
+      catch (...){
+        if (i + 1 == attempts) {
+          throw;
+        }
+        std::this_thread::sleep_for(delay);
+      }
+    }
+  }
 
 class CameraStream: public Poco::Runnable{
 public:
   SpinPath * parent;
-  bool interrupt;
+  std::atomic<bool> interrupt;
   CameraStream(SpinPath * parent): parent(parent) {};
   ~CameraStream() {};
-  virtual void run();
+  void run() override;
 };
 
 
 class FileStream: public Poco::Runnable{
 public:
   SpinPath * parent;
-  bool interrupt;
+  std::atomic<bool> interrupt;
   FileStream(SpinPath * parent): parent(parent) {};
   ~FileStream() {};
-  virtual void run();
+  void run() override;
 };
 
 class ProcessStream : public Poco::Runnable {
 public:
     SpinPath* parent;
-    bool interrupt;
+    std::atomic<bool> interrupt;
     ProcessStream(SpinPath* parent) : parent(parent) {};
     ~ProcessStream() {};
     virtual void run();
@@ -109,6 +124,7 @@ private:
   
 public:
   std::atomic<bool> cameraDone = false;
+  std::atomic<bool> queuedFrames = false;
   std::shared_ptr<StreamCam> sCam;
   SpinPath(LayeredConfiguration::Ptr config);
   ~SpinPath();
@@ -138,7 +154,7 @@ public:
   
 private:
   
-  bool interrupt;
+  std::atomic<bool> interrupt;
     
   int spinUpCamera();
   

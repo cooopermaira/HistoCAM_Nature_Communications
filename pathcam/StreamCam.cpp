@@ -987,6 +987,7 @@ namespace pathCam {
 
 
   void StreamCam::cleanup_and_reset() {
+    float minBlur = 1, maxBlur = 0;
     for (auto comp: composites) {
       comp->correct_offset();
     }
@@ -998,7 +999,8 @@ namespace pathCam {
         if (img->regInfo) {
           if (!img->regInfo->wasAligned) {
             // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
-            auto abc = Point2f(-img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
+            auto abc = Point2f(
+              -img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
             abc = get_AbC_relative_from_relative(img->regInfo->component_membership, abc, 0);
             AbCs[img->index] = abc;
           } else {
@@ -1017,8 +1019,11 @@ namespace pathCam {
             std::cout << img->index << " " << Image::get_label(img->label) <<"no reginfo but non black label" <<std::endl;
           }
         }
+        if (img->motionBlur < minBlur) { minBlur = img->motionBlur; }
+        if (img->motionBlur > maxBlur) { maxBlur = img->motionBlur; }
       }
     }
+    std::cout << "minBlur maxBlur " << minBlur << " " << maxBlur << std::endl;
     std::unordered_map<int, float> labelScaleLookup;
     create_mag_label_to_scale_lookup(labelScaleLookup);
 
