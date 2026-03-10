@@ -35,6 +35,8 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config) : con
   addChildComponent(capture);
   addChildComponent(annotate);
 
+  capture->setup_listbox();
+
   cwd = juce::File("/home/");
   dirFilter = std::make_unique<juce::WildcardFileFilter>("*", "*", "All Files");
   dirBrowser = std::make_unique<juce::FileBrowserComponent>(

@@ -47,7 +47,7 @@ namespace pathCam {
         SiftData compSiftData;
 
 
-        int frameDelay;
+        inline static int frameDelay = 10;
         int positionForNextWaitngFrame = 0;
         int debugFrameCount = 0;
         int debugTileCount1 = 0,debugTileCount2 = 0;

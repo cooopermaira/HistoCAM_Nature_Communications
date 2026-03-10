@@ -102,16 +102,15 @@ namespace pathCam {
 
             {
               Poco::FastMutex::ScopedLock lock(parent->cache_mutex);
+              parent->queuedFrames = true;
               parent->cache.push(image);
             }
             parent->sCam->pass_image(image, i, true);
             ++i;
             //image->free_memory_RAW();
           }
-
-
         } catch (Spinnaker::Exception &e) {
-          std::cout << "error 1 "<<e.what() << std::endl;
+          std::cout << "error 1 " << e.what() << std::endl;
           parent->camlogger.error("Error: %s", e.what());
         }
       }
@@ -119,35 +118,53 @@ namespace pathCam {
       parent->cameraDone = true;
       std::cout << "camera stream terminated" << std::endl;
     } catch (Spinnaker::Exception &e) {
-      std::cout << "error 2"<< e.what() << std::endl;
+      std::cout << "error 2" << e.what() << std::endl;
       parent->camlogger.error("Error: %s", e.what());
       return;
     }
   }
 
-  void FileStream::run() {
-    parent->IOlogger.information("*** FILE IO ***");
+
+
+  void FileStream::run(){
 
     int i = 0;
-    while (!interrupt || !parent->cameraDone || parent->thread_safe_cache_size() > 0) {
-      parent->IOlogger.information("loading next image");
-      {
-        Poco::FastMutex::ScopedLock lock(parent->cache_mutex);
-        while (!parent->cache.empty()) {
-          const auto image = parent->cache.front();
-          parent->cache.pop();
+    try {
+      while (!interrupt || !parent->cameraDone || parent->queuedFrames){
+        Image* image = nullptr;
 
-          image->write_to_path(true);
-          image->free_memory_RAW();
+        {
+          Poco::FastMutex::ScopedLock lock(parent->cache_mutex);
 
+          if (!parent->cache.empty()) {
+            image = parent->cache.front();
+            parent->cache.pop();
+          } else {
+            parent->queuedFrames = false;
+          }
+        }
+
+        if (!image) {
+          Poco::Thread::sleep(50);
+          continue;
+        }
+
+        try {
+          retry(3, std::chrono::milliseconds(10), [&]{
+            image->write_to_path(true);
+          });
           if ((i++) % 100 == 0) {
             std::cout << "wrote image " << i << std::endl;
           }
+        }catch (...) {
+          std::cout<<"FAILURE TO WRITE IMAGE IN FileStream::run()"<<std::endl;
         }
+
+        image->free_memory_RAW();
       }
-      if (parent->thread_safe_cache_size() == 0) {
-        Poco::Thread::sleep(50);
-      }
+    }catch (const std::exception& e) {
+      parent->IOlogger.fatal(
+        std::string("FileStream thread terminating: ") + e.what());
     }
   }
 
@@ -573,7 +590,6 @@ namespace pathCam {
   void SpinPath::stopCamera() {
     cameraStream->interrupt = true;
     fileStream->interrupt = true;
-    // if (serialStream) serialStream->interrupt = true;
 
     sCam->captureTimeMS = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::high_resolution_clock::now() - startTime).count();
@@ -581,21 +597,12 @@ namespace pathCam {
     std::cout << "Collection complete, processing " << std::endl;
     thread_cam.join();
     thread_file.join();
-    //thread_sCam.join();
-
-    // if (serialStream) {
-    //   thread_serial.join();
-    //   delete serialStream;
-    //   serialStream = nullptr;
-    // }
-
 
     delete cameraStream;
     cameraStream = nullptr;
 
     delete fileStream;
     fileStream = nullptr;
-    //delete processStream;
 
     spinDownCamera();
   }

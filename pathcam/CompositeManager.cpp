@@ -135,7 +135,6 @@ namespace pathCam {
 
     for (auto &comp: parent->composites) {
       if (comp->suspended) {
-        comp->imagePyramid->suspended = true;
         continue;
       }
       auto mc = std::dynamic_pointer_cast<MetricComposite>(comp);

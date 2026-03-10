@@ -29,7 +29,7 @@ namespace pathCam {
 
     float reg_full_scale;
     float motionBlur;
-    int blurPatch = 1024;
+    static inline int blurPatch = 1024;
 
     enum {
       _NOLABEL = 0, _2X, _4X, _10X, _20X, _40X, /*_UNKNOWN,*/ _BAD_FILE, _LOWFEAT, _UNDEREXP, _OVEREXP, _MOTION_BLUR

@@ -119,7 +119,7 @@ add_executable(test programs/test.cpp)
 
 target_include_directories(test PRIVATE ${OpenCV_INCLUDE_DIRS})
 
-target_link_libraries(test PRIVATE ${OpenCV_LIBS})
+target_link_libraries(test PRIVATE ${OpenCV_LIBS} CUDA::cudart nvinfer)
 #IF (BUILD_TEST)
 #    add_executable(test programs/test.cpp)
 #    target_link_libraries(test pathCamLib)
