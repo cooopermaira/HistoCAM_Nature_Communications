@@ -1027,6 +1027,13 @@ namespace pathCam {
     std::unordered_map<int, float> labelScaleLookup;
     create_mag_label_to_scale_lookup(labelScaleLookup);
 
+    for (auto &comp : composites) {
+      if (comp->frameCount < 5) {
+        comp->suspended = true;
+        comp->imagePyramid->suspended = true;
+      }
+    }
+
     MRImageSet->labelScaleLookup = labelScaleLookup;
     MRImageSet->AbCs = AbCs;
     MRImageSet->frameLabels = frameLabels;

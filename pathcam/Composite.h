@@ -120,6 +120,7 @@ namespace pathCam {
 
     std::vector<Image*> memberFrames;
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
+    int frameCount = 0;
 
     FeatureTrackGenerator* ftg;
     BundleAdjustmentIntegrator* bai;
@@ -143,6 +144,12 @@ namespace pathCam {
 
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);
+
+    void suspend() {
+      suspended = true;
+      imagePyramid->suspended = true;
+      imagePyramid->level.clear();
+    }
 
     void stage(RegInfo *_ri) { staging.push(_ri); }
 

@@ -77,7 +77,7 @@ namespace pathCam {
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
     parent, image_size, _componentIndex){
-    frameDelay = 10;
+
     waitingFrames.resize(frameDelay, {nullptr, {}});
     //compositeImage = imagePyramid->level[0];
 
@@ -145,6 +145,7 @@ namespace pathCam {
       assert(img->regInfo);
 
       staging.pop();
+      ++frameCount;
 
       if (img->labelObserved) {
         ++observedLabels[img->label];
