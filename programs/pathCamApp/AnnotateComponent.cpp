@@ -344,6 +344,11 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
       "For each finding, output:\n"
       "- label: a 1-5 word canonical pathology phrase.\n"
       "- evidence_text: the exact contiguous substring from the transcript that supports this label.\n"
+      "- scope: either 'local' or 'global'.\n"
+      "\n"
+      "Scope definitions: \n"
+      "- local = the finding is tied to a specific slide region, focal area, ROI, side, location, core, nodule, or microscopic subregion being discussed. \n"
+      "- global = the finding is stated as an overall specimen-level / case-level / final interpretive conclusion, grading summary, or report-level assessment. \n"
       "\n"
       "Rules:\n"
       "1) Output ONLY JSON matching the provided schema.\n"
@@ -356,23 +361,23 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
       // "6) If multiple alternative interpretations of the SAME finding appear in close proximity\n"
       // "   (e.g. 'maybe', 'probably', 'versus', 'favors'), and a later statement clearly resolves or favors one,\n"
       // "   output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
-  "6) Revision/uncertainty merge rule (MUST follow):\n"
-"   Only merge multiple mentions into ONE annotation when the transcript explicitly presents them as alternative interpretations\n"
-"   or a correction/revision of the SAME finding, using uncertainty/revision markers such as:\n"
-"   \"maybe\", \"probably\", \"or\", \"versus\", \"favors\", \"could be\", \"cannot exclude\", \"actually\", \"no\", \"never mind\", \"on second thought\".\n"
-"   In that case, output exactly ONE annotation labeled with the FINAL favored interpretation (the last decisive claim in that discussion),\n"
-"   and evidence_text MUST be one contiguous verbatim substring spanning from the first mention through the final conclusion/revision.\n"
-"\n"
-"6a) Distinct-assertion split rule (MUST follow):\n"
-"    If the transcript asserts TWO different interpretations/values as separate findings WITHOUT the uncertainty/revision markers above\n"
-"    (often joined by \"and\", \"also\", \"as well as\", or stated in separate clauses/sentences), then output TWO annotations (one per finding).\n"
-"    Gleason-specific example: \"more Gleason 3 plus 4, and Gleason pattern 4 plus 3\" -> output both \"Gleason 3+4\" and \"Gleason 4+3\".\n"
-"\n"
-"6b) Forbidden adjacent-alternatives pattern (guardrail):\n"
-"    Do NOT output two adjacent annotations for the same finding when one is clearly an alternative/correction of the other per rule 6\n"
-"    (e.g. \"Gleason 3+3\" then \"Gleason 3+4\" with \"maybe/probably\"). If you would, merge them into ONE labeled with the final favored interpretation,\n"
-"    and evidence_text spanning both. Do NOT label with an earlier, less confident alternative if a later, more confident alternative is present.\n"
-"\n"
+      "6) Revision/uncertainty merge rule (MUST follow):\n"
+      "   Only merge multiple mentions into ONE annotation when the transcript explicitly presents them as alternative interpretations\n"
+      "   or a correction/revision of the SAME finding, using uncertainty/revision markers such as:\n"
+      "   \"maybe\", \"probably\", \"or\", \"versus\", \"favors\", \"could be\", \"cannot exclude\", \"actually\", \"no\", \"never mind\", \"on second thought\".\n"
+      "   In that case, output exactly ONE annotation labeled with the FINAL favored interpretation (the last decisive claim in that discussion),\n"
+      "   and evidence_text MUST be one contiguous verbatim substring spanning from the first mention through the final conclusion/revision.\n"
+      "\n"
+      "6a) Distinct-assertion split rule (MUST follow):\n"
+      "    If the transcript asserts TWO different interpretations/values as separate findings WITHOUT the uncertainty/revision markers above\n"
+      "    (often joined by \"and\", \"also\", \"as well as\", or stated in separate clauses/sentences), then output TWO annotations (one per finding).\n"
+      "    Gleason-specific example: \"more Gleason 3 plus 4, and Gleason pattern 4 plus 3\" -> output both \"Gleason 3+4\" and \"Gleason 4+3\".\n"
+      "\n"
+      "6b) Forbidden adjacent-alternatives pattern (guardrail):\n"
+      "    Do NOT output two adjacent annotations for the same finding when one is clearly an alternative/correction of the other per rule 6\n"
+      "    (e.g. \"Gleason 3+3\" then \"Gleason 3+4\" with \"maybe/probably\"). If you would, merge them into ONE labeled with the final favored interpretation,\n"
+      "    and evidence_text spanning both. Do NOT label with an earlier, less confident alternative if a later, more confident alternative is present.\n"
+      "\n"
   // "6c) FINAL label tie-break (MUST follow, especially for Gleason):\n"
   // "    When a single discussion window contains multiple alternative values/grades (e.g. \"3 plus 3\" then \"maybe 3 plus 4\" then \"probably 3 plus 4\"),\n"
   // "    the label MUST be the FINAL favored value stated in that window.\n"
@@ -394,12 +399,16 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
 // "    then 'probably 3 plus 4'), output ONE annotation labeled with the final favored Gleason grade.\n"
 // "    evidence_text MUST include the full Gleason discussion from the first Gleason mention through the final favored grade.\n"
 
-      "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive surgical margin', 'Gleason 3+4').\n"
-  "8) Before outputting JSON, check for adjacent alternative/correction duplicates (rule 6) and merge as required.\n";
+      "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive surgical margin', 'negative surgical margin', 'Gleason 3+4').\n"
+      "8) Scope MUST be 'local' when the evidence_text is a gleason score or is tied to a particular area such as side, apex, base, nodule, focus, core, region or is 'positive' in assessment. \n"
+      "9) Scope MUST be 'global' when the evidence_text states an overall case-level or specimen-level conclusion, such as adenocarcinoma involvement, overall margin status, or generalized summary statement. \n"
+      "10) If uncertain between 'local' and 'global', prefer 'local' unless the wording clearly indicates a final overall conclusion. \n"
+      "12) 'Negative for' ROI should be reduced to 'no' ROI for labels. \n"
+      "13) Before outputting JSON, check for adjacent alternative/correction duplicates (rule 6) and merge as required.\n";
   if (!preconfigAnnos.empty()) {
     systemMsg +=
-        "9) If any annotation can be adequately described using one of the following exact labels,\n"
-        "   you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
+      "14) If any annotation can be adequately described using one of the following exact labels,\n"
+      "   you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
 
     for (const auto &anno: preconfigAnnos) {
       systemMsg += "   - " + juce::String(anno) + "\n";
@@ -418,9 +427,19 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
   annProps->setProperty("label", makeTypeObj("string"));
   annProps->setProperty("evidence_text", makeTypeObj("string"));
 
+  juce::DynamicObject::Ptr scopeObj(new juce::DynamicObject());
+  scopeObj->setProperty("type","string");
+  juce::Array<juce::var> scopeEnum;
+  scopeEnum.add("local");
+  scopeEnum.add("global");
+  scopeObj->setProperty("enum", scopeEnum);
+
+  annProps->setProperty("scope", juce::var(scopeObj.get()));
+
   juce::Array<juce::var> annRequiredArr;
   annRequiredArr.add("label");
   annRequiredArr.add("evidence_text");
+  annRequiredArr.add("scope");
   juce::var annRequiredVar = annRequiredArr;
 
   juce::DynamicObject::Ptr annItem(new juce::DynamicObject());
@@ -634,6 +653,8 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
 
       AnnotationSpan a;
       a.label = aobj->getProperty("label").toString().toStdString();
+      a.scope = aobj->getProperty("scope").toString().toStdString();
+
 
       // ---- NEW FLEXIBLE HANDLING ----
 
