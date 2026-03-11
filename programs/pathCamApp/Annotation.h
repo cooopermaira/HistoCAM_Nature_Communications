@@ -14,6 +14,7 @@
 struct AnnotationSpan
 {
   std::string label;
+  std::string scope;
   int spanStartI = -1;
   int spanEndI = -1;
   long startMS = -1;
