@@ -460,10 +460,10 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
 
   // --- Root request body
   juce::DynamicObject::Ptr root(new juce::DynamicObject());
-  root->setProperty("model", "gpt-5-mini");
+  root->setProperty("model", "gpt-4o-mini");
   root->setProperty("instructions", systemMsg);
   root->setProperty("input", text);
-  // root->setProperty("temperature", 0);
+  root->setProperty("temperature", 0);
   root->setProperty("text", juce::var(textObj.get()));
 
   return juce::JSON::toString(juce::var(root.get()), true).toStdString();

@@ -1091,6 +1091,10 @@ namespace pathCam {
     images.clear();
 
     //clean up all composites
+    for (auto &c : composites) {
+      c->joinedTo = nullptr;
+      c->absorbedComponents.clear();
+    }
     composites.clear();
     components = 0;
     maxIndex = -1;
