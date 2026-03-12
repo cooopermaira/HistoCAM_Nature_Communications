@@ -169,7 +169,7 @@ namespace pathCam {
     callersWaiting.clear();
 
     for (auto & child : children) {
-      auto theirRelCoords = child->relativeCoords;
+      auto theirRelCoords = -child->relativeCoords;
       Point2f theirAbCs;
       theirAbCs.x = theirRelCoords.x + absoluteCoords.x;
       theirAbCs.y = theirRelCoords.y + absoluteCoords.y;

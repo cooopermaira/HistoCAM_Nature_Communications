@@ -76,8 +76,7 @@ namespace pathCam {
   }
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
-    parent, image_size, _componentIndex){
-
+    parent, image_size, _componentIndex) {
     waitingFrames.resize(frameDelay, {nullptr, {}});
     //compositeImage = imagePyramid->level[0];
 
@@ -179,20 +178,18 @@ namespace pathCam {
 
 
       //calculate: for which of the affected tiles is this frame an improvement?
-      for (auto &el: affectedPyramidTilesWithStatus) {
-        if (el.first.x == 16 && el.first.y == 17) {
-          int k = 0;
-        }
-        auto pyrTileObj = imagePyramid->get_base_tile(el.first);
+      for (auto &ptStat: affectedPyramidTilesWithStatus) {
+
+        auto pyrTileObj = imagePyramid->get_base_tile(ptStat.first);
 
         //check if frame improves status of tile, if so process immediately
-        if (pyrTileObj->status < el.second) {
+        if (pyrTileObj->status < ptStat.second) {
           //if the tile is promoting to singleFrameCoverage, set owner and motionBlur from this frame
-          if (el.second == TileObj::singleFrameCoverage) {
-            img->ownedTiles.insert(el.first);
+          if (ptStat.second == TileObj::singleFrameCoverage) {
+            img->ownedTiles.insert(ptStat.first);
             pyrTileObj->owner = img;
-            pyrTileObj->status = el.second;
-            immediateProcessingTiles.push_back(el.first);
+            pyrTileObj->status = ptStat.second;
+            immediateProcessingTiles.push_back(ptStat.first);
           }
           // //this if you want edge tiles. not very functional
           // pyrTileObj->status = el.second;
@@ -200,9 +197,9 @@ namespace pathCam {
         }
 
         // check later if frame is less blurry than current source for tile (pyrTileObj)
-        else if (el.second == TileObj::singleFrameCoverage) {
-          waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(el.first);
-          img->ownedTiles.insert(el.first);
+        else if (ptStat.second == TileObj::singleFrameCoverage) {
+          waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(ptStat.first);
+          img->ownedTiles.insert(ptStat.first);
         }
       }
       ++positionForNextWaitngFrame;
@@ -246,13 +243,16 @@ namespace pathCam {
                        [&](Point2i &tileIdx) {
                          auto tileObj = imagePyramid->get_base_tile(tileIdx);
                          if (tileObj->owner == img) {
+                           //im marked as the owner, so i keep it
                            return false;
                          }
                          if (image_improves_tile(tileObj, img)) {
+                           //I can fill this tile and I'm now recognized as the best image to do it, so i keep it
                            tileObj->owner->ownedTiles.erase(tileIdx);
                            tileObj->owner = img;
                            return false;
                          }
+                         //I could fill it, but i never became acknowledged as the best frame to do so, so i give it up
                          img->ownedTiles.erase(tileIdx);
                          return true;
                        }), tiles.end()
@@ -284,8 +284,8 @@ namespace pathCam {
   }
 
   void MetricComposite::align_and_rebuild() {
-    for (auto & loser : absorbedComponents) {
-      ftg->storedMatches.insert(loser->ftg->storedMatches.begin(),loser->ftg->storedMatches.end());
+    for (auto &loser : absorbedComponents) {
+      ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
       for (auto &img : loser->landmarkFrames) {
         landmarkFrames.push_back(img);
       }
@@ -308,9 +308,9 @@ namespace pathCam {
       members.insert(img);
     }
     auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
-    std::unordered_map<Image*, std::vector<std::shared_ptr<Match>>> adjacency;
+    std::unordered_map<Image *, std::vector<std::shared_ptr<Match> > > adjacency;
 
-    for (auto& m : matches){
+    for (auto &m: matches) {
       adjacency[m->image_1].push_back(m);
       adjacency[m->image_2].push_back(m);
     }
@@ -323,12 +323,11 @@ namespace pathCam {
     }
 
     while (!q.empty()) {
-      Image* img = q.front();
+      Image *img = q.front();
       q.pop();
 
-      for (auto m : adjacency[img]) {
-
-        Image* other;
+      for (auto m: adjacency[img]) {
+        Image *other;
         Point2i offset;
 
         if (m->image_1 == img) {
@@ -341,7 +340,6 @@ namespace pathCam {
 
         // If not yet assigned
         if (other->regInfo->component_membership != componentIndex) {
-
           other->regInfo->component_membership = componentIndex;
           other->regInfo->absoluteCoords = img->regInfo->absoluteCoords - offset;
           other->regInfo->matchedTo = img->index;
@@ -779,7 +777,6 @@ namespace pathCam {
   }
 
 
-
   std::unordered_set<Image *> MetricComposite::find_contributing_images() const {
     std::unordered_set<Image *> members;
 
@@ -790,7 +787,7 @@ namespace pathCam {
     return members;
   }
 
-  void MetricComposite::add_landmark_frame(Image* img) {
+  void MetricComposite::add_landmark_frame(Image *img) {
     landmarkFrames.push_back(img);
     if (!img->subsequentMatchLaunched) {
       img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()

@@ -30,7 +30,7 @@ namespace pathCam {
       t.detach();
     }
 
-    int threads = 1;
+    int threads = 2;
 
     JobQ = std::make_shared<JobQueue>(threads, threads, windowWidth);
     JobQ->parent = this;
