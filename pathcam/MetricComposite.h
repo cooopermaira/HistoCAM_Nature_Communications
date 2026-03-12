@@ -29,8 +29,6 @@ namespace pathCam {
 
         bool image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image* _img) const;
 
-        void search_and_absorb_other_components();
-
         size_t consolidate_tile_ownership();
 
         void add_landmark_frame(Image *img) override;
