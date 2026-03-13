@@ -61,7 +61,7 @@ public:
 
     voiceHandlerThread = std::thread(&AnnotateComponent::voice_annotation_handler,this);
 
-    silly_test();
+    // silly_test();
 #if false
     {
       std::shared_ptr<SegmentAnnotation> temp = std::make_shared<SegmentAnnotation>("SAM");

@@ -360,13 +360,13 @@ public:
 };
 
 
-class DictateAnnotation : public Annotation{
-public:
-  DictateAnnotation(juce::String name): Annotation(name) {};
-
-  void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {}
-
-};
+// class DictateAnnotation : public Annotation{
+// public:
+//   DictateAnnotation(juce::String name): Annotation(name) {};
+//
+//   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {}
+//
+// };
 
 class SegmentAnnotation : public PolygonAnnotation{
 public:

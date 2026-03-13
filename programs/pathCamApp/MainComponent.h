@@ -96,6 +96,8 @@ private:
   void findSlideDirectories();
   void load_case(std::vector<juce::File> slideDirs);
 
+  void load_annotations(juce::File dir, int index);
+
   ToolbarComponent *toolbar;
 
   //Shared view

@@ -339,6 +339,9 @@ void MainComponent::load_case(std::vector<juce::File> slideDirs) {
       slide->cwd = p.getFullPathName().toStdString();
       slide->read_slide_header();
       sCam->previousSlides.push_back(slide);
+      load_annotations(p,slide->index);
+
+
       ++sCam->numSlides;
     }
   }
@@ -358,6 +361,14 @@ void MainComponent::load_case(std::vector<juce::File> slideDirs) {
     labelList->refresh();
 
   resized();
+}
+
+void MainComponent::load_annotations(juce::File dir, int index) {
+  auto dPath = dir.getChildFile("dictation.wav");
+  if (dPath.existsAsFile()) {
+    annotate->voiceAnnoOutstanding.push({index,dPath});
+    annotate->newVoiceAnnotation.set();
+  }
 }
 
 void MainComponent::GuiEventHandler(std::string event) {

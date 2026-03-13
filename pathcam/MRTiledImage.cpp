@@ -374,6 +374,7 @@ void MRTiledImageSet::write_slide_header() {
 
     write_string(fd, labelName);
 
+    write_all(fd, &framesPerMillisecond,sizeof(framesPerMillisecond)); //float
     // AbCs
     assert(frameLabels.size() == AbCs.size());
     auto numFrames = static_cast<uint16_t>(AbCs.size());
@@ -481,15 +482,17 @@ void MRTiledImageSet::read_slide_header() {
     labelName.resize(labelLen);
     read_all(fd, labelName.data(), labelLen);
 
+
     // ===============================
     // AbCs
     // ===============================
+
+    read_all(fd, &framesPerMillisecond,sizeof(float));
 
     uint16_t numFrames;
     read_all(fd, &numFrames, sizeof(numFrames));
 
     AbCs.reserve(numFrames);
-
     for (uint16_t i = 0; i < numFrames; ++i) {
       int32_t x, y;
       read_all(fd, &x, sizeof(int32_t));
@@ -498,7 +501,6 @@ void MRTiledImageSet::read_slide_header() {
     }
 
     frameLabels.reserve(numFrames);
-
     for (uint16_t i = 0; i < numFrames; ++i) {
       uint8_t fl;
       read_all(fd, &fl, sizeof(fl));
@@ -542,9 +544,6 @@ void MRTiledImageSet::read_slide_header() {
       cachePath.setFileName(std::to_string(mrImg->componentIndex));
       cachePath.setExtension("pcRawLayer");
 
-      if (cachePath.toString().find("/2/1.pcRawLayer") != std::string::npos){
-        int k = 0;
-      }
       std::cout << "file " << cachePath.toString() << std::endl;
 
       read_all(fd, &mrImg->bounds.x, sizeof(float));
@@ -590,7 +589,7 @@ void MRTiledImageSet::read_slide_header() {
 
 std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
   long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const {
-  assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
+  // assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
 
   startFrameIdx = msTimeStart * framesPerMillisecond;
   endFrameIdx = msTimeEnd * framesPerMillisecond;

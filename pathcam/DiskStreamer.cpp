@@ -383,7 +383,7 @@ namespace pathCam {
       parent->pass_image(image, image_index);
       ++image_index;
 
-      Poco::Thread::sleep(1000.0 / 21.0);
+      Poco::Thread::sleep(1000.0 / 20.0);
       // Poco::Thread::sleep(sleep_ms(rng));
     }
     auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();

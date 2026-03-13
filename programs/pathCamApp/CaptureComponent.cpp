@@ -85,7 +85,7 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
       setup_listbox();
     }
   }
-
+  ready = true;
 
 #endif
   if (!sCam) {
@@ -279,6 +279,7 @@ void CaptureComponent::stop() {
     parent->annotate->newVoiceAnnotation.set();
   }
   save_slide_set();
+  ready = true;
 }
 
 void CaptureComponent::stopRecording() {
@@ -323,24 +324,6 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
     if (procedureMode == 0) {
       // begin selecting or setting up input
 #ifdef WITH_SPINNAKER
-      //open camera barcode reader
-      procedureMode = 1;
-      ready = sCam->pathcamReady;
-#else
-      //selecting input
-      parent->fc.reset(new FileChooser("Choose an input file...", File("/home/cm/Documents/data/"),
-                                       "*.txt"));
-
-      parent->fc->launchAsync(FileBrowserComponent::openMode
-                              | FileBrowserComponent::canSelectFiles,
-                              std::bind(&CaptureComponent::set_input, this, std::placeholders::_1));
-      return true;
-#endif
-    }
-    if (procedureMode == 1) {
-      // begin an actual recording/simulation
-
-#ifdef WITH_SPINNAKER
       if (!ready) {
         std::cout << "not read" << std::endl;
 
@@ -368,12 +351,29 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
 
         return true;
       }
+      //open camera barcode reader
+      procedureMode = 1;
+#else
+      //selecting input
+      parent->fc.reset(new FileChooser("Choose an input file...", File("/home/cm/Documents/data/"),
+                                       "*.txt"));
+
+      parent->fc->launchAsync(FileBrowserComponent::openMode
+                              | FileBrowserComponent::canSelectFiles,
+                              std::bind(&CaptureComponent::set_input, this, std::placeholders::_1));
+      return true;
+#endif
+    }
+    if (procedureMode == 1) {
+      // begin an actual recording/simulation
+
+      ready = false;
+#ifdef WITH_SPINNAKER
       startRecording();
 #else
       startSimulating();
 #endif
-      ready = false;
-      sCam->pathcamReady = false;
+
       procedureMode = 2;
       return true;
     }

@@ -15,7 +15,7 @@ int Annotation::getType(){
     if(cast != NULL){ return _POLY; }
   }
   {
-    DictateAnnotation *cast = dynamic_cast < DictateAnnotation * >(this);
+    VoicePointPoly *cast = dynamic_cast < VoicePointPoly * >(this);
     if(cast != NULL){ return _DICT; }
   }
   {
