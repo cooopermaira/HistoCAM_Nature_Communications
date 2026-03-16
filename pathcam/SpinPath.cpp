@@ -5,6 +5,8 @@
 //  Created by Brian Summa on 4/27/23.
 //
 
+#include <sys/times.h>
+
 #include "pathCam.h"
 
 using Poco::Logger;
@@ -66,6 +68,7 @@ namespace pathCam {
         try {
           //pResultImage is on the camera
           ImagePtr pResultImage = parent->pCam->GetNextImage(3000);
+          long timeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - parent->startTime).count();
 
           if (pResultImage->IsIncomplete()) {
             parent->camlogger.warning(Poco::format("Image incomplete: %s",
@@ -81,6 +84,7 @@ namespace pathCam {
                                                        parent->sCam->get_scope_radius());
             image->copy_in(pResultImage->GetData());
             image->increment_smart_pointer();
+            image->timeStamp = timeStamp;
 
             std::string str;
             auto label = parent->getObjectiveLabel();
@@ -116,6 +120,14 @@ namespace pathCam {
       }
       parent->pCam->EndAcquisition();
       parent->cameraDone = true;
+
+      Poco::Path image_path = parent->getRootPath();
+      image_path.append(Poco::Path(parent->captureSetName));
+      image_path.append("ts");
+      image_path.setExtension(".txt");
+
+      parent->sCam->write_image_timestamps(image_path.toString());
+
       std::cout << "camera stream terminated" << std::endl;
     } catch (Spinnaker::Exception &e) {
       std::cout << "error 2" << e.what() << std::endl;

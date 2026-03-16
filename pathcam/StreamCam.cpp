@@ -164,6 +164,25 @@ namespace pathCam {
     return currentSlideLabel;
   }
 
+  void StreamCam::write_image_timestamps(const std::string &filename) {
+    image_mutex.readLock();
+
+    std::ofstream out(filename);
+    if (!out.is_open()) {
+      std::cout << "timestamp write failed" << std::endl;
+      return;
+    }
+
+    for (size_t i = 0; i <= maxIndex; ++i) {
+      auto img = images[i];
+      if (img) {
+        out << img->index << " " << img->timeStamp << std::endl;
+      }
+    }
+    out.close();
+    image_mutex.unlock();
+  }
+
   Poco::Path StreamCam::make_working_directory() const {
     assert(!currentSlideLabel.empty());
 
@@ -1016,7 +1035,8 @@ namespace pathCam {
               frameLabels[img->index] = frameLabels[img->index - 1];
             } //else it just stays (0,0) because that's what it inits to.
           } else {
-            std::cout << img->index << " " << Image::get_label(img->label) <<"no reginfo but non black label" <<std::endl;
+            std::cout << img->index << " " << Image::get_label(img->label) << "no reginfo but non black label" <<
+                std::endl;
           }
         }
         if (img->motionBlur < minBlur) { minBlur = img->motionBlur; }

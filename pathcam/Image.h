@@ -16,6 +16,7 @@ namespace pathCam {
     RegInfo* regInfo = nullptr;
 
     long index;
+    long timeStamp = -1;
     double blurTime = 0;
     int loadCount = 0;
 

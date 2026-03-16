@@ -26,6 +26,8 @@ struct AnnotationSpan
 
 class Annotation {
 public:
+
+  bool global = false;
   enum{_NONE, _POLY, _SEG, _DICT, _MEAS};
 
   Annotation(juce::String name): name(name){

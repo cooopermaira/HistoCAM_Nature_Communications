@@ -352,6 +352,8 @@ namespace pathCam {
       return res;
     }
 
+    void write_image_timestamps(const std::string& filename);
+
     bool segment_with_SAM(std::vector<Point3f> &_clicks, int _segID, int _slideIdx);
 
     int increment_and_get_components() { return components++; }

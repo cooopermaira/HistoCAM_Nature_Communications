@@ -836,6 +836,10 @@ void AnnotateComponent::voice_annotation_handler() {
         polyAnno->direct_add(fPoint(vertex.x, vertex.y));
       }
 
+      if (annospan.scope == "global") {
+        polyAnno->global = true;
+      }
+
       // Add the polygon annotation to this slide's annotations
       thisSlidesAnnotations->push_back(polyAnno);
     }
@@ -851,7 +855,7 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  juce::File dictPath("/home/pathcam/pcamdata/save_and_load/Andrew_2_26/0/dictation.wav");
+  juce::File dictPath("/home/pathcam/pcamdata/save_and_load/Andrew_2_26/1/dictation.wav");
 
   auto start = std::chrono::high_resolution_clock::now();
   auto [fullText,wordVec] = send_transcribe_call(dictPath);
