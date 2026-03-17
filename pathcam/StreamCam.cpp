@@ -30,7 +30,7 @@ namespace pathCam {
       t.detach();
     }
 
-    int threads = 2;
+    int threads = 1;
 
     JobQ = std::make_shared<JobQueue>(threads, threads, windowWidth);
     JobQ->parent = this;
@@ -173,7 +173,7 @@ namespace pathCam {
       return;
     }
 
-    for (size_t i = 0; i <= maxIndex; ++i) {
+    for (int i = 0; i <= maxIndex; ++i) {
       auto img = images[i];
       if (img) {
         out << img->index << " " << img->timeStamp << std::endl;
@@ -1006,10 +1006,19 @@ namespace pathCam {
 
 
   void StreamCam::cleanup_and_reset() {
+
+    Poco::Path image_path = givenWorkingDirectory;
+    image_path.append(MRImageSet->labelName);
+    image_path.append("ts");
+    image_path.setExtension(".txt");
+
+    write_image_timestamps(image_path.toString());
+
     float minBlur = 1, maxBlur = 0;
     for (auto comp: composites) {
       comp->correct_offset();
     }
+
 
     std::vector<Point2i> AbCs(maxIndex + 1);
     std::vector<unsigned> frameLabels(maxIndex + 1);

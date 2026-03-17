@@ -280,6 +280,7 @@ void CaptureComponent::stop() {
   }
   save_slide_set();
   ready = true;
+  std::cout<<"*************** READY ***************"<<std::endl;
 }
 
 void CaptureComponent::stopRecording() {

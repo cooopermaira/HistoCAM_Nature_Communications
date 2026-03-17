@@ -121,12 +121,6 @@ namespace pathCam {
       parent->pCam->EndAcquisition();
       parent->cameraDone = true;
 
-      Poco::Path image_path = parent->getRootPath();
-      image_path.append(Poco::Path(parent->captureSetName));
-      image_path.append("ts");
-      image_path.setExtension(".txt");
-
-      parent->sCam->write_image_timestamps(image_path.toString());
 
       std::cout << "camera stream terminated" << std::endl;
     } catch (Spinnaker::Exception &e) {

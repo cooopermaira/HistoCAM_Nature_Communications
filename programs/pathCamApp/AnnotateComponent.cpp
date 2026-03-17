@@ -855,7 +855,7 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  juce::File dictPath("/home/pathcam/pcamdata/save_and_load/Andrew_2_26/1/dictation.wav");
+  juce::File dictPath("/home/pathcam/pcamdata/save_and_load/Andrew_3_16_3/0/dictation.wav");
 
   auto start = std::chrono::high_resolution_clock::now();
   auto [fullText,wordVec] = send_transcribe_call(dictPath);
