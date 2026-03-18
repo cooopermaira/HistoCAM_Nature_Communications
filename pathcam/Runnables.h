@@ -329,7 +329,6 @@ namespace pathCam {
                                                                                parent(parent),
                                                                                image_idx(image_idx) {};
 
-    virtual void run1();
     void run() override;
 
     void build_reg_info(Image* img) const;
