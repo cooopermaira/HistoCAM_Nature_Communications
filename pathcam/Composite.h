@@ -122,6 +122,10 @@ namespace pathCam {
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
     int frameCount = 0;
 
+    std::atomic<bool> xcInProgress = false;
+    inline static std::mutex EstRoot_mutex;
+
+
     FeatureTrackGenerator* ftg;
     BundleAdjustmentIntegrator* bai;
 
@@ -137,7 +141,12 @@ namespace pathCam {
 
     Composite(StreamCam *parent, Size image_size, int _componentIndex);
 
-    virtual void align_and_rebuild() {
+    virtual int get_exit_rep_count(){ return 0;}
+
+    virtual void align_and_rebuild() {};
+
+    virtual std::unordered_set<Image *> find_contributing_images() const {
+      return {};
     };
 
     virtual void add_landmark_frame(Image* img){};

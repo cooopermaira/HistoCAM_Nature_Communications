@@ -112,14 +112,13 @@ namespace pathCam {
     std::vector<std::thread> threads;
     for (auto &comp: parent->composites) {
       if (comp->suspended) { continue; }
-      auto mc = std::dynamic_pointer_cast<MetricComposite>(comp);
 
-      threads.emplace_back([mc]() {
-        for (int i = 0; i < mc->frameDelay; ++i) {
-          mc->xcMatchShouldContinue = false;
-          mc->update();
+      threads.emplace_back([comp]() {
+        for (int i = 0; i < comp->get_exit_rep_count(); ++i) {
+          comp->xcMatchShouldContinue = false;
+          comp->update();
         }
-        mc->contributingFrames = mc->find_contributing_images();
+        comp->contributingFrames = comp->find_contributing_images();
       });
     }
 
@@ -138,23 +137,22 @@ namespace pathCam {
         comp->imagePyramid->suspended = true;
         continue;
       }
-      auto mc = std::dynamic_pointer_cast<MetricComposite>(comp);
 
-      threads.emplace_back([mc]() {
+      threads.emplace_back([comp]() {
         auto t1 = std::chrono::high_resolution_clock::now();
-        while (mc->outstandingCMS_jobs > 0 || mc->xcInProgress) {
+        while (comp->outstandingCMS_jobs > 0 || comp->xcInProgress) {
           Poco::Thread::sleep(50);
         }
-        for (auto &comp : mc->absorbedComponents) {
-          while (comp->outstandingCMS_jobs > 0) {
+        for (auto &subComp : comp->absorbedComponents) {
+          while (subComp->outstandingCMS_jobs > 0) {
             Poco::Thread::sleep(50);
           }
         }
-        mc->alignmentHasBegun = true;
+        comp->alignmentHasBegun = true;
         auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).
             count();
         std::cout << "wait time " << t2 << std::endl;
-        mc->align_and_rebuild();
+        comp->align_and_rebuild();
       });
     }
     for (auto &t: threads) {

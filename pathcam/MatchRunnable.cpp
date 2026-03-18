@@ -149,11 +149,8 @@ namespace pathCam {
     //store INTER component matches
     for (auto &match : matches) {
       if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
-        auto theirComp = std::dynamic_pointer_cast<MetricComposite>
-            (parent->composites[match->image_1->regInfo->component_membership]);
-        if (!theirComp) {
-          throw std::runtime_error("not a metric composite");
-        }
+        auto theirComp = parent->composites[match->image_1->regInfo->component_membership];
+
         Poco::FastMutex::ScopedLock lock(theirComp->ftg->accessMutex);
         if (match->image_1->regInfo->component_membership != theirComp->componentIndex) {
           theirComp->relatedComponents.insert(match->image_1->regInfo->component_membership);
@@ -189,7 +186,7 @@ namespace pathCam {
     if (!image->is_good()) {
       return;
     }
-    build_reg_info(image);
+    // build_reg_info(image);
 
     auto matcher = DescriptorMatcher(parent->matcher_type);
     int mostMatches = 0;

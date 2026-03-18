@@ -33,7 +33,9 @@ namespace pathCam {
 
         void add_landmark_frame(Image *img) override;
 
-        [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const;
+        int get_exit_rep_count() override {return frameDelay;}
+
+        [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const override;
 
         std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});
 
@@ -54,13 +56,7 @@ namespace pathCam {
         bool successfullyAligned = false;
         // bool componentSiftDataInit = false;
 
-        std::atomic<bool> xcInProgress = false;
-
         std::shared_ptr<TiledImage> baseImage;
-
-        inline static std::mutex EstRoot_mutex;
-
-        Poco::FastMutex cvtMutex;
 
         char* threeChnBuf;
         char* fourChnBuf;

@@ -301,6 +301,9 @@ int main(int argc, char *argv[]) {
     int k = 0;*/
 
 
+    delete jq;
+    delete blur;
+    delete names;
   } else {
 
     std::cout << "Processing File\n";

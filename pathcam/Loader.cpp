@@ -19,6 +19,17 @@ namespace pathCam {
     image->free_memory_RAW();
   }
 
+  void LoaderLogicRunnable::build_reg_image(Image *img) {
+    assert(img->parent);
+    auto t = img->parent->get_reg_ref(img->index);
+    Poco::FastMutex::ScopedLock lock(t->accessMutex);
+
+    t->index = img->index;
+    t->root = false;
+    t->image = img;
+    img->regInfo = t;
+  }
+
   void LoaderLogicRunnable::run() {
     image->parent = parent;
     if (!image->in_memory()) {
@@ -87,7 +98,7 @@ namespace pathCam {
 
       image->release_reg_image();
 
-      //parent->add_image(image, image_index);
+      build_reg_image(image);
       auto matchjob = new MatchRunnable(parent, image_index);
       ++parent->matchableCount;
       parent->JobQ->add_runnable(matchjob);

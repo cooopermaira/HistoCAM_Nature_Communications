@@ -175,6 +175,8 @@ namespace pathCam {
     virtual void run();
 
     void self_cancel(int label);
+
+    static void build_reg_image(Image *img);
   };
 
 

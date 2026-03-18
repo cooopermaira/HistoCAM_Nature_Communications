@@ -223,6 +223,7 @@ namespace pathCam {
     Mat img(image_size,CV_8U, image->get_Raw()), color, gray;
     cvtColor(img, color, COLOR_BayerBG2BGR);
 
+
     auto r = image->image_file.parent().parent();
 
     if (saveFull) {
@@ -299,6 +300,7 @@ namespace pathCam {
     //                 true, 0.125, true, 1);
     process_debayer(image, true, {2000, 2000},
                 true, 0.125, true, 1);
+    delete image;
 
   }
 

@@ -141,27 +141,6 @@ namespace pathCam {
   }
 
 
-  void Image::free_memory_RAW(bool force) {
-    buffer_mutex.lock();
-    if (raw_buffer != nullptr) {
-      --reference_count;
-      if (force || reference_count == 0) {
-        if (mempool) {
-          mempool->release(raw_buffer);
-        } else {
-          if (parent && parent->unifiedMemory) {
-            cudaFree(raw_buffer);
-          }else {
-            free(raw_buffer);
-          }
-        }
-        raw_buffer = nullptr;
-        reference_count = 0;
-      }
-    }
-    buffer_mutex.unlock();
-  }
-
   bool Image::is_mostly_black() {
     float threshold_value = 20.f;
     int checkPoints = 40;
@@ -539,6 +518,31 @@ namespace pathCam {
     ++reference_count;
     buffer_mutex.unlock();
   }
+
+
+  void Image::free_memory_RAW(bool force) {
+    buffer_mutex.lock();
+    if (raw_buffer != nullptr) {
+      --reference_count;
+      if (force || reference_count == 0) {
+        // if (mempool) {
+        //   mempool->release(raw_buffer);
+        // } else {
+        //   if (parent && parent->unifiedMemory) {
+        //     cudaFree(raw_buffer);
+        //   }else {
+        //
+        //     free(raw_buffer);
+        //   }
+        // }
+        cudaFree(raw_buffer);
+        raw_buffer = nullptr;
+        reference_count = 0;
+      }
+    }
+    buffer_mutex.unlock();
+  }
+
 
   void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
                            float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float *tempSpace) {

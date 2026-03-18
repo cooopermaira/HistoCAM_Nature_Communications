@@ -7,6 +7,7 @@
 
 #include "pathCam.h"
 
+using CompositeType = pathCam::MetricComposite;
 
 namespace pathCam {
   using Poco::Util::LayeredConfiguration;
@@ -30,7 +31,7 @@ namespace pathCam {
       t.detach();
     }
 
-    int threads = 1;
+    int threads = 2;
 
     JobQ = std::make_shared<JobQueue>(threads, threads, windowWidth);
     JobQ->parent = this;
@@ -716,7 +717,7 @@ namespace pathCam {
       ri->root = true;
       ri->matchedTo = ri->index;
 
-      std::shared_ptr<MetricComposite> component = std::make_shared<MetricComposite>(this, image_size, component_index);
+      std::shared_ptr<Composite> component = std::make_shared<CompositeType>(this, image_size, component_index);
       component->joinedTo = component;
 
       composites.push_back(component);
