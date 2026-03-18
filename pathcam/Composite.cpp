@@ -27,18 +27,6 @@ namespace pathCam {
                -1);
     rectMask = Mat(image_size, CV_8U, cv::Scalar(255));
 
-#ifdef HAVE_OPENCV_CUDAARITHM
-    circleMaskGPU.upload(circleMask);
-    circleMaskGPU255 = cuda::GpuMat(image_size,CV_8U);
-    cuda::multiply(circleMaskGPU, Scalar(255), circleMaskGPU255);
-    rectMaskGPU.upload(rectMask);
-    channelsGPU.resize(4);
-    threeChannelPrealGPU = cuda::GpuMat(image_size, CV_8UC3);
-    fourChannelPreallocated = Mat::zeros(image_size, CV_8UC4);
-    fourChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC4, fourChannelPreallocated.data);
-
-    //make_meshgrid();
-#endif
 
     channels.resize(2);
 
@@ -52,7 +40,6 @@ namespace pathCam {
     //first added image will be at (0,0), this value guarantees it is accepted
     lastAcceptedImageIndex = 999999999;
   }
-
 
   void CompositeVoronoi::update(std::vector<RegInfo *> new_info, bool _force_add) {
     if (new_info.empty()) { return; }
@@ -86,6 +73,117 @@ namespace pathCam {
   }
 
 
+  void CompositeVoronoi::update() {
+    if (suspended) { return; }
+
+    //place component in MR image
+    if (imagePyramid->scale == 0 && !xcMatchInitiated) {
+      if (staging.empty()) { return; }
+      xcInProgress = true;
+      xcMatchInitiated = true;
+
+      std::thread t([this, img = staging.front()->image]() {
+        std::lock_guard lock(EstRoot_mutex);
+        std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
+        establish_scale_at_root(img);
+        xcInProgress = false;
+      });
+      t.detach();
+    }
+
+    // PROCESS NEW FRAMES BEGIN
+    if (!staging.empty()) {
+      auto ri = staging.front();
+      auto img = ri->image;
+      memberFrames.push_back(img);
+      assert(img->regInfo);
+
+      staging.pop();
+      ++frameCount;
+
+      if (img->labelObserved) {
+        ++observedLabels[img->label];
+        int maxObservations = 0;
+        unsigned winner = componentMagLabel;
+        for (auto &[label,observationCount]: observedLabels) {
+          if (observationCount > maxObservations) {
+            maxObservations = observationCount;
+            winner = label;
+          }
+        }
+        if (winner != componentMagLabel) {
+          componentMagLabel = winner;
+
+          Poco::FastMutex::ScopedLock lock(update_mutex);
+          get_flatfield();
+          imagePyramid->set_mag_label(componentMagLabel);
+          parent->MRImageSet->sort_by_scale();
+        }
+      }
+
+      update_Bbox_no_composite({ri});
+      expand_subdiv({ri});
+
+      //add point to delaunay triangulation
+      std::vector<Point2i> face;
+      auto fShift = Point2f(ri->absoluteCoords.x, ri->absoluteCoords.y);
+      auto res = add_point_to_delaunay_triangulation(fShift, img, face, false);
+
+      if (res >= 0) {
+        //image accepted
+        img->vertexId = res;
+
+        imagesWaiting.push(img);
+
+        if (!img->subsequentMatchLaunched) {
+          img->load_raw_from_disk(); //freed in ComponentMatchSearch::run()
+          img->subsequentMatchLaunched = true;
+          ++outstandingCMS_jobs;
+          const auto cms = new ComponentMatchSearch(parent, img, this);
+          parent->jqSecondary->add_runnable(cms);
+        }
+
+
+          imagesWaiting.pop();
+          std::vector<std::vector<Point2f> > facets;
+          std::vector<Point2f> centers;
+          subdiv.getVoronoiFacetList({img->vertexId}, facets, centers);
+
+
+          std::vector<Point2i> effectedTiles;
+          std::vector<Point2i> effectedTilesNoMask;
+          bool noMask = false;
+
+          //calculate region of pyramid for data placement
+          auto imageBox = cv::Rect_<float>(ri->absoluteCoords.x, ri->absoluteCoords.y, img->width,
+                                           img->height);
+
+          if (componentMagLabel == Image::_2X) {
+            calculate_effected_tiles_round(face, effectedTiles, ri->absoluteCoords);
+          } else {
+            noMask = true;
+            calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
+          }
+
+          prepare_4CPA(img, effectedTiles);
+          imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
+          img->free_memory_RAW();
+      } else {
+        img->free_memory_RAW();
+      }
+
+
+      float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
+      float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
+      float w = parent->image_width * imagePyramid->scale;
+      float h = parent->image_height * imagePyramid->scale;
+      bool showAsCircle = (componentMagLabel == Image::_2X);
+
+      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
+                                Image::get_label(componentMagLabel), get_scale());
+    }
+  }
+
   void Composite::ff_correct_existing_tiles() {
     assert(flatfieldKnown);
     cuda::GpuMat oneChannel32f, oneChannel8u;
@@ -93,7 +191,6 @@ namespace pathCam {
     cuda::split(ffGPU, ffVec);
 
     for (auto &p: imagePyramid->liveTiles) {
-
       auto tileObj = imagePyramid->level[0]->getTile(p.x, p.y);
       if (!tileObj->owner) {
         tileObj.reset();
@@ -222,7 +319,7 @@ namespace pathCam {
     float scale = 1 / 240.0;
     cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
 
-    parent->set_flatfield(componentMagLabel,ffGPU);
+    parent->set_flatfield(componentMagLabel, ffGPU);
 
     flatfieldKnown = true;
   }
@@ -362,9 +459,9 @@ namespace pathCam {
     for (auto &ii: facets[0]) {
       //we have pulled only one face so facets has only 1 element
       ii.x -= centers[0].x;
-      ii.x += image_size.width / 2;
+      ii.x += imageSize.width / 2;
       ii.y -= centers[0].y;
-      ii.y += image_size.height / 2;
+      ii.y += imageSize.height / 2;
       _face.push_back((Point2i) ii);
     }
 
@@ -419,51 +516,42 @@ namespace pathCam {
     for (auto &ii: facets[0]) {
       //we have pulled only one face so facets has only 1 element
       ii.x -= centers[0].x;
-      ii.x += image_size.width / 2;
+      ii.x += imageSize.width / 2;
       ii.y -= centers[0].y;
-      ii.y += image_size.height / 2;
+      ii.y += imageSize.height / 2;
       _face.push_back((Point2i) ii);
     }
 
-    clean_face(_face);
-    //build polygon mask for new point
-#ifdef HAVE_OPENCV_CUDAARITHM
-    // coopers_GPU_vectorized_convex_mask_maker(_face);
-    // //cuda::multiply(polyMaskGPU,circleMaskGPU,polyMaskGPU);
-    // Mat temp;
-    // polyMaskGPU.download(temp);
+    // clean_face(_face);
 
     if (_drawMask) {
       polyMaskOutput.setTo(Scalar(0));
       fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
     }
-    // imwrite("/media/max/Data/fcp.png", polyMaskOutput);
-    // imwrite("/media/max/Data/ccmm.png", temp);
-
-#else
-    cv::fillConvexPoly(polyMaskOutput, _face, cv::Scalar(255));
-#endif
 
     //test for exclusion of frame via rollback
     int nonzeroMin;
     if (componentMagLabel == Image::_2X) {
       polyMaskOutput = polyMaskOutput.mul(circleMask);
-      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.00;
+      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.4;
     } else {
-      nonzeroMin = _image->width * _image->height * 0.1;
+      nonzeroMin = _image->width * _image->height * 0.25;
     }
 
     if (!_forceAdd && countNonZero(polyMaskOutput) <= nonzeroMin) {
       //contributing less than x% of its pixels, revert and don't bother loading from disk
       subdiv = tempSubdiv;
-      _image->free_memory_RAW();
-      memberImages.push_back({_image, false});
       return -1;
     }
 
-    _image->absoluteCoords = _point;
-    memberImages.push_back({_image, true});
-    delaunayMembers.insert({vertxId, _image->index});
+    auto ret = delaunayMembers.insert({vertxId, _image->index});
+    if (!ret.second) {
+      subdiv = tempSubdiv;
+      return -1;
+    }
+    imwrite("/home/cm/Documents/data/Andrew_data_march/cap8/deposite/" + std::to_string(_image->index) + ".png",
+            polyMaskOutput);
+
     return vertxId;
   }
 
@@ -512,7 +600,7 @@ namespace pathCam {
 
       //build image with alpha channel
       images[i]->load_raw_from_disk();
-      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+      Mat image_Mat = cv::Mat(imageSize, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
       images[i]->free_memory_RAW();
       if (componentMagLabel != 0) {
@@ -610,19 +698,19 @@ namespace pathCam {
     //get the tile column of the left and right edges
     int columnBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).x;
     int columnBoundHigh = imagePyramid->level[0]->getIJ(
-      Point2f(absCoord.x + image_size.width, absCoord.y)).x;
+      Point2f(absCoord.x + imageSize.width, absCoord.y)).x;
 
     //get the tile row top and bottom edges of the image frame
     long rowBoundLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y)).y;
     long rowBoundHigh = imagePyramid->level[0]->getIJ(
-      Point2f(absCoord.x, absCoord.y + image_size.height)).y;
+      Point2f(absCoord.x, absCoord.y + imageSize.height)).y;
 
     //get the tile row top and bottom as if the image was square. This is used to prevent chevrons
     auto dimensionDifference = parent->image_width - parent->image_height;
     long rowBoundFalseLow = imagePyramid->level[0]->getIJ(Point2f(absCoord.x, absCoord.y - dimensionDifference / 2))
         .y;
     long rowBoundFalseHigh = imagePyramid->level[0]->getIJ(
-      Point2f(absCoord.x, absCoord.y + image_size.height + dimensionDifference / 2)).y;
+      Point2f(absCoord.x, absCoord.y + imageSize.height + dimensionDifference / 2)).y;
 
     float yPixelBoundLow = float(rowBoundFalseLow) * float(imagePyramid->tile_size);
     float yPixelBoundHigh = float(rowBoundFalseHigh) * float(imagePyramid->tile_size);
@@ -720,8 +808,8 @@ namespace pathCam {
             int x = tilePoint.x * imagePyramid->tile_size + (idx % 2 == 0 ? imagePyramid->tile_size : 0);
             int y = tilePoint.y * imagePyramid->tile_size + (idx % 3 == 0 ? imagePyramid->tile_size : 0);
 
-            if (abs(absCoord.x + image_size.width / 2 - x) < image_size.width / 2
-                && abs(absCoord.y + image_size.height / 2 - y) < image_size.height / 2) {
+            if (abs(absCoord.x + imageSize.width / 2 - x) < imageSize.width / 2
+                && abs(absCoord.y + imageSize.height / 2 - y) < imageSize.height / 2) {
               canAdd = true;
               break;
             }
@@ -914,8 +1002,8 @@ namespace pathCam {
         p.x -= root_offset.x;
         p.y -= root_offset.y;
 
-        p.x += image_size.width / 2;
-        p.y += image_size.height / 2;
+        p.x += imageSize.width / 2;
+        p.y += imageSize.height / 2;
         poly.push_back(p);
       }
       if (!poly.empty()) {
@@ -932,15 +1020,15 @@ namespace pathCam {
         p.x -= root_offset.x;
         p.y -= root_offset.y;
 
-        p.x += image_size.width / 2;
-        p.y += image_size.height / 2;
+        p.x += imageSize.width / 2;
+        p.y += imageSize.height / 2;
         poly.push_back(p);
       }
       centers[i].x -= root_offset.x;
       centers[i].y -= root_offset.y;
 
-      centers[i].x += image_size.width / 2;
-      centers[i].y += image_size.height / 2;
+      centers[i].x += imageSize.width / 2;
+      centers[i].y += imageSize.height / 2;
 
       if (!_drawPathInsteadOfFaces) {
         if (!poly.empty()) {
@@ -1132,7 +1220,7 @@ namespace pathCam {
 
       //proceed with addition to composite
       images[i]->load_raw_from_disk();
-      Mat image_Mat = cv::Mat(image_size, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
+      Mat image_Mat = cv::Mat(imageSize, CV_8U, images[i]->get_Raw(), Mat::AUTO_STEP);
       cvtColor(image_Mat, threeChannelPreallocated, COLOR_BayerBG2BGR);
 
       if (images[i]->label == Image::_2X) {
@@ -1168,7 +1256,7 @@ namespace pathCam {
   Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : parent(parent),
     componentIndex(_componentIndex), imageSize(image_size),
     root_offset(0.0, 0.0),
-    max_offset(0.0, 0.0) , ftg(new FeatureTrackGenerator) {
+    max_offset(0.0, 0.0), ftg(new FeatureTrackGenerator) {
     //flat_field = parent->flat_field2X;
 
     imagePyramid = std::make_shared<MRTiledImage>(parent);
@@ -1179,6 +1267,26 @@ namespace pathCam {
     imagePyramid->componentIndex = _componentIndex;
     parent->MRImageSet->add(imagePyramid);
     imagePyramid->MRImageSet = parent->MRImageSet;
+
+    cudaMallocManaged(&rectMaskBuf, imageSize.area());
+    cudaMemset(rectMaskBuf, 255, imageSize.area());
+    rectMask = Mat(image_size, CV_8UC1, rectMaskBuf);
+    rectMaskGPU = cuda::GpuMat(imageSize,CV_8UC1, rectMaskBuf);
+
+    cudaMallocManaged(&threeChnBuf, 3 * imageSize.area());
+    threeChannelPreallocated = Mat(imageSize,CV_8UC3, threeChnBuf);
+    threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChnBuf);
+
+    cudaMallocManaged(&fourChnBuf, 4 * imageSize.area());
+    fourChannelPreallocated = Mat(imageSize,CV_8UC4, fourChnBuf);
+    fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4, fourChnBuf);
+
+    if (parent->circleMask.empty()) {
+      circleMask = Mat::zeros(image_size, CV_8U);
+      circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,
+             Scalar(255),
+             -1);
+    }
   }
 
 
@@ -1384,9 +1492,9 @@ namespace pathCam {
 
   void CompositeVoronoi::reset_image_as_polygon() {
     imageBoundsAsPolygon[0] = Point2i(0, 0);
-    imageBoundsAsPolygon[1] = Point2i(image_size.width, 0);
-    imageBoundsAsPolygon[2] = Point2i(image_size.width, image_size.height);
-    imageBoundsAsPolygon[3] = Point2i(0, image_size.height);
+    imageBoundsAsPolygon[1] = Point2i(imageSize.width, 0);
+    imageBoundsAsPolygon[2] = Point2i(imageSize.width, imageSize.height);
+    imageBoundsAsPolygon[3] = Point2i(0, imageSize.height);
   }
 
 

@@ -109,6 +109,10 @@ namespace pathCam {
 #endif
     Mat circleMask;
 
+    char* threeChnBuf;
+    char* fourChnBuf;
+    char* rectMaskBuf;
+
     Mat rectMask;
     Mat threeChannelPreallocated;
     Mat fourChannelPreallocated;
@@ -223,7 +227,6 @@ namespace pathCam {
 
 
     Subdiv2D subdiv;
-    Size image_size;
     std::vector<Mat> channels;
     std::vector<Point2i> imageBoundsAsPolygon;
     std::vector<double> blurVals;
@@ -310,6 +313,8 @@ namespace pathCam {
     std::vector<std::pair<long, long> > matchedEdges;
     std::vector<std::pair<Image *, bool> > memberImages;
 
+    std::queue<Image*> imagesWaiting;
+
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
 
@@ -329,6 +334,8 @@ namespace pathCam {
     void update_from_stored_info();
 
     void update(std::vector<RegInfo *> _new_info, bool _force_add = false);
+
+    void update() override;
 
     void build_system_from_DT(std::map<long, long> &systemIndexToFrameIndex,
                               std::map<long, long> &frameIndexToSystemIndex, cv::Mat &A, cv::Mat &bx,

@@ -37,29 +37,29 @@ namespace pathCam {
 
 
   void CompositeVoronoi::make_meshgrid() {
-    Mat x_row(1, image_size.width, CV_16S);
-    Mat y_col(image_size.height, 1, CV_16S);
+    Mat x_row(1, imageSize.width, CV_16S);
+    Mat y_col(imageSize.height, 1, CV_16S);
 
-    for (int i = 0; i < image_size.width; i++) {
+    for (int i = 0; i < imageSize.width; i++) {
       x_row.at<short>(i) = i;
     }
-    for (int i = 0; i < image_size.height; i++) {
+    for (int i = 0; i < imageSize.height; i++) {
       y_col.at<short>(i) = i;
     }
 
     Mat X, Y;
-    repeat(x_row, image_size.height, 1, X);
-    repeat(y_col, 1, image_size.width, Y);
+    repeat(x_row, imageSize.height, 1, X);
+    repeat(y_col, 1, imageSize.width, Y);
 
     meshGridX.upload(X);
     meshGridY.upload(Y);
 
-    diffGPU = cuda::GpuMat(image_size, CV_32S);
-    xp1 = cuda::GpuMat(image_size, CV_32F);
-    xp2 = cuda::GpuMat(image_size, CV_32F);
-    binaryCompare = cuda::GpuMat(image_size, CV_8U);
+    diffGPU = cuda::GpuMat(imageSize, CV_32S);
+    xp1 = cuda::GpuMat(imageSize, CV_32F);
+    xp2 = cuda::GpuMat(imageSize, CV_32F);
+    binaryCompare = cuda::GpuMat(imageSize, CV_8U);
 
-    polyMaskGPU = cuda::GpuMat(image_size, CV_8U);
+    polyMaskGPU = cuda::GpuMat(imageSize, CV_8U);
   }
 
 
@@ -264,13 +264,13 @@ namespace pathCam {
 
         //build and debayer with gpumat objects
         cuda::GpuMat rawMat;
-        rawMat = cuda::GpuMat(image_size, CV_8U, images[i]->get_raw_cuda());
+        rawMat = cuda::GpuMat(imageSize, CV_8U, images[i]->get_raw_cuda());
         cuda::cvtColor(rawMat, threeChannelPrealGPU, COLOR_BayerBG2BGR, 0, parent->cvCompositeStream);
       } else {
         Mat rawMat;
-        rawMat = Mat(image_size, CV_8U, images[i]->get_Raw());
+        rawMat = Mat(imageSize, CV_8U, images[i]->get_Raw());
         cvtColor(rawMat, threeChannelPreallocated, COLOR_BayerBG2BGR);
-        threeChannelPrealGPU = cuda::GpuMat(image_size,CV_8UC3, threeChannelPreallocated.data);
+        threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChannelPreallocated.data);
       }
 
       if (rootFound) {
@@ -466,7 +466,7 @@ namespace pathCam {
         }
 
         //prepare 3 channel image
-        cuda::GpuMat image_Mat(image_size, CV_8U, img->get_raw_cuda());
+        cuda::GpuMat image_Mat(imageSize, CV_8U, img->get_raw_cuda());
         cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
 
         img->free_memory_cuda();
@@ -566,9 +566,9 @@ namespace pathCam {
       for (auto &ii: facets[0]) {
         //we have pulled only one face so facets has only 1 element
         ii.x -= centers[0].x;
-        ii.x += image_size.width / 2;
+        ii.x += imageSize.width / 2;
         ii.y -= centers[0].y;
-        ii.y += image_size.height / 2;
+        ii.y += imageSize.height / 2;
         face.push_back((Point2i) ii);
       }
       clean_face(face);
@@ -583,7 +583,7 @@ namespace pathCam {
       }
 
       //debayer image on gpu
-      cuda::GpuMat image_Mat(image_size, CV_8U, img->get_raw_cuda());
+      cuda::GpuMat image_Mat(imageSize, CV_8U, img->get_raw_cuda());
       cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
 
       img->free_memory_cuda();
@@ -701,10 +701,10 @@ namespace pathCam {
         }
       } else {
         if (abs(contributingRegInfos[i]->absoluteCoords.x - contributingRegInfos.back()->absoluteCoords.x) < 0.7 *
-            image_size.
+            imageSize.
             width &&
             abs(contributingRegInfos[i]->absoluteCoords.y - contributingRegInfos.back()->absoluteCoords.y) < 0.7 *
-            image_size.
+            imageSize.
             height) {
           throw std::runtime_error("this logic path is no longer functional");
           //newOverlaps.emplace_back(contributingImages[i], contributingImages.back());

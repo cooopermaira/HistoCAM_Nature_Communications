@@ -58,9 +58,6 @@ namespace pathCam {
 
         std::shared_ptr<TiledImage> baseImage;
 
-        char* threeChnBuf;
-        char* fourChnBuf;
-        char* rectMaskBuf;
 
         ImageGraph *ig;
     };
