@@ -43,7 +43,7 @@ namespace pathCam {
     friend class RebuildRunnable;
 
   public:
-    virtual ~Composite() = default;
+    virtual ~Composite();
 
     StreamCam *parent;
     Image *root;
@@ -150,8 +150,10 @@ namespace pathCam {
     virtual void align_and_rebuild() {};
 
     virtual std::unordered_set<Image *> find_contributing_images() const {
-      return {};
+      return contributingFrames;
     };
+
+    std::vector<std::pair<Image *, Image *> > calculate_member_overlaps(std::vector<Image *> images);
 
     virtual void add_landmark_frame(Image* img){};
 
@@ -246,7 +248,6 @@ namespace pathCam {
 
     static void ensure_clockwise(std::vector<Point2i> &_face);
 
-#ifdef HAVE_OPENCV_CUDAARITHM
 
     void make_meshgrid();
 
@@ -259,11 +260,13 @@ namespace pathCam {
 
     void rebuild_and_initialize_SAM();
 
+    void align_and_rebuild() override;
+
     void coopers_GPU_vectorized_convex_mask_maker(std::vector<Point2i> &_face);
 
     void ff_correct_and_brighten();
 
-#endif
+
     int pixels_overlapping_between(Image *_img, Rect _rect);
 
     void rebuild_DT_elementwise(std::vector<RegInfo *> new_info, bool forceAdd, bool shuffle);
@@ -313,21 +316,10 @@ namespace pathCam {
     std::vector<std::pair<long, long> > matchedEdges;
     std::vector<std::pair<Image *, bool> > memberImages;
 
-    std::queue<Image*> imagesWaiting;
-
     std::vector<Point2i> queuedTiles;
     int inferenceCount = 0;
 
 
-    //void set_scale(double _scale);
-
-    // void set_offset(const Point2f &_offset) const;
-
-    //    void deduce_label();
-
-    //void set_candidate_scale_ratios();
-
-    //void get_flatfield();
 
     void store_new_info(RegInfo *_new_info);
 

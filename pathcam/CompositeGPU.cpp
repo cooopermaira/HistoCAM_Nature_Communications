@@ -351,6 +351,146 @@ namespace pathCam {
     }
   }
 
+  void CompositeVoronoi::align_and_rebuild() {
+    auto start = std::chrono::high_resolution_clock::now();
+
+
+    for (auto &loser : absorbedComponents) {
+      ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
+      for (auto &img : loser->landmarkFrames) {
+        landmarkFrames.push_back(img);
+      }
+      loser->root->regInfo->root = false;
+    }
+
+
+    auto ig = ImageGraph();
+
+    std::unordered_set<Image *> members = contributingFrames;
+    members.insert(root);
+    for (auto img : landmarkFrames) {
+      members.insert(img);
+    }
+    auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
+    std::unordered_map<Image *, std::vector<std::shared_ptr<Match> > > adjacency;
+
+    for (auto &m: matches) {
+      adjacency[m->image_1].push_back(m);
+      adjacency[m->image_2].push_back(m);
+    }
+    std::queue<Image*> q;
+
+    // Seed with confirmed members
+    for (auto img : members) {
+      img->regInfo->component_membership = componentIndex;
+      q.push(img);
+    }
+
+    while (!q.empty()) {
+      Image *img = q.front();
+      q.pop();
+
+      for (auto m: adjacency[img]) {
+        Image *other;
+        Point2i offset;
+
+        if (m->image_1 == img) {
+          other = m->image_2;
+          offset = Point2i(m->t_x, m->t_y);
+        } else {
+          other = m->image_1;
+          offset = Point2i(-m->t_x, -m->t_y);
+        }
+
+        // If not yet assigned
+        if (other->regInfo->component_membership != componentIndex) {
+          other->regInfo->component_membership = componentIndex;
+          other->regInfo->absoluteCoords = img->regInfo->absoluteCoords - offset;
+          other->regInfo->matchedTo = img->index;
+          other->regInfo->relativeCoords = offset;
+
+          members.insert(other);
+          q.push(other);
+        }
+      }
+    }
+
+    std::vector membersForRebuild(members.begin(), members.end());
+
+    for (auto m: matches) {
+      ig.addEdge(m->image_1->index, m->image_2->index, ImageGraph::EdgeKind::ORB);
+    }
+    for (int ii = 0; ii < extraMatches.size(); ++ii) {
+      auto [img1,img2,kp1,kp2] = extraMatches[ii];
+      ig.addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
+    }
+
+
+    for (auto img: members) {
+      ig.setMember(img->index, true);
+    }
+
+    auto graphConnectivityResult = ig.computeMinPromotionsToConnectMembersPreferORB();
+    if (!graphConnectivityResult.success) {
+      std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
+      return;
+    }
+
+    if (!graphConnectivityResult.promoted_nodes.empty()) {
+      std::cout << "Component " << componentIndex << " promoting additional " << graphConnectivityResult.promoted_nodes.
+          size() <<
+          " frames in BA" << std::endl;
+      //important to check if empty or get_image_ref returns every image known to StreamCam
+      for (auto img: parent->get_image_ref(graphConnectivityResult.promoted_nodes)) {
+        ig.setMember(img->index, true);
+        members.insert(img);
+      }
+    }
+    auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
+    auto start1 = std::chrono::high_resolution_clock::now();
+    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps, std::vector(ftg->storedMatches.begin(),ftg->storedMatches.end()));
+    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start1).count();
+
+
+    for (auto m: matches) {
+      if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
+        ++m->image_1->matchCount;
+        ++m->image_2->matchCount;
+        for (int i = 0; i < m->good_matches.size(); ++i) {
+          if (m->inliers[i]) {
+            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
+          }
+        }
+      }
+    }
+
+
+    for (auto &img: members) {
+      img->keypointsImageSpace.resize(img->keypoints.size());
+      for (int i = 0; i < img->keypoints.size(); ++i) {
+        img->keypointsImageSpace[i].pt = img->keypoints[i].pt / parent->scale_factor;
+      }
+      img->regInfo->wasAligned = true;
+    }
+
+    if (graphConnectivityResult.used_sift) {
+      std::cout << "Component " << componentIndex << " using sift in BA" << std::endl;
+      return;
+    }
+
+    //GENERATE TRACKS AND RUN
+    std::vector memberImgs(members.begin(), members.end());
+
+    auto tracks = ftg->generateCurrentTracks(memberImgs);
+    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks, memberImgs, 2 * memberImgs.size() + 200);
+
+    rebuild();
+
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start).count();
+    std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
+  }
 
   void CompositeVoronoi::rebuild_and_initialize_SAM() {
     //currently SAM only works for one component at a time. Ensure this is a single resolution composite
@@ -535,13 +675,13 @@ namespace pathCam {
 
     //do this for all images first so we pull final voronoi face on reconstruct
     for (auto &img: contributingImages) {
-      Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
+      Point2f absC(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y);
       std::vector<Point2i> face;
       if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
-        max_offset.x = max(max_offset.x, img->absoluteCoords.x + img->width);
-        max_offset.y = max(max_offset.y, img->absoluteCoords.y + img->height);
-        root_offset.x = min(root_offset.x, img->absoluteCoords.x);
-        root_offset.y = min(root_offset.y, img->absoluteCoords.y);
+        max_offset.x = max(max_offset.x, img->regInfo->absoluteCoords.x + img->width);
+        max_offset.y = max(max_offset.y, img->regInfo->absoluteCoords.y + img->height);
+        root_offset.x = min(root_offset.x, img->regInfo->absoluteCoords.x);
+        root_offset.y = min(root_offset.y, img->regInfo->absoluteCoords.y);
       }
     }
 
@@ -610,14 +750,14 @@ namespace pathCam {
       std::vector<Point2i> effectedTilesNoMask;
 
       //calculate region of pyramid for data placement
-      auto imageBox = cv::Rect_<float>(img->absoluteCoords.x, img->absoluteCoords.y, img->width,
+      auto imageBox = cv::Rect_<float>(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->width,
                                        img->height);
 
       if (componentMagLabel == Image::_2X) {
-        calculate_effected_tiles_round(face, effectedTiles, img->absoluteCoords);
+        calculate_effected_tiles_round(face, effectedTiles, img->regInfo->absoluteCoords);
         cuda::multiply(polyMaskGPU, circleMaskGPU, polyMaskGPU);
       } else {
-        calculate_effected_tiles(face, effectedTiles, img->absoluteCoords, &effectedTilesNoMask);
+        calculate_effected_tiles(face, effectedTiles, img->regInfo->absoluteCoords, &effectedTilesNoMask);
         imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageBox, effectedTilesNoMask);
       }
 
@@ -641,15 +781,15 @@ namespace pathCam {
   }
 
   int CompositeVoronoi::pixels_overlapping_between(Image *_img, Rect _rect) {
-    Rect imageRect(_img->absoluteCoords.x, _img->absoluteCoords.y, _img->width, _img->height);
+    Rect imageRect(_img->regInfo->absoluteCoords.x, _img->regInfo->absoluteCoords.y, _img->width, _img->height);
     auto overlapRect = imageRect & _rect;
 
     if (overlapRect.area() == 0 || componentMagLabel != Image::_2X) {
       return overlapRect.area();
     }
 
-    overlapRect.x -= _img->absoluteCoords.x;
-    overlapRect.y -= _img->absoluteCoords.y;
+    overlapRect.x -= _img->regInfo->absoluteCoords.x;
+    overlapRect.y -= _img->regInfo->absoluteCoords.y;
     return cuda::countNonZero(circleMaskGPU(overlapRect));
   }
 

@@ -280,8 +280,7 @@ namespace pathCam {
     //   ++consolidateCount;
     // }
 
-    ig = new ImageGraph();
-    //bai = new BundleAdjustmentIntegrator();
+    auto ig = ImageGraph();
 
     std::unordered_set<Image *> members = contributingFrames;
     members.insert(root);
@@ -332,33 +331,25 @@ namespace pathCam {
       }
     }
 
-    int iii = 0;
-    // for (auto &img : newContributingFrames) {
-    //   if(img->regInfo->component_membership != componentIndex) {
-    //     ++iii;
-    //     auto v = adjacency[img];
-    //     std::cout<<img->index<<std::endl;
-    //   }
-    // }
     members = reduce_members_through_competition(members);
     members.insert(root);
 
     std::vector membersForRebuild(members.begin(), members.end());
 
     for (auto m: matches) {
-      ig->addEdge(m->image_1->index, m->image_2->index, ImageGraph::EdgeKind::ORB);
+      ig.addEdge(m->image_1->index, m->image_2->index, ImageGraph::EdgeKind::ORB);
     }
     for (int ii = 0; ii < extraMatches.size(); ++ii) {
       auto [img1,img2,kp1,kp2] = extraMatches[ii];
-      ig->addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
+      ig.addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
     }
 
 
     for (auto img: members) {
-      ig->setMember(img->index, true);
+      ig.setMember(img->index, true);
     }
 
-    auto graphConnectivityResult = ig->computeMinPromotionsToConnectMembersPreferORB();
+    auto graphConnectivityResult = ig.computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
       std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
       if (observedLabels.size() > 1) {
@@ -380,7 +371,7 @@ namespace pathCam {
           " frames in BA" << std::endl;
       //important to check if empty or get_image_ref returns every image known to StreamCam
       for (auto img: parent->get_image_ref(graphConnectivityResult.promoted_nodes)) {
-        ig->setMember(img->index, true);
+        ig.setMember(img->index, true);
         members.insert(img);
       }
     }
@@ -445,9 +436,6 @@ namespace pathCam {
     BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks, memberImages, 2 * memberImages.size() + 200);
 
     rebuild(membersForRebuild);
-
-    delete ig;
-    delete ftg;
 
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start).count();
@@ -649,33 +637,6 @@ namespace pathCam {
     auto p2 = _tileCoord * parent->tileSize + Point2i(parent->tileSize / 2, parent->tileSize / 2);
 
     return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y);
-  }
-
-  std::vector<std::pair<Image *, Image *> > MetricComposite::calculate_member_overlaps(std::vector<Image *> images) {
-    if (images.empty()) {
-      images = std::vector(contributingImages.begin(), contributingImages.end());
-    }
-    std::vector<std::pair<Image *, Image *> > results;
-
-    Point2i mDistance;
-    int sqScopeRad = parent->scope_radius * parent->scope_radius * 0.7;
-    for (int i = 0; i < images.size() - 1; ++i) {
-      for (int j = i + 1; j < images.size(); ++j) {
-        mDistance = images[i]->regInfo->absoluteCoords - images[j]->regInfo->absoluteCoords;
-
-        if (componentMagLabel == Image::_2X) {
-          if (pow(mDistance.x, 2) + pow(mDistance.y, 2) < sqScopeRad) {
-            results.emplace_back(images[i], images[j]);
-          }
-        } else {
-          if (abs(mDistance.x) < (1 - parent->crop_factor) * 0.9 * imageSize.width &&
-              abs(mDistance.y) < (1 - parent->crop_factor) * 0.9 * imageSize.height) {
-            results.emplace_back(images[i], images[j]);
-          }
-        }
-      }
-    }
-    return results;
   }
 
 

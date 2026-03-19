@@ -37,8 +37,6 @@ namespace pathCam {
 
         [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const override;
 
-        std::vector<std::pair<Image *, Image *>> calculate_member_overlaps(std::vector<Image *> images = {});
-
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
 
         std::unordered_set<Image *> reduce_members_through_competition(std::unordered_set<Image *> _members) const;
@@ -58,8 +56,6 @@ namespace pathCam {
 
         std::shared_ptr<TiledImage> baseImage;
 
-
-        ImageGraph *ig;
     };
 
 

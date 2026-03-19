@@ -107,7 +107,7 @@ namespace pathCam {
 //    ******************** BEGIN POST PROCESSING  ********************
   // *******************************************************
 
-/*
+
     //process delayed frames
     std::vector<std::thread> threads;
     for (auto &comp: parent->composites) {
@@ -172,7 +172,7 @@ namespace pathCam {
       std::chrono::high_resolution_clock::now() - tAlign).count();
     std::cout << "total align time " << tAlignEnd << std::endl;
 
-    */
+
     //
     // tAlign = std::chrono::high_resolution_clock::now();
     // MatchSiftData(reinterpret_cast<MetricComposite *>(parent->composites[0])->compSiftData,reinterpret_cast<MetricComposite *>(parent->composites[1])->compSiftData);

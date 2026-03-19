@@ -132,8 +132,7 @@ namespace pathCam {
       if (res >= 0) {
         //image accepted
         img->vertexId = res;
-
-        imagesWaiting.push(img);
+        contributingFrames.insert(img);
 
         if (!img->subsequentMatchLaunched) {
           img->load_raw_from_disk(); //freed in ComponentMatchSearch::run()
@@ -144,34 +143,26 @@ namespace pathCam {
         }
 
 
-          imagesWaiting.pop();
-          std::vector<std::vector<Point2f> > facets;
-          std::vector<Point2f> centers;
-          subdiv.getVoronoiFacetList({img->vertexId}, facets, centers);
+        std::vector<Point2i> effectedTiles;
+        std::vector<Point2i> effectedTilesNoMask;
+        bool noMask = false;
 
+        //calculate region of pyramid for data placement
+        auto imageBox = cv::Rect_<float>(ri->absoluteCoords.x, ri->absoluteCoords.y, img->width,
+                                         img->height);
 
-          std::vector<Point2i> effectedTiles;
-          std::vector<Point2i> effectedTilesNoMask;
-          bool noMask = false;
+        if (componentMagLabel == Image::_2X) {
+          calculate_effected_tiles_round(face, effectedTiles, ri->absoluteCoords);
+        } else {
+          noMask = true;
+          calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
+        }
 
-          //calculate region of pyramid for data placement
-          auto imageBox = cv::Rect_<float>(ri->absoluteCoords.x, ri->absoluteCoords.y, img->width,
-                                           img->height);
-
-          if (componentMagLabel == Image::_2X) {
-            calculate_effected_tiles_round(face, effectedTiles, ri->absoluteCoords);
-          } else {
-            noMask = true;
-            calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
-          }
-
-          prepare_4CPA(img, effectedTiles);
-          imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
-          img->free_memory_RAW();
-      } else {
-        img->free_memory_RAW();
+        prepare_4CPA(img, effectedTiles);
+        imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
       }
 
+      img->free_memory_RAW();
 
       float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
       float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
@@ -346,6 +337,36 @@ namespace pathCam {
     }
   }
 
+  std::vector<std::pair<Image *, Image *> > Composite::calculate_member_overlaps(std::vector<Image *> images) {
+    if (images.empty()) {
+      images = std::vector(contributingImages.begin(), contributingImages.end());
+    }
+    std::vector<std::pair<Image *, Image *> > results;
+
+    Point2i mDistance;
+    int sqScopeRad = parent->scope_radius * parent->scope_radius * 0.7;
+    for (int i = 0; i < images.size() - 1; ++i) {
+      for (int j = i + 1; j < images.size(); ++j) {
+        mDistance = images[i]->regInfo->absoluteCoords - images[j]->regInfo->absoluteCoords;
+
+        if (componentMagLabel == Image::_2X) {
+          if (pow(mDistance.x, 2) + pow(mDistance.y, 2) < sqScopeRad) {
+            results.emplace_back(images[i], images[j]);
+          }
+        } else {
+          if (abs(mDistance.x) < (1 - parent->crop_factor) * 0.9 * imageSize.width &&
+              abs(mDistance.y) < (1 - parent->crop_factor) * 0.9 * imageSize.height) {
+            results.emplace_back(images[i], images[j]);
+              }
+        }
+      }
+    }
+    return results;
+  }
+
+  Composite::~Composite() {
+    delete ftg;
+  }
 
   void CompositeVoronoi::self_reset() {
     imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y), Point2i(max_offset.x, max_offset.y));
