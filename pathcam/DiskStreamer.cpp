@@ -363,30 +363,67 @@ namespace pathCam {
   void DiskReader::run() {
     std::cout<<"disk reader beginning"<<std::endl;
     std::ifstream infile;
+    Poco::Path inputPath;
     if (!parent->inputFileOverride.empty()) {
       infile = std::ifstream(parent->inputFileOverride.c_str());
+      inputPath = Poco::Path(parent->inputFileOverride);
     }
     else {
       infile = std::ifstream(parent->input_images.toString().c_str());
+      inputPath = Poco::Path(parent->input_images);
     }
+
+    std::unordered_map<unsigned long, unsigned long> ts_map;
+
+    Poco::Path tsPath = inputPath.parent();
+    tsPath.pushDirectory(""); // ensure it's treated as dir
+    tsPath.setFileName("ts.txt");
+
+    std::ifstream tsfile(tsPath.toString());
+
+    if (tsfile.is_open()) {
+      unsigned long idx, ms;
+      while (tsfile >> idx >> ms) {
+        ts_map[idx] = ms;
+      }
+      std::cout << "Loaded ts.txt with " << ts_map.size() << " entries\n";
+    }
+
     std::string imageFile;
     unsigned long image_index = 0;
 
     auto t1 = std::chrono::high_resolution_clock::now();
 
-    std::mt19937 rng{std::random_device{}()};
-    std::uniform_int_distribution<int> sleep_ms(1, 100); // pick your range
+    unsigned long prev_ts = 0;
+    bool has_ts = !ts_map.empty();
+
     while (infile >> imageFile) {
       Image *image = new Image(parent->image_width, parent->image_height, parent->scope_radius);
       image->set_disk_file(imageFile);
+
       Poco::Path f(imageFile);
       auto label = extractAfterFirstDash(f.getBaseName());
       image->set_observed_label(label);
+
+      // set timestamp if available
+      if (has_ts && ts_map.count(image_index)) {
+        unsigned long ts = ts_map[image_index];
+        image->timeStamp = ts;
+
+        // sleep based on delta
+        if (image_index > 0) {
+          unsigned long delta = ts - prev_ts;
+          Poco::Thread::sleep(delta);
+        }
+
+        prev_ts = ts;
+      } else {
+        // fallback to fixed FPS
+        Poco::Thread::sleep(1000.0 / 20.0);
+      }
+
       parent->pass_image(image, image_index);
       ++image_index;
-
-      Poco::Thread::sleep(1000.0 / 20.0);
-      // Poco::Thread::sleep(sleep_ms(rng));
     }
     auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
 
