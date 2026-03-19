@@ -700,7 +700,7 @@ namespace pathCam {
       }
       assert(vertexId != -1);
       subdiv.getVoronoiFacetList({vertexId}, facets, centers);
-      img->load_raw_from_disk();
+      img->load_raw_from_disk(false);
 
 
       //shift and recast

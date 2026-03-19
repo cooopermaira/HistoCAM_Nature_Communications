@@ -299,9 +299,8 @@ namespace pathCam {
     // process_debayer(image, true, {2000, 2000},
     //                 true, 0.125, true, 1);
     process_debayer(image, true, {2000, 2000},
-                true, 0.125, true, 1);
+                    true, 0.125, true, 1);
     delete image;
-
   }
 
 
@@ -344,8 +343,7 @@ namespace pathCam {
     return BayerImage;
   }
 
-  std::string extractAfterFirstDash(const std::string& filename)
-  {
+  std::string extractAfterFirstDash(const std::string &filename) {
     size_t dashPos = filename.find('_');
 
     if (dashPos == std::string::npos)
@@ -355,20 +353,18 @@ namespace pathCam {
   }
 
 
-
   DiskReader::DiskReader(StreamCam *parent) : parent(parent) {
     parent->microscopeInput = true;
   }
 
   void DiskReader::run() {
-    std::cout<<"disk reader beginning"<<std::endl;
+    std::cout << "disk reader beginning" << std::endl;
     std::ifstream infile;
     Poco::Path inputPath;
     if (!parent->inputFileOverride.empty()) {
       infile = std::ifstream(parent->inputFileOverride.c_str());
       inputPath = Poco::Path(parent->inputFileOverride);
-    }
-    else {
+    } else {
       infile = std::ifstream(parent->input_images.toString().c_str());
       inputPath = Poco::Path(parent->input_images);
     }
@@ -425,10 +421,11 @@ namespace pathCam {
       parent->pass_image(image, image_index);
       ++image_index;
     }
-    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
+    auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).
+        count();
 
     parent->microscopeInput = false;
     parent->captureTimeMS = t2;
-    std::cout << "simulated microscope input lasted " << t2<<std::endl;
+    std::cout << "simulated microscope input captured " << image_index + 1 << " frames in " << t2 << std::endl;
   }
 }

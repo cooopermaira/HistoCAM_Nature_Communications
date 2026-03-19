@@ -7,7 +7,7 @@
 
 #include "pathCam.h"
 
-using CompositeType = pathCam::MetricComposite;
+using CompositeType = pathCam::CompositeVoronoi;
 
 namespace pathCam {
   using Poco::Util::LayeredConfiguration;
