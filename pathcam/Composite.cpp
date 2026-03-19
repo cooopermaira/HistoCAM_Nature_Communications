@@ -16,7 +16,7 @@ namespace pathCam {
                                                                        parent, image_size, component_index),
                                                                      wakeEvent(true) {
     minPixelDistanceBetweenFrames = 200;
-
+    lastAccepted = Point2i(minDistance,minDistance);
 
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
@@ -124,44 +124,48 @@ namespace pathCam {
       update_Bbox_no_composite({ri});
       expand_subdiv({ri});
 
-      //add point to delaunay triangulation
-      std::vector<Point2i> face;
-      auto fShift = Point2f(ri->absoluteCoords.x, ri->absoluteCoords.y);
-      auto res = add_point_to_delaunay_triangulation(fShift, img, face, false);
+      Point2i distToLA = ri->absoluteCoords - lastAccepted;
+      if (distToLA.x * distToLA.x + distToLA.y * distToLA.y >= minDistance) {
 
-      if (res >= 0) {
-        //image accepted
-        img->vertexId = res;
-        contributingFrames.insert(img);
+        //add point to delaunay triangulation
+        std::vector<Point2i> face;
+        auto fShift = Point2f(ri->absoluteCoords.x, ri->absoluteCoords.y);
+        auto res = add_point_to_delaunay_triangulation(fShift, img, face, false);
 
-        if (!img->subsequentMatchLaunched) {
-          img->load_raw_from_disk(); //freed in ComponentMatchSearch::run()
-          img->subsequentMatchLaunched = true;
-          ++outstandingCMS_jobs;
-          const auto cms = new ComponentMatchSearch(parent, img, this);
-          parent->jqSecondary->add_runnable(cms);
+        if (res >= 0) {
+          //image accepted
+          img->vertexId = res;
+          contributingFrames.insert(img);
+          lastAccepted = ri->absoluteCoords;
+
+          if (!img->subsequentMatchLaunched) {
+            img->load_raw_from_disk(); //freed in ComponentMatchSearch::run()
+            img->subsequentMatchLaunched = true;
+            ++outstandingCMS_jobs;
+            const auto cms = new ComponentMatchSearch(parent, img, this);
+            parent->jqSecondary->add_runnable(cms);
+          }
+
+
+          std::vector<Point2i> effectedTiles;
+          std::vector<Point2i> effectedTilesNoMask;
+          bool noMask = false;
+
+          //calculate region of pyramid for data placement
+          auto imageBox = cv::Rect_<float>(ri->absoluteCoords.x, ri->absoluteCoords.y, img->width,
+                                           img->height);
+
+          if (componentMagLabel == Image::_2X) {
+            calculate_effected_tiles_round(face, effectedTiles, ri->absoluteCoords);
+          } else {
+            noMask = true;
+            calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
+          }
+
+          prepare_4CPA(img, effectedTiles);
+          imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
         }
-
-
-        std::vector<Point2i> effectedTiles;
-        std::vector<Point2i> effectedTilesNoMask;
-        bool noMask = false;
-
-        //calculate region of pyramid for data placement
-        auto imageBox = cv::Rect_<float>(ri->absoluteCoords.x, ri->absoluteCoords.y, img->width,
-                                         img->height);
-
-        if (componentMagLabel == Image::_2X) {
-          calculate_effected_tiles_round(face, effectedTiles, ri->absoluteCoords);
-        } else {
-          noMask = true;
-          calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
-        }
-
-        prepare_4CPA(img, effectedTiles);
-        imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
       }
-
       img->free_memory_RAW();
 
       float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
@@ -357,7 +361,7 @@ namespace pathCam {
           if (abs(mDistance.x) < (1 - parent->crop_factor) * 0.9 * imageSize.width &&
               abs(mDistance.y) < (1 - parent->crop_factor) * 0.9 * imageSize.height) {
             results.emplace_back(images[i], images[j]);
-              }
+          }
         }
       }
     }
@@ -570,8 +574,7 @@ namespace pathCam {
       subdiv = tempSubdiv;
       return -1;
     }
-    imwrite("/home/cm/Documents/data/Andrew_data_march/cap8/deposite/" + std::to_string(_image->index) + ".png",
-            polyMaskOutput);
+
 
     return vertxId;
   }

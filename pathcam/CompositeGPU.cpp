@@ -668,13 +668,13 @@ namespace pathCam {
 
 
   void CompositeVoronoi::rebuild() {
-    if (contributingImages.size() == 1) {
-      //return;
+    if (contributingFrames.size() == 1) {
+      return;
     }
     self_reset();
 
     //do this for all images first so we pull final voronoi face on reconstruct
-    for (auto &img: contributingImages) {
+    for (auto &img: contributingFrames) {
       Point2f absC(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y);
       std::vector<Point2i> face;
       if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
@@ -685,7 +685,7 @@ namespace pathCam {
       }
     }
 
-    for (auto &img: contributingImages) {
+    for (auto &img: contributingFrames) {
       //get voronoi facets for only this face
       std::vector<std::vector<Point2f> > facets;
       std::vector<Point2f> centers;
@@ -700,6 +700,7 @@ namespace pathCam {
       }
       assert(vertexId != -1);
       subdiv.getVoronoiFacetList({vertexId}, facets, centers);
+      img->load_raw_from_disk();
 
 
       //shift and recast
@@ -714,68 +715,31 @@ namespace pathCam {
       clean_face(face);
 
       fillConvexPoly(polyMaskOutput, face, cv::Scalar(255));
-      polyMaskGPU.upload(polyMaskOutput);
+      // polyMaskGPU.upload(polyMaskOutput);
 
-      //wait for buffer to be on gpu
-      {
-        std::unique_lock<std::mutex> lock(img->cudaBufferMutex);
-        img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
-      }
+      auto ri = img->regInfo;
 
-      //debayer image on gpu
-      cuda::GpuMat image_Mat(imageSize, CV_8U, img->get_raw_cuda());
-      cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
-
-      img->free_memory_cuda();
-
-      if (componentMagLabel != 0) {
-        //flatfield correct
-        ff_correct_and_brighten();
-      }
-
-      //add alpha channel
-      cuda::split(threeChannelPrealGPU, channelsGPU);
-      if (componentMagLabel == Image::_2X) {
-        for (auto &channel: channelsGPU) {
-          cuda::multiply(channel, circleMaskGPU, channel);
-        }
-        channelsGPU.push_back(circleMaskGPU255);
-      } else {
-        channelsGPU.push_back(rectMaskGPU);
-      }
-      cuda::merge(channelsGPU, fourChannelPrealGPU);
-
-      //calculate effected tiles
       std::vector<Point2i> effectedTiles;
       std::vector<Point2i> effectedTilesNoMask;
+      bool noMask = false;
 
       //calculate region of pyramid for data placement
-      auto imageBox = cv::Rect_<float>(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->width,
+      auto imageBox = cv::Rect_<float>(ri->absoluteCoords.x, ri->absoluteCoords.y, img->width,
                                        img->height);
 
       if (componentMagLabel == Image::_2X) {
-        calculate_effected_tiles_round(face, effectedTiles, img->regInfo->absoluteCoords);
-        cuda::multiply(polyMaskGPU, circleMaskGPU, polyMaskGPU);
+        calculate_effected_tiles_round(face, effectedTiles, ri->absoluteCoords);
       } else {
-        calculate_effected_tiles(face, effectedTiles, img->regInfo->absoluteCoords, &effectedTilesNoMask);
-        imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageBox, effectedTilesNoMask);
+        noMask = true;
+        calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
       }
 
-      imagePyramid->insertTilesAtBase(fourChannelPrealGPU, polyMaskGPU, imageBox, effectedTiles);
-
-      if (parent->inferencing) {
-        std::vector<Point2i> tiles;
-        tiles.reserve(effectedTiles.size() + effectedTilesNoMask.size());
-        tiles.insert(tiles.end(), effectedTiles.begin(), effectedTiles.end());
-        tiles.insert(tiles.end(), effectedTilesNoMask.begin(), effectedTilesNoMask.end());
-
-        auto pushForInferencing = push_for_inferencing(tiles);
-        parent->push_tile_embed_Q(pushForInferencing, componentIndex);
-      }
-      //update pyramid bounds, reset mask
-      imagePyramid->bounds = imagePyramid->level[0]->bounds;
+      prepare_4CPA(img, effectedTiles);
+      imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
       polyMaskOutput.setTo(Scalar(0));
       parent->notify_observers();
+
+      img->free_memory_RAW();
     }
     //needsAlignment = false;
   }

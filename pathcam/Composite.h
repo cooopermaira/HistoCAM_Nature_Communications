@@ -218,6 +218,10 @@ namespace pathCam {
     friend class RebuildRunnable;
 
   public:
+    inline static int minDistance = 250000;
+
+    Point2i lastAccepted;
+
     unsigned long lastAcceptedImageIndex;
     unsigned int minPixelDistanceBetweenFrames;
     Vec2 lastAcceptedImageAbC;
