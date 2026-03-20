@@ -116,13 +116,19 @@ namespace pathCam {
         winningVote = votes[0];
       }
       matchedTo = winningVote.m->image_1->index;
-      winningVote.m->image_1->regInfo->matchedBy = index;
+
       absoluteCoords = winningVote.abc - Point2i(winningVote.m->t_x,winningVote.m->t_y);
       relativeCoords = Point2i(winningVote.m->t_x,winningVote.m->t_y);
       component_membership = winningVote.componentIndex;
       {
         Poco::Mutex::ScopedLock lock(winningVote.m->image_1->regInfo->rAccessMutex);
         winningVote.m->image_1->regInfo->children.push_back(this);
+        winningVote.m->image_1->regInfo->matchedBy = index;
+      }
+      {
+        std::lock_guard lock(winningVote.m->image_1->blurMutex);
+        auto dist = winningVote.m->image_1->regInfo->relativeCoords + relativeCoords;
+        winningVote.m->image_1->motionBlur = dist.x * dist.x + dist.y * dist.y;
       }
     }else {
       absoluteCoords = {0,0};

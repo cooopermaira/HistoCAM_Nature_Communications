@@ -13,16 +13,16 @@ namespace pathCam {
     std::cout << "q manager beginning" << std::endl;
     auto jq = parent->JobQ;
     auto jq2 = parent->jqSecondary;
-    Poco::Thread::sleep(200);
+    // Poco::Thread::sleep(200);
     int count = 1;
 
     while (parent->compositing) {
-      if (count % 10 == 0) {
-        parent->launch_blur_metric();
-      }else if (count % 10 == 5) { //just gives a little time for it to run
-        parent->receive_blur_metric();
-      }
-      ++count;
+      // if (count % 10 == 0) {
+      //   parent->launch_blur_metric();
+      // }else if (count % 10 == 5) { //just gives a little time for it to run
+      //   parent->receive_blur_metric();
+      // }
+      // ++count;
       Poco::Runnable *job = nullptr;
       if (jq->pool->available()) {
         {

@@ -81,7 +81,7 @@ namespace pathCam {
                                       image_file(
                                         Poco::Path()),
                                       motionBlur(
-                                        0),
+                                        10000),
                                       cudaBufferReady(false) {
     prepare_blur_check_statics();
 

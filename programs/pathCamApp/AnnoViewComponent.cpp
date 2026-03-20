@@ -57,13 +57,16 @@ bool AnnoViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *o
 
 bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
   // Right click without shift: open dropdown menu for preconfigured class selection
-  if (event.mods.isRightButtonDown() && !event.mods.isShiftDown()){
+  if (event.mods.isRightButtonDown() && !event.mods.isShiftDown()) {
     const auto clickView = screen2view(fPoint(event.x, event.y), *view);
 
     std::shared_ptr<PolygonAnnotation> hitPoly;
-    for (auto it = annotations->rbegin(); it != annotations->rend(); ++it){
+    for (auto it = annotations->rbegin(); it != annotations->rend(); ++it) {
       auto poly = std::dynamic_pointer_cast<PolygonAnnotation>(*it);
-      if (poly && poly->containsPoint(clickView)) { hitPoly = poly; break; }
+      if (poly && poly->containsPoint(clickView)) {
+        hitPoly = poly;
+        break;
+      }
     }
     if (!hitPoly) return false;
 
@@ -75,17 +78,17 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
     juce::Rectangle<int> anchor(screenPt.x, screenPt.y, 1, 1);
 
     m.showMenuAsync(
-        juce::PopupMenu::Options().withTargetScreenArea(anchor),
-        [this, hitPoly](int result){
-            if (result <= 0) return;
-            if (result >= 1 && result <= (int)annotateParent->parent->sCam->preconfiguredAnnoLabels.size()){
-              auto ci = annotateParent->parent->sCam->preconfiguredAnnoLabels[(size_t)(result - 1)];
-                hitPoly->setName(ci.name);
-                hitPoly->setColor(Colour(ci.r,ci.g,ci.b));
-                annotateParent->annotationsUpdated();
-                repaint();
-            }
-        });
+      juce::PopupMenu::Options().withTargetScreenArea(anchor),
+      [this, hitPoly](int result) {
+        if (result <= 0) return;
+        if (result >= 1 && result <= (int) annotateParent->parent->sCam->preconfiguredAnnoLabels.size()) {
+          auto ci = annotateParent->parent->sCam->preconfiguredAnnoLabels[(size_t) (result - 1)];
+          hitPoly->setName(ci.name);
+          hitPoly->setColor(Colour(ci.r, ci.g, ci.b));
+          annotateParent->annotationsUpdated();
+          repaint();
+        }
+      });
 
     return true;
   }
@@ -106,8 +109,8 @@ bool AnnoViewComponent::polyMouseDown(const juce::MouseEvent &event) {
       cast->add(screen2view(fPoint(event.x, event.y), *view));
     }
 
-    // Always consume shift+left click to prevent navigation interference
-    return true;
+    // // Always consume shift+left click to prevent navigation interference
+    // return true;
   }
 
   // Left click without shift: select point for dragging
@@ -232,29 +235,30 @@ bool AnnoViewComponent::segMouseDown(const juce::MouseEvent &event) {
     return true;
   }
 
-  if (event.mods.isRightButtonDown() && event.mods.isShiftDown()) {
-    if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_SEG) {
-      SegmentAnnotation *cast = dynamic_cast<SegmentAnnotation *>(annotateParent->getSelected().get());
-
-      fPoint fovUpperLeft = screen2view(view->getTopLeft(), *view);
-      fPoint fovLowerRight = screen2view(view->getBottomRight(), *view);
-      cast->update_FOV(fovUpperLeft, fovLowerRight);
-
-      fPoint temp = screen2view(fPoint(event.x, event.y), *view);
-      Point3f point(temp.x, temp.y, 0.0);
-      cast->add(point);
-      //parent->parent->sCam->as->on_click(point);
-    }
-
-    // Always consume shift+right click to prevent navigation interference
-    return true;
-  }
+  // if (event.mods.isRightButtonDown() && event.mods.isShiftDown()) {
+  //   if (annotateParent->getSelected() != NULL && annotateParent->getSelected()->getType() == Annotation::_SEG) {
+  //     SegmentAnnotation *cast = dynamic_cast<SegmentAnnotation *>(annotateParent->getSelected().get());
+  //
+  //     fPoint fovUpperLeft = screen2view(view->getTopLeft(), *view);
+  //     fPoint fovLowerRight = screen2view(view->getBottomRight(), *view);
+  //     cast->update_FOV(fovUpperLeft, fovLowerRight);
+  //
+  //     fPoint temp = screen2view(fPoint(event.x, event.y), *view);
+  //     Point3f point(temp.x, temp.y, 0.0);
+  //     cast->add(point);
+  //     //parent->parent->sCam->as->on_click(point);
+  //   }
+  //
+  //   // Always consume shift+right click to prevent navigation interference
+  //   return true;
+  // }
 
   return false;
 }
 
 bool AnnoViewComponent::segMouseUp(const juce::MouseEvent &event) {
-  if ((annotateParent->getMode() == Annotation::_SEG || annotateParent->getSelected()->getType() == Annotation::_SEG) && event.mods.
+  if ((annotateParent->getMode() == Annotation::_SEG || annotateParent->getSelected()->getType() == Annotation::_SEG) &&
+      event.mods.
       isShiftDown()) {
     return true;
   }
@@ -262,7 +266,8 @@ bool AnnoViewComponent::segMouseUp(const juce::MouseEvent &event) {
 }
 
 bool AnnoViewComponent::segMouseDrag(const juce::MouseEvent &event) {
-  if ((annotateParent->getMode() == Annotation::_SEG || annotateParent->getSelected()->getType() == Annotation::_SEG) && event.mods.
+  if ((annotateParent->getMode() == Annotation::_SEG || annotateParent->getSelected()->getType() == Annotation::_SEG) &&
+      event.mods.
       isShiftDown()) {
     return true;
   }
@@ -270,7 +275,8 @@ bool AnnoViewComponent::segMouseDrag(const juce::MouseEvent &event) {
 }
 
 void AnnoViewComponent::mouseDown(const juce::MouseEvent &event) {
-  bool handled; {
+  bool handled = false;
+  {
     const ScopedLock lock(mutex);
     handled = polyMouseDown(event);
     if (!handled) { handled = measureMouseDown(event); }
@@ -284,7 +290,8 @@ void AnnoViewComponent::mouseDown(const juce::MouseEvent &event) {
 }
 
 void AnnoViewComponent::mouseUp(const juce::MouseEvent &event) {
-  bool handled; {
+  bool handled;
+  {
     const ScopedLock lock(mutex);
     handled = polyMouseUp(event);
     if (!handled) { handled = segMouseUp(event); }
@@ -297,7 +304,8 @@ void AnnoViewComponent::mouseUp(const juce::MouseEvent &event) {
 }
 
 void AnnoViewComponent::mouseDrag(const juce::MouseEvent &event) {
-  bool handled; {
+  bool handled;
+  {
     const ScopedLock lock(mutex);
     handled = polyMouseDrag(event);
     if (!handled) { handled = segMouseDrag(event); }
@@ -310,7 +318,8 @@ void AnnoViewComponent::mouseDrag(const juce::MouseEvent &event) {
 }
 
 void AnnoViewComponent::mouseMove(const juce::MouseEvent &event) {
-  bool handled; {
+  bool handled;
+  {
     const ScopedLock lock(mutex);
     handled = measureMouseMove(event);
     if (handled) { repaint(); }
@@ -322,7 +331,8 @@ void AnnoViewComponent::mouseMove(const juce::MouseEvent &event) {
 }
 
 void AnnoViewComponent::paint(juce::Graphics &g) {
-  ImageViewComponent::paint(g); {
+  ImageViewComponent::paint(g);
+  {
     const ScopedLock lock(mutex);
     for (unsigned int i = 0; i < annotations->size(); i++) {
       bool isSelected = (*annotations)[i].get() == annotateParent->getSelected().get();

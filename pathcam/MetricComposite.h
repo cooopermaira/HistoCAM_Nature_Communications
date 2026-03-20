@@ -27,7 +27,7 @@ namespace pathCam {
 
         void rebuild(const std::vector<Image *> &members);
 
-        bool image_improves_tile(const std::shared_ptr<TileObj>& _to, const Image* _img) const;
+        bool image_improves_tile(const std::shared_ptr<TileObj>& _to, Image *_img) const;
 
         size_t consolidate_tile_ownership();
 

@@ -22,7 +22,7 @@ namespace pathCam {
       im = new InferenceManager(this);
     }
 
-    segmentWithSAM = false;
+    // segmentWithSAM = false;
     if (segmentWithSAM) {
       std::thread t([this]() {
         as = std::make_shared<AccessSAM>(this);
@@ -46,7 +46,7 @@ namespace pathCam {
     minPixelDistanceBetweenFrames = pow(minPixelDistanceBetweenFrames, 2);
 
 
-    load_blur_engine();
+    // load_blur_engine();
 
 #ifdef HAVE_OPENCV_CUDAARITHM
     compositorCudaDevice = GPU_select_cuda_device(1);
@@ -746,6 +746,11 @@ namespace pathCam {
       component->set_offset(Point2f(0, 0));
     }
 
+    {
+      std::lock_guard lock(ri->image->blurMutex);
+      ri->image->motionBlur = 0;
+    }
+
     ri->resolved = true;
     push_compositeQ(ri);
     ri->cast_requested_votes();
@@ -1050,7 +1055,7 @@ namespace pathCam {
       comp->correct_offset();
     }
 
-    save_velocity_data();
+    // save_velocity_data();
 
     std::vector<Point2i> AbCs(maxIndex + 1);
     std::vector<unsigned> frameLabels(maxIndex + 1);

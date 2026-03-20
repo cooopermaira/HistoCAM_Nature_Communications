@@ -696,15 +696,24 @@ namespace pathCam {
     return updates.size();
   }
 
-  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, const Image *_img) const {
+  bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, Image *_img) const {
     //tile has no owner, candidate frame wins by default
     if (!_to->owner) {
       return true;
     }
 
+    float myBlur, theirBlur;
+    {
+      std::lock_guard lock(_img->blurMutex);
+      myBlur = _img->motionBlur;
+    }
+    {
+      std::lock_guard lock(_to->owner->blurMutex);
+      theirBlur = _to->owner->motionBlur;
+    }
     //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
     //pretty close to the center of the frame
-    if (std::abs(_to->owner->motionBlur - _img->motionBlur) < 0.01f) {
+    if (std::abs(theirBlur - myBlur) < /*0.01f*/50) {
       if (_to->owner->ownedTiles.size() < 12 && _img->ownedTiles.size() > 12) {
         //owner does not have sufficient presence and should be removed to reduce member image count
         return true;
@@ -716,7 +725,7 @@ namespace pathCam {
     }
 
     //amount of motion blur is significantly different, choose clearest image
-    return _to->owner->motionBlur > _img->motionBlur;
+    return theirBlur > myBlur;
   }
 
 

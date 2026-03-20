@@ -185,7 +185,7 @@ namespace pathCam {
     push_remaining_tiles_for_inference();
 
 
-    //save_components_to_disk();
+    // save_components_to_disk();
 
     parent->compositing = false;
     parent->inferenceWait.set();
@@ -219,7 +219,7 @@ namespace pathCam {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
 
-      i->save_pyramid_as_image("/home/pathcam/pyr.png", true, true);
+      i->save_pyramid_as_image("/home/cm/Desktop/10x.png", false, false);
     }
   }
 
