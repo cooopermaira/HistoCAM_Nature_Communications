@@ -7,7 +7,7 @@
 
 #include "pathCam.h"
 
-using CompositeType = pathCam::CompositeVoronoi;
+using CompositeType = pathCam::MetricComposite;
 
 namespace pathCam {
   using Poco::Util::LayeredConfiguration;
@@ -140,6 +140,13 @@ namespace pathCam {
       //im->thread.join();
       inference_thread.join();
     }
+
+    Poco::Path image_path = givenWorkingDirectory;
+    image_path.append(MRImageSet->labelName);
+    image_path.append("ts");
+    image_path.setExtension("txt");
+
+    write_image_timestamps(image_path.toString());
 
     cleanup_and_reset();
 
@@ -1007,14 +1014,6 @@ namespace pathCam {
 
 
   void StreamCam::cleanup_and_reset() {
-
-    Poco::Path image_path = givenWorkingDirectory;
-    image_path.append(MRImageSet->labelName);
-    image_path.append("ts");
-    image_path.setExtension(".txt");
-
-    write_image_timestamps(image_path.toString());
-
     float minBlur = 1, maxBlur = 0;
     for (auto comp: composites) {
       comp->correct_offset();
@@ -1023,6 +1022,7 @@ namespace pathCam {
 
     std::vector<Point2i> AbCs(maxIndex + 1);
     std::vector<unsigned> frameLabels(maxIndex + 1);
+    std::vector<long> frameTimeStamps(maxIndex + 1);
     for (auto &img: images) {
       if (img && img->index <= maxIndex) {
         if (img->regInfo) {
@@ -1051,13 +1051,14 @@ namespace pathCam {
         }
         if (img->motionBlur < minBlur) { minBlur = img->motionBlur; }
         if (img->motionBlur > maxBlur) { maxBlur = img->motionBlur; }
+        frameTimeStamps[img->index] = img->timeStamp;
       }
     }
     std::cout << "minBlur maxBlur " << minBlur << " " << maxBlur << std::endl;
     std::unordered_map<int, float> labelScaleLookup;
     create_mag_label_to_scale_lookup(labelScaleLookup);
 
-    for (auto &comp : composites) {
+    for (auto &comp: composites) {
       if (comp->frameCount < 5) {
         comp->suspended = true;
         comp->imagePyramid->suspended = true;
@@ -1067,6 +1068,7 @@ namespace pathCam {
     MRImageSet->labelScaleLookup = labelScaleLookup;
     MRImageSet->AbCs = AbCs;
     MRImageSet->frameLabels = frameLabels;
+    MRImageSet->frameTimeStamps = frameTimeStamps;
     MRImageSet->framesPerMillisecond = float(maxIndex) / float(captureTimeMS);
     MRImageSet->captureTimeMS = captureTimeMS;
 
@@ -1121,7 +1123,7 @@ namespace pathCam {
     images.clear();
 
     //clean up all composites
-    for (auto &c : composites) {
+    for (auto &c: composites) {
       c->joinedTo = nullptr;
       c->absorbedComponents.clear();
     }

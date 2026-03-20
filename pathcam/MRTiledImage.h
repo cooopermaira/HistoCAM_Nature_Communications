@@ -126,6 +126,7 @@ public:
 
   std::vector<Point2i> AbCs;
   std::vector<unsigned> frameLabels;
+  std::vector<long> frameTimeStamps;
   std::unordered_map<int,float> labelScaleLookup;
   float framesPerMillisecond;
   long captureTimeMS;

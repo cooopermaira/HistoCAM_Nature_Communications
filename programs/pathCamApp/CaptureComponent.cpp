@@ -185,22 +185,20 @@ void CaptureComponent::startRecording() {
 
   setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
-
   recentlyViewedSlides.push_unique(parent->MRimage);
 
-
-  if (parent->audioDictationOn) {
-    if (!wavRecorder.initialised) {
-      wavRecorder.init(1);
-    }
-    wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
-  }
   if (!parent->keepFrames) {
     sCam->clear_disk_frames();
   }
 
   compositeThread.start(new bcamPocoRunnable(this));
   parent->startCompositingUIUpdates();
+  if (parent->audioDictationOn) {
+    if (!wavRecorder.initialised) {
+      wavRecorder.init(1);
+    }
+    wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
+  }
 
   captureOverlay->resized();
   aiOverlay->resized();
@@ -235,9 +233,10 @@ void CaptureComponent::startSimulating() {
   parent->MRimage = sCam->get_MRimage_reference();
   setImage(parent->MRimage);
   parent->annotate->setImage(parent->MRimage);
-
   recentlyViewedSlides.push_unique(parent->MRimage);
 
+  compositeThread.start(new sCamPocoRunnable(this));
+  parent->startCompositingUIUpdates();
 
   if (parent->audioDictationOn) {
     if (!wavRecorder.initialised) {
@@ -245,9 +244,6 @@ void CaptureComponent::startSimulating() {
     }
     wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
   }
-
-  compositeThread.start(new sCamPocoRunnable(this));
-  parent->startCompositingUIUpdates();
 
   captureOverlay->resized();
   aiOverlay->resized();
@@ -270,12 +266,14 @@ void CaptureComponent::stop() {
   if (recording) { stopRecording(); }
   if (simulating) { stopSimulating(); }
 
-  if (parent->audioDictationOn) {
-    // if (true){
+  // if (parent->audioDictationOn) {
+    if (true){
     Poco::FastMutex::ScopedLock lock(parent->annotate->voiceAnnoMutex);
-    parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index, juce::File(finalAudio.toString())));
+    // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index, juce::File(finalAudio.toString())));
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/low_feat_10x/dictation.wav")));
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
+      auto p = Poco::Path(sCam->inputFileOverride).parent().pushDirectory("dictation.wav").toString();
+      parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(p)));
     parent->annotate->newVoiceAnnotation.set();
   }
   save_slide_set();
@@ -365,8 +363,7 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
       return true;
 #endif
     }
-    if (procedureMode == 1) {
-      // begin an actual recording/simulation
+    if (procedureMode == 1) { // begin an actual recording/simulation
 
       ready = false;
 #ifdef WITH_SPINNAKER
@@ -387,8 +384,6 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
     std::cout << "invalid procedure mode, resetting" << std::endl;
     procedureMode = 0;
     return true;
-
-    if (recording || simulating) { stop(); }
   }
   return false; // Key press not handled
 }

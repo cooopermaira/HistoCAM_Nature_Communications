@@ -558,7 +558,7 @@ namespace pathCam {
     int nonzeroMin;
     if (componentMagLabel == Image::_2X) {
       polyMaskOutput = polyMaskOutput.mul(circleMask);
-      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.4;
+      nonzeroMin = parent->scope_radius * parent->scope_radius * 3.14 * 0.2;
     } else {
       nonzeroMin = _image->width * _image->height * 0.25;
     }

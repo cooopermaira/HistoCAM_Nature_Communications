@@ -408,14 +408,15 @@ namespace pathCam {
 
         // sleep based on delta
         if (image_index > 0) {
-          unsigned long delta = ts - prev_ts;
-          Poco::Thread::sleep(delta);
+          auto target = t1 + std::chrono::milliseconds(ts);
+          std::this_thread::sleep_until(target);
         }
 
         prev_ts = ts;
       } else {
         // fallback to fixed FPS
         Poco::Thread::sleep(1000.0 / 20.0);
+        image->timeStamp = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).count();
       }
 
       parent->pass_image(image, image_index);

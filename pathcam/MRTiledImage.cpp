@@ -588,11 +588,33 @@ void MRTiledImageSet::read_slide_header() {
 
 
 std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
-  long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const {
-  // assert(msTimeStart <= captureTimeMS && msTimeEnd <= captureTimeMS && msTimeStart <= msTimeEnd);
+    long msTimeStart, long msTimeEnd,
+    long &startFrameIdx, long &endFrameIdx) const
+{
+  const auto& ts = frameTimeStamps;
 
-  startFrameIdx = msTimeStart * framesPerMillisecond;
-  endFrameIdx = msTimeEnd * framesPerMillisecond;
+  if (ts.empty()) {
+    startFrameIdx = endFrameIdx = -1;
+    return {};
+  }
+
+  // ---- startFrameIdx: last index with ts[i] <= msTimeStart ----
+  auto itStart = std::upper_bound(ts.begin(), ts.end(), msTimeStart);
+
+  if (itStart == ts.begin()) {
+    startFrameIdx = 0;  // all timestamps > start → clamp to first
+  } else {
+    startFrameIdx = static_cast<long>(std::distance(ts.begin(), itStart) - 1);
+  }
+
+  // ---- endFrameIdx: first index with ts[i] >= msTimeEnd ----
+  auto itEnd = std::lower_bound(ts.begin(), ts.end(), msTimeEnd);
+
+  if (itEnd == ts.end()) {
+    endFrameIdx = static_cast<long>(ts.size() - 1);  // all timestamps < end → clamp to last
+  } else {
+    endFrameIdx = static_cast<long>(std::distance(ts.begin(), itEnd));
+  }
 
   return poly_annotations_from_frame_interval(startFrameIdx, endFrameIdx);
 }
