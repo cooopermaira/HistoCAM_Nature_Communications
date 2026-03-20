@@ -41,7 +41,7 @@ public:
 
   StreamCam* parent;
   Image* image;
-  unsigned long index,matchedTo;
+  long index, matchedTo, matchedBy;
   bool matchSearchComplete = false;
   bool successful,root,resolved,rootOfRoot;
   bool stayFixedDuringBundleAdjustment = false;
@@ -64,8 +64,8 @@ public:
   int numBestMatches = 0;
   std::atomic<int> outstandingPolls = 0;
   
-  RegInfo(StreamCam* parent, bool successful=false, Point2f absoluteCoords=Point2f(0.0, 0.0),bool root = false,unsigned int component_membership = 0):
-  successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root), parent(parent),
+  RegInfo(StreamCam* parent, bool successful=false, Point2f absoluteCoords=Point2f(0.0, 0.0),bool root = false, int component_membership = 0):
+  successful(successful), resolved(false), absoluteCoords(absoluteCoords),component_membership(component_membership),root(root), parent(parent),matchedBy(-1),matchedTo(-1),index(-1),
   waitOnResolve(true),rootOfRoot(false) {
   };
 

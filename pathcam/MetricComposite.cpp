@@ -126,6 +126,7 @@ namespace pathCam {
 
       staging.pop();
       ++frameCount;
+      maxIndex = max(maxIndex,img->index);
 
       if (img->labelObserved) {
         ++observedLabels[img->label];
@@ -351,7 +352,7 @@ namespace pathCam {
 
     auto graphConnectivityResult = ig.computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
-      std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
+      std::cout << "component " << componentIndex << " failed to connect graph, frames "<<root->index<<", "<<  maxIndex << std::endl;
       if (observedLabels.size() > 1) {
         rebuild(membersForRebuild);
       }

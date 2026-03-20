@@ -116,6 +116,7 @@ namespace pathCam {
         winningVote = votes[0];
       }
       matchedTo = winningVote.m->image_1->index;
+      winningVote.m->image_1->regInfo->matchedBy = index;
       absoluteCoords = winningVote.abc - Point2i(winningVote.m->t_x,winningVote.m->t_y);
       relativeCoords = Point2i(winningVote.m->t_x,winningVote.m->t_y);
       component_membership = winningVote.componentIndex;

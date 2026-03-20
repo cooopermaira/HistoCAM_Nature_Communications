@@ -593,24 +593,24 @@ namespace pathCam {
 
   void StreamCam::add_image(Image *image, long index) {
     if (index >= images.size()) {
-      image_mutex.writeLock();
+
       reg_results_mutex.writeLock();
-
-      images.resize(index + 100);
-      reg_results.resize(index + 100);
-
-      reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
+      reg_results.resize(index + 100, nullptr);
       reg_results_mutex.unlock();
 
+      // reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
+
+      image_mutex.writeLock();
+      images.resize(index + 100);
       images[index] = image;
       ++maxIndex;
       image_mutex.unlock();
     } else {
-      reg_results_mutex.readLock();
-      reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
-      reg_results_mutex.unlock();
+      // reg_results_mutex.readLock();
+      // reg_results[index] = new RegInfo(this, true, {0.0, 0.0}, true, 0);
+      // reg_results_mutex.unlock();
 
-      image_mutex.readLock();
+      image_mutex.writeLock();
       images[index] = image;
       ++maxIndex;
       image_mutex.unlock();
@@ -691,6 +691,13 @@ namespace pathCam {
     reg_results_mutex.unlock();
     return temp;
   }
+
+  void StreamCam::set_reg_ref(RegInfo *ri) {
+    reg_results_mutex.writeLock();
+    reg_results[ri->index] = ri;
+    reg_results_mutex.unlock();
+  }
+
 
   Image *StreamCam::get_image_ref(unsigned long index) {
     Image *temp = nullptr;
@@ -1012,6 +1019,30 @@ namespace pathCam {
     return false;
   }
 
+  void StreamCam::save_velocity_data() {
+    auto p = images[0]->image_file.parent().parent();
+    p.setFileName("velocities.txt");
+    auto pstr = p.toString();
+    std::ofstream out(pstr);
+    if (!out.is_open()) {
+      std::cout << "timestamp write failed" << std::endl;
+      return;
+    }
+
+    for (int i = 0; i <= maxIndex; ++i) {
+      auto ri = reg_results[i];
+      if (!ri) { continue; }
+      if (ri->matchedTo >= 0 && ri->matchedBy >= 0 && ri->image) {
+        auto other = reg_results[ri->matchedBy];
+        auto travel = ri->relativeCoords + other->relativeCoords;
+        int val = travel.x * travel.x + travel.y * travel.y;
+
+        out << ri->image->image_file.toString() << " " << val << std::endl;
+      }
+    }
+
+    out.close();
+  }
 
   void StreamCam::cleanup_and_reset() {
     float minBlur = 1, maxBlur = 0;
@@ -1019,13 +1050,14 @@ namespace pathCam {
       comp->correct_offset();
     }
 
+    save_velocity_data();
 
     std::vector<Point2i> AbCs(maxIndex + 1);
     std::vector<unsigned> frameLabels(maxIndex + 1);
     std::vector<long> frameTimeStamps(maxIndex + 1);
     for (auto &img: images) {
       if (img && img->index <= maxIndex) {
-        if (img->regInfo) {
+        if (img->regInfo && img->is_good()) {
           if (!img->regInfo->wasAligned) {
             // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
             auto abc = Point2f(

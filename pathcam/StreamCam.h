@@ -176,6 +176,8 @@ namespace pathCam {
 
     std::vector<std::pair<std::string, double>> debugImageBlurWithNames;
     std::vector<double> debugImageBlur;
+
+
     CompositeManager *cm;
     QManager *qm;
     DiskReader *dr;
@@ -234,6 +236,7 @@ namespace pathCam {
     std::vector<Image*> blurImagesInProcess;
 
     // v DEBUG v
+    void save_velocity_data();
     // void increment_match_counter(bool trueForUpFalserDown,long imgIdx);
 
     bool run() override;
@@ -369,6 +372,8 @@ namespace pathCam {
     std::vector<RegInfo*> get_reg_ref(const std::vector<unsigned long>&);
 
     RegInfo* get_reg_ref(long image_idx);
+
+    void set_reg_ref(RegInfo *ri);
 
     std::vector<Image *> get_component_image_refs(unsigned long component);
 

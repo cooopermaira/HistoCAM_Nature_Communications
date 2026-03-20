@@ -80,6 +80,7 @@ namespace pathCam {
     int componentMagLabel = -1;
     bool needsAlignment = false;
     int memberCount = 0;
+    long maxIndex = -1;
 
     std::unordered_map<unsigned int, int> observedLabels;
 
