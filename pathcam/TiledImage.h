@@ -61,23 +61,19 @@ struct TileObj {
   int updateCount = 0;
   void *preferredObj;
 
-  void (*destroyPreferredObj)(void *) = nullptr;
+  static void (*destroyPreferredObj)(void *);
 
   bool usingPreferred = false;
   bool newData = false;
   bool newAnnoData = false;
 
   Poco::FastMutex mutex;
-  cuda::GpuMat image;
-  char *buf;
+  cv::Mat image;
 
   std::map<int, std::pair<cuda::GpuMat, void *> > SAMMasks;
 
   TileObj(int _tileSize, Point2i _index = {}) : index(_index) {
-    cudaMallocManaged(&buf, _tileSize * _tileSize * 4);
-    cudaMemset(buf, 0, _tileSize * _tileSize * 4);
-
-    image = cuda::GpuMat(_tileSize, _tileSize, CV_8UC4, buf);
+    image = cv::Mat(_tileSize, _tileSize, CV_8UC4, cv::Scalar(0, 0, 0, 0));
     preferredObj = nullptr;
     usingPreferred = false;
     newData = false;
@@ -90,12 +86,9 @@ struct TileObj {
         destroyPreferredObj(preferredObj);
       }
       preferredObj = nullptr;
-      destroyPreferredObj = nullptr;
       usingPreferred = false;
     }
     mutex.unlock();
-    cudaFree(buf);
-    image.release();
   }
 };
 

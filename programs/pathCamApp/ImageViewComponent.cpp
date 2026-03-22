@@ -38,6 +38,7 @@ ImageViewComponent::ImageViewComponent(std::shared_ptr<fRectangle> _view,
 
   shadeClasses = false;
 
+  TileObj::destroyPreferredObj = [](void *p) { delete static_cast<juce::Image *>(p); };
 
   //gl.attachTo(*this);
 }
@@ -136,9 +137,6 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
       if (!tile->usingPreferred) {
         juce::Image *im = new juce::Image(juce::Image::ARGB, tile->image.cols, tile->image.rows, true);
         tile->preferredObj = im;
-        tile->destroyPreferredObj = [](void *p) {
-          delete static_cast<juce::Image *>(p);
-        };
         tile->usingPreferred = true;
       }
 
@@ -147,8 +145,7 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
       if (tile->newData) {
         auto img = tile->image;
         juce::Image::BitmapData bitmap_data(*im, juce::Image::BitmapData::ReadWriteMode::writeOnly);
-        CHECK_CUDA(cudaMemcpy2D(bitmap_data.data, 4 * img.cols, img.data,
-          img.step, 4 * img.cols, img.rows, cudaMemcpyDeviceToHost));
+        memcpy(bitmap_data.data, img.data, img.rows * img.step);
         tile->newData = false;
       }
       if (tile->newAnnoData) {

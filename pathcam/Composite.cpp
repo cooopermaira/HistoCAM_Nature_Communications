@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <pathCam.h>
+#include <opencv2/core/cuda_stream_accessor.hpp>
 
 #include <memory>
 
@@ -16,7 +17,7 @@ namespace pathCam {
                                                                        parent, image_size, component_index),
                                                                      wakeEvent(true) {
     minPixelDistanceBetweenFrames = 200;
-    lastAccepted = Point2i(minDistance,minDistance);
+    lastAccepted = Point2i(minDistance, minDistance);
 
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
     subdiv.initDelaunay(subdiv_Bbox.as_cvRect());
@@ -126,7 +127,6 @@ namespace pathCam {
 
       Point2i distToLA = ri->absoluteCoords - lastAccepted;
       if (distToLA.x * distToLA.x + distToLA.y * distToLA.y >= minDistance) {
-
         //add point to delaunay triangulation
         std::vector<Point2i> face;
         auto fShift = Point2f(ri->absoluteCoords.x, ri->absoluteCoords.y);
@@ -134,6 +134,40 @@ namespace pathCam {
 
         if (res >= 0) {
           //image accepted
+          if (!parent->unifiedMemory) {
+            std::unique_lock<std::mutex> lock(img->cudaBufferMutex);
+            if (!img->raw_buffer_cuda) {
+              assert(img->get_Raw());
+              const size_t nBytes = static_cast<size_t>(img->height) * img->width;
+
+              // cudaMemcpyAsync requires a pinned source for a truly async transfer.
+              // Copy raw_buffer into a pinned staging buffer before launching.
+              char *pinnedBuf = nullptr;
+              cudaMallocHost(reinterpret_cast<void **>(&pinnedBuf), nBytes);
+              memcpy(pinnedBuf, img->get_Raw(), nBytes);
+
+              cudaMallocAsync(reinterpret_cast<void **>(&img->raw_buffer_cuda), nBytes,
+                              cuda::StreamAccessor::getStream(parent->cvCompositeStream));
+              cudaMemcpyAsync(img->raw_buffer_cuda, pinnedBuf, nBytes, cudaMemcpyHostToDevice,
+                              cuda::StreamAccessor::getStream(parent->cvCompositeStream));
+
+              // After the stream work completes: free the pinned staging buffer and
+              // signal cudaBufferReady so consumers waiting on cudaBufferConVar unblock.
+              struct Ctx { Image *img; char *pinnedBuf; };
+              auto *ctx = new Ctx{img, pinnedBuf};
+              cudaLaunchHostFunc(cuda::StreamAccessor::getStream(parent->cvCompositeStream),
+                [](void *ud) {
+                  auto *c = static_cast<Ctx *>(ud);
+                  cudaFreeHost(c->pinnedBuf);
+                  {
+                    std::lock_guard<std::mutex> cbLock(c->img->cudaBufferMutex);
+                    c->img->cudaBufferReady = true;
+                    c->img->cudaBufferConVar.notify_one();
+                  }
+                  delete c;
+                }, ctx);
+            }
+          }
           img->vertexId = res;
           contributingFrames.insert(img);
           lastAccepted = ri->absoluteCoords;
@@ -1124,11 +1158,7 @@ namespace pathCam {
             if (imagePyramid->level[0]->tiles(x, y) == NULL) {
               tile = Mat(Size(tile_size, tile_size), CV_8UC4, Scalar(0, 0, 0, 0));
             } else {
-#ifdef HAVE_OPENCV_CUDAARITHM
-              level->getTile(x, y)->image.download(tile);
-#else
-              tile = level->getTile(x, y).clone();
-#endif
+              tile = level->getTile(x, y)->image.clone();
             }
             auto searchForTile = Point2i(x, y);
             if (std::find(effectedTiles.begin(), effectedTiles.end(), Point2i(x, y)) != effectedTiles.
@@ -1136,11 +1166,7 @@ namespace pathCam {
               tile = 0.5 * tile + 0.5 * greyBlend;
             }
           } else {
-#ifdef HAVE_OPENCV_CUDAARITHM
-            level->getTile(x, y)->image.download(tile);
-#else
-            tile = level->getTile(x, y).clone();
-#endif
+            tile = level->getTile(x, y)->image.clone();
           }
 
           if (_withGrid) {

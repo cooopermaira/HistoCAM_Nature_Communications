@@ -200,7 +200,6 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
           }
           tileObj->usingPreferred = false;
           tileObj->preferredObj = nullptr;
-          tileObj->destroyPreferredObj = nullptr;
         }
       }
 
@@ -235,7 +234,6 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
       }
       tileObj->usingPreferred = false;
       tileObj->preferredObj = nullptr;
-      tileObj->destroyPreferredObj = nullptr;
     }
   }
 

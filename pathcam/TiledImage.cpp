@@ -7,6 +7,8 @@
 
 #include "pathCam.h"
 
+void (*TileObj::destroyPreferredObj)(void *) = nullptr;
+
 template<typename T>
 cv::Rect_<T> rect_mult(cv::Rect_<T> r, T s) {
   return cv::Rect_<T>(r.x * s, r.y * s, r.width * s, r.height * s);
@@ -180,12 +182,7 @@ void TiledImage::insertMat(cv::Mat image_in, cv::Rect_<float> box) {
       Point2f offset = box.tl();
 
       if (image_in.type() == CV_8UC4) {
-#ifdef HAVE_OPENCV_CUDAARITHM
-        Mat temp(tile_size, tile_size,CV_8UC4);
-        tiles(i, j)->image.download(temp);
-#else
-        Mat temp = *tiles(i, j);
-#endif
+        Mat &temp = tiles(i, j)->image;
         matToImage2(image_in, temp, offset * scale,
                     rect_mult<float>(image_box, scale),
                     rect_mult<float>(tile_box, scale));
@@ -211,11 +208,7 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
       int y = j * (int) logic_size - box.y;
       Rect_<float> rect = cv::Rect_<float>(x, y, logic_size, logic_size);
       if (tiles(i, j)) {
-#ifdef HAVE_OPENCV_CUDAARITHM
         box_tiles.emplace_back(getTile(i, j), i, j, rect);
-#else
-        box_tiles.emplace_back(*tiles(i, j), i, j, rect);
-#endif
       }
     }
   }
@@ -250,12 +243,7 @@ void TiledImage::saveBaseTilesToDisk() {
 
           int xloc = (x - minx) * (int) tile_size + xsubtile * 256;
           int yloc = (y - miny) * (int) tile_size + ysubtile * 256;
-#ifdef HAVE_OPENCV_CUDAARITHM
-          Mat temp(tile_size, tile_size,CV_8UC4);
-          (*tiles(x, y)).image.download(temp);
-#else
-          Mat temp = *tiles(x, y);
-#endif
+          Mat &temp = (*tiles(x, y)).image;
           Mat gry;
           cvtColor(temp(roi), gry, COLOR_BGR2GRAY);
           if (countNonZero(gry) > 0.95 * 256 * 256) {
@@ -323,7 +311,6 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
     }else {
       throw std::runtime_error("failed to grab weak pointer parent in matToTile");
     }
-    Mat temp(tileObject->image.rows, tileObject->image.cols,CV_8UC4, tileObject->image.data);
 
     //profiling
     ++tileObject->updateCount;
@@ -333,9 +320,9 @@ void TiledImage::matToTile(const cv::Mat &mat, const cv::Mat &mask, int x, int y
 
     tileObject->mutex.lock();
     if (!mask.empty()) {
-      matROI.copyTo(temp(tileROI), mask(ROIrect));
+      matROI.copyTo(tileObject->image(tileROI), mask(ROIrect));
     } else {
-      matROI.copyTo(temp(tileROI));
+      matROI.copyTo(tileObject->image(tileROI));
     }
 
     tileObject->newData = true;
@@ -455,9 +442,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
       assert(
         theirTileObj->image(theirROI).rows == myTileObj->image(cvRoi).rows / 2 && theirTileObj->image(theirROI).cols ==
         myTileObj->image(cvRoi).cols / 2);
-      Mat mine(myTileObj->image.rows, myTileObj->image.cols,CV_8UC4, myTileObj->image.data);
-      Mat theirs(theirTileObj->image.rows, theirTileObj->image.cols,CV_8UC4, theirTileObj->image.data);
-      resize(mine(cvRoi), theirs(theirROI), newSize);
+      resize(myTileObj->image(cvRoi), theirTileObj->image(theirROI), newSize);
       theirTileObj->newData = true;
     } else {
       if (theirTileObj->SAMMasks.find(_segID) == theirTileObj->SAMMasks.end()) {
@@ -550,12 +535,6 @@ Mat TiledImage::getTile(int x, int y) {
 
 void TiledImage::makeTile(int x, int y) {
   if (!tiles(x, y)) {
-#ifdef HAVE_OPENCV_CUDAARITHM
-    //tiles(x, y) = new cuda::GpuMat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
-    tiles(x, y) = std::make_unique<TileObj>(tile_size);
-#else
-    throw std::runtime_error("oops, that configuration doesnt work anymore. try compiling openCV with CUDA");
-    tiles(x, y) = new Mat(tile_size, tile_size, CV_8UC4, Scalar(0, 0, 0, 0));
-#endif
+    tiles(x, y) = std::make_shared<TileObj>(tile_size);
   }
 }

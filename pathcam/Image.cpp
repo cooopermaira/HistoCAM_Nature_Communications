@@ -113,7 +113,7 @@ namespace pathCam {
       return false;
     }
     CHECK_CUDA(cudaSetDevice(_device));
-    size_t nBytes = parent->image_height * parent->image_width;
+    size_t nBytes = height * width;
     CHECK_CUDA(cudaMalloc(&raw_buffer_cuda,nBytes));
     CHECK_CUDA(cudaMemcpy(raw_buffer_cuda,raw_buffer,nBytes,cudaMemcpyHostToDevice));
 
