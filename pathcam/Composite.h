@@ -117,6 +117,10 @@ namespace pathCam {
     Mat rectMask;
     Mat threeChannelPreallocated;
     Mat fourChannelPreallocated;
+    Mat ff;
+    Mat convertHolding;
+    std::vector<Mat> channels;
+
 
     std::vector<RegInfo *> contributingRegInfos;
     std::set<Image *> contributingImages;
@@ -138,7 +142,11 @@ namespace pathCam {
 
     bool prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
 
-    bool prepare_4CPA(Image *img, Rect roi = Rect());
+    bool prepare_4CPA_cpu(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
+
+    bool prepare_4CPA(Image *img, Rect roi_ = Rect());
+
+    bool prepare_4CPA_cpu(Image *img,Rect roi_ = Rect());
 
     Size imageSize;
 
@@ -229,8 +237,7 @@ namespace pathCam {
     Vec2 lastImageAbC;
     Mat polyMaskOutput;
     Mat freshMask;
-    Mat ff;
-    Mat convertHolding;
+
 
 
     Subdiv2D subdiv;

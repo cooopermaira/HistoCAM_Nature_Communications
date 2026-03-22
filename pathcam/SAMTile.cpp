@@ -285,11 +285,13 @@ namespace pathCam {
   }
 
 
-  void SAMTile::set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat) {
+  void SAMTile::set_component_tile(Point2i _tileID, Point2i _subLocation, const cv::Mat &_tileMat) {
     componentTiles.emplace_back(_subLocation, _tileID);
     Rect ROI(_subLocation.x * _tileMat.cols, _subLocation.y * _tileMat.rows, _tileMat.cols, _tileMat.rows);
     try {
-      _tileMat.copyTo(noncontiguousWrapper(ROI));
+      cuda::GpuMat gpuTile;
+      gpuTile.upload(_tileMat);
+      gpuTile.copyTo(noncontiguousWrapper(ROI));
     } catch (...) {
       throw std::exception();
     }

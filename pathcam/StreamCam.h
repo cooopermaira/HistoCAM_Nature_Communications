@@ -23,6 +23,9 @@ class MRTiledImage;
 
 
 namespace pathCam {
+  enum {_MetricComposite, _CompositeVoronoi};
+  using CompositeType = MetricComposite;
+
   class Composite;
 
   class CompositeVoronoi;
@@ -97,7 +100,7 @@ namespace pathCam {
 
 
   public:
-
+    inline static int CompositeType = _MetricComposite;
     // v DEBUG v
     std::vector<int> matchablesIncremented,matchablesDecremented;
     StreamCam(Poco::Util::LayeredConfiguration::Ptr config);
@@ -164,10 +167,10 @@ namespace pathCam {
     std::map<int, std::pair<double, Point2f>> scaleRepo;
     std::map<std::tuple<int,int,int>,int> tileCoordToClass;
 
-    cuda::GpuMat flat_field2X;
-    cuda::GpuMat flat_field4X;
-    cuda::GpuMat flat_field10X;
-    cuda::GpuMat flat_field20X;
+    Mat flat_field2X;
+    Mat flat_field4X;
+    Mat flat_field10X;
+    Mat flat_field20X;
     Mat circleMask;
     Mat regCircleMask;
 
@@ -280,9 +283,9 @@ namespace pathCam {
 
     std::string get_flatfield_path(int label, bool &ffAlreadySet);
 
-    cuda::GpuMat get_flatfield(int label);
+    Mat get_flatfield(int label);
 
-    void set_flatfield(int label, const cuda::GpuMat& ffGpu);
+    void set_flatfield(int label, const Mat &ff);
 
     void update_last_frame(cv::Rect_<float> _rectInScale1Space, bool showAsCircle, int _component_index,
                            std::string _label, float _scale);

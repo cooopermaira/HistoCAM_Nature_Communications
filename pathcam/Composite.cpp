@@ -153,19 +153,22 @@ namespace pathCam {
 
               // After the stream work completes: free the pinned staging buffer and
               // signal cudaBufferReady so consumers waiting on cudaBufferConVar unblock.
-              struct Ctx { Image *img; char *pinnedBuf; };
+              struct Ctx {
+                Image *img;
+                char *pinnedBuf;
+              };
               auto *ctx = new Ctx{img, pinnedBuf};
               cudaLaunchHostFunc(cuda::StreamAccessor::getStream(parent->cvCompositeStream),
-                [](void *ud) {
-                  auto *c = static_cast<Ctx *>(ud);
-                  cudaFreeHost(c->pinnedBuf);
-                  {
-                    std::lock_guard<std::mutex> cbLock(c->img->cudaBufferMutex);
-                    c->img->cudaBufferReady = true;
-                    c->img->cudaBufferConVar.notify_one();
-                  }
-                  delete c;
-                }, ctx);
+                                 [](void *ud) {
+                                   auto *c = static_cast<Ctx *>(ud);
+                                   cudaFreeHost(c->pinnedBuf);
+                                   {
+                                     std::lock_guard<std::mutex> cbLock(c->img->cudaBufferMutex);
+                                     c->img->cudaBufferReady = true;
+                                     c->img->cudaBufferConVar.notify_one();
+                                   }
+                                   delete c;
+                                 }, ctx);
             }
           }
           img->vertexId = res;
@@ -215,34 +218,54 @@ namespace pathCam {
 
   void Composite::ff_correct_existing_tiles() {
     assert(flatfieldKnown);
-    cuda::GpuMat oneChannel32f, oneChannel8u;
-    std::vector<cuda::GpuMat> ffVec, bgraVec;
-    cuda::split(ffGPU, ffVec);
 
-    for (auto &p: imagePyramid->liveTiles) {
+    Mat oneChannel32f, oneChannel8u;
+    std::vector<Mat> ffVec, bgraVec;
+
+    // split flatfield into channels
+    split(ff, ffVec);
+
+    for (auto &p : imagePyramid->liveTiles) {
       auto tileObj = imagePyramid->level[0]->getTile(p.x, p.y);
+
       if (!tileObj->owner) {
         tileObj.reset();
       } else {
         auto abc = tileObj->owner->regInfo->absoluteCoords;
+
         Rect imageRect(abc, imageSize);
-        Rect tileRect(p.x * imagePyramid->tile_size, p.y * imagePyramid->tile_size,
-                      imagePyramid->tile_size, imagePyramid->tile_size);
+        Rect tileRect(p.x * imagePyramid->tile_size,
+                      p.y * imagePyramid->tile_size,
+                      imagePyramid->tile_size,
+                      imagePyramid->tile_size);
+
         auto ffRoi = imageRect & tileRect;
 
         ffRoi.x -= abc.x;
         ffRoi.y -= abc.y;
 
+        // split BGRA tile
+        split(tileObj->image, bgraVec);
 
-        cuda::split(tileObj->image, bgraVec);
         for (int i = 0; i < 3; ++i) {
-          bgraVec[i].convertTo(oneChannel32f,CV_32F);
-          cuda::divide(oneChannel32f, ffVec[i](ffRoi), oneChannel32f);
-          oneChannel32f.convertTo(bgraVec[i],CV_8U);
+          bgraVec[i].convertTo(oneChannel32f, CV_32F);
+
+          divide(oneChannel32f,
+                 ffVec[i](ffRoi),
+                 oneChannel32f);
+
+          oneChannel32f.convertTo(bgraVec[i], CV_8U);
         }
-        cuda::merge(bgraVec, tileObj->image);
-        imagePyramid->level[0]->tileUpwards(p, tileRect, tileObj,
-                                            Rect(0, 0, imagePyramid->tile_size, imagePyramid->tile_size));
+
+        merge(bgraVec, tileObj->image);
+
+        imagePyramid->level[0]->tileUpwards(
+            p,
+            tileRect,
+            tileObj,
+            Rect(0, 0,
+                 imagePyramid->tile_size,
+                 imagePyramid->tile_size));
       }
     }
 
@@ -323,33 +346,49 @@ namespace pathCam {
   void Composite::get_flatfield() {
     set_candidate_scale_ratios();
 
-    //get flatfield file name from parent and load from disk
+    // get flatfield file name from parent and load from disk
     bool ffAlreadySet;
     std::string filename = parent->get_flatfield_path(componentMagLabel, ffAlreadySet);
+
     if (ffAlreadySet) {
-      ffGPU = parent->get_flatfield(componentMagLabel);
+      ff = parent->get_flatfield(componentMagLabel); // you may need to implement this
       flatfieldKnown = true;
       return;
     }
-    size_t nBytes = parent->image_height * parent->image_width;
-    char *buffer;
-    CHECK_CUDA(cudaMallocManaged(&buffer,nBytes));
 
-    std::ifstream stream;
-    stream.open(filename, std::ios::binary);
-    stream.read(buffer, nBytes);
+    size_t width  = parent->image_width;
+    size_t height = parent->image_height;
+    size_t nBytes = width * height;
 
-    ffGPU = cuda::GpuMat(Size(parent->image_width, parent->image_height), CV_8U, buffer);
+    std::ifstream stream(filename, std::ios::binary);
+    if (!stream) {
+      throw std::runtime_error("Failed to open flatfield file: " + filename);
+    }
 
-    cuda::cvtColor(ffGPU, ffGPU, COLOR_BayerBG2BGR);
-    cudaFree(buffer);
+    // allocate CPU mat directly
+    Mat rawMat(height, width, CV_8U);
 
-    ffGPU.convertTo(ffGPU,CV_32F);
-    float scale = 1 / 240.0;
-    cuda::multiply(ffGPU, Scalar(scale, scale, scale), ffGPU);
+    if (!stream.read(reinterpret_cast<char*>(rawMat.data), nBytes)) {
+      throw std::runtime_error("Failed to read flatfield data");
+    }
 
-    parent->set_flatfield(componentMagLabel, ffGPU);
+    // debayer → 3 channel
+    Mat threeChannel;
+    cvtColor(rawMat, threeChannel, COLOR_BayerBG2BGR);
 
+    // convert to float
+    threeChannel.convertTo(ff, CV_32FC3);
+
+    // scale
+    float scale = 1.0f / 240.0f;
+    multiply(ff, Scalar(scale, scale, scale), ff);
+
+    // cache in parent (CPU version)
+    parent->set_flatfield(componentMagLabel, ff);
+
+    if (parent->CompositeType == _CompositeVoronoi) {
+      ffGPU.upload(ff);
+    }
     flatfieldKnown = true;
   }
 

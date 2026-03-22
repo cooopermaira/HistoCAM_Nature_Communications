@@ -185,15 +185,13 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
 
         Poco::FastMutex::ScopedLock lock(tileObj->mutex);
 
-        if (!tileObj->buf) {
-          throw std::runtime_error("tileObj->buf is null");
+        if (!tileObj->image.data) {
+          throw std::runtime_error("tileObj->image has no data");
         }
 
-        write_all(fd, tileObj->buf, bytesPerTile);
+        write_all(fd, tileObj->image.data, bytesPerTile);
 
         if (!_keepInMemory) {
-          cudaFree(tileObj->buf);
-          tileObj->buf = nullptr;
           tileObj->image.release();
           if (tileObj->destroyPreferredObj) {
             tileObj->destroyPreferredObj(tileObj->preferredObj);
@@ -222,12 +220,10 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
 
       Poco::FastMutex::ScopedLock lock(tileObj->mutex);
 
-      if (!tileObj->buf) {
+      if (!tileObj->image.data) {
         continue;
       }
 
-      cudaFree(tileObj->buf);
-      tileObj->buf = nullptr;
       tileObj->image.release();
       if (tileObj->destroyPreferredObj) {
         tileObj->destroyPreferredObj(tileObj->preferredObj);
@@ -244,7 +240,6 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
       level[i].reset(new TiledImage(parentSP, tile_size, tile_size * (1 << i), i));
     }
   }
-  cudaDeviceSynchronize();
   inMemory = _keepInMemory;
 }
 
@@ -275,49 +270,17 @@ void MRTiledImage::uncache_from_disk() {
         throw std::runtime_error("cache file is smaller than expected (corrupt/incomplete?)");
       }
 
-      cudaError_t cerr = cudaDeviceSynchronize();
-      if (cerr != cudaSuccess) {
-        throw std::runtime_error(std::string("cudaDeviceSynchronize failed: ") +
-                                 cudaGetErrorString(cerr));
-      }
-
-      // int cpuDevice = cudaCpuDeviceId;
-      int gpuDevice = 0;
-      cudaGetDevice(&gpuDevice);
-
       for (const auto &tileIndex: liveTilesOrderedVec) {
         auto tileObj = level[0]->getTile(tileIndex);
         if (!tileObj) throw std::runtime_error("getTile returned null");
 
-
         Poco::FastMutex::ScopedLock lock(tileObj->mutex);
 
-        // Ensure the managed buffer exists (ideally you allocate these once and keep them)
-        if (!tileObj->buf) {
-          char *p = nullptr;
-          cerr = cudaMallocManaged(&p, bytesPerTile, cudaMemAttachGlobal);
-          if (cerr != cudaSuccess) {
-            throw std::runtime_error(std::string("cudaMallocManaged failed: ") +
-                                     cudaGetErrorString(cerr));
-          }
-          tileObj->buf = p;
+        if (!tileObj->image.data) {
+          tileObj->image = cv::Mat(tileSize, tileSize, CV_8UC4, cv::Scalar(0, 0, 0, 0));
         }
 
-        // Pull pages to CPU to avoid faulting mid-read (optional but often helps)
-        // cerr = cudaMemPrefetchAsync(tileObj->buf, bytesPerTile, cpuDevice, 0);
-        // if (cerr != cudaSuccess) {
-        //   throw std::runtime_error(std::string("cudaMemPrefetchAsync->CPU failed: ") +
-        //                            cudaGetErrorString(cerr));
-        // }
-        cerr = cudaStreamSynchronize(0);
-        if (cerr != cudaSuccess) {
-          throw std::runtime_error(std::string("cudaStreamSynchronize failed: ") +
-                                   cudaGetErrorString(cerr));
-        }
-
-        // Read directly into the managed buffer
-        read_all(fd, tileObj->buf, bytesPerTile);
-        tileObj->image = cuda::GpuMat(tileSize, tileSize, CV_8UC4, tileObj->buf);
+        read_all(fd, tileObj->image.data, bytesPerTile);
         tileObj->newData = true;
 
         Rect tileROI(0, 0, tileSize, tileSize);

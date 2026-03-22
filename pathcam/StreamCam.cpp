@@ -7,7 +7,6 @@
 
 #include "pathCam.h"
 
-using CompositeType = pathCam::MetricComposite;
 
 namespace pathCam {
   using Poco::Util::LayeredConfiguration;
@@ -522,26 +521,26 @@ namespace pathCam {
     JobQ->update_job_readiness(2, _index);
   }
 
-  void StreamCam::set_flatfield(int label, const cuda::GpuMat &ffGpu) {
+  void StreamCam::set_flatfield(int label, const Mat &ff) {
     switch (label) {
       case Image::_2X:
-        flat_field2X = ffGpu;
+        flat_field2X = ff;
         return;
       case Image::_4X:
-        flat_field4X = ffGpu;
+        flat_field4X = ff;
         return;
       case Image::_10X:
-        flat_field10X = ffGpu;
+        flat_field10X = ff;
         return;
       case Image::_20X:
-        flat_field20X = ffGpu;
+        flat_field20X = ff;
         return;
       default:
         throw std::runtime_error("not recognized");
     }
   }
 
-  cuda::GpuMat StreamCam::get_flatfield(int label) {
+  Mat StreamCam::get_flatfield(int label) {
     switch (label) {
       case Image::_2X:
         return flat_field2X;
@@ -731,7 +730,12 @@ namespace pathCam {
       ri->root = true;
       ri->matchedTo = ri->index;
 
-      std::shared_ptr<Composite> component = std::make_shared<CompositeType>(this, image_size, component_index);
+      std::shared_ptr<Composite> component;
+      if (CompositeType == _MetricComposite) {
+        component = std::make_shared<MetricComposite>(this, image_size, component_index);
+      }else if (CompositeType == _CompositeVoronoi) {
+        component = std::make_shared<CompositeVoronoi>(this,image_size,component_index);
+      }
       component->joinedTo = component;
 
       composites.push_back(component);

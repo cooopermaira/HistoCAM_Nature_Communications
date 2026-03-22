@@ -60,7 +60,7 @@ namespace pathCam {
     ~SAMTile() {
     };
 
-    void set_component_tile(Point2i _tileID, Point2i _subLocation, cuda::GpuMat &_tileMat);
+    void set_component_tile(Point2i _tileID, Point2i _subLocation, const cv::Mat &_tileMat);
 
     void get_tile_data(std::shared_ptr<Composite> _comp, unsigned int _interval);
 
