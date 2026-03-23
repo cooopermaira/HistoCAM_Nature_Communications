@@ -51,6 +51,14 @@ namespace pathCam {
 
   extern nvLogger nvloger;
 
+  inline long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2) {
+    if (p1.x == p2.x) {
+      return std::max(p1.y, p2.y);
+    }
+    return long((p1.y - p2.y) / (p1.x - p2.x) * (xloc - p1.x) + p1.y);
+  }
+
+
   inline std::vector<char> readFile(const std::string &p) {
     std::ifstream f(p, std::ios::binary);
     if (!f) {

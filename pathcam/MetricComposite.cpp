@@ -78,8 +78,6 @@ namespace pathCam {
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
     parent, image_size, _componentIndex) {
     waitingFrames.resize(frameDelay, {nullptr, {}});
-    //compositeImage = imagePyramid->level[0];
-
   }
 
   MetricComposite::~MetricComposite() {
