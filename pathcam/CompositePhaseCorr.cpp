@@ -30,9 +30,6 @@ namespace pathCam {
   }
 
 
-#include <vector>
-#include <cmath>
-
   inline void findHomographyInliersCPU(
       const SiftData& data,
       const float H[9],          // [0..8], with H[8]=1

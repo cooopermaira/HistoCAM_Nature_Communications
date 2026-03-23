@@ -61,15 +61,15 @@ namespace pathCam {
     cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
                -1);
 
-  //   cudaDeviceProp prop;
-  //   cudaGetDeviceProperties(&prop, 0);
-  //
-  //   int uva, managed;
-  //   cudaDeviceGetAttribute(&uva, cudaDevAttrUnifiedAddressing, 0);
-  //   cudaDeviceGetAttribute(&managed, cudaDevAttrManagedMemory, 0);
-  //
-  //   bool isUnifiedSystem = prop.integrated && uva && managed;
-  //   int k = 0;
+    //   cudaDeviceProp prop;
+    //   cudaGetDeviceProperties(&prop, 0);
+    //
+    //   int uva, managed;
+    //   cudaDeviceGetAttribute(&uva, cudaDevAttrUnifiedAddressing, 0);
+    //   cudaDeviceGetAttribute(&managed, cudaDevAttrManagedMemory, 0);
+    //
+    //   bool isUnifiedSystem = prop.integrated && uva && managed;
+    //   int k = 0;
   }
 
 
@@ -603,7 +603,6 @@ namespace pathCam {
 
   void StreamCam::add_image(Image *image, long index) {
     if (index >= images.size()) {
-
       reg_results_mutex.writeLock();
       reg_results.resize(index + 100, nullptr);
       reg_results_mutex.unlock();
@@ -744,8 +743,8 @@ namespace pathCam {
       std::shared_ptr<Composite> component;
       if (CompositeType == _MetricComposite) {
         component = std::make_shared<MetricComposite>(this, image_size, component_index);
-      }else if (CompositeType == _CompositeVoronoi) {
-        component = std::make_shared<CompositeVoronoi>(this,image_size,component_index);
+      } else if (CompositeType == _CompositeVoronoi) {
+        component = std::make_shared<CompositeVoronoi>(this, image_size, component_index);
       }
       component->joinedTo = component;
 

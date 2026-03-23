@@ -185,6 +185,9 @@ target_link_libraries(process_list_xml pathCamLib)
 add_executable(test_phase_corr programs/test_phase_corr.cpp)
 target_link_libraries(test_phase_corr pathCamLib)
 
+add_executable(test2 programs/test2.cpp)
+target_link_libraries(test2 ${OpenCV_LIBS})
+
 # =========================
 # GUI
 # =========================
