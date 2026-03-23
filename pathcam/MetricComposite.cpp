@@ -128,6 +128,8 @@ namespace pathCam {
       ++frameCount;
       maxIndex = max(maxIndex,img->index);
 
+      launch_component_match_search(img,true);
+
       if (img->labelObserved) {
         ++observedLabels[img->label];
         int maxObservations = 0;
@@ -332,7 +334,7 @@ namespace pathCam {
       }
     }
 
-    members = reduce_members_through_competition(members);
+    // members = reduce_members_through_competition(members);
     members.insert(root);
 
     std::vector membersForRebuild(members.begin(), members.end());
@@ -356,10 +358,27 @@ namespace pathCam {
       if (observedLabels.size() > 1) {
         rebuild(membersForRebuild);
       }
-      // for (auto &isl:graphConnectivityResult.member_islands) {
+      // for (int ii = 0; ii < graphConnectivityResult.member_islands.size(); ++ii) {
+      //   auto isl = graphConnectivityResult.member_islands[ii];
       //   for (auto &mem:isl) {
       //     auto adj = adjacency[parent->get_image_ref(mem)];
-      //     int k = 0;
+      //     for (auto &m : adj) {
+      //       long otherIndex;
+      //       if (m->image_1->index == mem) {
+      //         otherIndex = m->image_2->index;
+      //       }else {
+      //         otherIndex = m->image_1->index;
+      //       }
+      //       for (int jj = 0; jj < graphConnectivityResult.member_islands.size(); ++jj) {
+      //         if (jj == ii){continue;}
+      //         auto isl2 = graphConnectivityResult.member_islands[jj];
+      //         for (auto ind : isl2) {
+      //           if (ind == otherIndex) {
+      //             int k = 0;
+      //           }
+      //         }
+      //       }
+      //     }
       //   }
       //   int k = 0;
       // }
@@ -543,18 +562,13 @@ namespace pathCam {
 
   void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad,
                                       const bool forceFullImage) {
-    assert(parent->unifiedMemory); //change this to a fix later
+
     img->load_raw_from_disk(alertDoubleLoad);
 
-    if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk(alertDoubleLoad); //freed in ComponentMatchSearch::run()
-      img->subsequentMatchLaunched = true;
-      ++outstandingCMS_jobs;
-      const auto cms = new ComponentMatchSearch(parent, img, this);
-      parent->jqSecondary->add_runnable(cms);
-    }
+    launch_component_match_search(img,alertDoubleLoad);
+
     //lock mutex against component wide flatfielding
-    update_mutex.lock();
+    Poco::FastMutex::ScopedLock lock(update_mutex);
 
     //put raw data into fourChannelPreallocated
     prepare_4CPA(img, tiles, forceFullImage);
@@ -565,13 +579,11 @@ namespace pathCam {
                                      img->height);
     Mat mask = componentMagLabel == Image::_2X ? circleMask : rectMask;
 
-    int k = 0;
     // cv::Mat randomcolor(imageSize.height, imageSize.width, CV_8UC4,
     //                     cv::Scalar(rand() & 255, rand() & 255, rand() & 255, 255));
     // imagePyramid->insertTilesAtBase(randomcolor, mask, imageBox, tiles);
 
     imagePyramid->insertTilesAtBase(fourChannelPreallocated, mask, imageBox, tiles);
-    update_mutex.unlock();
   }
 
 

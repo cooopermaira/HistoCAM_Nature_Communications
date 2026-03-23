@@ -154,6 +154,8 @@ namespace pathCam {
 
     Composite(StreamCam *parent, Size image_size, int _componentIndex);
 
+    void launch_component_match_search(Image* img_, bool alertDoubleLoad_ = false);
+
     virtual int get_exit_rep_count(){ return 0;}
 
     virtual void align_and_rebuild() {};

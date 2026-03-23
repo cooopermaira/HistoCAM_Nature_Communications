@@ -931,6 +931,17 @@ namespace pathCam {
     }
   }
 
+  void Composite::launch_component_match_search(Image *img, bool alertDoubleLoad_) {
+    if (!img->subsequentMatchLaunched) {
+      img->load_raw_from_disk(alertDoubleLoad_); //freed in ComponentMatchSearch::run()
+      img->subsequentMatchLaunched = true;
+      ++outstandingCMS_jobs;
+      const auto cms = new ComponentMatchSearch(parent, img, this);
+      parent->jqSecondary->add_runnable(cms);
+    }
+  }
+
+
   void Composite::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                  Point2f absCoord) {
     auto start = std::chrono::high_resolution_clock::now();

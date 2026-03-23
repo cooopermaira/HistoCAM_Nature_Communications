@@ -279,7 +279,7 @@ namespace pathCam {
 
     image_mutex.readLock();
     for (auto &img: images) {
-      if (!(img && img->regInfo)) { continue; }
+      if (!(img && img->regInfo && img->regInfo->component_membership >= 0)) { continue; }
       if (composites[img->regInfo->component_membership]->imagePyramid->scale == 0) { continue; };
       auto theirTL = get_AbC_relative_from_relative(img->regInfo->component_membership,
                                                     img->regInfo->absoluteCoords, 0);
