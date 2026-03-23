@@ -59,6 +59,16 @@ namespace pathCam {
     circleMask = cv::Mat::zeros(image_height, image_width, CV_8U);
     cv::circle(circleMask, cv::Point(image_width / 2, image_height / 2), scope_radius, cv::Scalar(255),
                -1);
+
+  //   cudaDeviceProp prop;
+  //   cudaGetDeviceProperties(&prop, 0);
+  //
+  //   int uva, managed;
+  //   cudaDeviceGetAttribute(&uva, cudaDevAttrUnifiedAddressing, 0);
+  //   cudaDeviceGetAttribute(&managed, cudaDevAttrManagedMemory, 0);
+  //
+  //   bool isUnifiedSystem = prop.integrated && uva && managed;
+  //   int k = 0;
   }
 
 

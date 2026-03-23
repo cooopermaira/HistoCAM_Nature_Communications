@@ -21,7 +21,6 @@ OPTION(BUILD_IO_TEST "" OFF)
 OPTION(BUILD_FLATFIELD_TEST "" OFF)
 OPTION(BUILD_DEBAYER "" ON)
 OPTION(BUILD_POCO_TEST "" OFF)
-OPTION(BUILD_SFML_TEST "" OFF)
 OPTION(BUILD_TEST "" OFF)
 OPTION(BUILD_NANOGUI_EXAMPLE "" OFF)
 OPTION(BUILD_THREAD_TEST "" OFF)
@@ -62,8 +61,6 @@ set(CMAKE_CUDA_ARCHITECTURES 121)
 enable_language(CUDA)
 find_package(CUDAToolkit REQUIRED)
 
-INCLUDE_DIRECTORIES(${SFML_INCLUDE_DIR})
-
 find_package(CURL REQUIRED)
 
 #list(PREPEND CMAKE_PREFIX_PATH "/usr/local")
@@ -94,11 +91,6 @@ IF (NOT OVERRRIDE_SPINNAKER)
         SET(SPINNAKER_LIBRARIES "/opt/spinnaker/lib/libSpinnaker.so" "/opt/spinnaker/lib/libSpinUpdate.so" "/opt/spinnaker/lib/libSpinVideo.so")
     endif ()
 ENDIF ()
-
-#set(CMAKE_CXX_STANDARD 17)
-#set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-
 
 FILE(GLOB PATHCAM_FILES pathcam/*.h pathcam/*.cpp pathcam/*.cu)
 
@@ -146,11 +138,6 @@ ENDIF ()
 IF (BUILD_POCO_TEST)
     add_executable(poco_test programs/poco_test.cpp)
     target_link_libraries(poco_test pathCamLib)
-ENDIF ()
-
-IF (BUILD_SFML_TEST)
-    add_executable(sfml_test programs/sfml_test.cpp)
-    target_link_libraries(sfml_test sfml-audio sfml-system pathCamLib)
 ENDIF ()
 
 IF (BUILD_THREAD_TEST)
