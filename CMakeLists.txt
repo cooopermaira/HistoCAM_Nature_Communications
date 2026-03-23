@@ -29,7 +29,7 @@ add_subdirectory(JUCE)
 
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
-
+find_package(CURL REQUIRED)
 # =========================
 # OPTIONAL: CUDA
 # =========================
@@ -212,6 +212,7 @@ if (BUILD_PATHCAM_GUI)
             juce::juce_audio_basics
             juce::juce_audio_devices
             juce::juce_audio_formats
+            CURL::libcurl
     )
 
     target_compile_definitions(pathCamApp PRIVATE

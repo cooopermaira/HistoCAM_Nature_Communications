@@ -941,6 +941,73 @@ namespace pathCam {
     }
   }
 
+  bool Composite::prepare_4CPA_cpu(Image *img, const std::vector<Point2i> &affectedTiles, const bool forceFullImage) {
+    if (affectedTiles.size() < 100 && !forceFullImage) {
+      bool ans = false;
+
+      img->regInfo->accessMutex.lock();
+      auto AbC = img->regInfo->absoluteCoords;
+      img->regInfo->accessMutex.unlock();
+
+      Rect imageBoxCompSpace(AbC, imageSize);
+      img->buffer_mutex.lock();
+      for (auto &tile: affectedTiles) {
+        Rect tileBoxCompSpace(parent->tileSize * tile, Size(parent->tileSize, parent->tileSize));
+
+        auto intersectionInCompSpace = tileBoxCompSpace & imageBoxCompSpace;
+
+        if (intersectionInCompSpace.empty()) { continue; }
+
+        auto intersectionInImageSpace = intersectionInCompSpace - AbC;
+
+        ans = ans || prepare_4CPA_cpu(img, intersectionInImageSpace);
+      }
+      img->buffer_mutex.unlock();
+      return ans;
+    }
+
+    img->buffer_mutex.lock();
+    bool ans = prepare_4CPA_cpu(img);
+    img->buffer_mutex.unlock();
+    return ans;
+  }
+
+  bool Composite::prepare_4CPA_cpu(Image *img, Rect roi_) {
+    assert(roi_.x >= 0 && roi_.y >= 0);
+    bool wholeImage = false;
+
+    try {
+      if (roi_.width * roi_.height == 0) {
+        roi_ = Rect(0, 0, imageSize.width, imageSize.height);
+        wholeImage = true;
+      }
+
+      assert(img->get_Raw());
+
+      adjust_roi_for_debayer(roi_);
+      Mat rawMat(imageSize, CV_8U, img->get_Raw());
+      cvtColor(rawMat(roi_), threeChannelPreallocated(roi_), COLOR_BayerBG2BGR);
+
+      if (convertHolding.empty()) {
+        convertHolding = Mat(imageSize,CV_32FC3);
+      }
+      threeChannelPreallocated(roi_).convertTo(convertHolding(roi_),CV_32F);
+      if (flatfieldKnown) {
+        divide(convertHolding(roi_),ff(roi_),convertHolding(roi_),1,CV_32F);
+      }
+
+      convertHolding(roi_).convertTo(threeChannelPreallocated(roi_), CV_8UC3);
+
+      //add alpha
+      split(threeChannelPreallocated(roi_),channels);
+      channels.push_back(rectMask(roi_));
+      merge(channels,fourChannelPreallocated(roi_));
+
+    }catch (cv::Exception &e) {
+      std::cout<<e.what()<<std::endl;
+    }
+    return wholeImage;
+  }
 
   void Composite::calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                                  Point2f absCoord) {

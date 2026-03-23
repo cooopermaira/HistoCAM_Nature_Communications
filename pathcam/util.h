@@ -51,7 +51,7 @@ namespace pathCam {
 
   extern nvLogger nvloger;
 
-  static std::vector<char> readFile(const std::string &p) {
+  inline std::vector<char> readFile(const std::string &p) {
     std::ifstream f(p, std::ios::binary);
     if (!f) {
       std::cerr << "Open failed: " << p << "\n";
@@ -72,6 +72,23 @@ namespace pathCam {
     }
   }
 
+
+  inline void adjust_roi_for_debayer(cv::Rect &roi_) {
+    if (roi_.x % 2 > 0) {
+      --roi_.x;
+      ++roi_.width;
+    }
+    if (roi_.y % 2 > 0) {
+      --roi_.y;
+      ++roi_.height;
+    }
+    if (roi_.width % 2 > 0) {
+      ++roi_.width;
+    }
+    if (roi_.height % 2 > 0) {
+      ++roi_.height;
+    }
+  }
 
   /*
     Header-only image graph that supports:

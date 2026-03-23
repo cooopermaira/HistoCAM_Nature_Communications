@@ -21,7 +21,7 @@ namespace pathCam {
       im = new InferenceManager(this);
     }
 
-    // segmentWithSAM = false;
+#ifdef PATHCAM_HAS_TENSORRT
     if (segmentWithSAM) {
       std::thread t([this]() {
         as = std::make_shared<AccessSAM>(this);
@@ -29,6 +29,7 @@ namespace pathCam {
       });
       t.detach();
     }
+#endif
 
     int threads = 2;
 
@@ -47,7 +48,7 @@ namespace pathCam {
 
     // load_blur_engine();
 
-#ifdef HAVE_OPENCV_CUDAARITHM
+#ifdef PATHCAM_OPENCV_CUDA
     compositorCudaDevice = GPU_select_cuda_device(1);
     //siftCudaDevice = GPU_select_cuda_device();
     siftCudaDevice = compositorCudaDevice;

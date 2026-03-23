@@ -90,7 +90,7 @@ namespace pathCam {
     //                     getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
     //                     true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
     // image->siftMutex.unlock();
-    // image->free_memory_RAW(); //incremented in MetricComposite::process_tiles(...)
+    image->free_memory_RAW(); //incremented in MetricComposite::process_tiles(...)
 
 
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {

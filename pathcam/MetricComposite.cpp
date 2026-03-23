@@ -571,7 +571,7 @@ namespace pathCam {
     Poco::FastMutex::ScopedLock lock(update_mutex);
 
     //put raw data into fourChannelPreallocated
-    prepare_4CPA(img, tiles, forceFullImage);
+    prepare_4CPA_cpu(img, tiles, forceFullImage);
     img->free_memory_RAW();
 
     //calculate region of pyramid for data placement

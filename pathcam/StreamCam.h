@@ -264,7 +264,7 @@ namespace pathCam {
 
     std::vector<std::pair<Image *,Rect>> get_overlapping_frames(Rect _regionInComponentSpace, int _componentIndex);
 
-#ifdef HAVE_OPENCV_CUDAARITHM
+#ifdef PATHCAM_OPENCV_CUDA
     int GPU_select_cuda_device(int _priority = 0);
 
     // void align_and_rebuild();
