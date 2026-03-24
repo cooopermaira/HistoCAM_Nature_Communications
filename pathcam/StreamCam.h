@@ -100,8 +100,8 @@ namespace pathCam {
 
 
   public:
-    // inline static int CompositeType = _MetricComposite;
-    inline static int CompositeType = _CompositeVoronoi;
+    inline static int CompositeType = _MetricComposite;
+    // inline static int CompositeType = _CompositeVoronoi;
     // v DEBUG v
     std::vector<int> matchablesIncremented,matchablesDecremented;
     StreamCam(Poco::Util::LayeredConfiguration::Ptr config);

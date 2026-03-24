@@ -183,6 +183,8 @@ namespace pathCam {
 
     void establish_scale_at_root(Image *_rootImg);
 
+    void establish_scale_at_root_cpu(Image *_rootImg);
+
     bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
 
     static void sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,

@@ -151,7 +151,7 @@ namespace pathCam {
         comp->alignmentHasBegun = true;
         auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t1).
             count();
-        std::cout << "wait time " << t2 << std::endl;
+        std::cout << "component "<< comp->componentIndex << " wait time " << t2 << std::endl;
         comp->align_and_rebuild();
       });
     }

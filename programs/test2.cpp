@@ -117,70 +117,89 @@ struct HomographyResult {
   bool valid = false;
   float scale;
 };
+
 struct HomographyResultM {
   cv::Mat H;
   float scale = 1.0f;
   int inliers = 0;
   bool valid = false;
 };
-HomographyResultM findHomographyAKAZE_multiscale(
-    const cv::Mat& img1_gray,
-    const cv::Mat& img2_gray,
-    const std::vector<float>& scales)
-{
-  float baseScale = 0.5; // or even 0.2
-  Mat img1_small, img2_small;
-  resize(img1_gray, img1_small, Size(), baseScale, baseScale);
-  resize(img2_gray, img2_small, Size(), baseScale, baseScale);
+/*
+inline HomographyResultM findHomographyAKAZE_multiscale(
+  const cv::Mat &root,
+  const cv::Mat &target,
+  const std::vector<float> &scales) {
+  float downscale = 0.5;
+
   HomographyResultM best;
+
+  if (scales.empty())
+    return best;
+
+  float maxScale = *std::max_element(scales.begin(), scales.end());
+
+  std::vector<float> normScales;
+  normScales.reserve(scales.size());
+  for (float s: scales)
+    normScales.push_back(s / maxScale);
+
+  cv::Mat img1_scaled;
+  cv::resize(root, img1_scaled,
+             cv::Size(), downscale / maxScale, downscale / maxScale,
+             cv::INTER_AREA);
+
   auto akaze = cv::AKAZE::create();
+
   std::vector<cv::KeyPoint> kp1;
-  Mat desc1;
-  akaze->detectAndCompute(img1_small, cv::noArray(), kp1, desc1);
-  for (float s : scales){
-    // --- 1. Rescale img2 to match img1 scale ---
+  cv::Mat desc1;
+  akaze->detectAndCompute(img1_scaled, cv::noArray(), kp1, desc1);
+
+  if (desc1.empty())
+    return best;
+
+  cv::BFMatcher matcher(cv::NORM_HAMMING);
+
+  for (int i = 0; i < normScales.size(); i++) {
+    float s = normScales[i];
+
     cv::Mat img2_scaled;
-    cv::resize(img2_small, img2_scaled, cv::Size(), s, s, cv::INTER_LINEAR);
+    cv::resize(target, img2_scaled,
+               cv::Size(), downscale * s, downscale * s,
+               cv::INTER_AREA);
 
-
-
-    // --- 2. Detect + compute ---
-
-
-
-    cv::Mat desc2;
 
     std::vector<cv::KeyPoint> kp2;
+    cv::Mat desc2;
     akaze->detectAndCompute(img2_scaled, cv::noArray(), kp2, desc2);
 
-    if (desc1.empty() || desc2.empty())
+    if (desc2.empty()) {
       continue;
+    }
 
-    // --- 3. Match ---
-    cv::BFMatcher matcher(cv::NORM_HAMMING);
-    std::vector<std::vector<cv::DMatch>> knn;
+    std::vector<std::vector<cv::DMatch> > knn;
     matcher.knnMatch(desc1, desc2, knn, 2);
 
     std::vector<cv::DMatch> good;
-    for (auto& m : knn)
-    {
-      if (m.size() < 2) continue;
+    for (auto &m: knn) {
+      if (m.size() < 2) {
+        continue;
+      }
       if (m[0].distance < 0.75f * m[1].distance)
         good.push_back(m[0]);
     }
 
-    if (good.size() < 10)
+    if (good.size() < 20) // raised from 10
       continue;
 
-    // --- 4. Points ---
     std::vector<cv::Point2f> pts1, pts2;
-    for (auto& m : good)
-    {
+    pts1.reserve(good.size());
+    pts2.reserve(good.size());
+
+    for (auto &m: good) {
       pts1.push_back(kp1[m.queryIdx].pt);
       pts2.push_back(kp2[m.trainIdx].pt);
     }
 
-    // --- 5. Homography ---
     std::vector<char> mask;
     cv::Mat H = cv::findHomography(pts1, pts2, cv::RANSAC, 3.0, mask);
 
@@ -189,36 +208,232 @@ HomographyResultM findHomographyAKAZE_multiscale(
 
     int inliers = std::count(mask.begin(), mask.end(), 1);
 
-    if (inliers > best.inliers)
-    {
-      best.H = H;
-      best.scale = s;
+    // --- NEW: minimum inliers ---
+    if (inliers < 30)
+      continue;
+
+    // --- NEW: inlier ratio ---
+    float inlier_ratio = float(inliers) / float(good.size());
+    if (inlier_ratio < 0.3f)
+      continue;
+
+    // --- NEW: average reprojection error ---
+    double total_err = 0.0;
+    int count = 0;
+
+    for (int j = 0; j < pts1.size(); j++) {
+      if (!mask[j]) {
+        continue;
+      }
+
+      const cv::Point2f &p = pts1[j];
+      const cv::Point2f &q = pts2[j];
+
+      cv::Mat hp = H * (cv::Mat_<double>(3, 1) << p.x, p.y, 1.0);
+      double w = hp.at<double>(2);
+
+      if (std::abs(w) < 1e-8) {
+        continue;
+      }
+
+      cv::Point2f p_proj(
+        hp.at<double>(0) / w,
+        hp.at<double>(1) / w
+      );
+
+      total_err += cv::norm(p_proj - q);
+      count++;
+    }
+
+    if (count == 0) {
+      continue;
+    }
+
+    double avg_err = total_err / count;
+
+    if (avg_err > 2.0) {
+      continue;
+    }
+
+    if (inliers > best.inliers) {
+      float origScale = scales[i];
+
+      cv::Mat S_root = (cv::Mat_<double>(3, 3) <<
+                        1.0 / maxScale, 0, 0,
+                        0, 1.0 / maxScale, 0,
+                        0, 0, 1);
+
+      cv::Mat S_target = (cv::Mat_<double>(3, 3) <<
+                          origScale / maxScale, 0, 0,
+                          0, origScale / maxScale, 0,
+                          0, 0, 1);
+
+      cv::Mat S_target_inv = (cv::Mat_<double>(3, 3) <<
+                              maxScale / origScale, 0, 0,
+                              0, maxScale / origScale, 0,
+                              0, 0, 1);
+
+      best.H = S_target_inv * H * S_root;
+      best.scale = origScale;
       best.inliers = inliers;
       best.valid = true;
     }
-    kp2.clear();
+  }
+  if (!best.H.empty()) {
+    best.H.at<double>(0, 2) /= downscale;
+    best.H.at<double>(1, 2) /= downscale;
   }
 
   return best;
 }
+*/
 
+inline HomographyResultM findHomographyAKAZE_multiscale(
+    const cv::Mat& root,
+    const cv::Mat& target,
+    const std::vector<float>& scales)
+{
+  float downsample = 0.5;
+    HomographyResultM best;
+
+    if (scales.empty())
+        return best;
+
+    // --- 1. Find max scale ---
+    float maxScale = *std::max_element(scales.begin(), scales.end());
+
+    // --- 2. Normalize scales ---
+    std::vector<float> normScales;
+    normScales.reserve(scales.size());
+    for (float s : scales)
+        normScales.push_back(s / maxScale);
+
+    // --- 3. Resize root ONCE ---
+    cv::Mat img1_scaled;
+    cv::resize(root, img1_scaled,
+               cv::Size(), downsample / maxScale, downsample / maxScale,
+               cv::INTER_AREA);
+
+    // --- 4. Extract root features ONCE ---
+    auto akaze = cv::AKAZE::create();
+
+    std::vector<cv::KeyPoint> kp1;
+    cv::Mat desc1;
+    akaze->detectAndCompute(img1_scaled, cv::noArray(), kp1, desc1);
+
+    if (desc1.empty())
+        return best;
+
+    cv::BFMatcher matcher(cv::NORM_HAMMING);
+
+    // --- 5. Loop over normalized scales ---
+    for (int i = 0; i < normScales.size(); i++)
+    {
+        float s = normScales[i];
+
+        // --- Always <= 1, so always downsampling ---
+        cv::Mat img2_scaled;
+        cv::resize(target, img2_scaled,
+                   cv::Size(), s * downsample, s * downsample,
+                   cv::INTER_AREA);
+
+        // --- Extract features ---
+        std::vector<cv::KeyPoint> kp2;
+        cv::Mat desc2;
+        akaze->detectAndCompute(img2_scaled, cv::noArray(), kp2, desc2);
+
+        if (desc2.empty())
+            continue;
+
+        // --- Match ---
+        std::vector<std::vector<cv::DMatch>> knn;
+        matcher.knnMatch(desc1, desc2, knn, 2);
+
+        std::vector<cv::DMatch> good;
+        for (auto& m : knn)
+        {
+            if (m.size() < 2) continue;
+            if (m[0].distance < 0.75f * m[1].distance)
+                good.push_back(m[0]);
+        }
+
+        if (good.size() < 10)
+            continue;
+
+        // --- Points ---
+        std::vector<cv::Point2f> pts1, pts2;
+        pts1.reserve(good.size());
+        pts2.reserve(good.size());
+
+        for (auto& m : good)
+        {
+            pts1.push_back(kp1[m.queryIdx].pt);
+            pts2.push_back(kp2[m.trainIdx].pt);
+        }
+
+        // --- Homography ---
+        std::vector<char> mask;
+        cv::Mat H = cv::findHomography(pts1, pts2, cv::RANSAC, 3.0, mask);
+
+        if (H.empty())
+            continue;
+
+        int inliers = std::count(mask.begin(), mask.end(), 1);
+
+        if (inliers > best.inliers)
+        {
+            // --- Undo BOTH scalings ---
+            // root scaled by 1/maxScale
+            // target scaled by s = (original_scale / maxScale)
+
+            float origScale = scales[i];
+
+            cv::Mat S = (cv::Mat_<double>(3,3) <<
+                maxScale / origScale, 0, 0,
+                0, maxScale / origScale, 0,
+                0, 0, 1);
+
+            best.H = S * H;
+
+            best.scale = origScale;
+            best.inliers = inliers;
+            best.valid = true;
+        }
+    }
+  if (!best.H.empty()) {
+    best.H.at<double>(0, 2) /= downsample;
+    best.H.at<double>(1, 2) /= downsample;
+  }
+
+    return best;
+}
 
 int main(int argc, char **argv) {
   auto root = load_raw("/home/cm/Documents/data/phase_corr_testing/test_images_raw/breast/B1_2x.raw");
-  auto target = load_raw("/home/cm/Documents/data/phase_corr_testing/test_images_raw/breast/B1_40x.raw");
-  std::vector<float> cand10 = {5,2.5,1,0.5,0.25};
+  auto target = load_raw("/home/cm/Documents/data/phase_corr_testing/test_images_raw/breast/B1_20x.raw");
+  // auto root = load_raw("/home/cm/Documents/data/blur_test/raw/548.Raw");
+  // auto target = load_raw("/home/cm/Documents/data/blur_test/raw/549.Raw");
+  std::vector<float> cand10 = {5, 2.5, 1, 0.5, 0.25};
   std::vector<float> candidateScale = {1, 0.5, 0.2, 0.1, 0.05};
   auto start = std::chrono::high_resolution_clock::now();
 
-  auto res = findHomographyAKAZE_multiscale(root, target,candidateScale);
+  auto res = findHomographyAKAZE_multiscale(root, target, candidateScale);
 
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
     std::chrono::high_resolution_clock::now() - start).count();
   if (res.valid) {
     // std::cout << "Inliers: " << res.numInliers << std::endl;
     std::cout << "H:\n" << res.H << std::endl;
-    std::cout<<"scale "<<res.scale<<std::endl;
-    std::cout<<duration<<std::endl;
+    std::cout << "scale " << res.scale << std::endl;
+    std::cout << duration << std::endl;
+  }
+
+  auto res1 = findHomographyAKAZE_multiscale(root, target, std::vector<float>{1});
+  if (res1.valid) {
+    // std::cout << "Inliers: " << res.numInliers << std::endl;
+    std::cout << "H:\n" << res1.H << std::endl;
+    std::cout << "scale " << res1.scale << std::endl;
+    std::cout << duration << std::endl;
   }
   return 0;
 };

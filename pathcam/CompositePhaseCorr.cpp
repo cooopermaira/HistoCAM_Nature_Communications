@@ -326,6 +326,68 @@ namespace pathCam {
     return true;
   }
 
+  void Composite::establish_scale_at_root_cpu(Image *_rootImg) {
+    Poco::FastMutex::ScopedLock lock(parent->component_mutex);
+
+    //find most recent resolved frame
+    if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
+      mostRcntRslv) {
+      if (!objChange) {
+        std::cout << "no objective change detected for component " << componentIndex << std::endl;
+        //were probably still in the same component and couldn't match in matchRunnable due to blurry sequence.
+        //_rootImg may overlap with a different component. Find this region and calculate overlaps
+
+        Rect regionInMySpace;
+        if (auto [mostRcntRslv2,objChange2] = parent->get_most_recent_resolved_frame(mostRcntRslv, false);
+          mostRcntRslv2 &&
+          mostRcntRslv2->regInfo->component_membership
+          == mostRcntRslv->regInfo->component_membership) {
+          auto forwardIndexDif = float(_rootImg->index - mostRcntRslv->index);
+          auto indexDif = float(mostRcntRslv->index - mostRcntRslv2->index);
+          auto distance = mostRcntRslv->regInfo->absoluteCoords - mostRcntRslv2->regInfo->absoluteCoords;
+
+          auto projectedAbC = distance * forwardIndexDif / indexDif + mostRcntRslv->regInfo->absoluteCoords;
+          regionInMySpace = Rect(projectedAbC, imageSize);
+          } else {
+            regionInMySpace = Rect(mostRcntRslv->regInfo->absoluteCoords, imageSize);
+          }
+        auto overlappingFrames = parent->get_overlapping_frames(regionInMySpace,
+                                                                mostRcntRslv->regInfo->component_membership);
+        sort_overlaps_by_likelihood(overlappingFrames,
+                                    parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
+
+        auto likelyLabel = mostRcntRslv->label;
+        int count = 0;
+        //for (auto &[img,roi]: overlappingFrames) {
+        for (int i = 0; i < min(5,int(overlappingFrames.size())); ++i){
+          auto img = overlappingFrames[i].first;
+          std::cout <<"registration attemp " << count++ << std::endl;
+
+          findHomographyAKAZE_multiscale()
+        }
+        suspended = true;
+        imagePyramid->suspended = true;
+        _rootImg->load_raw_from_disk();
+
+        for (auto &p: imagePyramid->liveTiles) {
+          auto tObj = imagePyramid->level[0]->getTile(p.x, p.y);
+          tObj.reset();
+        }
+
+        auto myRegInfo = _rootImg->regInfo;
+
+        myRegInfo->root = false;
+        myRegInfo->stayFixedDuringBundleAdjustment = false;
+        myRegInfo->matchedTo = mostRcntRslv->index;
+        myRegInfo->relativeCoords = mostRcntRslv->regInfo->absoluteCoords - regionInMySpace.tl();
+        myRegInfo->attempt_absolute_reg(true);
+        std::cout<<"component "<< componentIndex <<" suspended and added to component via projection"<<std::endl;
+      } else {
+        //we likely changed objective lens so attempt to match against most recent resolved
+      }
+    }
+  }
+
   void Composite::establish_scale_at_root(Image *_rootImg) {
     Poco::FastMutex::ScopedLock lock(parent->component_mutex);
 
