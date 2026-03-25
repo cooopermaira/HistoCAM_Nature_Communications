@@ -11,6 +11,165 @@
 #include <memory>
 
 namespace pathCam {
+  struct HomographyResultM {
+    cv::Mat H;
+    bool valid = false;
+    int inliers = 0;
+    float scaleA = 1.0f;
+    float scaleB = 1.0f;
+    double avgReprojErr = 0.0;
+  };
+
+
+  inline HomographyResultM findHomographyAKAZE_allScalePairs(
+    const std::vector<Features> &featsA,
+    const std::vector<Features> &featsB) {
+    HomographyResultM best;
+
+    // const std::vector<float> scales = {1.0f, 0.5f, 0.1f};
+    const std::vector<float> scales = {0.5f, 0.25f, 0.1f};
+    // Geometric sanity thresholds for "almost no rotation or shearing"
+    const double maxAnisotropyFrac = 0.08; // |h00-h11| / avg(h00,h11)
+    const double maxOffDiag = 0.08; // small rotation/shear terms
+    const int minGoodMatches = 4;
+    const int minInliers = 4;
+    const double maxAvgReprojErr = 3.0;
+
+    cv::BFMatcher matcher(cv::NORM_HAMMING);
+
+
+    for (const auto &fa: featsA) {
+      if (fa.desc.empty() /*|| fa.image.cols < 40 || fa.image.rows < 40*/)
+        continue;
+
+      for (const auto &fb: featsB) {
+        // if (fb.desc.empty()/* || fb.image.cols < 40 || fb.image.rows < 40*/)
+        //     continue;
+
+        std::vector<std::vector<cv::DMatch> > knn;
+        matcher.knnMatch(fa.desc, fb.desc, knn, 2);
+
+        std::vector<cv::DMatch> good;
+        good.reserve(knn.size());
+        for (const auto &m: knn) {
+          if (m.size() < 2)
+            continue;
+          if (m[0].distance < 0.75f * m[1].distance)
+            good.push_back(m[0]);
+        }
+
+        if ((int) good.size() < minGoodMatches)
+          continue;
+
+        std::vector<cv::Point2f> ptsA, ptsB;
+        ptsA.reserve(good.size());
+        ptsB.reserve(good.size());
+
+        for (const auto &m: good) {
+          ptsA.push_back(fa.kp[m.queryIdx].pt);
+          ptsB.push_back(fb.kp[m.trainIdx].pt);
+        }
+
+        std::vector<unsigned char> mask;
+        cv::Mat Hscaled = cv::findHomography(ptsA, ptsB, cv::RANSAC, 3.0, mask);
+        if (Hscaled.empty())
+          continue;
+
+        int inliers = std::count(mask.begin(), mask.end(), 1);
+        if (inliers < minInliers)
+          continue;
+
+        // Average reprojection error in the scaled coordinate system
+        double totalErr = 0.0;
+        int errCount = 0;
+        for (size_t i = 0; i < ptsA.size(); ++i) {
+          if (!mask[i])
+            continue;
+
+          const cv::Point2f &p = ptsA[i];
+          const cv::Point2f &q = ptsB[i];
+
+          cv::Mat hp = Hscaled * (cv::Mat_<double>(3, 1) << p.x, p.y, 1.0);
+          double w = hp.at<double>(2, 0);
+          if (std::abs(w) < 1e-12)
+            continue;
+
+          cv::Point2f proj(
+            static_cast<float>(hp.at<double>(0, 0) / w),
+            static_cast<float>(hp.at<double>(1, 0) / w)
+          );
+
+          totalErr += cv::norm(proj - q);
+          errCount++;
+        }
+
+        if (errCount == 0)
+          continue;
+
+        double avgErr = totalErr / errCount;
+        if (avgErr > maxAvgReprojErr)
+          continue;
+
+        // Convert scaled-image homography back to full-resolution coordinates:
+        // xB_scaled = Hscaled * xA_scaled
+        // xA_scaled = SA * xA_full,  SA = diag(scaleA, scaleA, 1)
+        // xB_scaled = SB * xB_full,  SB = diag(scaleB, scaleB, 1)
+        // => xB_full = SB^{-1} * Hscaled * SA * xA_full
+        cv::Mat SA = (cv::Mat_<double>(3, 3) <<
+                      fa.scale, 0, 0,
+                      0, fa.scale, 0,
+                      0, 0, 1.0);
+
+        cv::Mat SB_inv = (cv::Mat_<double>(3, 3) <<
+                          1.0 / fb.scale, 0, 0,
+                          0, 1.0 / fb.scale, 0,
+                          0, 0, 1.0);
+
+        cv::Mat Hfull = SB_inv * Hscaled * SA;
+
+        // Normalize for inspection / consistency
+        double h33 = Hfull.at<double>(2, 2);
+        if (std::abs(h33) < 1e-12)
+          continue;
+        Hfull /= h33;
+
+        // Geometric sanity checks in full-resolution coordinates
+        double h00 = Hfull.at<double>(0, 0);
+        double h01 = Hfull.at<double>(0, 1);
+        double h10 = Hfull.at<double>(1, 0);
+        double h11 = Hfull.at<double>(1, 1);
+        double avgDiag = 0.5 * (std::abs(h00) + std::abs(h11));
+
+        if (avgDiag < 1e-3)
+          continue;
+
+        double anisotropyFrac = std::abs(h00 - h11) / avgDiag;
+
+        if (anisotropyFrac > maxAnisotropyFrac)
+          continue;
+
+        if (std::abs(h01) > maxOffDiag || std::abs(h10) > maxOffDiag)
+          continue;
+
+        // Also reject strong perspective since your motion should be close to affine
+        if (std::abs(Hfull.at<double>(2, 0)) > 1e-3 ||
+            std::abs(Hfull.at<double>(2, 1)) > 1e-3)
+          continue;
+
+        if (!best.valid || inliers > best.inliers) {
+          best.H = Hfull;
+          best.valid = true;
+          best.inliers = inliers;
+          best.scaleA = fa.scale;
+          best.scaleB = fb.scale;
+          best.avgReprojErr = avgErr;
+        }
+      }
+    }
+
+    return best;
+  }
+
   CompositeVoronoi::CompositeVoronoi(StreamCam *parent, cv::Size image_size,
                                      unsigned int component_index) : Composite(
                                                                        parent, image_size, component_index),
@@ -73,8 +232,6 @@ namespace pathCam {
   }
 
 
-
-
   void Composite::ff_correct_existing_tiles() {
     assert(flatfieldKnown);
 
@@ -84,7 +241,7 @@ namespace pathCam {
     // split flatfield into channels
     split(ff, ffVec);
 
-    for (auto &p : imagePyramid->liveTiles) {
+    for (auto &p: imagePyramid->liveTiles) {
       auto tileObj = imagePyramid->level[0]->getTile(p.x, p.y);
 
       if (!tileObj->owner) {
@@ -119,12 +276,12 @@ namespace pathCam {
         merge(bgraVec, tileObj->image);
 
         imagePyramid->level[0]->tileUpwards(
-            p,
-            tileRect,
-            tileObj,
-            Rect(0, 0,
-                 imagePyramid->tile_size,
-                 imagePyramid->tile_size));
+          p,
+          tileRect,
+          tileObj,
+          Rect(0, 0,
+               imagePyramid->tile_size,
+               imagePyramid->tile_size));
       }
     }
 
@@ -150,6 +307,15 @@ namespace pathCam {
     imagePyramid->set_scale(_scale);
     update_mutex.lock();
     deduce_label();
+
+    if (componentMagLabel > 0) {
+      for (auto &img: memberFrames) {
+        if (!img->labelObserved) {
+          img->label = componentMagLabel;
+        }
+      }
+    }
+
     if (_ffCorrectExistingTiles) {
       ff_correct_existing_tiles();
     }
@@ -215,7 +381,7 @@ namespace pathCam {
       return;
     }
 
-    size_t width  = parent->image_width;
+    size_t width = parent->image_width;
     size_t height = parent->image_height;
     size_t nBytes = width * height;
 
@@ -227,7 +393,7 @@ namespace pathCam {
     // allocate CPU mat directly
     Mat rawMat(height, width, CV_8U);
 
-    if (!stream.read(reinterpret_cast<char*>(rawMat.data), nBytes)) {
+    if (!stream.read(reinterpret_cast<char *>(rawMat.data), nBytes)) {
       throw std::runtime_error("Failed to read flatfield data");
     }
 
@@ -249,6 +415,237 @@ namespace pathCam {
       ffGPU.upload(ff);
     }
     flatfieldKnown = true;
+  }
+
+  void Composite::establish_scale_at_root_cpu(Image *_rootImg) {
+    _rootImg->load_raw_from_disk(true);
+
+
+    Poco::FastMutex::ScopedLock lock(parent->component_mutex);
+
+    //find most recent resolved frame
+    if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
+      mostRcntRslv) {
+      if (!objChange) {
+        std::cout << "no objective change detected for component " << componentIndex << std::endl;
+        //were probably still in the same component and couldn't match in matchRunnable due to blurry sequence.
+        //_rootImg may overlap with a different component. Find this region and calculate overlaps
+
+        Rect regionInMySpace;
+        if (auto [mostRcntRslv2,objChange2] = parent->get_most_recent_resolved_frame(mostRcntRslv, false);
+          mostRcntRslv2 && mostRcntRslv2->regInfo->component_membership == mostRcntRslv->regInfo->
+          component_membership) {
+          auto forwardIndexDif = float(_rootImg->index - mostRcntRslv->index);
+          auto indexDif = float(mostRcntRslv->index - mostRcntRslv2->index);
+          auto distance = mostRcntRslv->regInfo->absoluteCoords - mostRcntRslv2->regInfo->absoluteCoords;
+
+          auto projectedAbC = distance * forwardIndexDif / indexDif + mostRcntRslv->regInfo->absoluteCoords;
+          regionInMySpace = Rect(projectedAbC, imageSize);
+        } else {
+          regionInMySpace = Rect(mostRcntRslv->regInfo->absoluteCoords, imageSize);
+        }
+        auto overlappingFrames = parent->get_overlapping_frames(regionInMySpace,
+                                                                mostRcntRslv->regInfo->component_membership);
+        sort_overlaps_by_likelihood(overlappingFrames,
+                                    parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
+
+        auto likelyLabel = mostRcntRslv->label;
+        Mat rootRaw(imageSize,CV_8UC1, _rootImg->get_Raw());
+        int count = 0;
+        //for (auto &[img,roi]: overlappingFrames) {
+        for (int i = 0; i < min(5, int(overlappingFrames.size())); ++i) {
+          auto target = overlappingFrames[i].first;
+          std::cout << "registration attempt " << count++ << std::endl;
+          target->load_raw_from_disk(true);
+          Mat targetMat(imageSize,CV_8UC1, target->get_Raw());
+
+          //target and root are swapped in this function call because we know the scales for target but not for root
+          auto targetScales = Image::valid_scales_for_label(target->label);
+
+          if (auto res = findHomographyAKAZE_allScalePairs(targetMat, rootRaw); res.valid) {
+            target->free_memory_RAW();
+
+            //detect scale difference between likelyLabel and img.label
+            auto scaleDiff = targetScales[likelyLabel - 1];
+
+            auto hx = res.H.at<double>(0, 0);
+            auto hy = res.H.at<double>(1, 1);
+            auto rsx = abs(res.H.at<double>(0, 1));
+            auto rsy = abs(res.H.at<double>(1, 0));
+
+            if (abs(hx - scaleDiff) < 0.05 * scaleDiff && abs(hy - scaleDiff) < 0.05 * scaleDiff &&
+                rsx < 0.01 && rsy < 0.01) {
+              //valid homography
+              float relativeScale = (hx + hy) / 2;
+
+              //get component of matched-to frame
+              auto theirComponentIndex = target->regInfo->component_membership;
+              auto theirComponent = parent->composites[theirComponentIndex];
+
+              //calculate absolute coordinates of _rootImg in their component space
+              Point2f pairwiseDistance = Point2f(-res.H.at<double>(0, 2), -res.H.at<double>(1, 2));
+
+              if (abs(relativeScale - 1.f) < 0.05) {
+                //we're part of this component. suspend self, create a match and attempt registration.
+
+                suspend_and_join(_rootImg->regInfo, target->index, pairwiseDistance);
+
+                std::cout << "component " << componentIndex << " suspended and joined to component "
+                    << target->regInfo->component_membership << std::endl;
+
+                std::vector<uint8_t> inlierMask;
+                std::vector<KeyPoint> kp1, kp2;
+
+                theirComponent->extraMatches.emplace_back(_rootImg, target, kp1, kp2);
+
+                _rootImg->free_memory_RAW();
+                return;
+              }
+            }
+          }
+        }
+
+        //we know were in the same component, but we couldnt match. we have a good guess as to where this frame probably
+        //is via velocity estimation, go ahead and just put it there:
+
+        auto relDist = mostRcntRslv->regInfo->absoluteCoords - regionInMySpace.tl();
+        suspend_and_join(_rootImg->regInfo, mostRcntRslv->index, relDist);
+        std::cout << "component " << componentIndex << " suspended and added to component via projection" << std::endl;
+
+        _rootImg->free_memory_RAW();
+      } else {
+        //we likely changed objective lens so attempt to match against most recent resolved
+        mostRcntRslv->load_raw_from_disk(true);
+        Mat targetRaw(imageSize,CV_8UC1, mostRcntRslv->get_Raw());
+        Mat rootRaw(imageSize,CV_8UC1, _rootImg->get_Raw());
+
+        if (auto res = findHomographyAKAZE_allScalePairs(rootRaw, targetRaw); res.valid) {
+          bool validHomography = false;
+          std::vector<float> homography(9);
+
+          auto matchedComp = parent->composites[mostRcntRslv->regInfo->component_membership];
+          auto targetScales = Image::valid_scales_for_label(mostRcntRslv->label);
+          auto hx = res.H.at<double>(0, 0);
+          auto hy = res.H.at<double>(1, 1);
+
+          if (_rootImg->labelObserved) {
+            //set against known scale diff
+            float scale = targetScales[_rootImg->label - 1];
+            auto hx = res.H.at<double>(0, 0);
+            auto hy = res.H.at<double>(1, 1);
+            if (abs(scale - hx) < 0.05 * scale && abs(scale - hy) < 0.05 * scale) {
+              //everything checks out
+              validHomography = true;
+              homography[0] = hx;
+              homography[4] = hy;
+              homography[2] = res.H.at<double>(0, 2);
+              homography[5] = res.H.at<double>(1, 2);
+            }
+          } else {
+            for (auto scale: targetScales) {
+              auto v1 = abs(scale - hx);
+              auto v2 = abs(scale - hy);
+              if (v1 < 0.05 * scale && v2 < 0.05 * scale) {
+                validHomography = true;
+                homography[0] = hx;
+                homography[4] = hy;
+                homography[2] = res.H.at<double>(0, 2);
+                homography[5] = res.H.at<double>(1, 2);
+                break;
+              }
+            }
+          }
+
+          if (validHomography) {
+            float relativeScale = (homography[0] + homography[4]) / 2;
+
+            //calculate relative coordinates of _rootImg in their component space
+            Point2f pairwiseDistance = Point2f(homography[2], homography[5]);
+
+            if (abs(relativeScale - 1.f) < 0.05) {
+              //we're part of this component even though we thought there had been an objective change. suspend self,
+              //create a match and attempt registration.
+              suspend_and_join(_rootImg->regInfo, mostRcntRslv->index, pairwiseDistance);
+              std::cout << "component " << componentIndex << " suspended and joined to component "
+                  << mostRcntRslv->regInfo->component_membership << std::endl;
+            }
+
+            //get matched-to frames absolute coordinates
+            Point2f theirAbC(mostRcntRslv->regInfo->absoluteCoords.x, mostRcntRslv->regInfo->absoluteCoords.y);
+
+            Point2f queryAbC = pairwiseDistance + theirAbC;
+
+            //convert queryAbC to base component spce
+            auto resultantPoint = parent->get_AbC_relative_from_relative(matchedComp->componentIndex, queryAbC, 0);
+
+            //
+            double scale = relativeScale * matchedComp->get_scale();
+
+            assert(scale > 0);
+            set_scale(scale, !flatfieldKnown);
+            set_offset(resultantPoint / scale);
+
+            xcPwDist = pairwiseDistance;
+            xcRegLandmark = mostRcntRslv;
+            matchedComp->add_landmark_frame(mostRcntRslv);
+            std::cout << "component " << componentIndex << " XC registered" << std::endl;
+
+            _rootImg->free_memory_RAW();
+            return;
+          }
+        }
+
+        if (mostRcntRslv->labelObserved) {
+          //get matched-to frames absolute coordinates
+          Point2f theirAbC(mostRcntRslv->regInfo->absoluteCoords.x, mostRcntRslv->regInfo->absoluteCoords.y);
+          auto theirComponentIndex = mostRcntRslv->regInfo->component_membership;
+          auto theirComponent = parent->composites[theirComponentIndex];
+
+          auto scale = Image::get_mpp(_rootImg->label) / Image::get_mpp(mostRcntRslv->label);
+
+
+          //calculate absolute coordinates of _rootImg in their component space
+          auto px = imageSize.width * (1.f - scale) / 2.f;
+          auto py = imageSize.height * (1.f - scale) / 2.f;
+          Point2f pairwiseDistance = Point2f(px, py);
+          Point2f queryAbC = pairwiseDistance + theirAbC;
+
+          //convert queryAbC to base component spce
+          auto resultantPoint = parent->get_AbC_relative_from_relative(theirComponentIndex, queryAbC, 0);
+
+          scale *= theirComponent->get_scale();
+          assert(scale > 0);
+          set_scale(scale, !flatfieldKnown);
+          set_offset(resultantPoint / scale);
+
+          xcPwDist = pairwiseDistance;
+          xcRegLandmark = mostRcntRslv;
+          theirComponent->add_landmark_frame(mostRcntRslv);
+          std::cout << "component " << componentIndex << " XC registered by label based guess" << std::endl;
+
+          _rootImg->free_memory_RAW();
+          return;
+        }
+        std::cout << "UNABLE TO DETERMINE SCALE FOR COMPONENT " << componentIndex << std::endl;
+        _rootImg->free_memory_RAW();
+      }
+    }
+  }
+
+  void Composite::suspend_and_join(RegInfo *ri_, const long matchedToInd_, const Point2i relCoords_) {
+    suspended = true;
+    imagePyramid->suspended = true;
+
+    for (auto &p: imagePyramid->liveTiles) {
+      auto tObj = imagePyramid->level[0]->getTile(p.x, p.y);
+      tObj.reset();
+    }
+
+    ri_->root = false;
+    ri_->stayFixedDuringBundleAdjustment = false;
+    ri_->matchedTo = matchedToInd_;
+    ri_->relativeCoords = relCoords_;
+    ri_->attempt_absolute_reg(true);
   }
 
   void Composite::set_candidate_scale_ratios() {
@@ -273,7 +670,25 @@ namespace pathCam {
     }
   }
 
-  std::vector<std::pair<Image *, Image *> > Composite::calculate_member_overlaps(std::vector<Image *> images) {
+  void Composite::sort_overlaps_by_likelihood(std::vector<std::pair<pathCam::Image *, cv::Rect> > &_overlaps,
+                                              const float &_targetScale) {
+    std::sort(_overlaps.begin(), _overlaps.end(),
+              [this, _targetScale](const auto &a, const auto &b) {
+                float valA = parent->composites[a.first->regInfo->component_membership]->get_scale();
+                float valB = parent->composites[b.first->regInfo->component_membership]->get_scale();
+
+                float diffA = std::abs(log(valA) - log(_targetScale));
+                float diffB = std::abs(log(valB) - log(_targetScale));
+
+                if (std::abs(diffA - diffB) > 0.0001f) {
+                  return diffA < diffB;
+                }
+
+                return a.second.area() > b.second.area();
+              });
+  }
+
+  std::vector<std::pair<Image *, Image *> > Composite::calculate_member_overlaps(std::vector<Image *> images) const {
     if (images.empty()) {
       images = std::vector(contributingImages.begin(), contributingImages.end());
     }
@@ -303,7 +718,6 @@ namespace pathCam {
   Composite::~Composite() {
     delete ftg;
   }
-
 
 
   void Composite::launch_component_match_search(Image *img, bool alertDoubleLoad_) {
@@ -368,18 +782,17 @@ namespace pathCam {
       }
       threeChannelPreallocated(roi_).convertTo(convertHolding(roi_),CV_32F);
       if (flatfieldKnown) {
-        divide(convertHolding(roi_),ff(roi_),convertHolding(roi_),1,CV_32F);
+        divide(convertHolding(roi_), ff(roi_), convertHolding(roi_), 1,CV_32F);
       }
 
       convertHolding(roi_).convertTo(threeChannelPreallocated(roi_), CV_8UC3);
 
       //add alpha
-      split(threeChannelPreallocated(roi_),channels);
+      split(threeChannelPreallocated(roi_), channels);
       channels.push_back(rectMask(roi_));
-      merge(channels,fourChannelPreallocated(roi_));
-
-    }catch (cv::Exception &e) {
-      std::cout<<e.what()<<std::endl;
+      merge(channels, fourChannelPreallocated(roi_));
+    } catch (cv::Exception &e) {
+      std::cout << e.what() << std::endl;
     }
     return wholeImage;
   }

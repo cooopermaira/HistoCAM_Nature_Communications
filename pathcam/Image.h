@@ -6,6 +6,14 @@
 
 namespace pathCam {
 
+  struct Features
+  {
+    float scale = 1.0f;
+    cv::Mat image;
+    std::vector<cv::KeyPoint> kp;
+    cv::Mat desc;
+  };
+
   using Poco::MemoryPool;
   class RegInfo;
   class StreamCam;
@@ -22,6 +30,7 @@ namespace pathCam {
 
     // v DEBUG v
     int matchCount = 0;
+    long profileTime = 0;
     // ^ DEBUG ^
 
     int width, height;
@@ -54,6 +63,7 @@ namespace pathCam {
     std::unordered_set<cv::Point2i> ownedTiles;
     std::vector<std::shared_ptr<Match>> matches;
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
+    std::vector<Features> akazeFeatures;
     cv::Mat descriptors;
 
     static cv::cuda::GpuMat hannWindow, blurMask;
@@ -63,6 +73,22 @@ namespace pathCam {
     bool siftFullInitialized = false;
 #endif
 
+    static std::vector<float> valid_scales_for_label(unsigned int label) {
+      switch (label) {
+        case _2X:
+          return {1.0, 0.5, 0.2, 0.1, 0.05};
+        case _4X:
+          return {2,1,0.4,0.2,0.1};
+        case _10X:
+          return {5,2.5,1,0.5,0.25};
+        case _20X:
+          return {10,5,2,1,0.5};
+        case _40X:
+          return {20,10,4,2,1};
+        default:
+          throw std::runtime_error("unknown component mag label");
+      }
+    }
 
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 
@@ -93,6 +119,22 @@ namespace pathCam {
       allocate_memory_RAW();
       memcpy(raw_buffer, buffer, width * height);
       ++reference_count;
+    }
+
+    static Features buildFeatures(
+    const cv::Mat& src,
+    float s,
+    cv::Ptr<cv::AKAZE> akaze)
+    {
+      Features f;
+      f.scale = s;
+
+      cv::resize(src, f.image, cv::Size(), s, s, cv::INTER_AREA);
+
+      if (!f.image.empty())
+        akaze->detectAndCompute(f.image, cv::noArray(), f.kp, f.desc);
+
+      return f;
     }
 
     static float get_mpp(unsigned int _label) {

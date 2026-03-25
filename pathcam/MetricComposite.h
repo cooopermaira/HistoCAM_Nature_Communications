@@ -21,7 +21,7 @@ namespace pathCam {
 
         int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) const;
 
-        void process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad = true, bool forceFullImage = false);
+        void process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad = false, bool forceFullImage = false);
 
         void align_and_rebuild() override;
 

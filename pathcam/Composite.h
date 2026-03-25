@@ -164,7 +164,10 @@ namespace pathCam {
       return contributingFrames;
     };
 
-    std::vector<std::pair<Image *, Image *> > calculate_member_overlaps(std::vector<Image *> images);
+    std::vector<std::pair<Image *, Image *> > calculate_member_overlaps(std::vector<Image *> images) const;
+
+
+    void sort_overlaps_by_likelihood(std::vector<std::pair<pathCam::Image *, cv::Rect> > &_overlaps, const float &_targetScale);
 
     virtual void add_landmark_frame(Image* img){};
 
@@ -179,13 +182,13 @@ namespace pathCam {
 
     void stage(RegInfo *_ri) { staging.push(_ri); }
 
-    void join_and_suspend(Image* img, Point2i _relativeCoords);
+    bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
 
     void establish_scale_at_root(Image *_rootImg);
 
     void establish_scale_at_root_cpu(Image *_rootImg);
 
-    bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
+    void suspend_and_join(RegInfo *ri_, long matchedToInd_, Point2i relCoords_);
 
     static void sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,
                                 const std::vector<uint8_t> &inlierMask, std::vector<
@@ -270,6 +273,7 @@ namespace pathCam {
     void GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add = false);
 
     std::vector<std::pair<Image *, Image *> > calculate_new_overlaps();
+
 
 
     void rebuild();

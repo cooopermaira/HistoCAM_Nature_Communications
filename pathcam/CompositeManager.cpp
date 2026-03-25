@@ -99,13 +99,14 @@ namespace pathCam {
         outstandingSubmitted = true;
         submit_outstanding_jobs();
       }
-    }
+           }
     std::cout << "composite loop time: " + std::to_string(duration) << std::endl;
 
+    bool align = false;
 
     // *******************************************************
-//    ******************** BEGIN POST PROCESSING  ********************
-  // *******************************************************
+    //    ******************** BEGIN POST PROCESSING  ********************
+    // *******************************************************
 
 
     //process delayed frames
@@ -130,6 +131,7 @@ namespace pathCam {
 
     combine_components();
 
+    if (align){
     auto tAlign = std::chrono::high_resolution_clock::now();
 
     for (auto &comp: parent->composites) {
@@ -159,7 +161,14 @@ namespace pathCam {
       t.join();
     }
     parent->notify_observers();
-
+      auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(
+  std::chrono::high_resolution_clock::now() - tAlign).count();
+      std::cout << "total align time " << tAlignEnd << std::endl;
+  }else {
+    for (auto comp : parent->composites) {
+      comp->xcMatchShouldContinue = false;
+    }
+  }
 
     for (auto img: parent->images) {
       if (!img) { continue; }
@@ -168,9 +177,17 @@ namespace pathCam {
       }
     }
 
-    auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(
-      std::chrono::high_resolution_clock::now() - tAlign).count();
-    std::cout << "total align time " << tAlignEnd << std::endl;
+    int count = 0;
+    long total = 0;
+    for (auto img: parent->images) {
+      if (!img){continue;}
+      if (img->profileTime > 0) {
+        total += img->profileTime;
+        ++count;
+      }
+    }
+    std::cout<<"tota and count "<<total<<" "<<count<<std::endl;
+
 
 
     //

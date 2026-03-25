@@ -512,6 +512,7 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     return true;
   }
   if (key == KeyPress::createFromDescription("c")) {
+    if (!MRImageSet){return true;}
     const int N = (int) MRImageSet->MRImages.size();
     if (N == 0) return true;
 

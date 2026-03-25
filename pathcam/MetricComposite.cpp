@@ -109,7 +109,7 @@ namespace pathCam {
       std::thread t([this, img = staging.front()->image]() {
         std::lock_guard lock(EstRoot_mutex);
         std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
-        establish_scale_at_root(img);
+        establish_scale_at_root_cpu(img);
         xcInProgress = false;
       });
       t.detach();

@@ -91,7 +91,6 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "util.h"
 #include "DataObserver.h"
 #include "Image.h"
-#include "ImageList.h"
 #include "FeatureDetector.h"
 #include "Match.h"
 #include "DescriptorMatcher.h"
