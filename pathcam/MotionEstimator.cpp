@@ -76,6 +76,7 @@ namespace pathCam {
 
   void RegInfo::count_votes() {
     if (!votes.empty()) {
+      Poco::ScopedReadRWLock lock(registrationProcessMutex);
 
       sort(votes.begin(),votes.end(),
     [](const vote& a, const vote& b){return a.m->inlierCount > b.m->inlierCount;});
@@ -117,11 +118,13 @@ namespace pathCam {
       }
       matchedTo = winningVote.m->image_1->index;
 
-      absoluteCoords = winningVote.abc - Point2i(winningVote.m->t_x,winningVote.m->t_y);
-      relativeCoords = Point2i(winningVote.m->t_x,winningVote.m->t_y);
-      component_membership = winningVote.componentIndex;
+
       {
         Poco::Mutex::ScopedLock lock(winningVote.m->image_1->regInfo->rAccessMutex);
+        absoluteCoords = winningVote.abc - Point2i(winningVote.m->t_x,winningVote.m->t_y);
+        relativeCoords = Point2i(winningVote.m->t_x,winningVote.m->t_y);
+        component_membership = winningVote.m->image_1->regInfo->component_membership;
+
         winningVote.m->image_1->regInfo->children.push_back(this);
         winningVote.m->image_1->regInfo->matchedBy = index;
       }
@@ -135,6 +138,9 @@ namespace pathCam {
     }
 
     resolved = true;
+    if (flag && component_membership == 6) {
+      int k = 0;
+    }
     parent->push_compositeQ(this);
 
     cast_requested_votes();
@@ -151,12 +157,12 @@ namespace pathCam {
 
     _absoluteCoords.x = std::round(_absoluteCoords.x);
     _absoluteCoords.y = std::round(_absoluteCoords.y);
-    accessMutex.lock();
+    rAccessMutex.lock();
     absoluteCoords = _absoluteCoords;
     component_membership = _componentMembership;
     resolved = true;
     waitOnResolve.set();
-    accessMutex.unlock();
+    rAccessMutex.unlock();
 
     // image = parent->get_image_ref(index);
     image->regInfo = this;

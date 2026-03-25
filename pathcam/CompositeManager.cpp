@@ -376,6 +376,7 @@ namespace pathCam {
       _regInfo->image->label = parent->composites[_regInfo->component_membership]->componentMagLabel;
     }
     parent->composites[_regInfo->component_membership]->stage(_regInfo);
+    _regInfo->staged = true;
     _regInfo->accessMutex.unlock();
   }
 }

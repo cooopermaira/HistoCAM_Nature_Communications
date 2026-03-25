@@ -392,9 +392,6 @@ namespace pathCam {
         // Mat rootRaw(imageSize,CV_8UC1, _rootImg->get_Raw());
         int count = 0;
 
-        if (_rootImg->index == 811) {
-          int k = 0;
-        }
 
         for (int i = 0; i < min(5, int(overlappingFrames.size())); ++i) {
 
@@ -594,7 +591,12 @@ namespace pathCam {
     ri_->stayFixedDuringBundleAdjustment = false;
     ri_->matchedTo = matchedTo_->index;
     ri_->relativeCoords = relCoords_;
+
+    Poco::ScopedWriteRWLock lock(RegInfo::registrationProcessMutex);
     ri_->attempt_absolute_reg(true);
+    if (componentIndex == 6) {
+      RegInfo::flag = true;
+    }
   }
 
   void Composite::set_candidate_scale_ratios() {

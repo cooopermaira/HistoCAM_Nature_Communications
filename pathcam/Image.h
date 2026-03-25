@@ -47,7 +47,6 @@ namespace pathCam {
     unsigned int label;
     int vertexId;
     cv::Point2i absoluteCoords;
-    cv::Point2f debugInitialGuess;
 
     Poco::FastMutex buffer_mutex,siftMutex,matchesMutex;
     std::mutex cudaBufferMutex, blurMutex;
@@ -58,7 +57,7 @@ namespace pathCam {
     bool labelObserved = false;
 
     bool subsequentMatchLaunched = false;
-    bool fullKeyPoints = false;
+
 
     std::unordered_set<cv::Point2i> ownedTiles;
     std::vector<std::shared_ptr<Match>> matches;

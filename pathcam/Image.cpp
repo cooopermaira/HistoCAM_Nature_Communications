@@ -494,9 +494,6 @@ namespace pathCam {
   }
 
   unsigned int Image::get_label() const {
-    if (index == 687) {
-      int k = 0;
-    }
     if (label == _NOLABEL) {
       if (regInfo && regInfo->component_membership >= 0) {
         if (parent) {

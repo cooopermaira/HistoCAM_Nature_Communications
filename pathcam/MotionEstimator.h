@@ -33,6 +33,9 @@ class RegInfo{
 public:
   inline static int featureQuorum = 100;
   inline static int minimumVote = 50;
+  inline static Poco::RWLock registrationProcessMutex;
+  inline static std::atomic<bool> flag = false;
+
   struct vote {
     int componentIndex;
     Point2i abc;
@@ -48,6 +51,12 @@ public:
   bool wasAligned = false;
   bool tryComposite = false;
   bool inCompositeQ = false;
+
+  // bool registered = false;
+  bool queued = false;
+  bool staged = false;
+  bool compPopped = false;
+
   int component_membership;
   Point2i absoluteCoords;
   Point2i relativeCoords = Point2i(0.0, 0.0);

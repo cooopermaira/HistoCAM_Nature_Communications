@@ -871,16 +871,17 @@ namespace pathCam {
      * Q, the membership has already been corrected by this point so just do nothing, the problem is solved
      * before it was noticed.
      */
-    _regInfo->accessMutex.lock();
+    _regInfo->rAccessMutex.lock();
     if (_regInfo->inCompositeQ) {
-      _regInfo->accessMutex.unlock();
+      _regInfo->rAccessMutex.unlock();
       return;
     }
     _regInfo->inCompositeQ = true;
-    _regInfo->accessMutex.unlock();
+    _regInfo->rAccessMutex.unlock();
 
     compositeQ_mutex.lock();
     compositeBatch.push({_regInfo});
+    _regInfo->queued = true;
     compositeQ_mutex.unlock();
   }
 
