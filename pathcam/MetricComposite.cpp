@@ -106,14 +106,15 @@ namespace pathCam {
       xcInProgress = true;
       xcMatchInitiated = true;
 
-      std::thread t([this, img = staging.front()->image]() {
+      // std::thread t([this, img = staging.front()->image]() {
         std::lock_guard lock(EstRoot_mutex);
         std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
-        establish_scale_at_root_cpu(img);
+        establish_scale_at_root_cpu(staging.front()->image);
         xcInProgress = false;
-      });
-      t.detach();
+      // });
+      // t.detach();
     }
+
 
     // PROCESS NEW FRAMES BEGIN
     if (!staging.empty()) {

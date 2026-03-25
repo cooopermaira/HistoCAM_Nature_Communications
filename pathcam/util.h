@@ -80,7 +80,23 @@ namespace pathCam {
     }
   }
 
+  template<typename T>
+  class OrderedSet {
+  public:
+    bool insert(const T& value) {
+      if (set.insert(value).second) {  // only if not already present
+        vec.push_back(value);
+        return true;
+      }
+      return false;
+    }
 
+    const std::vector<T>& values() const { return vec; }
+
+  private:
+    std::vector<T> vec;
+    std::unordered_set<T> set;
+  };
 
 
   inline void adjust_roi_for_debayer(cv::Rect &roi_) {

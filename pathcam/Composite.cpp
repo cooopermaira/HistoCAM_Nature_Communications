@@ -388,15 +388,20 @@ namespace pathCam {
         sort_overlaps_by_likelihood(overlappingFrames,
                                     parent->composites[mostRcntRslv->regInfo->component_membership]->get_scale());
 
+
+        OrderedSet<Image *> targets;
+        targets.insert(mostRcntRslv);
+        for (int i = 0; i < min(5, int(overlappingFrames.size())); ++i) {
+          targets.insert(overlappingFrames[i].first);
+        }
+
         auto likelyLabel = mostRcntRslv->get_label();
         // Mat rootRaw(imageSize,CV_8UC1, _rootImg->get_Raw());
         int count = 0;
 
 
-        for (int i = 0; i < min(5, int(overlappingFrames.size())); ++i) {
-
-          auto target = overlappingFrames[i].first;
-          std::cout << "registration attempt " << count++ << std::endl;
+        for (auto target: targets.values()) {
+          std::cout << "registration attempt " << count++ << " frame " << target->index << std::endl;
 
           // target->load_raw_from_disk(true);
           // Mat targetMat(imageSize,CV_8UC1, target->get_Raw());
@@ -461,7 +466,8 @@ namespace pathCam {
         // Mat targetRaw(imageSize,CV_8UC1, mostRcntRslv->get_Raw());
         // Mat rootRaw(imageSize,CV_8UC1, _rootImg->get_Raw());
 
-        if (auto res = findHomographyAKAZE_allScalePairs(_rootImg->akazeFeatures, mostRcntRslv->akazeFeatures); res.valid) {
+        if (auto res = findHomographyAKAZE_allScalePairs(_rootImg->akazeFeatures, mostRcntRslv->akazeFeatures); res.
+          valid) {
           bool validHomography = false;
           std::vector<float> homography(9);
 
@@ -578,7 +584,7 @@ namespace pathCam {
     suspended = true;
     imagePyramid->suspended = true;
 
-    for (auto img : memberFrames) {
+    for (auto img: memberFrames) {
       img->regInfo->component_membership = matchedTo_->regInfo->component_membership;
     }
 
@@ -857,7 +863,6 @@ namespace pathCam {
   }
 
 
-
   void Composite::save_pyramid_as_image(std::string _fileName, bool _withGrid, bool _withGridAndIndexes,
                                         bool _withEffectedTiles, bool _outline,
                                         std::vector<Point2i> effectedTiles) {
@@ -969,7 +974,6 @@ namespace pathCam {
       imwrite(path, pyramidImage);
     }
   }
-
 
 
   Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : parent(parent),
@@ -1209,7 +1213,8 @@ namespace pathCam {
     return composite;
   }
 
-  void ImageToTileCopyRunnable::run() {}
+  void ImageToTileCopyRunnable::run() {
+  }
 
   cv::Mat Composite::score_image_2X(int rows, int cols, int radius) {
     cv::Mat img = cv::Mat::zeros(cv::Size(cols, rows), CV_16U);
@@ -1255,5 +1260,4 @@ namespace pathCam {
     //imwrite("img.png", img);
     return temp;
   }
-
 }
