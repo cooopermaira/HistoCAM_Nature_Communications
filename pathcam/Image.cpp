@@ -493,6 +493,20 @@ namespace pathCam {
     }
   }
 
+  unsigned int Image::get_label() const {
+    if (index == 687) {
+      int k = 0;
+    }
+    if (label == _NOLABEL) {
+      if (regInfo && regInfo->component_membership >= 0) {
+        if (parent) {
+          return parent->composites[regInfo->component_membership]->componentMagLabel;
+        }
+      }
+    }
+    return label;
+  }
+
   void Image::load_raw_from_disk(bool _alertDoubleLoad) {
     buffer_mutex.lock();
     if (!raw_buffer) {

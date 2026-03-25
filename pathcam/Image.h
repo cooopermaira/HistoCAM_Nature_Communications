@@ -106,6 +106,8 @@ namespace pathCam {
       image_file = _image_file;
     }
 
+    unsigned int get_label() const;
+
     void load_raw_from_disk(bool _alertDoubleLoad = true);
 
     void manually_set_label();

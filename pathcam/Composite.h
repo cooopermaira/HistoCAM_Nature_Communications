@@ -188,7 +188,7 @@ namespace pathCam {
 
     void establish_scale_at_root_cpu(Image *_rootImg);
 
-    void suspend_and_join(RegInfo *ri_, long matchedToInd_, Point2i relCoords_);
+    void suspend_and_join(RegInfo *ri_, Image *matchedTo_, Point2i relCoords_);
 
     static void sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,
                                 const std::vector<uint8_t> &inlierMask, std::vector<

@@ -122,6 +122,9 @@ namespace pathCam {
       memberFrames.push_back(img);
       assert(img->regInfo);
 
+      if (img->index == 687) {
+        int k = 0;
+      }
       staging.pop();
       ++frameCount;
       maxIndex = max(maxIndex,img->index);
