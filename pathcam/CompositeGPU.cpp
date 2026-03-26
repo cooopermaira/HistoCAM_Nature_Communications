@@ -2,9 +2,11 @@
 // Created by cooper on 5/9/25.
 //
 #include "pathCam.h"
-namespace pathCam {
 #ifdef PATHCAM_OPENCV_CUDA
 #include <opencv2/core/cuda_stream_accessor.hpp>
+#endif
+namespace pathCam {
+#ifdef PATHCAM_OPENCV_CUDA
 
 
 
