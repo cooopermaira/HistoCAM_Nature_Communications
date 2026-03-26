@@ -75,7 +75,7 @@ unsigned long extractSortableValue3(const std::string& filename)
   // Find underscore
   size_t underscorePos = name.find('_');
   if (underscorePos == std::string::npos)
-    return 0;  // fallback if malformed
+    std::stoul(filename);  // fallback if malformed
 
   std::string importantPart = name.substr(0, underscorePos);
 

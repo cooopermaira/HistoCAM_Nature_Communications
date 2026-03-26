@@ -1026,9 +1026,11 @@ namespace pathCam {
     cudaMallocManaged(&fourChnBuf, 4 * imageSize.area());
     fourChannelPreallocated = Mat(imageSize,CV_8UC4, fourChnBuf);
     fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4, fourChnBuf);
+#else
+    threeChannelPreallocated = Mat(imageSize,CV_8UC3);
+    fourChannelPreallocated = Mat(imageSize,CV_8UC4);
+    rectMask = Mat(image_size, CV_8UC1,Scalar(255));
 #endif
-
-    rectMask = Mat(image_size, CV_8UC1);
     if (parent->circleMask.empty()) {
       circleMask = Mat::zeros(image_size, CV_8U);
       circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,

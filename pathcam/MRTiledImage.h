@@ -146,6 +146,7 @@ public:
     // if (workDir.exists() && workDir.isDirectory()) {
     //   workDir.remove(true);
     // }
+    int k = 0;
   }
 
 
