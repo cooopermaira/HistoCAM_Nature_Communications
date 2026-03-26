@@ -546,9 +546,10 @@ namespace pathCam {
 
             _rootImg->free_memory_RAW();
             return;
-          } else {
-            if (!_rootImg->labelObserved)
           }
+          // else {
+          //   if (!_rootImg->labelObserved)
+          // }
         }
 
         if (mostRcntRslv->labelObserved) {

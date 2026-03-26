@@ -70,7 +70,7 @@ struct TileObj {
   Poco::FastMutex mutex;
   cv::Mat image;
 
-  std::map<int, std::pair<cuda::GpuMat, void *> > SAMMasks;
+  std::map<int, std::pair<Mat, void *> > SAMMasks;
 
   TileObj(int _tileSize, Point2i _index = {}) : index(_index) {
     image = cv::Mat(_tileSize, _tileSize, CV_8UC4, cv::Scalar(0, 0, 0, 0));
@@ -145,7 +145,7 @@ public:
 
   void insertTilesAtBase(cv::Mat &image_in, cv::Mat &mask, cv::Rect_<float> &box, std::vector<Point2i> &retileIndices);
 
-#ifdef HAVE_OPENCV_CUDAARITHM
+// #ifdef HAVE_OPENCV_CUDAARITHM
   void matToTile(const cuda::GpuMat &mat, const cuda::GpuMat &mask, int x, int y, Point2f rootOffset,
                  cv::Rect_<float> image_box, cv::Rect_<float> tile_box);
 
@@ -159,13 +159,13 @@ public:
   std::shared_ptr<TileObj> getTile(int x, int y);
 
   std::shared_ptr<TileObj> getTile(Point2i);
-#else
-
-
-  void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
-
-  Mat getTile(int x, int y);
-#endif
+// #else
+//
+//
+//   void tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion, const cv::Mat &mat);
+//
+//   Mat getTile(int x, int y);
+// #endif
 
   inline Point2i getIJ(Point2f p) {
     Point2i ij = Point2i(p.x / (int) logic_size, p.y / (int) logic_size);

@@ -21,6 +21,8 @@
 #include "opencv2/core.hpp"
 
 #ifdef PATHCAM_HAS_CUDA
+#include <cuda_runtime.h>
+
 #define CHECK_CUDA(x) do { cudaError_t e=(x); if(e!=cudaSuccess){ \
 std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<<"\n"; std::exit(1);} } while(0)
 #endif
@@ -33,7 +35,6 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "opencv2/cudawarping.hpp"
 #include "opencv2/cudaimgproc.hpp"
 #include "opencv2/cudafilters.hpp"
-#include <cuda_runtime.h>
 
 #endif
 
@@ -51,14 +52,13 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 
 
 
-#ifdef HAVE_OPENCV_XFEATURES2D
 #include "opencv2/calib3d.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/features2d.hpp"
 #include "opencv2/xfeatures2d.hpp"
 #include "opencv2/xphoto/white_balance.hpp"
-#endif
+#
 
 #include "Poco/Mutex.h"
 #include "Poco/RWLock.h"
@@ -96,7 +96,6 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "BatchCam.h"
 
 #include "StreamCam.h"
-// #include "PostProcessor.h"
 #include "SIFTSearchUtils.h"
 
 

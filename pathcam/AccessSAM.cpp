@@ -571,15 +571,17 @@ namespace pathCam {
 
     //if no display object exists, initialize one
     if (tileObj->SAMMasks.find(_segID) == tileObj->SAMMasks.end()) {
-      tileObj->SAMMasks[_segID] = {cuda::GpuMat(parent->tileSize, parent->tileSize,CV_8U, Scalar(0)), nullptr};
+      tileObj->SAMMasks[_segID] = {Mat(parent->tileSize, parent->tileSize,CV_8U, Scalar(0)), nullptr};
     }
 
     //combine with current mask by taking max at each pixel
     //parent->composites[0]->imagePyramid->imgPyramidMutex->lock();
+    Mat mask;
+    _mask.download(mask);
     if (_unionWithExistingMask) {
-      cuda::max(_mask, tileObj->SAMMasks[_segID].first, tileObj->SAMMasks[_segID].first);
+      cv::max(mask, tileObj->SAMMasks[_segID].first, tileObj->SAMMasks[_segID].first);
     }else {
-      tileObj->SAMMasks[_segID].first = _mask.clone();
+      tileObj->SAMMasks[_segID].first = mask;
     }
     tileObj->newAnnoData = true;
 

@@ -4,7 +4,7 @@
 #include "pathCam.h"
 #include <opencv2/core/cuda_stream_accessor.hpp>
 namespace pathCam {
-#ifdef HAVE_OPENCV_CUDAARITHM
+#ifdef PATHCAM_OPENCV_CUDA
 
 
   void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
@@ -711,26 +711,26 @@ void CompositeVoronoi::update() {
   }
 
   void CompositeVoronoi::update(std::vector<RegInfo *> new_info, bool _force_add) {
-    if (new_info.empty()) { return; }
-
-    update_mutex.lock();
-
-    if (new_info.size() > 1) {
-      // this shuffle is very important for reducing image count in the DT.
-      auto rng = std::default_random_engine{};
-      std::shuffle(std::begin(new_info), std::end(new_info), rng);
-    }
-
-    update_Bbox_no_composite(new_info);
-    expand_subdiv(new_info);
-#ifdef HAVE_OPENCV_CUDAARITHM
-    GPU_add_images_no_composite(new_info, _force_add);
-
-
-#else
-    add_images_no_composite(new_info, _force_add);
-#endif
-    update_mutex.unlock();
+//     if (new_info.empty()) { return; }
+//
+//     update_mutex.lock();
+//
+//     if (new_info.size() > 1) {
+//       // this shuffle is very important for reducing image count in the DT.
+//       auto rng = std::default_random_engine{};
+//       std::shuffle(std::begin(new_info), std::end(new_info), rng);
+//     }
+//
+//     update_Bbox_no_composite(new_info);
+//     expand_subdiv(new_info);
+// #ifdef HAVE_OPENCV_CUDAARITHM
+//     GPU_add_images_no_composite(new_info, _force_add);
+//
+//
+// #else
+//     add_images_no_composite(new_info, _force_add);
+// #endif
+//     update_mutex.unlock();
   }
 
   void CompositeVoronoi::store_new_info(pathCam::RegInfo *_new_info) {
@@ -1493,6 +1493,7 @@ void CompositeVoronoi::update() {
       }
     }
   }
+  /*
   void CompositeVoronoi::GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add) {
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<long> indexes;
@@ -1632,7 +1633,7 @@ void CompositeVoronoi::update() {
       parent->notify_observers();
     }
   }
-
+*/
   void CompositeVoronoi::align_and_rebuild() {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -1775,7 +1776,7 @@ void CompositeVoronoi::update() {
         (std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
-
+/*
   void CompositeVoronoi::rebuild_and_initialize_SAM() {
     //currently SAM only works for one component at a time. Ensure this is a single resolution composite
     assert(componentIndex == 0);
@@ -1949,7 +1950,7 @@ void CompositeVoronoi::update() {
       imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageRect, retileIndices);
     }
   }
-
+*/
 
   void CompositeVoronoi::rebuild() {
     if (contributingFrames.size() == 1) {
