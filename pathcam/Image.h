@@ -6,14 +6,6 @@
 
 namespace pathCam {
 
-  struct Features
-  {
-    float scale = 1.0f;
-    cv::Mat image;
-    std::vector<cv::KeyPoint> kp;
-    cv::Mat desc;
-  };
-
   using Poco::MemoryPool;
   class RegInfo;
   class StreamCam;

@@ -8,26 +8,7 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  inline Ptr<AKAZE>& getThreadLocalAKAZE()
-  {
-    thread_local Ptr<AKAZE> akaze = AKAZE::create();
-    return akaze;
-  }
 
-  inline Features buildFeatures(const Mat& src, float s)
-  {
-    auto akaze = getThreadLocalAKAZE();
-
-    Features f;
-    f.scale = s;
-
-    resize(src, f.image, Size(), s, s, INTER_AREA);
-
-    if (!f.image.empty())
-      akaze->detectAndCompute(f.image, noArray(), f.kp, f.desc);
-
-    return f;
-  }
 
   void LoaderLogicRunnable::self_cancel(int label) {
     successful = true;
@@ -67,10 +48,6 @@ namespace pathCam {
       jobComplete.set();
       return;
     }
-    // if (parent->recordingMode) {
-    //   image->write_to_path(true);
-    // }
-
 
     image->index = image_index;
 
@@ -80,13 +57,8 @@ namespace pathCam {
       // image->motionBlur = 0.5;
 
       auto start = std::chrono::high_resolution_clock::now();
-      {
-        Mat raw(image->height,image->width,CV_8UC1,image->get_Raw());
-        image->akazeFeatures.reserve(3);
-        for (auto &s : {0.25f,0.1f}) {
-          image->akazeFeatures.push_back(buildFeatures(raw,s));
-        }
-      }
+      // make_akaze(image,{0.25,0.1});
+
       image->profileTime = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::high_resolution_clock::now() - start).count();
 

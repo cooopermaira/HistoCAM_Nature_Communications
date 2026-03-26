@@ -4,6 +4,18 @@
 #include "pathCam.h"
 
 namespace pathCam {
+
+
+  void make_akaze(Image* img_, std::vector<float> scales) {
+    img_->load_raw_from_disk();
+    Mat raw(img_->height,img_->width,CV_8UC1,img_->get_Raw());
+    img_->akazeFeatures.reserve(scales.size() + img_->akazeFeatures.size());
+    for (auto &s : scales) {
+      img_->akazeFeatures.push_back(buildFeatures(raw,s));
+    }
+    img_->free_memory_RAW();
+  }
+
   void ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(
     std::unordered_set<Image *> &members,
     const std::vector<std::pair<Image *, Image *> > &overlaps,

@@ -357,7 +357,10 @@ namespace pathCam {
   }
 
   void Composite::establish_scale_at_root_cpu(Image *_rootImg) {
-    // _rootImg->load_raw_from_disk(true);
+    _rootImg->load_raw_from_disk(true);
+    if (_rootImg->akazeFeatures.empty()) {
+      make_akaze(_rootImg,{0.25,0.1});
+    }
 
     Poco::FastMutex::ScopedLock lock(parent->component_mutex);
 
@@ -390,8 +393,9 @@ namespace pathCam {
 
         OrderedSet<Image *> targets;
         targets.insert(mostRcntRslv);
-        for (int i = 0; i < min(3, int(overlappingFrames.size())); ++i) {
-          targets.insert(overlappingFrames[i].first);
+        int i = 0;
+        while (targets.values().size() < 3) {
+          targets.insert(overlappingFrames[i++].first);
         }
 
         auto likelyLabel = mostRcntRslv->get_label();
@@ -402,8 +406,9 @@ namespace pathCam {
         for (auto target: targets.values()) {
           std::cout << "registration attempt " << count++ << " frame " << target->index << std::endl;
 
-          // target->load_raw_from_disk(true);
-          // Mat targetMat(imageSize,CV_8UC1, target->get_Raw());
+          if (target->akazeFeatures.empty()) {
+            make_akaze(target,{0.25,0.1});
+          }
 
           //target and root are swapped in this function call because we know the scales for target but not for root
           if (auto res = findHomographyAKAZE_allScalePairs(target->akazeFeatures, _rootImg->akazeFeatures); res.valid) {
@@ -442,7 +447,7 @@ namespace pathCam {
 
                 theirComponent->extraMatches.emplace_back(_rootImg, target, kp1, kp2);
 
-                // _rootImg->free_memory_RAW();
+                _rootImg->free_memory_RAW();
                 return;
               }
             }
@@ -456,13 +461,16 @@ namespace pathCam {
         suspend_and_join(_rootImg->regInfo, mostRcntRslv, relDist);
         std::cout << "component " << componentIndex << " suspended and added to component via projection" << std::endl;
 
-        // _rootImg->free_memory_RAW();
+        _rootImg->free_memory_RAW();
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
 
         // mostRcntRslv->load_raw_from_disk(true);
         // Mat targetRaw(imageSize,CV_8UC1, mostRcntRslv->get_Raw());
         // Mat rootRaw(imageSize,CV_8UC1, _rootImg->get_Raw());
+        if (mostRcntRslv->akazeFeatures.empty()) {
+          make_akaze(mostRcntRslv,{0.25,0.1});
+        }
 
         if (auto res = findHomographyAKAZE_allScalePairs(_rootImg->akazeFeatures, mostRcntRslv->akazeFeatures); res.
           valid) {
@@ -536,8 +544,10 @@ namespace pathCam {
             matchedComp->add_landmark_frame(mostRcntRslv);
             std::cout << "component " << componentIndex << " XC registered" << std::endl;
 
-            // _rootImg->free_memory_RAW();
+            _rootImg->free_memory_RAW();
             return;
+          } else {
+            if (!_rootImg->labelObserved)
           }
         }
 
@@ -569,11 +579,11 @@ namespace pathCam {
           theirComponent->add_landmark_frame(mostRcntRslv);
           std::cout << "component " << componentIndex << " XC registered by label based guess" << std::endl;
 
-          // _rootImg->free_memory_RAW();
+          _rootImg->free_memory_RAW();
           return;
         }
         std::cout << "UNABLE TO DETERMINE SCALE FOR COMPONENT " << componentIndex << std::endl;
-        // _rootImg->free_memory_RAW();
+        _rootImg->free_memory_RAW();
       }
     }
   }

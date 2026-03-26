@@ -31,7 +31,40 @@ namespace std {
 }
 
 namespace pathCam {
+  class Image;
   using namespace nvinfer1;
+
+
+  inline cv::Ptr<cv::AKAZE>& getThreadLocalAKAZE()
+  {
+    thread_local cv::Ptr<cv::AKAZE> akaze = cv::AKAZE::create();
+    return akaze;
+  }
+
+  struct Features
+  {
+    float scale = 1.0f;
+    cv::Mat image;
+    std::vector<cv::KeyPoint> kp;
+    cv::Mat desc;
+  };
+
+  inline Features buildFeatures(const cv::Mat& src, float s)
+  {
+    auto akaze = getThreadLocalAKAZE();
+
+    Features f;
+    f.scale = s;
+
+    resize(src, f.image, cv::Size(), s, s, cv::INTER_AREA);
+
+    if (!f.image.empty())
+      akaze->detectAndCompute(f.image, cv::noArray(), f.kp, f.desc);
+
+    return f;
+  }
+
+  void make_akaze(pathCam::Image* img_, std::vector<float> scales);
 
   struct ScaleResult {
     double scale = 0.0;
@@ -73,12 +106,7 @@ namespace pathCam {
     return buf;
   }
 
-  // inline void catch_ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh,
-  //                               float lowestScale, bool scaleUp) {
-  //   if (int ans = ExtractSift(siftData, img, numOctaves, initBlur, thresh, lowestScale, scaleUp); ans != 0) {
-  //     int k = 0;
-  //   }
-  // }
+
 
   template<typename T>
   class OrderedSet {

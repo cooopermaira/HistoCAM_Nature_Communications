@@ -113,7 +113,7 @@ namespace pathCam {
       std::cout << "component " << componentIndex << " establishing scale" << std::endl;
       auto start = std::chrono::high_resolution_clock::now();
       establish_scale_at_root_cpu(staging.front()->image);
-      std::cout << "component " << componentIndex << " XC registered in " << std::chrono::duration_cast<
+      std::cout << "XC REGISTERED COMPONENT " << componentIndex << " in " << std::chrono::duration_cast<
         std::chrono::milliseconds>(
         std::chrono::high_resolution_clock::now() - start).count() << std::endl;
       xcInProgress = false;

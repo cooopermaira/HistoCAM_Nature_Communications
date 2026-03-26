@@ -138,9 +138,6 @@ namespace pathCam {
     }
 
     resolved = true;
-    if (flag && component_membership == 6) {
-      int k = 0;
-    }
     parent->push_compositeQ(this);
 
     cast_requested_votes();
