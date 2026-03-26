@@ -357,8 +357,7 @@ namespace pathCam {
   }
 
   void Composite::establish_scale_at_root_cpu(Image *_rootImg) {
-    _rootImg->load_raw_from_disk(true);
-
+    // _rootImg->load_raw_from_disk(true);
 
     Poco::FastMutex::ScopedLock lock(parent->component_mutex);
 
@@ -408,7 +407,6 @@ namespace pathCam {
 
           //target and root are swapped in this function call because we know the scales for target but not for root
           if (auto res = findHomographyAKAZE_allScalePairs(target->akazeFeatures, _rootImg->akazeFeatures); res.valid) {
-            target->free_memory_RAW();
 
             //detect scale difference between likelyLabel and img.label
             auto targetScales = Image::valid_scales_for_label(target->get_label());
@@ -444,7 +442,7 @@ namespace pathCam {
 
                 theirComponent->extraMatches.emplace_back(_rootImg, target, kp1, kp2);
 
-                _rootImg->free_memory_RAW();
+                // _rootImg->free_memory_RAW();
                 return;
               }
             }
@@ -458,7 +456,7 @@ namespace pathCam {
         suspend_and_join(_rootImg->regInfo, mostRcntRslv, relDist);
         std::cout << "component " << componentIndex << " suspended and added to component via projection" << std::endl;
 
-        _rootImg->free_memory_RAW();
+        // _rootImg->free_memory_RAW();
       } else {
         //we likely changed objective lens so attempt to match against most recent resolved
 
@@ -538,7 +536,7 @@ namespace pathCam {
             matchedComp->add_landmark_frame(mostRcntRslv);
             std::cout << "component " << componentIndex << " XC registered" << std::endl;
 
-            _rootImg->free_memory_RAW();
+            // _rootImg->free_memory_RAW();
             return;
           }
         }
@@ -571,11 +569,11 @@ namespace pathCam {
           theirComponent->add_landmark_frame(mostRcntRslv);
           std::cout << "component " << componentIndex << " XC registered by label based guess" << std::endl;
 
-          _rootImg->free_memory_RAW();
+          // _rootImg->free_memory_RAW();
           return;
         }
         std::cout << "UNABLE TO DETERMINE SCALE FOR COMPONENT " << componentIndex << std::endl;
-        _rootImg->free_memory_RAW();
+        // _rootImg->free_memory_RAW();
       }
     }
   }

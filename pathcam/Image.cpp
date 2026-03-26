@@ -8,20 +8,20 @@ namespace pathCam {
   static std::once_flag g_gauss_once;
 
 
-  inline void sortSiftDataByX(SiftData& sd) {
-    assert(sd.h_data);
-    assert(sd.numPts <= sd.maxPts);
-
-    std::sort(sd.h_data, sd.h_data + sd.numPts,
-              [](const SiftPoint& a, const SiftPoint& b) {
-                return a.xpos < b.xpos;
-              });
-
-    cudaMemcpy(sd.d_data,
-           sd.h_data,
-           sd.numPts * sizeof(SiftPoint),
-           cudaMemcpyHostToDevice);
-  }
+  // inline void sortSiftDataByX(SiftData& sd) {
+  //   assert(sd.h_data);
+  //   assert(sd.numPts <= sd.maxPts);
+  //
+  //   std::sort(sd.h_data, sd.h_data + sd.numPts,
+  //             [](const SiftPoint& a, const SiftPoint& b) {
+  //               return a.xpos < b.xpos;
+  //             });
+  //
+  //   cudaMemcpy(sd.d_data,
+  //          sd.h_data,
+  //          sd.numPts * sizeof(SiftPoint),
+  //          cudaMemcpyHostToDevice);
+  // }
 
 
   static std::mutex g_gauss_mtx;
@@ -89,12 +89,12 @@ namespace pathCam {
 
   Image::~Image() {
     free_memory_RAW(true);
-    if (siftFullInitialized) {
-      FreeSiftData(siftDataFull);
-    }
-    if (siftInitialized) {
-      FreeSiftData(siftData);
-    }
+    // if (siftFullInitialized) {
+    //   FreeSiftData(siftDataFull);
+    // }
+    // if (siftInitialized) {
+    //   FreeSiftData(siftData);
+    // }
     // if (regInfo) {
     //   delete regInfo;
     // }
@@ -539,14 +539,13 @@ namespace pathCam {
         // if (mempool) {
         //   mempool->release(raw_buffer);
         // } else {
-        //   if (parent && parent->unifiedMemory) {
-        //     cudaFree(raw_buffer);
-        //   }else {
-        //
-        //     free(raw_buffer);
-        //   }
+        if (parent && parent->unifiedMemory) {
+          cudaFree(raw_buffer);
+        }else {
+          free(raw_buffer);
+        }
         // }
-        cudaFree(raw_buffer);
+        // cudaFree(raw_buffer);
         raw_buffer = nullptr;
         reference_count = 0;
       }
@@ -554,7 +553,7 @@ namespace pathCam {
     buffer_mutex.unlock();
   }
 
-
+/*
   void Image::extract_sift(int numPts, int octaves, float initBlur, float thresh,
                            float lowestScale, cuda::GpuMat &buffer, bool siftWindow, float *tempSpace) {
     if ((siftInitialized && siftWindow) || (siftFullInitialized && !siftWindow)){return;}
@@ -613,4 +612,5 @@ namespace pathCam {
       siftFullInitialized = true;
     }
   }
+  */
 }

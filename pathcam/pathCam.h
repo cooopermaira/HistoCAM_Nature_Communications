@@ -17,8 +17,6 @@
 #include <termios.h>
 #include <cstring>
 
-//#include <Python.h>
-
 
 #include "opencv2/core.hpp"
 #ifdef HAVE_OPENCV_CUDAARITHM
@@ -40,8 +38,8 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include <condition_variable>
 #include <thread>
 
-#include "cudaImage.h"
-#include "cudaSift.h"
+// #include "cudaImage.h"
+// #include "cudaSift.h"
 #include <clipper2/clipper.h>
 
 
@@ -79,11 +77,6 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "Poco/ThreadPool.h"
 #include "Poco/DateTimeFormatter.h"
 
-#if 0
-#include <torch/torch.h>
-#include <torch/script.h>
-#include <torch/csrc/autograd/python_variable.h>
-#endif
 
 #include <NvInfer.h>
 
@@ -99,7 +92,7 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "BatchCam.h"
 
 #include "StreamCam.h"
-#include "PostProcessor.h"
+// #include "PostProcessor.h"
 #include "SIFTSearchUtils.h"
 #include "AccessSAM.h"
 
@@ -108,6 +101,10 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"
 #include "SpinPath.h"
+#endif
+
+#ifdef PATHCAM_OPENCV_CUDA
+#include "CompositeVoronoi.h"
 #endif
 
 #include "Runnables.h"

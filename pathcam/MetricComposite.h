@@ -42,7 +42,7 @@ namespace pathCam {
         std::unordered_set<Image *> reduce_members_through_competition(std::unordered_set<Image *> _members) const;
 
 
-        SiftData compSiftData;
+        // SiftData compSiftData;
 
 
         inline static int frameDelay = 10;

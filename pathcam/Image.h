@@ -66,11 +66,7 @@ namespace pathCam {
     cv::Mat descriptors;
 
     static cv::cuda::GpuMat hannWindow, blurMask;
-#ifdef HAVE_OPENCV_CUDAFEATURES2D
-    SiftData siftData, siftDataFull;
-    bool siftInitialized = false;
-    bool siftFullInitialized = false;
-#endif
+
 
     static std::vector<float> valid_scales_for_label(unsigned int label) {
       switch (label) {

@@ -5,7 +5,7 @@
 
 namespace pathCam {
   // cuda::GpuMat &getThreadConvertSpace(int width, int height);// {
-
+/*
   void copy_sift_data(SiftData &dst, const SiftData &src) {
     InitSiftData(dst, src.numPts, true, true);
 
@@ -417,4 +417,5 @@ namespace pathCam {
     }
     assert(loc == inlierCount);
   }
+  */
 }

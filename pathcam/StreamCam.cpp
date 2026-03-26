@@ -349,20 +349,20 @@ namespace pathCam {
     }
   }
 
-  void StreamCam::push_SIFT_matches(std::vector<std::pair<Image *, Image *> > &_newOverlaps, Image *_image) {
-    sfm->matchWorkOutstanding += (int) _newOverlaps.size();
-    siftQMutex.lock();
-    if (compositorCudaDevice != siftCudaDevice) {
-      siftDataQueue.push(_image);
-    }
-
-    if (_image->regInfo->root) {
-      siftMatchQueue.push_front(_newOverlaps);
-    } else {
-      siftMatchQueue.push_back(_newOverlaps);
-    }
-    siftQMutex.unlock();
-  }
+  // void StreamCam::push_SIFT_matches(std::vector<std::pair<Image *, Image *> > &_newOverlaps, Image *_image) {
+  //   sfm->matchWorkOutstanding += (int) _newOverlaps.size();
+  //   siftQMutex.lock();
+  //   if (compositorCudaDevice != siftCudaDevice) {
+  //     siftDataQueue.push(_image);
+  //   }
+  //
+  //   if (_image->regInfo->root) {
+  //     siftMatchQueue.push_front(_newOverlaps);
+  //   } else {
+  //     siftMatchQueue.push_back(_newOverlaps);
+  //   }
+  //   siftQMutex.unlock();
+  // }
 
 #endif
 
@@ -779,40 +779,40 @@ namespace pathCam {
   }
 
 
-  std::vector<std::pair<Image *, Image *> > StreamCam::get_sift_match_Q_front(std::vector<Image *> &_images) {
-    std::vector<std::pair<Image *, Image *> > temp;
+  // std::vector<std::pair<Image *, Image *> > StreamCam::get_sift_match_Q_front(std::vector<Image *> &_images) {
+  //   std::vector<std::pair<Image *, Image *> > temp;
+  //
+  //   siftQMutex.lock();
+  //
+  //   //move all the buffers to my device (if necessary)
+  //   get_sift_data_Q_front(_images);
+  //
+  //   //grab a bunch of matches from the Q to process
+  //   if (!siftMatchQueue.empty()) {
+  //     temp = siftMatchQueue.front();
+  //     siftMatchQueue.pop_front();
+  //   }
+  //   siftQMutex.unlock();
+  //   return temp;
+  // }
 
-    siftQMutex.lock();
 
-    //move all the buffers to my device (if necessary)
-    get_sift_data_Q_front(_images);
-
-    //grab a bunch of matches from the Q to process
-    if (!siftMatchQueue.empty()) {
-      temp = siftMatchQueue.front();
-      siftMatchQueue.pop_front();
-    }
-    siftQMutex.unlock();
-    return temp;
-  }
-
-
-  void StreamCam::get_sift_data_Q_front(std::vector<Image *> &_images) {
-    std::vector<Image *> temp;
-
-    //no need to check if compositor device is different from sft device, Q will be empty if same -> no need to move data
-    while (!siftDataQueue.empty()) {
-      auto img = siftDataQueue.front();
-      _images.push_back(img);
-      if (siftCudaDevice != compositorCudaDevice) {
-        CHECK_CUDA(cudaMalloc((void **) &img->siftData.d_data, sizeof(SiftPoint) * img->siftData.numPts));
-        CHECK_CUDA(
-          cudaMemcpy(img->siftData.d_data, img->siftData.h_data, sizeof(SiftPoint) * img->siftData.numPts,
-            cudaMemcpyHostToDevice));
-      }
-      siftDataQueue.pop();
-    }
-  }
+  // void StreamCam::get_sift_data_Q_front(std::vector<Image *> &_images) {
+  //   std::vector<Image *> temp;
+  //
+  //   //no need to check if compositor device is different from sft device, Q will be empty if same -> no need to move data
+  //   while (!siftDataQueue.empty()) {
+  //     auto img = siftDataQueue.front();
+  //     _images.push_back(img);
+  //     if (siftCudaDevice != compositorCudaDevice) {
+  //       CHECK_CUDA(cudaMalloc((void **) &img->siftData.d_data, sizeof(SiftPoint) * img->siftData.numPts));
+  //       CHECK_CUDA(
+  //         cudaMemcpy(img->siftData.d_data, img->siftData.h_data, sizeof(SiftPoint) * img->siftData.numPts,
+  //           cudaMemcpyHostToDevice));
+  //     }
+  //     siftDataQueue.pop();
+  //   }
+  // }
 
 
   void StreamCam::push_tile_embed_Q(std::vector<Point2i> &_tiles, unsigned int _componentIndex) {

@@ -203,13 +203,13 @@ void CompositeVoronoi::update() {
       xcInProgress = true;
       xcMatchInitiated = true;
 
-      std::thread t([this, img = staging.front()->image]() {
+      // std::thread t([this, img = staging.front()->image]() {
         std::lock_guard lock(EstRoot_mutex);
         std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
-        establish_scale_at_root(img);
+        establish_scale_at_root_cpu(staging.front()->image);
         xcInProgress = false;
-      });
-      t.detach();
+      // });
+      // t.detach();
     }
 
     // PROCESS NEW FRAMES BEGIN
@@ -295,6 +295,7 @@ void CompositeVoronoi::update() {
           contributingFrames.insert(img);
           lastAccepted = ri->absoluteCoords;
 
+          img->load_raw_from_disk();
           if (!img->subsequentMatchLaunched) {
             img->load_raw_from_disk(); //freed in ComponentMatchSearch::run()
             img->subsequentMatchLaunched = true;
@@ -323,13 +324,15 @@ void CompositeVoronoi::update() {
           auto tiles = effectedTilesNoMask;
           tiles.insert(tiles.end(),effectedTiles.begin(),effectedTiles.end());
           prepare_4CPA(img, tiles);
+          img->free_memory_RAW();
+
           if (!effectedTilesNoMask.empty()) {
             imagePyramid->insertTilesAtBase(fourChannelPreallocated,rectMask,imageBox,effectedTilesNoMask);
           }
           imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
         }
       }
-      img->free_memory_RAW();
+      img->free_memory_RAW(); // releasing buffer from when image was created
 
       float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
       float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
@@ -1554,7 +1557,7 @@ void CompositeVoronoi::update() {
 
       if (rootFound) {
         parent->cvCompositeStream.waitForCompletion();
-        establish_scale_at_root(images[i]);
+        establish_scale_at_root_cpu(images[i]);
       }
 
       ff_correct_and_brighten();
@@ -1712,6 +1715,7 @@ void CompositeVoronoi::update() {
     auto graphConnectivityResult = ig.computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
       std::cout << "component " << componentIndex << " failed to connect graph" << std::endl;
+      rebuild();
       return;
     }
 
@@ -1755,6 +1759,7 @@ void CompositeVoronoi::update() {
 
     if (graphConnectivityResult.used_sift) {
       std::cout << "Component " << componentIndex << " using sift in BA" << std::endl;
+      rebuild();
       return;
     }
 
@@ -2043,37 +2048,37 @@ void CompositeVoronoi::update() {
   }
 
 
-  SiftData Composite::GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts) {
-    SiftData siftData;
-    try {
-      if (_img.channels() == 1) {
-        cuda::cvtColor(_img, gry, COLOR_BayerBG2GRAY);
-      } else if (_img.channels() == 3) {
-        cuda::cvtColor(_img, gry, COLOR_BGR2GRAY);
-      } else {
-        throw std::runtime_error("Unsupported image format in GPU_extract_SIFT");
-      }
-
-      if (componentMagLabel == Image::_2X) {
-        cuda::multiply(circleMaskGPU, gry, gry);
-      }
-
-      gry.convertTo(gry2,CV_32FC1);
-
-      CudaImage cImgGry;
-      cImgGry.Allocate(imageSize.width, imageSize.height, gry2.step / sizeof(float), false,
-                       reinterpret_cast<float *>(gry2.data), nullptr);
-
-
-      InitSiftData(siftData, 100000, true, true);
-      catch_ExtractSift(siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
-    } catch (cv::Exception &e) {
-      int k = 0;
-    }
-    return siftData;
-
-    //int k = 0;
-  }
+  // SiftData Composite::GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts) {
+  //   SiftData siftData;
+  //   try {
+  //     if (_img.channels() == 1) {
+  //       cuda::cvtColor(_img, gry, COLOR_BayerBG2GRAY);
+  //     } else if (_img.channels() == 3) {
+  //       cuda::cvtColor(_img, gry, COLOR_BGR2GRAY);
+  //     } else {
+  //       throw std::runtime_error("Unsupported image format in GPU_extract_SIFT");
+  //     }
+  //
+  //     if (componentMagLabel == Image::_2X) {
+  //       cuda::multiply(circleMaskGPU, gry, gry);
+  //     }
+  //
+  //     gry.convertTo(gry2,CV_32FC1);
+  //
+  //     CudaImage cImgGry;
+  //     cImgGry.Allocate(imageSize.width, imageSize.height, gry2.step / sizeof(float), false,
+  //                      reinterpret_cast<float *>(gry2.data), nullptr);
+  //
+  //
+  //     InitSiftData(siftData, 100000, true, true);
+  //     catch_ExtractSift(siftData, cImgGry, 5, 0.0f, 0.4f, 0.1f, false);
+  //   } catch (cv::Exception &e) {
+  //     int k = 0;
+  //   }
+  //   return siftData;
+  //
+  //   //int k = 0;
+  // }
 
 
   std::vector<std::pair<Image *, Image *> > CompositeVoronoi::calculate_new_overlaps() {

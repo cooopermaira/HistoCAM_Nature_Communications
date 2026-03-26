@@ -73,12 +73,12 @@ namespace pathCam {
     return buf;
   }
 
-  inline void catch_ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh,
-                                float lowestScale, bool scaleUp) {
-    if (int ans = ExtractSift(siftData, img, numOctaves, initBlur, thresh, lowestScale, scaleUp); ans != 0) {
-      int k = 0;
-    }
-  }
+  // inline void catch_ExtractSift(SiftData &siftData, CudaImage &img, int numOctaves, double initBlur, float thresh,
+  //                               float lowestScale, bool scaleUp) {
+  //   if (int ans = ExtractSift(siftData, img, numOctaves, initBlur, thresh, lowestScale, scaleUp); ans != 0) {
+  //     int k = 0;
+  //   }
+  // }
 
   template<typename T>
   class OrderedSet {

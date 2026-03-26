@@ -5,6 +5,7 @@
 #include "pathCam.h"
 
 namespace pathCam {
+  /*
   inline SiftData collect_SiftData(const std::vector<std::pair<Image *, std::vector<const SiftPoint *> > > &_inVec,
                                    int _subsample) {
     SiftData siftData;
@@ -74,6 +75,7 @@ namespace pathCam {
       }
     }
   }
+  */
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
     parent, image_size, _componentIndex) {
@@ -486,8 +488,8 @@ namespace pathCam {
       }
     }
 
-    std::vector<std::pair<Image *, std::vector<const SiftPoint *> > > componentFeatures;
-    Point2i siftWindowCorner((imageSize.width - parent->siftWindow) / 2, (imageSize.height - parent->siftWindow) / 2);
+    // std::vector<std::pair<Image *, std::vector<const SiftPoint *> > > componentFeatures;
+    // Point2i siftWindowCorner((imageSize.width - parent->siftWindow) / 2, (imageSize.height - parent->siftWindow) / 2);
 
     for (auto &img: members) {
       std::vector<Point2i> tileIndexes;
