@@ -32,8 +32,17 @@ namespace std {
 
 namespace pathCam {
   class Image;
-  using namespace nvinfer1;
 
+#ifdef PATHCAM_HAS_TENSORRT
+  using namespace nvinfer1;
+  class nvLogger : public ILogger {
+    void log(Severity s, const char *msg) noexcept override {
+      if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
+    }
+  };
+
+  extern nvLogger nvloger;
+#endif
 
   inline cv::Ptr<cv::AKAZE>& getThreadLocalAKAZE()
   {
@@ -76,13 +85,7 @@ namespace pathCam {
     bool valid = false;
   };
 
-  class nvLogger : public ILogger {
-    void log(Severity s, const char *msg) noexcept override {
-      if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
-    }
-  };
 
-  extern nvLogger nvloger;
 
   inline long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2) {
     if (p1.x == p2.x) {

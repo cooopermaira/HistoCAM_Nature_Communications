@@ -19,21 +19,28 @@
 
 
 #include "opencv2/core.hpp"
-#ifdef HAVE_OPENCV_CUDAARITHM
 
+#ifdef PATHCAM_HAS_CUDA
 #define CHECK_CUDA(x) do { cudaError_t e=(x); if(e!=cudaSuccess){ \
 std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<<"\n"; std::exit(1);} } while(0)
+#endif
+
+#ifdef PATHCAM_OPENCV_CUDA
+
 
 #include "opencv2/core/cuda.hpp"
 #include "opencv2/cudaarithm.hpp"
 #include "opencv2/cudawarping.hpp"
 #include "opencv2/cudaimgproc.hpp"
 #include "opencv2/cudafilters.hpp"
+#include <cuda_runtime.h>
+
+#endif
 
 #include <opencv2/stitching/detail/matchers.hpp>
 #include <opencv2/stitching/detail/camera.hpp>
 
-#include <cuda_runtime.h>
+
 #include <cstdio>
 #include <condition_variable>
 #include <thread>
@@ -41,7 +48,6 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include <clipper2/clipper.h>
 
 
-#endif
 
 
 
@@ -75,9 +81,9 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "Poco/ThreadPool.h"
 #include "Poco/DateTimeFormatter.h"
 
-
+#ifdef PATHCAM_HAS_TENSORRT
 #include <NvInfer.h>
-
+#endif
 
 #include "util.h"
 #include "DataObserver.h"
@@ -92,9 +98,11 @@ std::cerr<<"CUDA error "<<cudaGetErrorString(e)<<" @ "<<__FILE__<<":"<<__LINE__<
 #include "StreamCam.h"
 // #include "PostProcessor.h"
 #include "SIFTSearchUtils.h"
+
+
+#ifdef PATHCAM_HAS_TENSORRT
 #include "AccessSAM.h"
-
-
+#endif
 
 #ifdef WITH_SPINNAKER
 #include "Spinnaker.h"
