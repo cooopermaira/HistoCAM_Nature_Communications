@@ -156,7 +156,7 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
           auto annoMask = static_cast<juce::Image *>(kv.second.second);
           juce::Image::BitmapData bitmap_data(*annoMask, juce::Image::BitmapData::ReadWriteMode::writeOnly);
           auto img = kv.second.first;
-          CHECK_CUDA(cudaMemcpy2D(bitmap_data.data,img.cols,img.data,img.step,img.cols,img.rows,cudaMemcpyDeviceToHost))
+          memcpy(bitmap_data.data, img.data, img.cols * img.rows);
           ;
         }
       }

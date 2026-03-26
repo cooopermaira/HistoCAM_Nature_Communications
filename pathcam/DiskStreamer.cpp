@@ -175,7 +175,7 @@ namespace pathCam {
     }
     return noise;
   }
-
+/*
   Mat getContrib(Mat img, int flag) {
     Mat grayHost;
     auto mask = buildRotatedSqrMask(img.rows, flag);
@@ -215,6 +215,7 @@ namespace pathCam {
     //grayHost.convertTo(grayHost,CV_8U);
     return grayHost;
   }
+*/
 
   void process_debayer(Image *image, bool saveCrop, Size cropSize, bool saveFull, float downsample,
                        bool trainDft, int trainSamples) {
@@ -252,7 +253,7 @@ namespace pathCam {
       v.setExtension("png");
       imwrite(v.toString(), crop);
     }
-
+/*
     if (trainDft) {
       Point2f center(image->width / 2, image->height / 2);
       cvtColor(img, gray, COLOR_BayerBG2GRAY);
@@ -262,7 +263,7 @@ namespace pathCam {
       for (float i = 0; i < trainSamples; ++i) {
         float angle = step * i;
         auto roi = extractRotatedROI(gray, center, Size(image->blurPatch, image->blurPatch), angle);
-        image->check_blur_async(roi, false);
+        // image->check_blur_async(roi, false);
 
 
         std::string fn = image->image_file.getBaseName() + "r" + std::to_string(angle) + "r";
@@ -274,7 +275,7 @@ namespace pathCam {
         imwrite(r.toString(), image->blurDFT);
       }
     }
-
+*/
     // Mat img32f;
     // cvtColor(color,img,COLOR_BGR2GRAY);
     // img.convertTo(img32f,CV_32F);

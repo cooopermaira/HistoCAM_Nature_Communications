@@ -452,7 +452,7 @@ void TiledImage::tileUpwards(Point2i myTileIndex, cv::Rect_<float> myLevelRegion
       assert(theirTileObj->SAMMasks[_segID].first(theirROI).rows == myTileObj->SAMMasks[_segID].first(cvRoi).rows / 2
         && theirTileObj->SAMMasks[_segID].first(theirROI).cols == myTileObj->SAMMasks[_segID].first(cvRoi).cols / 2);
 
-      cuda::resize(myTileObj->SAMMasks[_segID].first(cvRoi), theirTileObj->SAMMasks[_segID].first(theirROI), newSize);
+      resize(myTileObj->SAMMasks[_segID].first(cvRoi), theirTileObj->SAMMasks[_segID].first(theirROI), newSize);
       theirTileObj->newAnnoData = true;
     }
 

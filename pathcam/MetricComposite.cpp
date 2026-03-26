@@ -83,9 +83,7 @@ namespace pathCam {
   }
 
   MetricComposite::~MetricComposite() {
-    cudaFree(threeChnBuf);
-    cudaFree(fourChnBuf);
-    cudaFree(rectMaskBuf);
+
     // if (!suspended && successfullyAligned) {
     //   FreeSiftData(compSiftData);
     // }

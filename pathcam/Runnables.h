@@ -20,6 +20,7 @@ extern "C" {
 
 void launch_drop_alpha_and_swap(char *dst, const char *src, int count);
 
+#ifdef PATHCAM_OPENCV_CUDA
 void ensure1DHann(int w, int h, cuda::GpuMat &wx, cuda::GpuMat &wy, cudaStream_t stream = nullptr);
 
 void launch_apply_hann_2d(cuda::GpuMat &wx, cuda::GpuMat &wy, cuda::GpuMat &win, cuda::GpuMat &magNorm,
@@ -30,6 +31,7 @@ void launch_CPS(const cuda::GpuMat &F,
                 cuda::GpuMat &CPS,
                 float eps = 1e-9f,
                 cudaStream_t stream = nullptr);
+#endif
 
 #ifdef __cplusplus
 }

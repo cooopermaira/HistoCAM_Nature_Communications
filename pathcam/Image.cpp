@@ -3,25 +3,26 @@
 using namespace cv;
 
 namespace pathCam {
+  /*
   cuda::GpuMat Image::hannWindow, Image::blurMask;
   static Ptr<cuda::Filter> g_gauss;
   static std::once_flag g_gauss_once;
 
 
-  // inline void sortSiftDataByX(SiftData& sd) {
-  //   assert(sd.h_data);
-  //   assert(sd.numPts <= sd.maxPts);
-  //
-  //   std::sort(sd.h_data, sd.h_data + sd.numPts,
-  //             [](const SiftPoint& a, const SiftPoint& b) {
-  //               return a.xpos < b.xpos;
-  //             });
-  //
-  //   cudaMemcpy(sd.d_data,
-  //          sd.h_data,
-  //          sd.numPts * sizeof(SiftPoint),
-  //          cudaMemcpyHostToDevice);
-  // }
+  inline void sortSiftDataByX(SiftData& sd) {
+    assert(sd.h_data);
+    assert(sd.numPts <= sd.maxPts);
+
+    std::sort(sd.h_data, sd.h_data + sd.numPts,
+              [](const SiftPoint& a, const SiftPoint& b) {
+                return a.xpos < b.xpos;
+              });
+
+    cudaMemcpy(sd.d_data,
+           sd.h_data,
+           sd.numPts * sizeof(SiftPoint),
+           cudaMemcpyHostToDevice);
+  }
 
 
   static std::mutex g_gauss_mtx;
@@ -64,7 +65,7 @@ namespace pathCam {
                                                BORDER_DEFAULT);
     });
   }
-
+*/
   Image::Image(unsigned int width, unsigned int height, unsigned int scope_radius,
                MemoryPool *mempool) : width(width),
                                       height(
@@ -75,7 +76,7 @@ namespace pathCam {
                                         _NOLABEL),
                                       mempool(
                                         mempool),
-                                      raw_buffer(0), raw_buffer_cuda(nullptr),
+                                      raw_buffer(0),
                                       reference_count(
                                         0),
                                       image_file(
@@ -83,9 +84,22 @@ namespace pathCam {
                                       motionBlur(
                                         10000),
                                       cudaBufferReady(false) {
-    prepare_blur_check_statics();
+    //prepare_blur_check_statics();
+#ifdef PATHCAM_OPENCV_CUDA
+    raw_buffer_cuda = nullptr;
+#endif
 
   };
+  void Image::free_memory_cuda() {
+#ifdef PATHCAM_HAS_CUDA
+
+    if (raw_buffer_cuda != nullptr) {
+      cudaFree(raw_buffer_cuda);
+    }
+    raw_buffer_cuda = nullptr;
+    cudaBufferReady = false;
+#endif
+  }
 
   Image::~Image() {
     free_memory_RAW(true);
@@ -126,13 +140,7 @@ namespace pathCam {
   }
 #endif
 
-  void Image::free_memory_cuda() {
-    if (raw_buffer_cuda != nullptr) {
-      cudaFree(raw_buffer_cuda);
-    }
-    raw_buffer_cuda = nullptr;
-    cudaBufferReady = false;
-  }
+
 
 
   bool Image::is_mostly_black() {
@@ -152,7 +160,7 @@ namespace pathCam {
     return false;
   }
 
-
+/*
   void Image::check_blur_async(const Mat &img, bool submitForInference) {
      auto start = std::chrono::high_resolution_clock::now();
     Mat grayHost;
@@ -207,7 +215,7 @@ namespace pathCam {
 
     blurTime = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - start).count();
   }
-
+*/
 
   void Image::write_to_path(bool _profile) {
     auto start = std::chrono::high_resolution_clock::now();
@@ -404,15 +412,18 @@ namespace pathCam {
     return image_Mat;
   }
 
+
   char *Image::get_raw_cuda() {
+#ifdef PATHCAM_HAS_CUDA
     //assert(raw_buffer_cuda);
     if (parent && parent->unifiedMemory) {
       //assert(raw_buffer);
       return raw_buffer;
     }
     return raw_buffer_cuda;
+#endif
+    return nullptr;
   }
-
   void Image::create_reg_image(double _reg_scale, double _reg_crop, bool convert, int interpolation, bool real) {
     bool release = false;
     buffer_mutex.lock();
@@ -478,11 +489,15 @@ namespace pathCam {
       // if (mempool) {
       //   raw_buffer = reinterpret_cast<char *>(mempool->get());
       // } else {
-      //   if (parent && parent->unifiedMemory) {
+#ifdef PATHCAM_HAS_CUDA
+      if (parent && parent->unifiedMemory) {
       cudaMallocManaged(&raw_buffer,width * height);
-      //   }else {
-      //     raw_buffer = new char[width * height];
-      //   }
+      }else {
+        raw_buffer = new char[width * height];
+      }
+#else
+      raw_buffer = new char[width * height];
+#endif
       // }
     }
   }
@@ -533,11 +548,15 @@ namespace pathCam {
         // if (mempool) {
         //   mempool->release(raw_buffer);
         // } else {
+#ifdef PATHCAM_HAS_CUDA
         if (parent && parent->unifiedMemory) {
           cudaFree(raw_buffer);
         }else {
           free(raw_buffer);
         }
+#else
+        free(raw_buffer);
+#endif
         // }
         // cudaFree(raw_buffer);
         raw_buffer = nullptr;

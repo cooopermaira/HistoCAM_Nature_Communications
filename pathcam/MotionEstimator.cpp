@@ -58,7 +58,7 @@ namespace pathCam {
       Poco::Mutex::ScopedLock lock(rAccessMutex);
       --outstandingPolls;
 
-      vote v(_componentMembership,_absoluteCoords,m);
+      vote v{_componentMembership,_absoluteCoords,m};
       votes.push_back(v);
     }
 

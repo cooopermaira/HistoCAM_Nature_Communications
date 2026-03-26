@@ -171,6 +171,10 @@ namespace pathCam {
   }
 
 
+  double Composite::get_scale() const {
+    return imagePyramid->scale;
+  }
+
   void Composite::ff_correct_existing_tiles() {
     assert(flatfieldKnown);
 
@@ -349,10 +353,11 @@ namespace pathCam {
 
     // cache in parent (CPU version)
     parent->set_flatfield(componentMagLabel, ff);
-
+#ifdef PATHCAM_OPENCV_CUDA
     if (parent->CompositeType == _CompositeVoronoi) {
       ffGPU.upload(ff);
     }
+#endif
     flatfieldKnown = true;
   }
 
@@ -682,6 +687,12 @@ namespace pathCam {
   }
 
   Composite::~Composite() {
+
+#ifdef PATHCAM_OPENCV_CUDA
+    cudaFree(threeChnBuf);
+    cudaFree(fourChnBuf);
+    cudaFree(rectMaskBuf);
+#endif
     delete ftg;
   }
 
@@ -1000,10 +1011,13 @@ namespace pathCam {
     parent->MRImageSet->add(imagePyramid);
     imagePyramid->MRImageSet = parent->MRImageSet;
 
+#ifdef PATHCAM_OPENCV_CUDA
     cudaMallocManaged(&rectMaskBuf, imageSize.area());
     cudaMemset(rectMaskBuf, 255, imageSize.area());
     rectMask = Mat(image_size, CV_8UC1, rectMaskBuf);
     rectMaskGPU = cuda::GpuMat(imageSize,CV_8UC1, rectMaskBuf);
+
+
 
     cudaMallocManaged(&threeChnBuf, 3 * imageSize.area());
     threeChannelPreallocated = Mat(imageSize,CV_8UC3, threeChnBuf);
@@ -1012,7 +1026,9 @@ namespace pathCam {
     cudaMallocManaged(&fourChnBuf, 4 * imageSize.area());
     fourChannelPreallocated = Mat(imageSize,CV_8UC4, fourChnBuf);
     fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4, fourChnBuf);
+#endif
 
+    rectMask = Mat(image_size, CV_8UC1);
     if (parent->circleMask.empty()) {
       circleMask = Mat::zeros(image_size, CV_8U);
       circle(circleMask, Point(image_size.width / 2, image_size.height / 2), parent->scope_radius,

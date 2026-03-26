@@ -2,9 +2,10 @@
 // Created by cooper on 5/9/25.
 //
 #include "pathCam.h"
-#include <opencv2/core/cuda_stream_accessor.hpp>
 namespace pathCam {
 #ifdef PATHCAM_OPENCV_CUDA
+#include <opencv2/core/cuda_stream_accessor.hpp>
+
 
 
   void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {

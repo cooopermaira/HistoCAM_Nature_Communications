@@ -6,6 +6,8 @@
 
 
 namespace pathCam {
+#ifdef PATHCAM_HAS_TENSORRT
+#ifdef PATHCAM_OPENCV_CUDA
   using namespace nvinfer1;
 
   SAMTile::SAMTile(int _ID, Point2i _location, AccessSAM *_as, unsigned _componentIndex, unsigned _size) : ID(_ID),
@@ -397,4 +399,7 @@ namespace pathCam {
 
     return result;
   }
+#endif
+#endif
+
 }

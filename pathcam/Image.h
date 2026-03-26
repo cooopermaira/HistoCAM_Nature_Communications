@@ -157,7 +157,7 @@ namespace pathCam {
 
     bool is_good();
 
-    void check_blur_async(const cv::Mat &img = cv::Mat(), bool submitForInference = true);
+    // void check_blur_async(const cv::Mat &img = cv::Mat(), bool submitForInference = true);
 
 
     float debayer(int x, int y);

@@ -385,6 +385,7 @@ namespace pathCam {
     auto img = get_image_ref(_image_idx);
     img->free_memory_RAW();
     img->free_memory_cuda();
+
   }
 
   Point2f StreamCam::get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC,
@@ -643,7 +644,11 @@ namespace pathCam {
       if (CompositeType == _MetricComposite) {
         component = std::make_shared<MetricComposite>(this, image_size, component_index);
       } else if (CompositeType == _CompositeVoronoi) {
+#ifdef PATHCAM_OPENCV_CUDA
         component = std::make_shared<CompositeVoronoi>(this, image_size, component_index);
+#else
+        component = std::make_shared<MetricComposite>(this, image_size, component_index);
+#endif
       }
       component->joinedTo = component;
 
@@ -714,6 +719,7 @@ namespace pathCam {
   }
 
   bool StreamCam::segment_with_SAM(std::vector<Point3f> &_clicks, int _segID, int _slideIdx) {
+#ifdef PATHCAM_HAS_TENSORRT
     if (segmentWithSAM) {
       if (as) {
         if ((_clicks.end() - 2)->z == 4) {
@@ -732,6 +738,7 @@ namespace pathCam {
         }
       }
     }
+#endif
     return false;
   }
 
@@ -1097,9 +1104,9 @@ namespace pathCam {
   }
 
   StreamCam::~StreamCam() {
-    clean_up_blur_engine();
+    // clean_up_blur_engine();
 
-    Image::cleanup_blur_check_statics();
+    // Image::cleanup_blur_check_statics();
 
     previousSlides.clear();
   }

@@ -174,6 +174,9 @@ target_link_libraries(pathCamLib ${PATHCAM_LIBS})
 # EXECUTABLES
 # =========================
 
+add_executable(debayer programs/debayer.cpp)
+target_link_libraries(debayer pathCamLib)
+
 add_executable(test programs/test.cpp)
 target_link_libraries(test PRIVATE pathCamLib)
 

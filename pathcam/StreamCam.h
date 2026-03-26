@@ -11,7 +11,11 @@
 #include <stdio.h>
 
 #include "MetricComposite.h"
+#ifdef PATHCAM_HAS_TENSORRT
+#ifdef PATHCAM_OPENCV_CUDA
 #include "AccessSAM.h"
+#endif
+#endif
 #include "pathCam.h"
 #include "MRTiledImage.h"
 
@@ -148,8 +152,9 @@ namespace pathCam {
     int compositorCudaDevice;
     int siftCudaDevice = -1;
 
+#ifdef PATHCAM_HAS_CUDA
     cuda::Stream cvCompositeStream;
-
+#endif
     int siftWindow = 1024;
     int siftPoints = 60000;
 
@@ -228,9 +233,11 @@ namespace pathCam {
     Poco::Event compositeWait;
     Poco::Event cacheAlert;
 
+#ifdef PATHCAM_HAS_TENSORRT
     ICudaEngine *blurEngine = nullptr;
     IExecutionContext *blurCtx = nullptr;
     cudaStream_t blurStream{};
+    #endif
     char *blurInputs = nullptr;
     float *blurOutputs = nullptr;
     bool outstandingBlurInference = false;

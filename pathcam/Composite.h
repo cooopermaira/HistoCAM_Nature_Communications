@@ -10,16 +10,17 @@
 
 #include <stdio.h>
 #include <random>
-#include <numeric>
+// #include <numeric>
 #include "pathCam.h"
 #include "MRTiledImage.h"
-#include "AccessSAM.h"
-#include "StreamCam.h"
+// #include "AccessSAM.h"
+// #include "StreamCam.h"
 
 
 namespace pathCam {
   class FeatureTrackGenerator;
   class BundleAdjustmentIntegrator;
+  // class MRTiledImage;
   template<typename T>
   struct PointCompare {
     inline bool operator()(const T &p1, const T &p2) {
@@ -174,11 +175,6 @@ namespace pathCam {
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);
 
-    void suspend() {
-      suspended = true;
-      imagePyramid->suspended = true;
-      imagePyramid->level.clear();
-    }
 
     void stage(RegInfo *_ri) { staging.push(_ri); }
 
@@ -198,7 +194,7 @@ namespace pathCam {
 
     void ff_correct_existing_tiles();
 
-    double get_scale() const { return imagePyramid->scale; }
+    double get_scale() const;
 
     void set_offset(const Point2f &_offset) const;
 

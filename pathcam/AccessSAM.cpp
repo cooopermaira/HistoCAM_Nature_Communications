@@ -9,6 +9,8 @@
 
 
 namespace pathCam {
+#ifdef PATHCAM_HAS_TENSORRT
+#ifdef PATHCAM_OPENCV_CUDA
   using namespace nvinfer1;
 
   nvLogger nvloger;
@@ -687,4 +689,6 @@ namespace pathCam {
     }
     return s;
   }
+#endif
+#endif
 }

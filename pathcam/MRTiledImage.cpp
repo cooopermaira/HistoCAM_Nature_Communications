@@ -10,6 +10,30 @@
 #include <sys/stat.h>
 
 //STATIC HELPER FUNCTIONS
+int preallocate_file(int fd, off_t length) {
+#ifdef __APPLE__
+  fstore_t store = {};
+  store.fst_flags = F_ALLOCATECONTIG; // try contiguous first
+  store.fst_posmode = F_PEOFPOSMODE;
+  store.fst_offset = 0;
+  store.fst_length = length;
+
+  int rc = fcntl(fd, F_PREALLOCATE, &store);
+  if (rc == -1) {
+    // fallback to non-contiguous
+    store.fst_flags = F_ALLOCATEALL;
+    rc = fcntl(fd, F_PREALLOCATE, &store);
+  }
+
+  if (rc != -1) {
+    rc = ftruncate(fd, length);
+  }
+
+  return rc;
+#else
+  return posix_fallocate(fd, 0, length);
+#endif
+}
 
 std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc, unsigned label) const {
   std::vector<Point2i> result;
@@ -171,7 +195,7 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
 
       // Preallocate disk space (best-effort / strong guarantee depending on FS)
       // posix_fallocate returns error code directly (does NOT set errno reliably)
-      int rc = ::posix_fallocate(fd, 0, static_cast<off_t>(totalBytes));
+      int rc = ::preallocate_file(fd, static_cast<off_t>(totalBytes));
       if (rc != 0) {
         throw std::runtime_error(std::string("posix_fallocate failed: ") + std::strerror(rc));
       }
