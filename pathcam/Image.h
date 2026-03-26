@@ -48,7 +48,7 @@ namespace pathCam {
     int vertexId;
     cv::Point2i absoluteCoords;
 
-    Poco::FastMutex buffer_mutex,siftMutex,matchesMutex;
+    Poco::FastMutex buffer_mutex,matchesMutex;
     std::mutex cudaBufferMutex, blurMutex;
     std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
@@ -88,10 +88,6 @@ namespace pathCam {
     Image(unsigned int width, unsigned int height,unsigned int scope_radius, MemoryPool* mempool = 0);
 
     ~Image();
-
-    void extract_sift(int numPts, int octaves, float initBlur, float thresh,
-                      float lowestScale, cv::cuda::GpuMat &buffer, bool siftWindow, float *tempSpace = nullptr);
-
 
     void set_memory_pool(MemoryPool *mempool_in) {
       mempool = mempool_in;

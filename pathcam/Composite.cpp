@@ -390,7 +390,7 @@ namespace pathCam {
 
         OrderedSet<Image *> targets;
         targets.insert(mostRcntRslv);
-        for (int i = 0; i < min(5, int(overlappingFrames.size())); ++i) {
+        for (int i = 0; i < min(3, int(overlappingFrames.size())); ++i) {
           targets.insert(overlappingFrames[i].first);
         }
 

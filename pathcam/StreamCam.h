@@ -100,8 +100,8 @@ namespace pathCam {
 
 
   public:
-    // inline static int CompositeType = _MetricComposite;
-    inline static int CompositeType = _CompositeVoronoi;
+    inline static int CompositeType = _MetricComposite;
+    // inline static int CompositeType = _CompositeVoronoi;
     // v DEBUG v
     std::vector<int> matchablesIncremented,matchablesDecremented;
     StreamCam(Poco::Util::LayeredConfiguration::Ptr config);
@@ -122,14 +122,12 @@ namespace pathCam {
     Poco::FastMutex pixelDistanceMutex;
     Poco::FastMutex pyramidQMutex;
     Poco::FastMutex blurMutex;
-    Poco::FastMutex CudaSiftGlobalUseMutex;
     Poco::FastMutex previousSlidesMutex;
     Poco::Mutex componentQmutex;
 
     Poco::Path givenWorkingDirectory;
     std::vector<Poco::Path> fileSaveFolders;
 
-    long cudaSiftTime = 0;
     long captureTimeMS = 0;
 
     std::string inputFileOverride;

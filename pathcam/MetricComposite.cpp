@@ -109,10 +109,14 @@ namespace pathCam {
       xcMatchInitiated = true;
 
       // std::thread t([this, img = staging.front()->image]() {
-        std::lock_guard lock(EstRoot_mutex);
-        std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
-        establish_scale_at_root_cpu(staging.front()->image);
-        xcInProgress = false;
+      std::lock_guard lock(EstRoot_mutex);
+      std::cout << "component " << componentIndex << " establishing scale" << std::endl;
+      auto start = std::chrono::high_resolution_clock::now();
+      establish_scale_at_root_cpu(staging.front()->image);
+      std::cout << "component " << componentIndex << " XC registered in " << std::chrono::duration_cast<
+        std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - start).count() << std::endl;
+      xcInProgress = false;
       // });
       // t.detach();
     }
@@ -129,15 +133,15 @@ namespace pathCam {
 
       staging.pop();
       ++frameCount;
-      maxIndex = max(maxIndex,img->index);
+      maxIndex = max(maxIndex, img->index);
 
-      launch_component_match_search(img,true);
+      launch_component_match_search(img, true);
 
       if (img->labelObserved) {
         ++observedLabels[img->label];
         int maxObservations = 0;
         unsigned winner = componentMagLabel;
-        for (auto &[label,observationCount] : observedLabels) {
+        for (auto &[label,observationCount]: observedLabels) {
           if (observationCount > maxObservations) {
             maxObservations = observationCount;
             winner = label;
@@ -166,7 +170,6 @@ namespace pathCam {
 
       //calculate: for which of the affected tiles is this frame an improvement?
       for (auto &ptStat: affectedPyramidTilesWithStatus) {
-
         auto pyrTileObj = imagePyramid->get_base_tile(ptStat.first);
 
         //check if frame improves status of tile, if so process immediately
@@ -271,9 +274,9 @@ namespace pathCam {
   }
 
   void MetricComposite::align_and_rebuild() {
-    for (auto &loser : absorbedComponents) {
+    for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
-      for (auto &img : loser->landmarkFrames) {
+      for (auto &img: loser->landmarkFrames) {
         landmarkFrames.push_back(img);
       }
       loser->root->regInfo->root = false;
@@ -290,7 +293,7 @@ namespace pathCam {
 
     std::unordered_set<Image *> members = contributingFrames;
     members.insert(root);
-    for (auto img : landmarkFrames) {
+    for (auto img: landmarkFrames) {
       members.insert(img);
     }
     auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
@@ -300,10 +303,10 @@ namespace pathCam {
       adjacency[m->image_1].push_back(m);
       adjacency[m->image_2].push_back(m);
     }
-    std::queue<Image*> q;
+    std::queue<Image *> q;
 
     // Seed with confirmed members
-    for (auto img : members) {
+    for (auto img: members) {
       img->regInfo->component_membership = componentIndex;
       q.push(img);
     }
@@ -357,7 +360,8 @@ namespace pathCam {
 
     auto graphConnectivityResult = ig.computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
-      std::cout << "component " << componentIndex << " failed to connect graph, frames "<<root->index<<", "<<  maxIndex << std::endl;
+      std::cout << "component " << componentIndex << " failed to connect graph, frames " << root->index << ", " <<
+          maxIndex << std::endl;
       if (observedLabels.size() > 1) {
         rebuild(membersForRebuild);
       }
@@ -400,7 +404,10 @@ namespace pathCam {
     }
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
     auto start1 = std::chrono::high_resolution_clock::now();
-    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps, std::vector(ftg->storedMatches.begin(),ftg->storedMatches.end()));
+    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps,
+                                                                std::vector(
+                                                                  ftg->storedMatches.begin(),
+                                                                  ftg->storedMatches.end()));
     auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start1).count();
 
@@ -538,7 +545,8 @@ namespace pathCam {
     successfullyAligned = true;
   }
 
-  std::unordered_set<Image *> MetricComposite::reduce_members_through_competition(std::unordered_set<Image *> _members) const {
+  std::unordered_set<Image *> MetricComposite::reduce_members_through_competition(
+    std::unordered_set<Image *> _members) const {
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
@@ -565,10 +573,9 @@ namespace pathCam {
 
   void MetricComposite::process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad,
                                       const bool forceFullImage) {
-
     img->load_raw_from_disk(alertDoubleLoad);
 
-    launch_component_match_search(img,alertDoubleLoad);
+    launch_component_match_search(img, alertDoubleLoad);
 
     //lock mutex against component wide flatfielding
     Poco::FastMutex::ScopedLock lock(update_mutex);

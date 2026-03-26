@@ -89,12 +89,6 @@ namespace pathCam {
 
   Image::~Image() {
     free_memory_RAW(true);
-    // if (siftFullInitialized) {
-    //   FreeSiftData(siftDataFull);
-    // }
-    // if (siftInitialized) {
-    //   FreeSiftData(siftData);
-    // }
     // if (regInfo) {
     //   delete regInfo;
     // }

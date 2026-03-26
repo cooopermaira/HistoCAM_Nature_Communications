@@ -5,9 +5,6 @@
 [submodule "JUCE"]
 	path = JUCE
 	url = https://github.com/juce-framework/JUCE.git
-[submodule "CudaSift"]
-	path = CudaSift
-	url = git@github.com:cooopermaira/CudaSift.git
 [submodule "Clipper2"]
 	path = Clipper2
 	url = https://github.com/AngusJohnson/Clipper2.git

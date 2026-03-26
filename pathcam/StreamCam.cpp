@@ -112,7 +112,6 @@ namespace pathCam {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "total runtime " << duration << std::endl;
-    std::cout << "cudasift extract time " << cudaSiftTime << std::endl;
     std::cout << std::endl << std::endl;
 
 

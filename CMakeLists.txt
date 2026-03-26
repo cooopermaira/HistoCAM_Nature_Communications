@@ -129,8 +129,6 @@ if (PATHCAM_HAS_CUDA)
     file(GLOB PATHCAM_CU pathcam/*.cu)
     list(APPEND PATHCAM_FILES ${PATHCAM_CU})
 
-    add_subdirectory(CudaSift)
-    include_directories(CudaSift)
 endif()
 
 # Remove Spinnaker files if disabled
@@ -157,7 +155,7 @@ set(PATHCAM_LIBS
 
 # Optional CUDA libs
 if (PATHCAM_HAS_CUDA)
-    list(APPEND PATHCAM_LIBS CUDA::cudart cudasift)
+    list(APPEND PATHCAM_LIBS CUDA::cudart)
 endif()
 
 # Optional TensorRT
