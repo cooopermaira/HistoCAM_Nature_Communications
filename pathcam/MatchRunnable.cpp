@@ -30,6 +30,8 @@ namespace pathCam {
       if (!previous->is_good()) {continue;}
       if (image->label != Image::_NOLABEL && previous->label != Image::_NOLABEL && image->label != previous->label){continue;}
 
+      ++image->matchCount;
+
       // auto meP1 = image->regInfo->absoluteCoords - Point2i(200,200);
       // auto meP2 = image->regInfo->absoluteCoords + Point2i(image->width+200,image->height+200);
       // Rect me(parent->get_AbC_relative_from_relative(image->regInfo->component_membership,meP1,0),

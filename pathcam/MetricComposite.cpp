@@ -412,11 +412,6 @@ namespace pathCam {
 
     for (auto m: matches) {
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-        // members.insert(m->image_1);
-        // members.insert(m->image_2);
-        //debug int k = 0;
-        ++m->image_1->matchCount;
-        ++m->image_2->matchCount;
         for (int i = 0; i < m->good_matches.size(); ++i) {
           if (m->inliers[i]) {
             ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);

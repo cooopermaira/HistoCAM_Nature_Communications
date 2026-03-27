@@ -132,7 +132,7 @@ namespace pathCam {
 
     void perform_global_alignment();
 
-    void debug_termination_check();
+    // void debug_termination_check();
 
     void save_components_to_disk();
 
