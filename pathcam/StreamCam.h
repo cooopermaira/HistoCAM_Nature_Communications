@@ -107,7 +107,10 @@ namespace pathCam {
     inline static int CompositeType = _MetricComposite;
     // inline static int CompositeType = _CompositeVoronoi;
     // v DEBUG v
-    std::vector<int> matchablesIncremented,matchablesDecremented;
+    std::atomic<long> cmsTime = 0;
+    std::atomic<int> cmsCount = 0;
+
+
     StreamCam(Poco::Util::LayeredConfiguration::Ptr config);
 
     ~StreamCam();

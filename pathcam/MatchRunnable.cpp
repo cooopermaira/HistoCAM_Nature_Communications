@@ -22,6 +22,8 @@ namespace pathCam {
     image->free_memory_RAW(); //incremented in MetricComposite::process_tiles(...)
 
 
+    auto start = std::chrono::high_resolution_clock::now();
+    int count = 0;
     for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
       Image *previous = parent->get_image_ref(prev_idx);
 
@@ -50,17 +52,23 @@ namespace pathCam {
         m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
         //forward match to feature track generator (ftg)
 
-        {
-          Poco::FastMutex::ScopedLock lock(image->matchesMutex);
-          image->matches.push_back(m);
-        }
-        {
-          Poco::FastMutex::ScopedLock lock(previous->matchesMutex);
-          previous->matches.push_back(m);
-        }
+        // {
+        //   Poco::FastMutex::ScopedLock lock(image->matchesMutex);
+        //   image->matches.push_back(m);
+        // }
+        // {
+        //   Poco::FastMutex::ScopedLock lock(previous->matchesMutex);
+        //   previous->matches.push_back(m);
+        // }
         matches.push_back(m);
       }
+
+      ++count;
     }
+    parent->cmsCount += count;
+    auto v = std::chrono::duration_cast<std::chrono::milliseconds>(
+  std::chrono::high_resolution_clock::now() - start).count();
+    parent->cmsTime += v;
 
     //store INTRA component matches
     {

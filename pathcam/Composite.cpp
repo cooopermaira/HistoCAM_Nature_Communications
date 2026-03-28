@@ -672,7 +672,7 @@ namespace pathCam {
         mDistance = images[i]->regInfo->absoluteCoords - images[j]->regInfo->absoluteCoords;
 
         if (componentMagLabel == Image::_2X) {
-          if (pow(mDistance.x, 2) + pow(mDistance.y, 2) < sqScopeRad) {
+          if (mDistance.x * mDistance.x + mDistance.y * mDistance.y < sqScopeRad) {
             results.emplace_back(images[i], images[j]);
           }
         } else {

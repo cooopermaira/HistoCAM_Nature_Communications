@@ -194,8 +194,6 @@ namespace pathCam {
 
       if (!immediateProcessingTiles.empty()) {
         process_tiles(img, immediateProcessingTiles);
-        ++debugFrameCount;
-        debugTileCount1 += immediateProcessingTiles.size();
       }
 
       //if (imagePyramid->scale > 0) {

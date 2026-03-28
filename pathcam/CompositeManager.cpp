@@ -178,6 +178,9 @@ namespace pathCam {
       }
     }
 
+    std::cout<< parent->cmsCount<<" "<<parent->cmsTime<<std::endl;
+
+
     int count = 0;
     long total = 0;
     for (auto img: parent->images) {

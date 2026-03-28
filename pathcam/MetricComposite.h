@@ -19,6 +19,8 @@ namespace pathCam {
 
         std::vector<std::pair<Point2i,int>> calculate_affected_tiles_with_status(Point2f AbC) const;
 
+        std::unordered_set<std::pair<Image*,Image*>> calculate_member_neighbors()
+
         int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) const;
 
         void process_tiles(Image *img, std::vector<Point2i> &tiles, bool alertDoubleLoad = false, bool forceFullImage = false);
