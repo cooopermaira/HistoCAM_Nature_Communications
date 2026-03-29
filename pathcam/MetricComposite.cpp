@@ -83,7 +83,6 @@ namespace pathCam {
   }
 
   MetricComposite::~MetricComposite() {
-
     // if (!suspended && successfullyAligned) {
     //   FreeSiftData(compSiftData);
     // }
@@ -119,6 +118,7 @@ namespace pathCam {
       // t.detach();
     }
 
+    Poco::FastMutex::ScopedLock lock(update_mutex);
 
     // PROCESS NEW FRAMES BEGIN
     if (!staging.empty()) {
@@ -133,7 +133,7 @@ namespace pathCam {
       ++frameCount;
       maxIndex = max(maxIndex, img->index);
 
-      launch_component_match_search(img, true);
+      launch_component_match_search_with_XC(img);
 
       if (img->labelObserved) {
         ++observedLabels[img->label];
@@ -254,13 +254,9 @@ namespace pathCam {
     //once delay is met, process frame
     auto &[img,tiles] = waitingFrames[positionForNextWaitngFrame % frameDelay];
     if (positionForNextWaitngFrame > frameDelay && !tiles.empty()) {
-      contributingImages.insert(img);
       needsAlignment = true;
 
       process_tiles(img, tiles);
-
-      debugTileCount2 += tiles.size();
-      ++debugFrameCount;
 
       tiles.clear();
       img->free_memory_RAW();
@@ -270,6 +266,8 @@ namespace pathCam {
   }
 
   void MetricComposite::align_and_rebuild() {
+    contributingFrames = find_contributing_images();
+
     for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
       for (auto &img: loser->landmarkFrames) {
@@ -280,10 +278,6 @@ namespace pathCam {
 
 
     auto start = std::chrono::high_resolution_clock::now();
-    // int consolidateCount = 0;
-    // while (consolidate_tile_ownership()) {
-    //   ++consolidateCount;
-    // }
 
     auto ig = ImageGraph();
 
@@ -336,7 +330,7 @@ namespace pathCam {
       }
     }
 
-    // members = reduce_members_through_competition(members);
+    members = reduce_members_through_competition(members);
     members.insert(root);
 
     std::vector membersForRebuild(members.begin(), members.end());
@@ -566,11 +560,6 @@ namespace pathCam {
                                       const bool forceFullImage) {
     img->load_raw_from_disk(alertDoubleLoad);
 
-    launch_component_match_search(img, alertDoubleLoad);
-
-    //lock mutex against component wide flatfielding
-    Poco::FastMutex::ScopedLock lock(update_mutex);
-
     //put raw data into fourChannelPreallocated
     prepare_4CPA_cpu(img, tiles, forceFullImage);
     img->free_memory_RAW();
@@ -752,14 +741,50 @@ namespace pathCam {
     return members;
   }
 
+  std::vector<std::pair<Image *, Image *> > MetricComposite::calculate_member_neighbors() {
+    std::unordered_set<std::pair<Image *, Image *>, ImagePairHash, ImagePairEqual> neighborPairs;
+    for (auto &tileIdx: imagePyramid->liveTiles) {
+      auto tileObj = imagePyramid->get_base_tile(tileIdx);
+
+      //up down left right of tileIdx
+      for (int i = 0; i < 4; ++i) {
+        int x = -1 + 2 * (i % 2) + tileIdx.x;
+        int y = -1 + 2 * (i / 2) + tileIdx.y;
+        if (auto toNeighbor = imagePyramid->level[0]->tiles(x, y); toNeighbor) {
+          if (toNeighbor->owner != tileObj->owner) {
+            neighborPairs.insert({toNeighbor->owner, tileObj->owner});
+          }
+        }
+      }
+    }
+    return {neighborPairs.begin(), neighborPairs.end()};
+  }
+
   void MetricComposite::add_landmark_frame(Image *img) {
     landmarkFrames.push_back(img);
     if (!img->subsequentMatchLaunched) {
       img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
-      auto cms = new ComponentMatchSearch(parent, img, this);
+      auto members = find_contributing_images();
+      auto cms = new ComponentMatchSearch(parent, img, this,{members.begin(),members.end()});
       parent->jqSecondary->add_runnable(cms);
     }
+  }
+
+  void MetricComposite::launch_component_match_search_with_XC(Image *img_) {
+    auto members = find_contributing_images();
+
+    Poco::FastMutex::ScopedLock lock(parent->component_mutex);
+
+    for (auto &component : parent->composites) {
+      if (component->componentIndex == componentIndex){continue;}
+      if (component->componentMagLabel == componentMagLabel) {
+        auto ans = component->find_contributing_images();
+        members.insert(ans.begin(),ans.end());
+      }
+    }
+
+    launch_component_match_search(img_,{members.begin(),members.end()});
   }
 }

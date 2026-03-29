@@ -159,6 +159,7 @@ public:
   std::shared_ptr<TileObj> getTile(int x, int y);
 
   std::shared_ptr<TileObj> getTile(Point2i);
+
 // #else
 //
 //

@@ -35,7 +35,7 @@ namespace pathCam {
 
     JobQ = std::make_shared<JobQueue>(threads, threads, windowWidth);
     JobQ->parent = this;
-    jqSecondary = std::make_shared<JobQueue>(6, 6, 0);
+    jqSecondary = std::make_shared<JobQueue>(2, 2, 0);
 
     MRTiledImageSet::frameHeight = image_height;
     MRTiledImageSet::frameWidth = image_width;

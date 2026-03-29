@@ -299,13 +299,8 @@ void CompositeVoronoi::update() {
           lastAccepted = ri->absoluteCoords;
 
           img->load_raw_from_disk();
-          if (!img->subsequentMatchLaunched) {
-            img->load_raw_from_disk(); //freed in ComponentMatchSearch::run()
-            img->subsequentMatchLaunched = true;
-            ++outstandingCMS_jobs;
-            const auto cms = new ComponentMatchSearch(parent, img, this);
-            parent->jqSecondary->add_runnable(cms);
-          }
+
+          launch_component_match_search(img,{});
 
 
           std::vector<Point2i> effectedTiles;

@@ -119,7 +119,6 @@ namespace pathCam {
           comp->xcMatchShouldContinue = false;
           comp->update();
         }
-        comp->contributingFrames = comp->find_contributing_images();
       });
     }
 
@@ -190,7 +189,7 @@ namespace pathCam {
         ++count;
       }
     }
-    std::cout << "tota and count " << total << " " << count << std::endl;
+    std::cout << "total and count " << total << " " << count << std::endl;
 
 
     //

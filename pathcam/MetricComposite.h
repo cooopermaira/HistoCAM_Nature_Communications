@@ -10,6 +10,22 @@
 
 namespace pathCam {
 
+    struct ImagePairHash {
+        std::size_t operator()(const std::pair<Image*, Image*>& p) const noexcept {
+            std::size_t h1 = std::hash<Image*>{}(p.first);
+            std::size_t h2 = std::hash<Image*>{}(p.second);
+
+            // standard hash combine
+            return h1 ^ (h2 << 1);
+        }
+    };
+    struct ImagePairEqual {
+        bool operator()(const std::pair<Image*, Image*>& a,
+                        const std::pair<Image*, Image*>& b) const noexcept {
+            return (a.first == b.first && a.second == b.second) || (a.first == b.second && a.second == b.first);
+        }
+    };
+
     class MetricComposite : public Composite {
     public:
         MetricComposite(StreamCam *parent, Size image_size, int componentIndex);
@@ -19,7 +35,7 @@ namespace pathCam {
 
         std::vector<std::pair<Point2i,int>> calculate_affected_tiles_with_status(Point2f AbC) const;
 
-        std::unordered_set<std::pair<Image*,Image*>> calculate_member_neighbors()
+        std::vector<std::pair<Image *, Image *>> calculate_member_neighbors();
 
         int get_sqrd_center_distance_tile_to_img(Point2i _imgAbC, Point2i _tileCoord) const;
 
@@ -42,6 +58,8 @@ namespace pathCam {
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
 
         std::unordered_set<Image *> reduce_members_through_competition(std::unordered_set<Image *> _members) const;
+
+        void launch_component_match_search_with_XC(Image* img_);
 
 
         // SiftData compSiftData;

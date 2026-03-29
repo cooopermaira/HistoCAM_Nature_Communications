@@ -341,9 +341,10 @@ namespace pathCam {
     StreamCam *parent;
     Image *image;
     Composite* component;
+    std::vector<Image*> candidates;
 
-    ComponentMatchSearch(StreamCam *_parent, Image *_image,Composite *_component) : parent(_parent),component(_component),
-                                                              image(_image),
+    ComponentMatchSearch(StreamCam *_parent, Image *_image,Composite *_component, std::vector<Image*> candidates_) : parent(_parent),component(_component),
+                                                              image(_image), candidates(candidates_),
                                                               RunnableIntermediate(_image->index, 0) {};
     void run() override;
   };

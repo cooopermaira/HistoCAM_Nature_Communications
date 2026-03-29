@@ -21,16 +21,22 @@ namespace pathCam {
     // image->siftMutex.unlock();
     image->free_memory_RAW(); //incremented in MetricComposite::process_tiles(...)
 
+    bool empty = false;
+    if (candidates.empty() && image_index > 0) {
+      empty = true;
+      std::vector<long> indexes(image_index);
+      for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
+        indexes.push_back(prev_idx);
+      }
+    }
 
     auto start = std::chrono::high_resolution_clock::now();
     int count = 0;
-    for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
-      Image *previous = parent->get_image_ref(prev_idx);
+    for (auto candidate : candidates) {
 
-
-      if (previous == nullptr) {continue;}
-      if (!previous->is_good()) {continue;}
-      if (image->label != Image::_NOLABEL && previous->label != Image::_NOLABEL && image->label != previous->label){continue;}
+      if (candidate == nullptr) {continue;}
+      if (!candidate->is_good()) {continue;}
+      if (image->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && image->label != candidate->label){continue;}
 
       ++image->matchCount;
 
@@ -45,7 +51,7 @@ namespace pathCam {
       //   parent->get_AbC_relative_from_relative(previous->regInfo->component_membership,themP2,0));
       // if ((me & them).empty()){continue;}
 
-      auto m = std::make_shared<Match>(previous, image);
+      auto m = std::make_shared<Match>(candidate, image);
       matcher.match(m);
 
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 30)) {
