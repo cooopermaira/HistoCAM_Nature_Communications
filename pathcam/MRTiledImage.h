@@ -8,6 +8,7 @@
 #ifndef MRTiledImage_h
 #define MRTiledImage_h
 
+using namespace pathCam;
 #include "pathCam.h"
 #include "StreamCam.h"
 #include "TiledImage.h"
@@ -41,6 +42,8 @@ public:
 
   std::atomic<bool> cachedToDisk = false;
   std::atomic<bool> inMemory = true;
+
+  std::vector<Features> akaze;
 
 
   MRTiledImage(pathCam::StreamCam *parent = nullptr, int _tile_size = 0);
@@ -82,6 +85,8 @@ public:
   void set_mag_label(unsigned int _magLabel) { magLabel = _magLabel; }
 
   void set_offset(Point2f _offset) { offset = _offset; }
+
+  void extract_akaze();
 
   std::vector<TileQuery> getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen, bool pullFromBase = false);
 
@@ -219,6 +224,8 @@ public:
   std::vector<Point2i> poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const;
 
   std::vector<Point2i> generate_frame_vertices(const Point2i &Abc, unsigned label) const;
+
+  void correct_alignment();
 };
 
 

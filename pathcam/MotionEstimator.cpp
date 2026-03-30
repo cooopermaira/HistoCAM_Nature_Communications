@@ -116,22 +116,30 @@ namespace pathCam {
       }else {
         winningVote = votes[0];
       }
-      matchedTo = winningVote.m->image_1->index;
+      auto wImg = winningVote.m->image_1;
+      matchedTo = wImg->index;
 
 
       {
-        Poco::Mutex::ScopedLock lock(winningVote.m->image_1->regInfo->rAccessMutex);
+        Poco::Mutex::ScopedLock lock(wImg->regInfo->rAccessMutex);
         absoluteCoords = winningVote.abc - Point2i(winningVote.m->t_x,winningVote.m->t_y);
         relativeCoords = Point2i(winningVote.m->t_x,winningVote.m->t_y);
-        component_membership = winningVote.m->image_1->regInfo->component_membership;
+        component_membership = wImg->regInfo->component_membership;
 
-        winningVote.m->image_1->regInfo->children.push_back(this);
-        winningVote.m->image_1->regInfo->matchedBy = index;
-      }
-      {
-        std::lock_guard lock(winningVote.m->image_1->blurMutex);
-        auto dist = winningVote.m->image_1->regInfo->relativeCoords + relativeCoords;
-        winningVote.m->image_1->motionBlur = dist.x * dist.x + dist.y * dist.y;
+        wImg->regInfo->children.push_back(this);
+        wImg->regInfo->matchedBy = index;
+
+        std::scoped_lock lock2(wImg->blurMutex);
+        if (!wImg->blurSet) {
+          auto dist_i = wImg->regInfo->relativeCoords + relativeCoords;
+          long dt = index - wImg->regInfo->matchedTo;
+
+          if (dt > 0) {
+            Point2f dist = Point2f(dist_i) / static_cast<float>(dt);
+            wImg->motionBlur = dist.dot(dist);
+            wImg->blurSet = true;
+          }
+        }
       }
     }else {
       absoluteCoords = {0,0};

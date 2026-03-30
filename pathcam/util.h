@@ -58,17 +58,36 @@ namespace pathCam {
     cv::Mat desc;
   };
 
-  inline Features buildFeatures(const cv::Mat& src, float s)
-  {
+  inline Features buildFeatures(const cv::Mat& src, float s, const cv::Mat& mask = cv::Mat()){
     auto akaze = getThreadLocalAKAZE();
 
     Features f;
     f.scale = s;
 
-    resize(src, f.image, cv::Size(), s, s, cv::INTER_AREA);
+    cv::Mat resizedMask;
 
-    if (!f.image.empty())
-      akaze->detectAndCompute(f.image, cv::noArray(), f.kp, f.desc);
+    if (s != 1.f) {
+      resize(src, f.image, cv::Size(), s, s, cv::INTER_AREA);
+
+      if (!mask.empty()) {
+        resize(mask, resizedMask, cv::Size(), s, s, cv::INTER_NEAREST);
+      }
+    } else {
+      f.image = src;
+
+      if (!mask.empty()) {
+        resizedMask = mask;
+      }
+    }
+
+    if (!f.image.empty()) {
+      akaze->detectAndCompute(
+          f.image,
+          resizedMask.empty() ? cv::noArray() : resizedMask,
+          f.kp,
+          f.desc
+      );
+    }
 
     return f;
   }

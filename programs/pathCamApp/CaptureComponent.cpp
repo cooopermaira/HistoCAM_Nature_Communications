@@ -29,6 +29,9 @@ public:
       [safeParent = Component::SafePointer(cptcmp->parent)]() mutable {
         if (safeParent != nullptr)
           safeParent->stopCompositingUIUpdates();
+        safeParent->capture->stop();
+        safeParent->capture->procedureMode = 0;
+        safeParent->capture->captureOverlay->resized();
       });
   }
 };
@@ -376,6 +379,7 @@ bool CaptureComponent::keyPressed(const juce::KeyPress &key, juce::Component *or
       return true;
     }
     if (procedureMode == 2) {
+      if (simulating){return true;}
       stop();
       captureOverlay->resized();
       procedureMode = 0;

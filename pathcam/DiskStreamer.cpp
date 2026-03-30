@@ -299,8 +299,8 @@ namespace pathCam {
 
     // process_debayer(image, true, {2000, 2000},
     //                 true, 0.125, true, 1);
-    process_debayer(image, true, {2000, 2000},
-                    true, 0.125, true, 1);
+    process_debayer(image, false, {2000, 2000},
+                    true, 1, true, 1);
     delete image;
   }
 

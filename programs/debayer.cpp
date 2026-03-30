@@ -175,21 +175,14 @@ int main(int argc, char *argv[]) {
 
 
   //Should probably add fancier command line parsing
-  if (argc < 3) {
-    std::cout << "Missing input. Use:\n";
-    std::cout << "debayer <path to input image> <path to output image>\n";
-    return -1;
-  }
+
 
   auto inFile = Poco::Path(argv[1]);
-  auto outFile = Poco::Path(argv[2]);
+  inFile.makeDirectory();
+  auto outFile = inFile.parent().pushDirectory("png");
 
-  if (!(inFile.isDirectory() == outFile.isDirectory())) {
-    std::cout << "Input needs to be both directories or files.\n";
-    return -1;
-  }
 
-  if (inFile.isDirectory()) {
+
     std::vector<int> *blur = new std::vector<int>;
     std::vector<std::string> *names = new std::vector<std::string>;
     //std::vector<std::string> names = load_label_names("/home/cm/Downloads/blur.txt");
@@ -240,8 +233,8 @@ int main(int argc, char *argv[]) {
     auto cropDir = parentDir, dftDir = parentDir, pngDir = parentDir;
 
     pngDir.pushDirectory("png");
-    dftDir.pushDirectory("dft");
-    cropDir.pushDirectory("png_crop");
+    // dftDir.pushDirectory("dft");
+    // cropDir.pushDirectory("png_crop");
 
     Poco::File dir(pngDir);
     if (!dir.exists()){dir.createDirectories();}
@@ -304,27 +297,7 @@ int main(int argc, char *argv[]) {
     delete jq;
     delete blur;
     delete names;
-  } else {
 
-    std::cout << "Processing File\n";
-
-    pathCam::Image *image = new pathCam::Image(6464, 4852, 2190);
-
-    image->set_disk_file(inFile);
-    image->load_raw_from_disk();
-
-
-    if (!image->in_memory()) {
-      std::cout << "Issue loading image.\n";
-      return -1;
-    }
-
-    image->create_reg_image(1.0, 1.0, true, cv::INTER_CUBIC, false);
-
-    imwrite(outFile.toString(), image->get_reg_image());
-
-    delete image;
-  }
 
   return 0;
 

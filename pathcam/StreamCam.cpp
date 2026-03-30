@@ -632,7 +632,7 @@ namespace pathCam {
     auto ri = reg_results[image_index];
 
     {
-      Poco::FastMutex::ScopedLock lock1(ri->accessMutex);
+      Poco::Mutex::ScopedLock lock1(ri->rAccessMutex);
       Poco::FastMutex::ScopedLock lock2(component_mutex);
 
       ri->component_membership = component_index;
@@ -666,7 +666,8 @@ namespace pathCam {
 
     {
       std::lock_guard lock(ri->image->blurMutex);
-      ri->image->motionBlur = 0;
+      ri->image->motionBlur = 10000000;
+      ri->image->blurSet = true;
     }
 
     ri->resolved = true;
@@ -1101,6 +1102,12 @@ namespace pathCam {
 
     assert(set_slide_label().empty());
     pathcamReady = true;
+
+    // auto start = std::chrono::high_resolution_clock::now();
+    // previousSlides.back()->correct_alignment();
+    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+    //   std::chrono::high_resolution_clock::now() - start).count();
+    // int k = 0;
   }
 
   StreamCam::~StreamCam() {

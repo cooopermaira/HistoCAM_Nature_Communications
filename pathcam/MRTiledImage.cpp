@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+// using namespace pathCam;
+
 //STATIC HELPER FUNCTIONS
 int preallocate_file(int fd, off_t length) {
 #ifdef __APPLE__
@@ -37,21 +39,21 @@ int preallocate_file(int fd, off_t length) {
 
 std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc, unsigned label) const {
   std::vector<Point2i> result;
-  if (!(label == pathCam::Image::_2X || label == pathCam::Image::_4X || label == pathCam::Image::_10X || label ==
-        pathCam::Image::_20X || label ==
-        pathCam::Image::_40X)) { return {}; }
+  if (!(label == Image::_2X || label == Image::_4X || label == Image::_10X || label ==
+        Image::_20X || label ==
+        Image::_40X)) { return {}; }
 
   auto scale = labelScaleLookup.at((int) label);
 
-  if (label == pathCam::Image::_4X || label == pathCam::Image::_10X || label == pathCam::Image::_20X || label ==
-      pathCam::Image::_40X) {
+  if (label == Image::_4X || label == Image::_10X || label == Image::_20X || label ==
+      Image::_40X) {
     //rectangle
     result.reserve(4);
     result.push_back(Abc);
     result.push_back(Abc + scale * Point2i(MRTiledImageSet::frameWidth, 0));
     result.push_back(Abc + scale * Point2i(MRTiledImageSet::frameWidth, MRTiledImageSet::frameHeight));
     result.push_back(Abc + scale * Point2i(0, MRTiledImageSet::frameHeight));
-  } else if (label == pathCam::Image::_2X) {
+  } else if (label == Image::_2X) {
     //using octagon
     auto centerPoint = Abc + scale * Point2i(MRTiledImageSet::frameWidth / 2, MRTiledImageSet::frameHeight / 2);
     const int r = scale * MRTiledImageSet::scopeRadius;
@@ -137,8 +139,41 @@ std::vector<TileQuery> MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect_<i
   return level[i_scale]->getTiles(view);
 }
 
-MRTiledImage::MRTiledImage(pathCam::StreamCam *parent, int _tile_size) : parent(parent), tile_size(_tile_size),
-                                                                         scale(0) {
+void MRTiledImage::extract_akaze() {
+  Point2i minIdx(INT_MAX, INT_MAX);
+  Point2i maxIdx(INT_MIN, INT_MIN);
+
+  for (auto & tileIdx : liveTiles) {
+    minIdx.x = std::min(minIdx.x,tileIdx.x);
+    minIdx.y = std::min(minIdx.y,tileIdx.y);
+    maxIdx.x = std::max(maxIdx.x,tileIdx.x);
+    maxIdx.y = std::max(maxIdx.y,tileIdx.y);
+  }
+
+  Size size(tile_size * (maxIdx.x - minIdx.x + 1) , tile_size * (maxIdx.y - minIdx.y + 1));
+  Mat data(size,CV_8UC1,Scalar(0));
+  Mat mask(size,CV_8UC1,Scalar(0));
+
+  for (auto &tileIdx : liveTiles) {
+    auto tileObj = get_base_tile(tileIdx);
+    assert(tileObj);
+    assert(!tileObj->image.empty());
+
+    Rect roi(tile_size * (tileIdx.x - minIdx.x), tile_size * (tileIdx.y - minIdx.y), tile_size,tile_size);
+    auto dataROI = data(roi);
+    auto maskROI = mask(roi);
+
+    maskROI.setTo(255);
+    cvtColor(tileObj->image, dataROI, COLOR_BGRA2GRAY);
+  }
+
+  for (auto s : {1.f,0.5f,0.1f}) {
+    akaze.push_back(buildFeatures(data,s,mask));
+  }
+}
+
+MRTiledImage::MRTiledImage(StreamCam *parent, int _tile_size) : parent(parent), tile_size(_tile_size),
+                                                                scale(0) {
   if (tile_size == 0) {
     tile_size = parent->tileSize;
   }
@@ -617,7 +652,7 @@ std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long 
     }
 
     if (!frameBoundaries.empty()) {
-      return pathCam::poly_union_envelope::union_boundary_then_chord_simplify_CW(frameBoundaries);
+      return poly_union_envelope::union_boundary_then_chord_simplify_CW(frameBoundaries);
     }
   }
   return {};
@@ -680,4 +715,11 @@ void MRTiledImageSet::detach() {
                      return mrImg->suspended;
                    }),
     MRImages.end());
+}
+
+void MRTiledImageSet::correct_alignment() {
+  for (auto &mrImg : MRImages) {
+    if (mrImg->suspended){continue;}
+    mrImg->extract_akaze();
+  }
 }
