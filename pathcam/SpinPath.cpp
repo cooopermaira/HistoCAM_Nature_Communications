@@ -82,6 +82,7 @@ namespace pathCam {
 
             pathCam::Image *image = new pathCam::Image(parent->sCam->image_width, parent->sCam->image_height,
                                                        parent->sCam->get_scope_radius());
+            image->parent = parent->sCam.get();
             image->copy_in(pResultImage->GetData());
             image->increment_smart_pointer();
             image->timeStamp = timeStamp;
