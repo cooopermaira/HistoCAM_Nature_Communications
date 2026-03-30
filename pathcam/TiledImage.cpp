@@ -202,8 +202,13 @@ std::vector<TileQuery> TiledImage::getTiles(cv::Rect_<float> box) {
   bottom_right.y--;
 
 
-  for (int i = getIJ(top_left).x; i <= getIJ(bottom_right).x; i++) {
-    for (int j = getIJ(top_left).y; j <= getIJ(bottom_right).y; j++) {
+  int iMin = std::max(getIJ(top_left).x, tiles.minX);
+  int iMax = std::min(getIJ(bottom_right).x, tiles.minX + tiles.width - 1);
+  int jMin = std::max(getIJ(top_left).y, tiles.minY);
+  int jMax = std::min(getIJ(bottom_right).y, tiles.minY + tiles.height - 1);
+
+  for (int i = iMin; i <= iMax; i++) {
+    for (int j = jMin; j <= jMax; j++) {
       int x = i * (int) logic_size - box.x;
       int y = j * (int) logic_size - box.y;
       Rect_<float> rect = cv::Rect_<float>(x, y, logic_size, logic_size);
