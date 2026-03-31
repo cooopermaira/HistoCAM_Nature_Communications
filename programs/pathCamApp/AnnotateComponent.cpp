@@ -332,6 +332,202 @@ std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File aud
 }
 
 
+static std::string buildConceptExtractionRequestBody_JSON(const juce::String &text) {
+  juce::String systemMsg =
+      "You extract atomic pathology concepts from slide-review transcripts.\n"
+      "Input: a single string 'text'.\n"
+      "\n"
+      "GOAL:\n"
+      "Decompose the transcript into the SMALLEST CLINICALLY MEANINGFUL pathology concepts.\n"
+      "\n"
+      "For each concept, output:\n"
+      "- evidence_text: the EXACT contiguous substring from the transcript\n"
+      "- concept_text: a concise interpretation (1 to 10 words, NOT a final label)\n"
+      "- concept_type: one of ['inflammation','invasion','margin','gleason_grade','tumor','architecture','other']\n"
+      "- assertion: one of ['present','absent','uncertain','revised']\n"
+      "- attributes: object (may be empty)\n"
+      "\n"
+      "CRITICAL RULES (STRICT):\n"
+      "1) evidence_text MUST be copied VERBATIM from the transcript.\n"
+      "2) evidence_text MUST be a SINGLE contiguous substring.\n"
+      "3) DO NOT paraphrase or modify evidence_text.\n"
+      "4) Extract ALL concepts (INCLUDING negative ones).\n"
+      "5) DO NOT skip concepts because another seems more important.\n"
+      "\n"
+      "6) CONCEPT GRANULARITY (VERY IMPORTANT):\n"
+      "   Extract the smallest CLINICALLY MEANINGFUL concepts, NOT the smallest phrases.\n"
+      "\n"
+      "   The following MUST remain grouped as a SINGLE concept:\n"
+      "\n"
+      "   a) GLEASON GROUPING:\n"
+      "      Any Gleason score MUST include ALL directly associated information:\n"
+      "      - Gleason pattern (e.g. 3+4)\n"
+      "      - Percent involvement (if present)\n"
+      "      - Immediate continuation phrases\n"
+      "\n"
+      "      Example:\n"
+      "      'Gleason 3 plus 3 equals 6, involving 2% of prostate present'\n"
+      "      -> ONE concept\n"
+      "\n"
+      "   b) MARGIN GROUPING:\n"
+      "      Margin statements MUST include the governing term 'margin'.\n"
+      "\n"
+      "      Example:\n"
+      "      'Margin negative for tumor'\n"
+      "      -> evidence_text MUST include 'Margin'\n"
+      "\n"
+      "   c) GOVERNING NOUN RULE:\n"
+      "      If a phrase depends on a governing term (e.g. margin, invasion, glands),\n"
+      "      the governing term MUST be included in evidence_text.\n"
+      "\n"
+      "   d) DEPENDENT PHRASES:\n"
+      "      Do NOT split a concept if a later phrase depends on an earlier one.\n"
+      "\n"
+      "      BAD:\n"
+      "        'Gleason 3+3' + 'involving 2%'\n"
+      "      GOOD:\n"
+      "        one combined concept\n"
+      "\n"
+      "   e) Prefer slightly larger spans over fragmented ones when meaning would be lost.\n"
+      "\n"
+      "7) SPLIT truly independent concepts:\n"
+      "   Example: 'acute and chronic inflammation' -> TWO concepts.\n"
+      "\n"
+      "8) DO NOT merge separate independent findings into one.\n"
+      "9) concept_text MUST be derived ONLY from evidence_text.\n"
+      "10) DO NOT use context outside the evidence_text.\n"
+      "\n"
+      "11) 'prostatic adenocarcinoma' is context and SHOULD NOT be a standalone concept\n"
+      "    unless it is the ONLY finding in the transcript.\n"
+      "\n"
+      "12) Assertion mapping:\n"
+      "   - 'positive', 'present' -> present\n"
+      "   - 'negative for', 'no', 'absent' -> absent\n"
+      "   - 'maybe', 'possible', 'cannot exclude' -> uncertain\n"
+      "   - corrections -> revised\n"
+      "\n"
+      "13) SPAN PRECISION:\n"
+      "   evidence_text must contain ONLY the words expressing the concept.\n"
+      "   Do NOT include neighboring concepts.\n"
+      "\n"
+      "14) ORDER:\n"
+      "   Maintain original order of appearance.\n"
+      "\n"
+      "15) GLEASON EXTRACTION:\n"
+      "   For Gleason, extract attributes:\n"
+      "   - gleason_primary\n"
+      "   - gleason_secondary\n"
+      "   - percent_involvement (if present)\n"
+      "\n"
+      "16) SELF-CHECK BEFORE OUTPUT:\n"
+      "   - Every evidence_text appears EXACTLY in the input string\n"
+      "   - No concepts missing\n"
+      "   - No incorrectly split grouped concepts\n";
+
+  // helper
+  auto makeTypeObj = [](const juce::String &t) -> juce::var {
+    juce::DynamicObject::Ptr o(new juce::DynamicObject());
+    o->setProperty("type", t);
+    return {o.get()};
+  };
+
+  // --- attributes object
+  juce::DynamicObject::Ptr attrProps(new juce::DynamicObject());
+
+  auto intOrNull = [](const juce::String &t) -> juce::var {
+    juce::DynamicObject::Ptr o(new juce::DynamicObject());
+    juce::Array<juce::var> types;
+    types.add("integer");
+    types.add("null");
+    o->setProperty("type", juce::var(types));
+    return {o.get()};
+  };
+
+  auto numOrNull = [](const juce::String &t) -> juce::var {
+    juce::DynamicObject::Ptr o(new juce::DynamicObject());
+    juce::Array<juce::var> types;
+    types.add("number");
+    types.add("null");
+    o->setProperty("type", juce::var(types));
+    return {o.get()};
+  };
+
+  attrProps->setProperty("gleason_primary", intOrNull("integer"));
+  attrProps->setProperty("gleason_secondary", intOrNull("integer"));
+  attrProps->setProperty("percent_involvement", numOrNull("number"));
+
+  juce::Array<juce::var> attrRequired;
+  attrRequired.add("gleason_primary");
+  attrRequired.add("gleason_secondary");
+  attrRequired.add("percent_involvement");
+
+  juce::DynamicObject::Ptr attrObj(new juce::DynamicObject());
+  attrObj->setProperty("type", "object");
+  attrObj->setProperty("properties", juce::var(attrProps.get()));
+  attrObj->setProperty("required", juce::var(attrRequired));
+  attrObj->setProperty("additionalProperties", false);
+
+  // --- properties
+  juce::DynamicObject::Ptr props(new juce::DynamicObject());
+  props->setProperty("evidence_text", makeTypeObj("string"));
+  props->setProperty("concept_text", makeTypeObj("string"));
+  props->setProperty("concept_type", makeTypeObj("string"));
+  props->setProperty("assertion", makeTypeObj("string"));
+  props->setProperty("attributes", juce::var(attrObj.get()));
+
+  // required
+  juce::Array<juce::var> requiredArr;
+  requiredArr.add("evidence_text");
+  requiredArr.add("concept_text");
+  requiredArr.add("concept_type");
+  requiredArr.add("assertion");
+  requiredArr.add("attributes");
+
+  juce::DynamicObject::Ptr item(new juce::DynamicObject());
+  item->setProperty("type", "object");
+  item->setProperty("properties", juce::var(props.get()));
+  item->setProperty("required", juce::var(requiredArr));
+  item->setProperty("additionalProperties", false);
+
+  juce::DynamicObject::Ptr arrayProp(new juce::DynamicObject());
+  arrayProp->setProperty("type", "array");
+  arrayProp->setProperty("items", juce::var(item.get()));
+
+  // root schema
+  juce::DynamicObject::Ptr rootProps(new juce::DynamicObject());
+  rootProps->setProperty("concepts", juce::var(arrayProp.get()));
+
+  juce::Array<juce::var> rootRequired;
+  rootRequired.add("concepts");
+
+  juce::DynamicObject::Ptr schema(new juce::DynamicObject());
+  schema->setProperty("type", "object");
+  schema->setProperty("properties", juce::var(rootProps.get()));
+  schema->setProperty("required", juce::var(rootRequired));
+  schema->setProperty("additionalProperties", false);
+
+  // format
+  juce::DynamicObject::Ptr format(new juce::DynamicObject());
+  format->setProperty("type", "json_schema");
+  format->setProperty("name", "concept_extraction");
+  format->setProperty("strict", true);
+  format->setProperty("schema", juce::var(schema.get()));
+
+  juce::DynamicObject::Ptr textObj(new juce::DynamicObject());
+  textObj->setProperty("format", juce::var(format.get()));
+
+  // root request
+  juce::DynamicObject::Ptr root(new juce::DynamicObject());
+  root->setProperty("model", "gpt-4o-mini");
+  root->setProperty("instructions", systemMsg);
+  root->setProperty("input", text);
+  root->setProperty("temperature", 0);
+  root->setProperty("text", juce::var(textObj.get()));
+
+  return juce::JSON::toString(juce::var(root.get()), true).toStdString();
+}
+
+
 static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
                                                    const std::vector<std::string> &preconfigAnnos) {
   juce::String systemMsg =
@@ -339,7 +535,7 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
       "Input: a single string 'text'.\n"
       "\n"
       "Your task:\n"
-      "Extract 1..N distinct pathology findings mentioned in the transcript, in the SAME ORDER they appear.\n"
+      "Extract 1..N distinct POSITIVE pathology findings mentioned in the transcript, in the SAME ORDER they appear.\n"
       "\n"
       "For each finding, output:\n"
       "- label: a 1-5 word canonical pathology phrase.\n"
@@ -358,9 +554,6 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
       "4) evidence_text MUST be copied verbatim from the transcript as a single contiguous substring.\n"
       "   Do not paraphrase it. Do not summarize it.\n"
       "5) evidence_text must include all words necessary to justify the label, including qualifiers, numbers, and context words.\n"
-      // "6) If multiple alternative interpretations of the SAME finding appear in close proximity\n"
-      // "   (e.g. 'maybe', 'probably', 'versus', 'favors'), and a later statement clearly resolves or favors one,\n"
-      // "   output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
       "6) Revision/uncertainty merge rule (MUST follow):\n"
       "   Only merge multiple mentions into ONE annotation when the transcript explicitly presents them as alternative interpretations\n"
       "   or a correction/revision of the SAME finding, using uncertainty/revision markers such as:\n"
@@ -378,37 +571,37 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
       "    (e.g. \"Gleason 3+3\" then \"Gleason 3+4\" with \"maybe/probably\"). If you would, merge them into ONE labeled with the final favored interpretation,\n"
       "    and evidence_text spanning both. Do NOT label with an earlier, less confident alternative if a later, more confident alternative is present.\n"
       "\n"
-  // "6c) FINAL label tie-break (MUST follow, especially for Gleason):\n"
-  // "    When a single discussion window contains multiple alternative values/grades (e.g. \"3 plus 3\" then \"maybe 3 plus 4\" then \"probably 3 plus 4\"),\n"
-  // "    the label MUST be the FINAL favored value stated in that window.\n"
-  // "    - If the word \"probably\" appears with a value, choose that value as the label.\n"
-  // "    - Otherwise if \"favors\" / \"most consistent with\" appears with a value, choose that value.\n"
-  // "    - Otherwise choose the LAST mentioned value in the window.\n"
-  // "    Do NOT label with an earlier, less confident alternative if a later, more confident alternative is present.\n"
-//   "6) Resolution / hedging merge rule (MUST follow):\n"
-// "   If the transcript discusses multiple alternative interpretations of the SAME finding in close proximity\n"
-// "   (e.g., 'maybe', 'probably', 'versus', 'favors', 'could be', 'cannot exclude') and later text favors one,\n"
-// "   you MUST output exactly ONE annotation for that finding.\n"
-// "   - Do NOT output separate annotations for the tentative early mention and the later resolved mention.\n"
-// "   - evidence_text MUST cover the entire discussion window from the first mention through the final resolved statement.\n"
-// "\n"
-// "6a) Close proximity definition: treat as the SAME discussion if alternatives occur within the same sentence OR within 25 words,\n"
-// "    and no new unrelated finding starts in between.\n"
-// "\n"
-// "6b) Gleason-specific rule: if multiple Gleason patterns/grades are mentioned close together (e.g., '3 plus 3' then 'maybe 3 plus 4'\n"
-// "    then 'probably 3 plus 4'), output ONE annotation labeled with the final favored Gleason grade.\n"
-// "    evidence_text MUST include the full Gleason discussion from the first Gleason mention through the final favored grade.\n"
-
       "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive surgical margin', 'negative surgical margin', 'Gleason 3+4').\n"
-      "8) Scope MUST be 'local' when the evidence_text is a gleason score or is tied to a particular area such as side, apex, base, nodule, focus, core, region or is 'positive' in assessment. \n"
-      "9) Scope MUST be 'global' when the evidence_text states an overall case-level or specimen-level conclusion, such as adenocarcinoma involvement, overall margin status, or generalized summary statement. \n"
-      "10) If uncertain between 'local' and 'global', prefer 'local' unless the wording clearly indicates a final overall conclusion. \n"
-      "12) 'Negative for' ROI should be reduced to 'no' ROI for labels. \n"
-      "13) Before outputting JSON, check for adjacent alternative/correction duplicates (rule 6) and merge as required.\n";
+      "8) NEGATIVE FINDINGS - SKIP ENTIRELY (MOST IMPORTANT RULE):\n"
+      "   If a finding is negative, absent, or not identified - including any phrasing such as\n"
+      "   'negative for', 'no evidence of', 'not identified', 'absent', 'none', 'not seen', 'free of', 'clear of' -\n"
+      "   DO NOT output an annotation for it. Omit it completely. This applies even if the finding is named.\n"
+      "   Example: 'negative for perineural invasion' -> output NOTHING for this finding.\n"
+      "   Example: 'margins are clear' -> output NOTHING.\n"
+      "   Only output annotations for findings that are PRESENT and POSITIVE.\n"
+      "\n"
+      "9) Scope MUST be 'local' when the evidence_text is tied to a particular area such as side, apex, base,\n"
+      "   nodule, focus, core, or microscopic subregion, OR when it is a Gleason score tied to a specific region or core.\n"
+      "\n"
+      "10) Scope MUST be 'global' when the evidence_text states an overall specimen-level or case-level conclusion,\n"
+      "    such as overall adenocarcinoma involvement, overall margin status, or a generalized summary statement.\n"
+      "    IMPORTANT - Gleason global pattern: when the transcript states a Gleason grade together with a percentage\n"
+      "    of prostate gland involvement (e.g. 'Gleason 4 plus 3 constituting 60 percent of the prostate gland',\n"
+      "    'Gleason 3+4 involving 40% of the gland'), this IS a specimen-level summary - scope MUST be 'global'.\n"
+      "    Label it as the Gleason grade (e.g. 'Gleason 4+3') and include the full phrase with percentage in evidence_text.\n"
+      "\n"
+      "11) If uncertain between 'local' and 'global', prefer 'local' unless the wording clearly indicates a final overall conclusion.\n"
+      "\n"
+      "12) Before outputting JSON, perform two self-checks:\n"
+      "    a) Confirm no annotation corresponds to a negative or absent finding. Remove any that do.\n"
+      "    b) Check for adjacent alternative/correction duplicates (rule 6) and merge as required.\n"
+      "13) Label-evidence fidelity (MUST follow):\n"
+      "    The label MUST be derivable from the evidence_text alone. Do NOT assign a label based on\n"
+      "    context elsewhere in the transcript if that concept does not appear in the evidence_text.\n";
   if (!preconfigAnnos.empty()) {
     systemMsg +=
-      "14) If any annotation can be adequately described using one of the following exact labels,\n"
-      "   you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
+        "14) If any annotation can be adequately described using one of the following exact labels,\n"
+        "   you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
 
     for (const auto &anno: preconfigAnnos) {
       systemMsg += "   - " + juce::String(anno) + "\n";
@@ -428,7 +621,7 @@ static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
   annProps->setProperty("evidence_text", makeTypeObj("string"));
 
   juce::DynamicObject::Ptr scopeObj(new juce::DynamicObject());
-  scopeObj->setProperty("type","string");
+  scopeObj->setProperty("type", "string");
   juce::Array<juce::var> scopeEnum;
   scopeEnum.add("local");
   scopeEnum.add("global");
@@ -586,7 +779,7 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text,
 
 static std::string openAIResponses_POST(const std::string &apiKey,
                                         const std::string &requestBodyJson,
-                                        int timeoutMs = 60000) {
+                                        int timeoutMs = 120000) {
   juce::URL url("https://api.openai.com/v1/responses");
 
   juce::String headers;
@@ -724,28 +917,169 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
 }
 
 
+static std::vector<Concept> parseConceptsFromResponses(const std::string &responsesJson) {
+  std::vector<Concept> out;
+
+  auto top = juce::JSON::parse(responsesJson);
+  if (!top.isObject()) return out;
+
+  auto *topObj = top.getDynamicObject();
+  if (!topObj) return out;
+
+  auto outputVar = topObj->getProperty("output");
+  auto *outArr = outputVar.getArray();
+  if (!outArr) return out;
+
+  juce::var messageContentVar;
+
+  // ==============================
+  // 1) Find message
+  // ==============================
+  for (const auto &item: *outArr) {
+    auto *msgObj = item.getDynamicObject();
+    if (!msgObj) continue;
+
+    if (msgObj->getProperty("type").toString() == "message") {
+      messageContentVar = msgObj->getProperty("content");
+      break;
+    }
+  }
+
+  auto *msgContentArr = messageContentVar.getArray();
+  if (!msgContentArr) return out;
+
+  juce::String payloadText;
+
+  // ==============================
+  // Helper: parse concepts array
+  // ==============================
+  auto parseConceptArray = [&](juce::Array<juce::var> *conceptArr) {
+    if (!conceptArr) return;
+
+    out.reserve((size_t) conceptArr->size());
+
+    for (const auto &cv: *conceptArr) {
+      auto *cobj = cv.getDynamicObject();
+      if (!cobj) continue;
+
+      Concept c;
+
+      // ---- core fields ----
+      c.evidence_text = cobj->getProperty("evidence_text").toString().toStdString();
+      c.concept_text = cobj->getProperty("concept_text").toString().toStdString();
+      c.concept_type = cobj->getProperty("concept_type").toString().toStdString();
+      c.assertion = cobj->getProperty("assertion").toString().toStdString();
+
+      // ---- attributes ----
+      auto attrVar = cobj->getProperty("attributes");
+      auto *attrObj = attrVar.getDynamicObject();
+
+      if (attrObj) {
+        auto gp = attrObj->getProperty("gleason_primary");
+        auto gs = attrObj->getProperty("gleason_secondary");
+        auto pi = attrObj->getProperty("percent_involvement");
+
+        if (!gp.isVoid())
+          c.attributes.gleason_primary = (int) gp;
+
+        if (!gs.isVoid())
+          c.attributes.gleason_secondary = (int) gs;
+
+        if (!pi.isVoid())
+          c.attributes.percent_involvement = (double) pi;
+      }
+
+      if (!c.evidence_text.empty())
+        out.push_back(std::move(c));
+    }
+  };
+
+  // ==============================
+  // 2) Extract output_text / json
+  // ==============================
+  for (const auto &c: *msgContentArr) {
+    auto *cobj = c.getDynamicObject();
+    if (!cobj) continue;
+
+    const auto ctype = cobj->getProperty("type").toString();
+
+    if (ctype == "output_text") {
+      payloadText = cobj->getProperty("text").toString();
+      break;
+    } else if (ctype == "output_json") {
+      auto jsonVar = cobj->getProperty("content");
+      auto *jsonObj = jsonVar.getDynamicObject();
+      if (!jsonObj) return out;
+
+      auto conceptsVar = jsonObj->getProperty("concepts");
+      auto *conceptArr = conceptsVar.getArray();
+
+      parseConceptArray(conceptArr);
+      return out;
+    }
+  }
+
+  if (payloadText.isEmpty())
+    return out;
+
+  // ==============================
+  // 3) Parse inner JSON string
+  // ==============================
+  auto inner = juce::JSON::parse(payloadText);
+  if (!inner.isObject()) return out;
+
+  auto *innerObj = inner.getDynamicObject();
+  if (!innerObj) return out;
+
+  auto conceptsVar = innerObj->getProperty("concepts");
+  auto *conceptArr = conceptsVar.getArray();
+
+  parseConceptArray(conceptArr);
+
+  return out;
+}
+
+std::vector<Concept> reduceToConcepts_OpenAI(const std::string &text) {
+  std::string apiKey(
+    "REDACTED_OPENAI_API_KEY");
+  std::string body = buildConceptExtractionRequestBody_JSON(text);
+  const std::string resp = openAIResponses_POST(apiKey, body, 60000);
+
+  if (resp.empty()) {
+    return {};
+  }
+
+  auto pResp = parseConceptsFromResponses(resp);
+  return pResp;
+}
+
 std::vector<AnnotationSpan> reduceToAnnotations_OpenAI(const std::string &text,
                                                        const std::vector<std::string> &preconfigAnnos) {
   std::string apiKey(
     "REDACTED_OPENAI_API_KEY");
 
-  bool run_gpt_5 = false;
+  bool extractConceptFirst = true;
 
-  const std::string body = run_gpt_5
-                             ? buildResponsesRequestBody_JSON(text, preconfigAnnos)
-                             : buildResponsesRequestBody_JSON2(text, preconfigAnnos);
+  if (extractConceptFirst) {
+    std::string body = buildConceptExtractionRequestBody_JSON(text);
+    const std::string resp = openAIResponses_POST(apiKey, body, 60000);
 
+    if (resp.empty()) {
+      return {};
+    }
 
-  const std::string resp = openAIResponses_POST(apiKey, body, 60000);
-  if (resp.empty()) {
+    auto pResp = parseConceptsFromResponses(resp);
     return {};
-  }
-
-  auto pResp = parseAnnotationsFromResponses(resp);
-  if (run_gpt_5) {
-    return pResp;
   } else {
-    resolveEvidenceSpans(text,pResp);
+    std::string body = buildResponsesRequestBody_JSON2(text, preconfigAnnos);
+    const std::string resp = openAIResponses_POST(apiKey, body, 60000);
+
+    if (resp.empty()) {
+      return {};
+    }
+
+    auto pResp = parseAnnotationsFromResponses(resp);
+    resolveEvidenceSpans(text, pResp);
     return pResp;
   }
 }
@@ -855,15 +1189,34 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  juce::File dictPath("/home/pathcam/pcamdata/save_and_load/Andrew_3_16_3/0/dictation.wav");
+  for (int i = 6; i < 15; ++i) {
+    juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/dictation.wav");
+    auto [fullText,wordVec] = send_transcribe_call(dictPath);
+    std::cout << std::endl << std::endl << i << std::endl;
+    size_t width = 120;
+    for (size_t i = 0; i < fullText.size(); i += width) {
+      std::cout << fullText.substr(i, width) << "\n";
+    }
+    auto start = std::chrono::high_resolution_clock::now();
+
+    auto annoSpanVec = reduceToConcepts_OpenAI(fullText);
+
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
+
+    int k = 0;
+  }
+
+
+  juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap1/dictation.wav");
 
   auto start = std::chrono::high_resolution_clock::now();
   auto [fullText,wordVec] = send_transcribe_call(dictPath);
-  auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, get_preconfig_anno());
+
   auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
       count();
   std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
-
+  auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, get_preconfig_anno());
   for (auto &annospan: annoSpanVec) {
     std::cout << annospan.label;
 

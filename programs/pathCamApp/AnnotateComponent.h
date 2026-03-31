@@ -62,39 +62,6 @@ public:
     voiceHandlerThread = std::thread(&AnnotateComponent::voice_annotation_handler,this);
 
     // silly_test();
-#if false
-    {
-      std::shared_ptr<SegmentAnnotation> temp = std::make_shared<SegmentAnnotation>("SAM");
-
-      temp->add(Point3f(50, 50, 1.0));
-      temp->add(Point3f(1200, 150, 0.0)); // Add second point
-      temp->add(Point3f(1150, 1150, 0.0)); // Add third point
-      temp->add(Point3f(150, 1100, 1.0)); // Add fourth point
-      temp->add(Point3f(-150, 500, 1.0)); // Add fifth point
-
-      activeAnnotations->push_back(temp);
-    } {
-      std::shared_ptr<PointClickPoly> temp = std::make_shared<PointClickPoly>("Poly 2");
-
-      temp->add(fPoint(2050, 2050));
-      temp->add(fPoint(2050, 3050)); // Add second point
-      temp->add(fPoint(3050, 3050)); // Add third point
-      temp->add(fPoint(3050, 2050)); // Add fourth point
-
-      activeAnnotations->push_back(temp);
-    } {
-      std::shared_ptr<MeasureAnnotation> temp = std::make_shared<MeasureAnnotation>("Measure 1");
-      temp->setPoints(fPoint(1000, 1000), fPoint(2000, 1000));
-      activeAnnotations->push_back(temp);
-    } {
-      std::shared_ptr<MeasureAnnotation> temp = std::make_shared<MeasureAnnotation>("Measure 2");
-      temp->setPoints(fPoint(4000, 4000), fPoint(5000, 5000));
-      activeAnnotations->push_back(temp);
-    }
-
-
-    leftComponent->updatelist();
-#endif
   }
 
   void voice_annotation_handler();

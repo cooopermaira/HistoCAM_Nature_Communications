@@ -19,7 +19,7 @@ inline cv::Rect_<T> RecMult(cv::Rect_<T> r, T scalar) {
 template<typename T>
 class Dense2DArray {
 public:
-  Dense2DArray(int minX = -2048, int maxX = 2048, int minY = -2048, int maxY = 2048)
+  Dense2DArray(int minX = -512, int maxX = 512, int minY = -512, int maxY = 512)
     : minX(minX), minY(minY), width(maxX - minX + 1), height(maxY - minY + 1) {
     data.resize(width * height);
   }

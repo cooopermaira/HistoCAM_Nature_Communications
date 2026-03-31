@@ -10,6 +10,19 @@
 
 #include "JuceHeader.h"
 
+struct ConceptAttributes {
+  std::optional<int> gleason_primary;
+  std::optional<int> gleason_secondary;
+  std::optional<double> percent_involvement;
+};
+
+struct Concept {
+  std::string evidence_text;
+  std::string concept_text;
+  std::string concept_type;
+  std::string assertion;
+  ConceptAttributes attributes;
+};
 
 struct AnnotationSpan
 {
