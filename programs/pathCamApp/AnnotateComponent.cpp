@@ -332,6 +332,167 @@ std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File aud
 }
 
 
+static std::string buildConceptExtractionRequestBody_JSON_Llama(const juce::String &text) {
+
+  juce::String systemMsg =
+  "You extract atomic pathology concepts from slide-review transcripts.\n"
+  "Input: a single string 'text'.\n"
+  "\n"
+  "GOAL:\n"
+  "Decompose the transcript into the SMALLEST CLINICALLY MEANINGFUL pathology concepts.\n"
+  "\n"
+  "For each concept, output:\n"
+  "- evidence_text: the EXACT contiguous substring from the transcript\n"
+  "- concept_text: a concise interpretation (1 to 10 words, NOT a final label)\n"
+  "- concept_type: one of ['inflammation','invasion','margin','gleason_grade','extraprostatic_extension','tumor','architecture','other']\n"
+  "- assertion: one of ['present','absent','uncertain','revised']\n"
+  "- attributes: object (may be empty)\n"
+  "\n"
+  "CRITICAL RULES (STRICT):\n"
+  "1) evidence_text MUST be copied VERBATIM from the transcript.\n"
+  "2) evidence_text MUST be a SINGLE contiguous substring.\n"
+  "3) DO NOT paraphrase or modify evidence_text.\n"
+  "4) Extract ALL concepts (INCLUDING negative ones).\n"
+  "5) DO NOT skip concepts because another seems more important.\n"
+  "\n"
+  "6) CONCEPT GRANULARITY (VERY IMPORTANT):\n"
+  "   Extract the smallest CLINICALLY MEANINGFUL concepts, NOT the smallest phrases.\n"
+  "\n"
+  "   The following MUST remain grouped as a SINGLE concept:\n"
+  "\n"
+  "   a) GLEASON GROUPING:\n"
+  "      Any Gleason score MUST include ALL directly associated information:\n"
+  "      - Gleason pattern (e.g. 3+4)\n"
+  "      - Percent involvement (if present)\n"
+  "      - Immediate continuation phrases\n"
+  "\n"
+  "      Example:\n"
+  "      'Gleason 3 plus 3 equals 6, involving 2% of prostate present'\n"
+  "      -> ONE concept\n"
+  "\n"
+  "   b) MARGIN GROUPING:\n"
+  "      Margin statements MUST include the governing term 'margin'.\n"
+  "\n"
+  "      Example:\n"
+  "      'Margin negative for tumor'\n"
+  "      -> evidence_text MUST include 'Margin'\n"
+  "\n"
+  "   c) GOVERNING NOUN RULE:\n"
+  "      If a phrase depends on a governing term (e.g. margin, invasion, glands),\n"
+  "      the governing term MUST be included in evidence_text.\n"
+  "\n"
+  "   d) DEPENDENT PHRASES:\n"
+  "      Do NOT split a concept if a later phrase depends on an earlier one.\n"
+  "\n"
+  "      BAD:\n"
+  "        'Gleason 3+3' + 'involving 2%'\n"
+  "      GOOD:\n"
+  "        one combined concept\n"
+  "\n"
+  "   e) Prefer slightly larger spans over fragmented ones when meaning would be lost.\n"
+  "\n"
+  "7) SPLIT truly independent concepts:\n"
+  "   Example: 'acute and chronic inflammation' -> TWO concepts.\n"
+  "\n"
+  "8) DO NOT merge separate independent findings into one.\n"
+  "9) concept_text MUST be derived ONLY from evidence_text.\n"
+  "10) DO NOT use context outside the evidence_text.\n"
+  "\n"
+  "11) 'prostatic adenocarcinoma' is context and SHOULD NOT be a standalone concept\n"
+  "    unless it is the ONLY finding in the transcript.\n"
+  "\n"
+  "12) Assertion mapping:\n"
+  "   - 'positive', 'present' -> present\n"
+  "   - 'negative for', 'no', 'absent' -> absent\n"
+  "   - 'maybe', 'possible', 'cannot exclude' -> uncertain\n"
+  "   - corrections -> revised\n"
+  "\n"
+  "13) SPAN PRECISION:\n"
+  "   evidence_text must contain ONLY the words expressing the concept.\n"
+  "   Do NOT include neighboring concepts.\n"
+  "\n"
+  "14) ORDER:\n"
+  "   Maintain original order of appearance.\n"
+  "\n"
+  "15) GLEASON EXTRACTION:\n"
+  "   For Gleason, extract attributes:\n"
+  "   - gleason_primary\n"
+  "   - gleason_secondary\n"
+  "   - percent_involvement (if present)\n"
+  "\n"
+  "16) SELF-CHECK BEFORE OUTPUT:\n"
+  "   - Every evidence_text appears EXACTLY in the input string\n"
+  "   - No concepts missing\n"
+  "   - No incorrectly split grouped concepts\n"
+  "\n"
+  "17) OUTPUT FORMAT (MANDATORY):\n"
+  "   You MUST output ONLY valid JSON.\n"
+  "   Do NOT include explanations.\n"
+  "   Do NOT include markdown.\n"
+  "   Do NOT include any text before or after the JSON.\n"
+  "\n"
+  "18) JSON STRUCTURE (STRICT):\n"
+  "   The output MUST EXACTLY match this schema:\n"
+  "\n"
+  "   {\n"
+  "     \"concepts\": [\n"
+  "       {\n"
+  "         \"evidence_text\": string,\n"
+  "         \"concept_text\": string,\n"
+  "         \"concept_type\": string,\n"
+  "         \"assertion\": string,\n"
+  "         \"attributes\": {\n"
+  "           \"gleason_primary\": number or null,\n"
+  "           \"gleason_secondary\": number or null,\n"
+  "           \"percent_involvement\": number or null\n"
+  "         }\n"
+  "       }\n"
+  "     ]\n"
+  "   }\n"
+  "\n"
+  "19) FAILURE CASE:\n"
+  "   If no concepts are found, return EXACTLY:\n"
+  "   {\"concepts\":[]}\n"
+  "\n"
+  "20) FINAL RULE:\n"
+  "   Your response MUST be parseable by a strict JSON parser with no modifications.\n";
+
+  juce::DynamicObject::Ptr root(new juce::DynamicObject());
+
+  root->setProperty("model", "local-llama"); // ignored by llama.cpp but keep for compatibility
+  root->setProperty("temperature", 0);
+
+  // ---- messages array ----
+  juce::Array<juce::var> messages;
+
+  // system message
+  {
+    juce::DynamicObject::Ptr sys(new juce::DynamicObject());
+    sys->setProperty("role", "system");
+    sys->setProperty("content", systemMsg);
+    messages.add(juce::var(sys.get()));
+  }
+
+  // user message
+  {
+    juce::DynamicObject::Ptr usr(new juce::DynamicObject());
+    usr->setProperty("role", "user");
+    usr->setProperty("content", text);
+    messages.add(juce::var(usr.get()));
+  }
+
+  root->setProperty("messages", juce::var(messages));
+
+  // optional but useful: stop generation drift
+  juce::Array<juce::var> stopArr;
+  stopArr.add("\n\n");
+  root->setProperty("stop", juce::var(stopArr));
+
+  // serialize
+  return juce::JSON::toString(juce::var(root.get()), true).toStdString();
+}
+
+
 static std::string buildConceptExtractionRequestBody_JSON(const juce::String &text) {
   juce::String systemMsg =
       "You extract atomic pathology concepts from slide-review transcripts.\n"
@@ -776,6 +937,27 @@ static std::string buildResponsesRequestBody_JSON(const juce::String &text,
   return juce::JSON::toString(juce::var(root.get()), true).toStdString();
 }
 
+static std::string LlamaResponses_POST(const std::string &requestBodyJson, int timeoutMs = 120000) {
+
+  juce::URL url("http://127.0.0.1:8081/v1/chat/completions");
+
+  juce::String headers;
+  headers << "Content-Type: application/json\r\n";
+
+  auto in = url.withPOSTData(requestBodyJson)
+      .createInputStream(
+        juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inPostData)
+        .withExtraHeaders(headers)
+        .withConnectionTimeoutMs(timeoutMs)
+        .withNumRedirectsToFollow(0)
+      );
+
+  if (in == nullptr) {
+    return {};
+  }
+
+  return in->readEntireStreamAsString().toStdString();
+}
 
 static std::string openAIResponses_POST(const std::string &apiKey,
                                         const std::string &requestBodyJson,
@@ -1039,21 +1221,123 @@ static std::vector<Concept> parseConceptsFromResponses(const std::string &respon
   return out;
 }
 
-std::vector<Concept> reduceToConcepts_OpenAI(const std::string &text) {
-  std::string apiKey(
-    "REDACTED_OPENAI_API_KEY");
-  std::string body = buildConceptExtractionRequestBody_JSON(text);
-  const std::string resp = openAIResponses_POST(apiKey, body, 60000);
+static std::vector<Concept> parseConceptsFromLlamaResponses(const std::string &responsesJson) {
+  std::vector<Concept> out;
+
+  // ==============================
+  // 1) Parse outer response
+  // ==============================
+  auto top = juce::JSON::parse(responsesJson);
+  if (!top.isObject()) return out;
+
+  auto *topObj = top.getDynamicObject();
+  if (!topObj) return out;
+
+  auto choicesVar = topObj->getProperty("choices");
+  auto *choicesArr = choicesVar.getArray();
+  if (!choicesArr || choicesArr->isEmpty()) return out;
+
+  auto *choiceObj = choicesArr->getReference(0).getDynamicObject();
+  if (!choiceObj) return out;
+
+  auto messageVar = choiceObj->getProperty("message");
+  auto *msgObj = messageVar.getDynamicObject();
+  if (!msgObj) return out;
+
+  std::string content = msgObj->getProperty("content").toString().toStdString();
+  if (content.empty()) return out;
+
+  // ==============================
+  // 2) Extract JSON array from string
+  // ==============================
+  auto start = content.find("[");
+  auto end   = content.rfind("]");
+
+  if (start == std::string::npos || end == std::string::npos || end <= start)
+    return out;
+
+  std::string jsonArrayStr = content.substr(start, end - start + 1);
+
+  auto parsed = juce::JSON::parse(jsonArrayStr);
+  if (!parsed.isArray()) return out;
+
+  auto *conceptArr = parsed.getArray();
+  if (!conceptArr) return out;
+
+  // ==============================
+  // 3) Parse concepts directly
+  // ==============================
+  out.reserve((size_t)conceptArr->size());
+
+  for (const auto &cv : *conceptArr) {
+    auto *cobj = cv.getDynamicObject();
+    if (!cobj) continue;
+
+    Concept c;
+
+    c.evidence_text = cobj->getProperty("evidence_text").toString().toStdString();
+    c.concept_text  = cobj->getProperty("concept_text").toString().toStdString();
+    c.concept_type  = cobj->getProperty("concept_type").toString().toStdString();
+    c.assertion     = cobj->getProperty("assertion").toString().toStdString();
+
+    // ---- attributes ----
+    auto attrVar = cobj->getProperty("attributes");
+    auto *attrObj = attrVar.getDynamicObject();
+
+    if (attrObj) {
+      auto gp = attrObj->getProperty("gleason_primary");
+      auto gs = attrObj->getProperty("gleason_secondary");
+      auto pi = attrObj->getProperty("percent_involvement");
+
+      if (!gp.isVoid()) c.attributes.gleason_primary = (int)gp;
+      if (!gs.isVoid()) c.attributes.gleason_secondary = (int)gs;
+      if (!pi.isVoid()) c.attributes.percent_involvement = (double)pi;
+    }
+
+    // ==============================
+    // 4) Fix assertion deterministically
+    // ==============================
+    std::string lower = c.evidence_text;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+    if (lower.find("negative") != std::string::npos ||
+        lower.find("no ") != std::string::npos) {
+      c.assertion = "absent";
+    }
+    else if (lower.find("positive") != std::string::npos ||
+             lower.find("present") != std::string::npos) {
+      c.assertion = "present";
+    }
+
+    // Gleason ALWAYS wins
+    if (lower.find("gleason") != std::string::npos &&
+    (c.attributes.gleason_primary.has_value() ||
+     c.attributes.gleason_secondary.has_value())) {
+      c.concept_type = "gleason_grade";
+    }
+
+    if (!c.evidence_text.empty())
+      out.push_back(std::move(c));
+  }
+
+  return out;
+}
+
+
+std::vector<Concept> reduceToConcepts_LLM(const std::string &text) {
+
+  std::string body = buildConceptExtractionRequestBody_JSON_Llama(text);
+  const std::string resp = LlamaResponses_POST(body);
 
   if (resp.empty()) {
     return {};
   }
 
-  auto pResp = parseConceptsFromResponses(resp);
+  auto pResp = parseConceptsFromLlamaResponses(resp);
   return pResp;
 }
 
-std::vector<AnnotationSpan> reduceToAnnotations_OpenAI(const std::string &text,
+std::vector<AnnotationSpan> reduceToAnnotations_LLM(const std::string &text,
                                                        const std::vector<std::string> &preconfigAnnos) {
   std::string apiKey(
     "REDACTED_OPENAI_API_KEY");
@@ -1061,8 +1345,11 @@ std::vector<AnnotationSpan> reduceToAnnotations_OpenAI(const std::string &text,
   bool extractConceptFirst = true;
 
   if (extractConceptFirst) {
+    auto resp = reduceToConcepts_LLM(text);
+    return {};
+  } else {
     std::string body = buildConceptExtractionRequestBody_JSON(text);
-    const std::string resp = openAIResponses_POST(apiKey, body, 60000);
+    const std::string resp = openAIResponses_POST(apiKey, body);
 
     if (resp.empty()) {
       return {};
@@ -1070,17 +1357,8 @@ std::vector<AnnotationSpan> reduceToAnnotations_OpenAI(const std::string &text,
 
     auto pResp = parseConceptsFromResponses(resp);
     return {};
-  } else {
-    std::string body = buildResponsesRequestBody_JSON2(text, preconfigAnnos);
-    const std::string resp = openAIResponses_POST(apiKey, body, 60000);
-
-    if (resp.empty()) {
-      return {};
-    }
-
-    auto pResp = parseAnnotationsFromResponses(resp);
-    resolveEvidenceSpans(text, pResp);
-    return pResp;
+    // resolveEvidenceSpans(text, pResp);
+    // return pResp;
   }
 }
 
@@ -1105,7 +1383,7 @@ void AnnotateComponent::voice_annotation_handler() {
     }
     auto start = std::chrono::high_resolution_clock::now();
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
-    auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, get_preconfig_anno());
+    auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
         count();
 
@@ -1199,11 +1477,26 @@ void AnnotateComponent::silly_test() {
     }
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto annoSpanVec = reduceToConcepts_OpenAI(fullText);
+    auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
 
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
         count();
 
+    // for (auto &annospan: annoSpanVec) {
+    //   std::cout << annospan.label;
+    //
+    //   if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
+    //     std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
+    //     for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
+    //       std::cout << wordVec[i].word;
+    //       if (i < annospan.spanEndI) {
+    //         std::cout << " ";
+    //       }
+    //     }
+    //     std::cout << "\"" << std::endl;
+    //   }
+    //
+    // }
     int k = 0;
   }
 
@@ -1216,24 +1509,7 @@ void AnnotateComponent::silly_test() {
   auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
       count();
   std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
-  auto annoSpanVec = reduceToAnnotations_OpenAI(fullText, get_preconfig_anno());
-  for (auto &annospan: annoSpanVec) {
-    std::cout << annospan.label;
+  auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
 
-    if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
-      std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
-      for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
-        std::cout << wordVec[i].word;
-        if (i < annospan.spanEndI) {
-          std::cout << " ";
-        }
-      }
-      std::cout << "\"" << std::endl;
-    }
-
-    // if (!annospan.evidenceText.empty()) {
-    //   std::cout << ", \"" << annospan.evidenceText << "\"" << std::endl;
-    // }
-  }
   int k = 0;
 }
