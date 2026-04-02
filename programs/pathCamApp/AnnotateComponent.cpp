@@ -79,7 +79,7 @@ namespace {
 }
 
 void resolveEvidenceSpans(const std::string &originalText,
-                          std::vector<AnnotationSpan> &annotations) {
+                          std::vector<ConceptSpan> &annotations) {
   if (originalText.empty())
     return;
 
@@ -90,30 +90,30 @@ void resolveEvidenceSpans(const std::string &originalText,
   const auto normalizedTranscript = normalize(originalText);
 
   for (auto &ann: annotations) {
-    if (ann.evidenceText.empty())
+    if (ann.evidence_text.empty())
       continue;
 
     // ---------------------------------------------
     // 1) Exact substring match
     // ---------------------------------------------
-    size_t pos = originalText.find(ann.evidenceText, searchStartByte);
+    size_t pos = originalText.find(ann.evidence_text, searchStartByte);
 
     if (pos != std::string::npos) {
       int startWord = byteOffsetToWordIndex(originalText, pos);
       int endWord = byteOffsetToWordIndex(originalText,
-                                          pos + ann.evidenceText.size() - 1);
+                                          pos + ann.evidence_text.size() - 1);
 
       ann.spanStartI = startWord;
       ann.spanEndI = endWord;
 
-      searchStartByte = pos + ann.evidenceText.size();
+      searchStartByte = pos + ann.evidence_text.size();
       continue;
     }
 
     // ---------------------------------------------
     // 2) Normalized exact match
     // ---------------------------------------------
-    const std::string normalizedEvidence = normalize(ann.evidenceText);
+    const std::string normalizedEvidence = normalize(ann.evidence_text);
 
     size_t normPos = normalizedTranscript.find(
       normalizedEvidence,
@@ -129,7 +129,7 @@ void resolveEvidenceSpans(const std::string &originalText,
     // ---------------------------------------------
     // 3) Token sequence match (contiguous)
     // ---------------------------------------------
-    const auto evidenceTokens = splitWords(ann.evidenceText);
+    const auto evidenceTokens = splitWords(ann.evidence_text);
 
     if (!evidenceTokens.empty()) {
       const size_t tSize = transcriptTokens.size();
@@ -1099,8 +1099,8 @@ static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::stri
 }
 
 
-static std::vector<Concept> parseConceptsFromResponses(const std::string &responsesJson) {
-  std::vector<Concept> out;
+static std::vector<ConceptSpan> parseConceptsFromResponses(const std::string &responsesJson) {
+  std::vector<ConceptSpan> out;
 
   auto top = juce::JSON::parse(responsesJson);
   if (!top.isObject()) return out;
@@ -1144,7 +1144,7 @@ static std::vector<Concept> parseConceptsFromResponses(const std::string &respon
       auto *cobj = cv.getDynamicObject();
       if (!cobj) continue;
 
-      Concept c;
+      ConceptSpan c;
 
       // ---- core fields ----
       c.evidence_text = cobj->getProperty("evidence_text").toString().toStdString();
@@ -1221,8 +1221,8 @@ static std::vector<Concept> parseConceptsFromResponses(const std::string &respon
   return out;
 }
 
-static std::vector<Concept> parseConceptsFromLlamaResponses(const std::string &responsesJson) {
-  std::vector<Concept> out;
+static std::vector<ConceptSpan> parseConceptsFromLlamaResponses(const std::string &responsesJson) {
+  std::vector<ConceptSpan> out;
 
   // ==============================
   // 1) Parse outer response
@@ -1273,7 +1273,7 @@ static std::vector<Concept> parseConceptsFromLlamaResponses(const std::string &r
     auto *cobj = cv.getDynamicObject();
     if (!cobj) continue;
 
-    Concept c;
+    ConceptSpan c;
 
     c.evidence_text = cobj->getProperty("evidence_text").toString().toStdString();
     c.concept_text  = cobj->getProperty("concept_text").toString().toStdString();
@@ -1324,7 +1324,7 @@ static std::vector<Concept> parseConceptsFromLlamaResponses(const std::string &r
 }
 
 
-std::vector<Concept> reduceToConcepts_LLM(const std::string &text) {
+std::vector<ConceptSpan> reduceToConcepts_LLM(const std::string &text) {
 
   std::string body = buildConceptExtractionRequestBody_JSON_Llama(text);
   const std::string resp = LlamaResponses_POST(body);
@@ -1337,7 +1337,7 @@ std::vector<Concept> reduceToConcepts_LLM(const std::string &text) {
   return pResp;
 }
 
-std::vector<AnnotationSpan> reduceToAnnotations_LLM(const std::string &text,
+std::vector<ConceptSpan> reduceToAnnotations_LLM(const std::string &text,
                                                        const std::vector<std::string> &preconfigAnnos) {
   std::string apiKey(
     "REDACTED_OPENAI_API_KEY");
@@ -1346,7 +1346,8 @@ std::vector<AnnotationSpan> reduceToAnnotations_LLM(const std::string &text,
 
   if (extractConceptFirst) {
     auto resp = reduceToConcepts_LLM(text);
-    return {};
+    resolveEvidenceSpans(text, resp);
+    return resp;
   } else {
     std::string body = buildConceptExtractionRequestBody_JSON(text);
     const std::string resp = openAIResponses_POST(apiKey, body);
@@ -1361,6 +1362,7 @@ std::vector<AnnotationSpan> reduceToAnnotations_LLM(const std::string &text,
     // return pResp;
   }
 }
+
 
 void AnnotateComponent::voice_annotation_handler() {
   while (voiceHandlerShouldContinue) {
@@ -1389,7 +1391,7 @@ void AnnotateComponent::voice_annotation_handler() {
 
     std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
     for (auto &annospan: annoSpanVec) {
-      std::cout << annospan.label;
+      std::cout << annospan.concept_type;
 
       if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
         std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
@@ -1402,8 +1404,8 @@ void AnnotateComponent::voice_annotation_handler() {
         std::cout << "\"" << std::endl;
       }
 
-      if (!annospan.evidenceText.empty()) {
-        std::cout << ", \"" << annospan.evidenceText << "\"" << std::endl;
+      if (!annospan.evidence_text.empty()) {
+        std::cout << ", \"" << annospan.evidence_text << "\"" << std::endl;
       }
     }
     std::shared_ptr<MRTiledImageSet> mrImgSet;
@@ -1421,34 +1423,33 @@ void AnnotateComponent::voice_annotation_handler() {
     allSlideAnnotationMutex.unlock();
 
     //make the polygon
-    for (auto &annospan: annoSpanVec) {
-      if (annospan.spanStartI < 0 || annospan.spanEndI < 0) {
-        std::cout << "bad text indices for annotation: " + annospan.label << std::endl;
+    for (auto &conceptSpan: annoSpanVec) {
+      if (conceptSpan.spanStartI < 0 || conceptSpan.spanEndI < 0) {
+        std::cout << "bad text indices for annotation: " + conceptSpan.concept_type << std::endl;
         continue;
       }
 
-      annospan.endMS = wordVec[annospan.spanEndI].endMS;
-      annospan.startMS = wordVec[annospan.spanStartI].startMS;
+
 
       long startFrameIndex, endFrameIndex;
-      auto polyAnnoVertices = mrImgSet->poly_annotation_from_time_interval(annospan.startMS,
-                                                                           annospan.endMS,
+      auto polyAnnoVertices = mrImgSet->poly_annotation_from_time_interval(conceptSpan.startMS,
+                                                                           conceptSpan.endMS,
                                                                            startFrameIndex,
                                                                            endFrameIndex);
 
-      annospan.startFrameIdx = startFrameIndex;
-      annospan.endFrameIdx = endFrameIndex;
+      conceptSpan.startFrameIdx = startFrameIndex;
+      conceptSpan.endFrameIdx = endFrameIndex;
 
       // Create a new polygon annotation with the label
-      auto polyAnno = std::make_shared<VoicePointPoly>(annospan);
-      std::cout << "annospan frame index: " << annospan.startFrameIdx << " " << annospan.endFrameIdx << std::endl;
+      auto polyAnno = std::make_shared<VoicePointPoly>(conceptSpan);
+      std::cout << "annospan frame index: " << conceptSpan.startFrameIdx << " " << conceptSpan.endFrameIdx << std::endl;
 
       // Add each vertex from polyAnnoVertices
       for (const auto &vertex: polyAnnoVertices) {
         polyAnno->direct_add(fPoint(vertex.x, vertex.y));
       }
 
-      if (annospan.scope == "global") {
+      if (conceptSpan.concept_type == "gleason_grade") {
         polyAnno->global = true;
       }
 
@@ -1467,7 +1468,7 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  for (int i = 6; i < 15; ++i) {
+  for (int i = 0; i < 15; ++i) {
     juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/dictation.wav");
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     std::cout << std::endl << std::endl << i << std::endl;
@@ -1477,11 +1478,19 @@ void AnnotateComponent::silly_test() {
     }
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
+    auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
 
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
         count();
 
+    for (auto & c : annoSpanVec) {
+      if (!c.evidence_text.empty()) {
+        c.endMS = wordVec[c.spanEndI].endMS;
+        c.startMS = wordVec[c.spanStartI].startMS;
+      }
+
+    }
+    int k = 0;
     // for (auto &annospan: annoSpanVec) {
     //   std::cout << annospan.label;
     //
@@ -1497,7 +1506,6 @@ void AnnotateComponent::silly_test() {
     //   }
     //
     // }
-    int k = 0;
   }
 
 

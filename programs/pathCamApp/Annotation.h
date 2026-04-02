@@ -16,12 +16,21 @@ struct ConceptAttributes {
   std::optional<double> percent_involvement;
 };
 
-struct Concept {
+struct ConceptSpan {
   std::string evidence_text;
   std::string concept_text;
   std::string concept_type;
   std::string assertion;
   ConceptAttributes attributes;
+
+  bool slideLevel = false;
+
+  int spanStartI = -1;
+  int spanEndI = -1;
+  long startMS = -1;
+  long endMS = -1;
+  long startFrameIdx = -1;
+  long endFrameIdx = -1;
 };
 
 struct AnnotationSpan
@@ -360,7 +369,9 @@ private:
 class VoicePointPoly : public PointClickPoly {
 public:
   AnnotationSpan annospan;
+  ConceptSpan conceptSpan;
   VoicePointPoly(AnnotationSpan _annospan) : PointClickPoly(_annospan.label), annospan(std::move(_annospan)){};
+  VoicePointPoly(ConceptSpan _conceptSpan) : PointClickPoly(_conceptSpan.concept_type), conceptSpan(_conceptSpan){};
 
 };
 
