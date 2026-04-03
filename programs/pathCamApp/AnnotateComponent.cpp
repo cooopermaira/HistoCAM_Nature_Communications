@@ -1476,20 +1476,23 @@ void AnnotateComponent::silly_test() {
     for (size_t i = 0; i < fullText.size(); i += width) {
       std::cout << fullText.substr(i, width) << "\n";
     }
-    auto start = std::chrono::high_resolution_clock::now();
-
-    auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
-
-    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-        count();
-
-    for (auto & c : annoSpanVec) {
-      if (!c.evidence_text.empty()) {
-        c.endMS = wordVec[c.spanEndI].endMS;
-        c.startMS = wordVec[c.spanStartI].startMS;
-      }
-
+    for (auto &word : wordVec) {
+      std::cout<<word.word<<" "<<word.startMS << " "<<word.endMS<<std::endl;
     }
+    // auto start = std::chrono::high_resolution_clock::now();
+    //
+    // auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
+    //
+    // auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+    //     count();
+    //
+    // for (auto & c : annoSpanVec) {
+    //   if (!c.evidence_text.empty()) {
+    //     c.endMS = wordVec[c.spanEndI].endMS;
+    //     c.startMS = wordVec[c.spanStartI].startMS;
+    //   }
+    //
+    // }
     int k = 0;
     // for (auto &annospan: annoSpanVec) {
     //   std::cout << annospan.label;
