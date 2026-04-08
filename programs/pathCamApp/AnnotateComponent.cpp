@@ -1468,7 +1468,7 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  for (int i = 0; i < 15; ++i) {
+  for (int i = 10; i < 15; ++i) {
     juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/dictation.wav");
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     std::cout << std::endl << std::endl << i << std::endl;
@@ -1479,12 +1479,12 @@ void AnnotateComponent::silly_test() {
     for (auto &word : wordVec) {
       std::cout<<word.word<<" "<<word.startMS << " "<<word.endMS<<std::endl;
     }
-    // auto start = std::chrono::high_resolution_clock::now();
-    //
-    // auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
-    //
-    // auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-    //     count();
+    auto start = std::chrono::high_resolution_clock::now();
+
+    auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
+
+    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
     //
     // for (auto & c : annoSpanVec) {
     //   if (!c.evidence_text.empty()) {
