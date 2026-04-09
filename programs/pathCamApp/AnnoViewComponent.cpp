@@ -44,11 +44,17 @@ bool AnnoViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *o
 
   if (key == juce::KeyPress::createFromDescription("shift + d")) {
     std::shared_ptr<Annotation> new_annotation;
-    new_annotation.reset(new debugAnnotation("debug", MRImageSet));
+    new_annotation.reset(new debugAnnotation("0 0", MRImageSet));
+    new_annotation->setName("0 0");
     annotateParent->setSelected(new_annotation);
     annotations->push_back(new_annotation);
     annotateParent->annotationsUpdated();
-    repaint();
+    debugIterAnnotation = new_annotation;
+    debugIterCount = 0;
+    debugIterMode = true;
+    // repaint();
+    parent->startCompositingUIUpdates();
+    parent->notify_new_data();
     return true;
   }
 

@@ -2,6 +2,8 @@
 
 #include "JuceHeader.h"
 
+class Annotation;
+
 //==============================================================================
 /*
  This component lives inside our window, and this is where you should put all
@@ -239,6 +241,12 @@ public:
   }
 
   void layoutIn(juce::Rectangle<int> area);
+
+  void debugStep();
+
+  bool debugIterMode = false;
+  int debugIterCount = 0;
+  std::shared_ptr<Annotation> debugIterAnnotation;
 
   inline fPoint screen2viewScale(fRectangle myview)
   {

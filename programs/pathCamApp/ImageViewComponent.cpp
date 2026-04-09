@@ -262,6 +262,18 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
     */
 }
 
+void ImageViewComponent::debugStep() {
+  if (!debugIterMode || !debugIterAnnotation || !MRImageSet) return;
+  debugIterCount++;
+  debugIterAnnotation->setName(juce::String(debugIterCount) + " " + juce::String(debugIterCount));
+  if (debugIterCount >= (int)MRImageSet->AbCs.size() - 1) {
+    debugIterMode = false;
+    parent->stopCompositingUIUpdates();
+    std::cout<<"DONE"<<std::endl;
+  }
+  parent->notify_new_data();
+}
+
 void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   bool canShadeClasses = false;
 
@@ -269,6 +281,7 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   {
     Poco::FastMutex::ScopedLock lock(MRImageSet->mutex);
     mrImages = MRImageSet->MRImages;
+    debugStep();
   }
 
   const int N = (int) mrImages.size();
