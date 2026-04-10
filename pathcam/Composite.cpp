@@ -440,18 +440,19 @@ namespace pathCam {
               Point2f pairwiseDistance = Point2f(-res.H.at<double>(0, 2), -res.H.at<double>(1, 2));
 
               if (abs(relativeScale - 1.f) < 0.05) {
-                //we're part of this component. suspend self, create a match and attempt registration.
-
-                suspend_and_join(_rootImg->regInfo, target, pairwiseDistance);
-
-                std::cout << "component " << componentIndex << " suspended and joined to component "
-                    << target->regInfo->component_membership << std::endl;
-
-                std::vector<uint8_t> inlierMask;
-                std::vector<KeyPoint> kp1, kp2;
-
-                theirComponent->extraMatches.emplace_back(_rootImg, target, kp1, kp2);
-
+                // Same scale — keep as independent component. CMS will find shared frames;
+                // CompositeManager::combine_components() will join later.
+                Point2f theirAbC(target->regInfo->absoluteCoords.x, target->regInfo->absoluteCoords.y);
+                Point2f queryAbC = pairwiseDistance + theirAbC;
+                auto resultantPoint = parent->get_AbC_relative_from_relative(theirComponentIndex, queryAbC, 0);
+                double scale = relativeScale * theirComponent->get_scale();
+                assert(scale > 0);
+                set_scale(scale, !flatfieldKnown);
+                set_offset(resultantPoint / scale);
+                xcPwDist = pairwiseDistance;
+                xcRegLandmark = target;
+                std::cout << "component " << componentIndex
+                          << " is same-scale; remaining independent for CMS joining" << std::endl;
                 _rootImg->free_memory_RAW();
                 return;
               }
@@ -459,12 +460,20 @@ namespace pathCam {
           }
         }
 
-        //we know were in the same component, but we couldnt match. we have a good guess as to where this frame probably
-        //is via velocity estimation, go ahead and just put it there:
-
-        auto relDist = mostRcntRslv->regInfo->absoluteCoords - regionInMySpace.tl();
-        suspend_and_join(_rootImg->regInfo, mostRcntRslv, relDist);
-        std::cout << "component " << componentIndex << " suspended and added to component via projection" << std::endl;
+        // AKAZE failed to confirm match, but no objective change detected. Use velocity-projected
+        // position to anchor the component; stay independent for CMS joining later.
+        auto theirComponentIndex = mostRcntRslv->regInfo->component_membership;
+        auto theirComponent = parent->composites[theirComponentIndex];
+        auto projectedAbC = Point2f(regionInMySpace.tl());
+        auto resultantPoint = parent->get_AbC_relative_from_relative(theirComponentIndex, projectedAbC, 0);
+        double scale = theirComponent->get_scale();
+        assert(scale > 0);
+        set_scale(scale, !flatfieldKnown);
+        set_offset(resultantPoint / scale);
+        xcPwDist = projectedAbC - Point2f(mostRcntRslv->regInfo->absoluteCoords);
+        xcRegLandmark = mostRcntRslv;
+        std::cout << "component " << componentIndex
+                  << " positioned via velocity projection; remaining independent" << std::endl;
 
         _rootImg->free_memory_RAW();
       } else {
@@ -521,13 +530,7 @@ namespace pathCam {
             //calculate relative coordinates of _rootImg in their component space
             Point2f pairwiseDistance = Point2f(homography[2], homography[5]);
 
-            if (abs(relativeScale - 1.f) < 0.05) {
-              //we're part of this component even though we thought there had been an objective change. suspend self,
-              //create a match and attempt registration.
-              suspend_and_join(_rootImg->regInfo, mostRcntRslv, pairwiseDistance);
-              std::cout << "component " << componentIndex << " suspended and joined to component "
-                  << mostRcntRslv->regInfo->component_membership << std::endl;
-            }
+            // Same scale in objective-change branch — stay independent; CMS will handle joining.
 
             //get matched-to frames absolute coordinates
             Point2f theirAbC(mostRcntRslv->regInfo->absoluteCoords.x, mostRcntRslv->regInfo->absoluteCoords.y);
