@@ -1104,7 +1104,7 @@ namespace pathCam {
     pathcamReady = true;
 
     // auto start = std::chrono::high_resolution_clock::now();
-    // previousSlides.back()->correct_alignment();
+    previousSlides.back()->correct_alignment();
     // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
     //   std::chrono::high_resolution_clock::now() - start).count();
     // int k = 0;

@@ -44,6 +44,8 @@ public:
   std::atomic<bool> inMemory = true;
 
   std::vector<Features> akaze;
+  bool aligned = false;
+  cv::Mat H_to_anchor;
 
 
   MRTiledImage(pathCam::StreamCam *parent = nullptr, int _tile_size = 0);

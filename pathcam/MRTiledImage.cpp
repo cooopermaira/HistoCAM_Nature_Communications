@@ -717,9 +717,110 @@ void MRTiledImageSet::detach() {
     MRImages.end());
 }
 
-void MRTiledImageSet::correct_alignment() {
-  for (auto &mrImg : MRImages) {
-    if (mrImg->suspended){continue;}
-    mrImg->extract_akaze();
-  }
+// void MRTiledImageSet::correct_alignment() {
+//   for (auto &mrImg : MRImages) {
+//     if (mrImg->suspended){continue;}
+//     mrImg->extract_akaze();
+//   }
+// }
+
+void MRTiledImageSet::correct_alignment(){
+    if (MRImages.empty()) return;
+
+    // Step 1: extract features
+    for (auto &mrImg : MRImages)
+    {
+        if (mrImg->suspended) continue;
+        mrImg->extract_akaze();
+        mrImg->aligned = false;
+        mrImg->H_to_anchor = cv::Mat::eye(3, 3, CV_64F);
+    }
+
+    // Step 2: define anchor (layer 0)
+    int anchorIdx = 0;
+    MRImages[anchorIdx]->aligned = true;
+    MRImages[anchorIdx]->H_to_anchor = cv::Mat::eye(3, 3, CV_64F);
+
+    // Step 3: build ordering by scale distance to anchor
+    std::vector<int> order;
+    for (int i = 0; i < (int)MRImages.size(); i++)
+    {
+        if (i == anchorIdx) continue;
+        if (MRImages[i]->suspended) continue;
+        order.push_back(i);
+    }
+
+    std::sort(order.begin(), order.end(),
+        [&](int a, int b)
+        {
+            return std::abs(MRImages[a]->scale - MRImages[anchorIdx]->scale) <
+                   std::abs(MRImages[b]->scale - MRImages[anchorIdx]->scale);
+        });
+
+    // Step 4: propagate alignment outward
+    for (int idx : order)
+    {
+        auto& target = MRImages[idx];
+
+        // --- find closest aligned neighbor in scale ---
+        int bestNeighbor = -1;
+        double bestScaleDiff = std::numeric_limits<double>::max();
+
+        for (int j = 0; j < (int)MRImages.size(); j++)
+        {
+            if (!MRImages[j]->aligned) continue;
+            if (MRImages[j]->suspended) continue;
+
+            double d = std::abs(MRImages[j]->scale - target->scale);
+            if (d < bestScaleDiff)
+            {
+                bestScaleDiff = d;
+                bestNeighbor = j;
+            }
+        }
+
+        if (bestNeighbor < 0) continue;
+
+        auto& ref = MRImages[bestNeighbor];
+
+        // --- compute homography target → ref ---
+        HomographyResultM result =
+            findHomographyAKAZE_allScalePairs(target->akaze, ref->akaze);
+
+        if (!result.valid){
+            continue;
+        }
+
+        // --- basic robustness checks ---
+        if (result.inliers < 20){
+            continue;
+        }
+
+        // Optional: check for degenerate H
+        if (result.H.empty() || result.H.rows != 3 || result.H.cols != 3){
+            continue;
+        }
+
+        // --- compose transforms ---
+        // result.H maps target → ref
+        // ref->H_to_anchor maps ref → anchor
+        // so:
+        // target → anchor = ref→anchor * target→ref
+
+        target->H_to_anchor = ref->H_to_anchor * result.H;
+
+      std::cout<<target->H_to_anchor<<std::endl;
+
+        target->aligned = true;
+
+    }
+
+    // Optional: report failures
+    for (int i = 0; i < (int)MRImages.size(); i++)
+    {
+        if (!MRImages[i]->aligned)
+        {
+            std::cout<<"Layer " << i << " failed to align."<<std::endl;
+        }
+    }
 }
