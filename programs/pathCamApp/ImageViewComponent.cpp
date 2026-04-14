@@ -287,19 +287,26 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   const int N = (int) mrImages.size();
   if (N == 0) return;
 
-  const int mode = wrapMod(componentSelector, N + 1); // 0..N
+  // Build ordered list of unique magLabels (preserving MRImages sort order, skipping suspended).
+  std::vector<unsigned int> uniqueLabels;
+  for (auto &img : mrImages) {
+    if (img->suspended) continue;
+    if (uniqueLabels.empty() || uniqueLabels.back() != img->magLabel)
+      uniqueLabels.push_back(img->magLabel);
+  }
+
+  const int numGroups = (int) uniqueLabels.size();
+  const int mode = wrapMod(componentSelector, numGroups + 1); // 0 = all, 1..numGroups = group
   const bool showAll = (mode == 0);
-  const int selectedIdx = showAll ? -1 : (mode - 1); // 0..N-1
+  const unsigned int selectedLabel = showAll ? 0 : uniqueLabels[mode - 1];
 
   if (!showAll) {
     g.beginTransparencyLayer(0.3f);
   }
 
-  for (int i = 0; i < N; ++i) {
-    if (!showAll && i == selectedIdx) continue;
-
-    auto img = mrImages[i];
-    if (/*img->scale == 0 ||*/ img->suspended) continue;
+  for (auto &img : mrImages) {
+    if (img->suspended) continue;
+    if (!showAll && img->magLabel == selectedLabel) continue;
 
     g.setColour(juce::Colours::white);
     drawLayer(g, scale, img);
@@ -308,24 +315,23 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   if (!showAll) {
     g.endTransparencyLayer();
 
-    // draw selected at full opacity
-    auto img = mrImages[selectedIdx];
-    if (img->scale != 0 && !img->suspended) {
+    // draw selected group at full opacity
+    for (auto &img : mrImages) {
+      if (img->suspended || img->magLabel != selectedLabel) continue;
+      if (img->scale == 0) continue;
       g.setColour(juce::Colours::white);
       drawLayer(g, scale, img);
+    }
 
-      if (!parent->sCam->microscopeInput) {
-        g.setColour(juce::Colours::red);
-
-        g.setFont(15);
-        g.drawText("current objective", 5, getHeight() - 30, 110,
-                   Justification::centredLeft, true);
-
-        g.setFont(40.0f);
-        g.drawText(pathCam::Image::get_label(img->magLabel),
-                   20, getHeight() - 50, 100,
-                   Justification::centredLeft, true);
-      }
+    if (!parent->sCam->microscopeInput) {
+      g.setColour(juce::Colours::red);
+      g.setFont(15);
+      g.drawText("current objective", 5, getHeight() - 30, 110,
+                 Justification::centredLeft, true);
+      g.setFont(40.0f);
+      g.drawText(pathCam::Image::get_label(selectedLabel),
+                 20, getHeight() - 50, 100,
+                 Justification::centredLeft, true);
     }
   }
 
@@ -525,32 +531,20 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     return true;
   }
   if (key == KeyPress::createFromDescription("c")) {
-    if (!MRImageSet){return true;}
-    const int N = (int) MRImageSet->MRImages.size();
-    if (N == 0) return true;
+    if (!MRImageSet) return true;
+    const auto &mrImages = MRImageSet->MRImages;
 
-    const int M = N + 1; // 0..N  (0 = show all)
-    int mode = wrapMod(componentSelector + 1, M);
-
-    // If we're in "show one component" mode, skip suspended components.
-    if (mode != 0) {
-      int guard = 0;
-      while (guard++ < M) {
-        const int idx = mode - 1; // 0..N-1
-        if (!MRImageSet->MRImages[idx]->suspended) break;
-
-        mode = wrapMod(mode + 1, M); // advance within 0..N
-        if (mode == 0) {
-          // landed on "show all" -> always allowed
-          break;
-        }
-      }
-
-      // If we failed to find a non-suspended component (all suspended), show all.
-      if (guard >= M && mode != 0) mode = 0;
+    // Build ordered unique magLabels from non-suspended images (same as drawSlide)
+    std::vector<unsigned int> uniqueLabels;
+    for (auto &img : mrImages) {
+      if (img->suspended) continue;
+      if (uniqueLabels.empty() || uniqueLabels.back() != img->magLabel)
+        uniqueLabels.push_back(img->magLabel);
     }
+    const int numGroups = (int) uniqueLabels.size();
+    if (numGroups == 0) return true;
 
-    componentSelector = mode;
+    componentSelector = wrapMod(componentSelector + 1, numGroups + 1);
     repaint();
     return true;
   }
