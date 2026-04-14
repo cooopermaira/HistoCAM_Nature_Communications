@@ -838,7 +838,7 @@ void MRTiledImageSet::correct_alignment() {
                   << "  scale " << root->scale << " -> " << newScale
                   << "  offset (" << root->offset.x << "," << root->offset.y
                   << ") -> (" << newOffset.x << "," << newOffset.y << ")"
-                  << std::endl;
+                  << " anchored to layer "<< target->componentIndex << std::endl;
 
         root->set_scale(newScale);
         root->set_offset(newOffset);
