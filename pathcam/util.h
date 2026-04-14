@@ -35,6 +35,7 @@ namespace pathCam {
 
 #ifdef PATHCAM_HAS_TENSORRT
   using namespace nvinfer1;
+
   class nvLogger : public ILogger {
     void log(Severity s, const char *msg) noexcept override {
       if (s <= Severity::kWARNING) std::cerr << "[TRT] " << msg << "\n";
@@ -44,21 +45,57 @@ namespace pathCam {
   extern nvLogger nvloger;
 #endif
 
-  inline cv::Ptr<cv::AKAZE>& getThreadLocalAKAZE()
-  {
+  inline cv::Ptr<cv::AKAZE> &getThreadLocalAKAZE() {
     thread_local cv::Ptr<cv::AKAZE> akaze = cv::AKAZE::create();
     return akaze;
   }
 
-  struct Features
-  {
+  struct Features {
     float scale = 1.0f;
     cv::Mat image;
     std::vector<cv::KeyPoint> kp;
     cv::Mat desc;
   };
 
-  inline Features buildFeatures(const cv::Mat& src, float s, const cv::Mat& mask = cv::Mat()){
+  inline void spatially_filter_keypoints(
+    std::vector<cv::KeyPoint> &kp,
+    int imageWidth,
+    int imageHeight,
+    float cellSizePx = 128.0f,
+    int maxPerCell = 40) {
+    if (kp.empty()) return;
+
+    int gridX = std::max(1, int(std::ceil(imageWidth / cellSizePx)));
+    int gridY = std::max(1, int(std::ceil(imageHeight / cellSizePx)));
+
+    std::vector<std::vector<cv::KeyPoint> > buckets(gridX * gridY);
+
+    for (auto &k: kp) {
+      int gx = std::min(gridX - 1, int(k.pt.x / cellSizePx));
+      int gy = std::min(gridY - 1, int(k.pt.y / cellSizePx));
+
+      buckets[gy * gridX + gx].push_back(k);
+    }
+
+    std::vector<cv::KeyPoint> filtered;
+    filtered.reserve(gridX * gridY * maxPerCell);
+
+    for (auto &b: buckets) {
+      if (b.empty()) continue;
+
+      std::sort(b.begin(), b.end(),
+                [](const cv::KeyPoint &a, const cv::KeyPoint &b) {
+                  return a.response > b.response;
+                });
+
+      int keep = std::min((int) b.size(), maxPerCell);
+      filtered.insert(filtered.end(), b.begin(), b.begin() + keep);
+    }
+
+    kp = std::move(filtered);
+  }
+
+  inline Features buildFeatures(const cv::Mat &src, float s, const cv::Mat &mask = cv::Mat(), bool gridFilter = false) {
     auto akaze = getThreadLocalAKAZE();
 
     Features f;
@@ -81,12 +118,26 @@ namespace pathCam {
     }
 
     if (!f.image.empty()) {
-      akaze->detectAndCompute(
+      if (gridFilter) {
+        akaze->detect(f.image, f.kp, resizedMask.empty() ? cv::noArray() : resizedMask);
+
+        spatially_filter_keypoints(
+          f.kp,
+          f.image.cols,
+          f.image.rows,
+          256.0f, // cell size in pixels
+          40 // max per cell
+        );
+
+        akaze->compute(f.image, f.kp, f.desc);
+      } else {
+        akaze->detectAndCompute(
           f.image,
           resizedMask.empty() ? cv::noArray() : resizedMask,
           f.kp,
           f.desc
-      );
+        );
+      }
     }
 
     return f;
@@ -102,13 +153,10 @@ namespace pathCam {
   };
 
 
-  inline HomographyResultM findHomographyAKAZE_allScalePairs(
-    const std::vector<Features> &featsA,
-    const std::vector<Features> &featsB) {
+  inline HomographyResultM findHomographyAKAZE_allScalePairs(const std::vector<Features> &featsA, const std::vector<Features> &featsB) {
+
     HomographyResultM best;
 
-    // const std::vector<float> scales = {1.0f, 0.5f, 0.1f};
-    const std::vector<float> scales = {0.5f, 0.25f, 0.1f};
     // Geometric sanity thresholds for "almost no rotation or shearing"
     const double maxAnisotropyFrac = 0.08; // |h00-h11| / avg(h00,h11)
     const double maxOffDiag = 0.08; // small rotation/shear terms
@@ -252,7 +300,7 @@ namespace pathCam {
   }
 
 
-  void make_akaze(pathCam::Image* img_, std::vector<float> scales);
+  void make_akaze(pathCam::Image *img_, std::vector<float> scales);
 
   struct ScaleResult {
     double scale = 0.0;
@@ -263,7 +311,6 @@ namespace pathCam {
     cv::Size cropSize;
     bool valid = false;
   };
-
 
 
   inline long segment_yval_at_point(float xloc, cv::Point2f p1, cv::Point2f p2) {
@@ -289,19 +336,19 @@ namespace pathCam {
   }
 
 
-
   template<typename T>
   class OrderedSet {
   public:
-    bool insert(const T& value) {
-      if (set.insert(value).second) {  // only if not already present
+    bool insert(const T &value) {
+      if (set.insert(value).second) {
+        // only if not already present
         vec.push_back(value);
         return true;
       }
       return false;
     }
 
-    const std::vector<T>& values() const { return vec; }
+    const std::vector<T> &values() const { return vec; }
 
   private:
     std::vector<T> vec;
@@ -353,10 +400,10 @@ namespace pathCam {
       std::vector<ImgId> promoted_nodes; // nodes that were non-member and must become member
 
       // Each entry is a list of node ids that are MEMBERS in that island.
-      std::vector<std::vector<ImgId>> member_islands;
+      std::vector<std::vector<ImgId> > member_islands;
 
       // Optional: closure of each island through allowed edges (members+nonmembers)
-      std::vector<std::vector<ImgId>> island_closures;
+      std::vector<std::vector<ImgId> > island_closures;
     };
 
   public:
@@ -707,17 +754,16 @@ namespace pathCam {
     // }
 
 
-    void fillFailureIslands(PromotionResult& res,
-                        const std::vector<bool>& working_member,
-                        bool allow_sift) const
-    {
+    void fillFailureIslands(PromotionResult &res,
+                            const std::vector<bool> &working_member,
+                            bool allow_sift) const {
       auto comp = memberComponents(working_member, allow_sift);
 
       // Map comp_id -> list of member node indices
-      std::unordered_map<int, std::vector<int>> islands;
+      std::unordered_map<int, std::vector<int> > islands;
       islands.reserve(adj_.size());
 
-      for (int i = 0; i < (int)working_member.size(); ++i) {
+      for (int i = 0; i < (int) working_member.size(); ++i) {
         if (!working_member[i]) continue;
         islands[comp[i]].push_back(i);
       }
@@ -725,16 +771,16 @@ namespace pathCam {
       // Emit in stable order (optional)
       std::vector<int> comp_ids;
       comp_ids.reserve(islands.size());
-      for (auto& kv : islands) comp_ids.push_back(kv.first);
+      for (auto &kv: islands) comp_ids.push_back(kv.first);
       std::sort(comp_ids.begin(), comp_ids.end());
 
       res.member_islands.clear();
       res.member_islands.reserve(comp_ids.size());
 
-      for (int cid : comp_ids) {
+      for (int cid: comp_ids) {
         std::vector<ImgId> island;
         island.reserve(islands[cid].size());
-        for (int idx : islands[cid]) island.push_back(idx_to_id_[idx]);
+        for (int idx: islands[cid]) island.push_back(idx_to_id_[idx]);
         res.member_islands.push_back(std::move(island));
       }
 
@@ -1145,193 +1191,198 @@ namespace pathCam {
   };
 
   namespace poly_union_envelope {
+    using Clipper2Lib::Point64;
+    using Clipper2Lib::Path64;
+    using Clipper2Lib::Paths64;
 
-using Clipper2Lib::Point64;
-using Clipper2Lib::Path64;
-using Clipper2Lib::Paths64;
+    // ------------------------- helpers -------------------------
 
-// ------------------------- helpers -------------------------
+    static inline int64_t packXY32(int x, int y) {
+      return (int64_t(uint32_t(x)) << 32) | uint32_t(y);
+    }
 
-static inline int64_t packXY32(int x, int y) {
-  return (int64_t(uint32_t(x)) << 32) | uint32_t(y);
-}
+    static inline int64_t cross_ll(const cv::Point2i &a, const cv::Point2i &b) {
+      return int64_t(a.x) * int64_t(b.y) - int64_t(a.y) * int64_t(b.x);
+    }
 
-static inline int64_t cross_ll(const cv::Point2i& a, const cv::Point2i& b) {
-  return int64_t(a.x) * int64_t(b.y) - int64_t(a.y) * int64_t(b.x);
-}
-
-// Signed area*2. In standard Cartesian coords, + => CCW.
-// (In image coords with y down, sign flips, but we only use it for consistency.)
-static inline int64_t signedArea2(const std::vector<cv::Point2i>& p) {
-  int64_t a2 = 0;
-  for (size_t i = 0; i < p.size(); ++i) {
-    const auto& A = p[i];
-    const auto& B = p[(i + 1) % p.size()];
-    a2 += int64_t(A.x) * int64_t(B.y) - int64_t(B.x) * int64_t(A.y);
-  }
-  return a2;
-}
-
-static inline void ensureClockwise(std::vector<cv::Point2i>& poly) {
-  if (poly.size() < 3) return;
-  // If positive area => CCW (cartesian). Reverse to CW.
-  if (signedArea2(poly) > 0) std::reverse(poly.begin(), poly.end());
-}
-
-static inline void removeDuplicateConsecutive(std::vector<cv::Point2i>& poly) {
-  poly.erase(std::unique(poly.begin(), poly.end(),
-                         [](const cv::Point2i& a, const cv::Point2i& b){ return a == b; }),
-             poly.end());
-  // Also remove closing duplicate if present
-  if (poly.size() >= 2 && poly.front() == poly.back()) poly.pop_back();
-}
-
-static inline void removeCollinear(std::vector<cv::Point2i>& poly) {
-  if (poly.size() < 4) return;
-  std::vector<cv::Point2i> out;
-  out.reserve(poly.size());
-  auto sgn = [](int v) { return (v > 0) - (v < 0); };
-
-  const size_t n = poly.size();
-  for (size_t i = 0; i < n; ++i) {
-    const auto& prev = poly[(i + n - 1) % n];
-    const auto& cur  = poly[i];
-    const auto& next = poly[(i + 1) % n];
-
-    int dx1 = sgn(cur.x - prev.x), dy1 = sgn(cur.y - prev.y);
-    int dx2 = sgn(next.x - cur.x), dy2 = sgn(next.y - cur.y);
-
-    if (dx1 == dx2 && dy1 == dy2) continue;
-    out.push_back(cur);
-  }
-  poly.swap(out);
-}
-
-// Segment intersection (including touching) using int64 arithmetic.
-static inline bool segIntersects(const cv::Point2i& a, const cv::Point2i& b,
-                                 const cv::Point2i& c, const cv::Point2i& d) {
-  auto orient = [](const cv::Point2i& p, const cv::Point2i& q, const cv::Point2i& r) -> int64_t {
-    return int64_t(q.x - p.x) * int64_t(r.y - p.y) - int64_t(q.y - p.y) * int64_t(r.x - p.x);
-  };
-  auto onSeg = [](const cv::Point2i& p, const cv::Point2i& q, const cv::Point2i& r) -> bool {
-    // q on segment pr
-    return std::min(p.x, r.x) <= q.x && q.x <= std::max(p.x, r.x) &&
-           std::min(p.y, r.y) <= q.y && q.y <= std::max(p.y, r.y);
-  };
-
-  int64_t o1 = orient(a, b, c);
-  int64_t o2 = orient(a, b, d);
-  int64_t o3 = orient(c, d, a);
-  int64_t o4 = orient(c, d, b);
-
-  if ((o1 > 0 && o2 < 0 || o1 < 0 && o2 > 0) &&
-      (o3 > 0 && o4 < 0 || o3 < 0 && o4 > 0)) return true;
-
-  if (o1 == 0 && onSeg(a, c, b)) return true;
-  if (o2 == 0 && onSeg(a, d, b)) return true;
-  if (o3 == 0 && onSeg(c, a, d)) return true;
-  if (o4 == 0 && onSeg(c, b, d)) return true;
-
-  return false;
-}
-
-// Point in convex polygon (CW or CCW). Treat boundary as inside.
-static inline bool pointInConvexPoly(const cv::Point2i& p, const std::vector<cv::Point2i>& poly) {
-  if (poly.size() < 3) return false;
-
-  // Use half-plane tests. Works for convex polygon either orientation if we track sign.
-  int64_t prev = 0;
-  for (size_t i = 0; i < poly.size(); ++i) {
-    const auto& a = poly[i];
-    const auto& b = poly[(i + 1) % poly.size()];
-    cv::Point2i ab{b.x - a.x, b.y - a.y};
-    cv::Point2i ap{p.x - a.x, p.y - a.y};
-    int64_t c = cross_ll(ab, ap);
-    if (c == 0) continue;
-    if (prev == 0) prev = c;
-    else if ((prev > 0) != (c > 0)) return false;
-  }
-  return true;
-}
-
-// Conservative legality: reject chord if it passes through the interior of ANY input polygon.
-// Implementation: if the segment intersects any polygon edge at a non-endpoint, or if the
-// midpoint lies inside the polygon. Touching polygon boundaries is allowed.
-static bool chordIsLegal(const cv::Point2i& u,
-                         const cv::Point2i& v,
-                         const std::vector<std::vector<cv::Point2i>>& inputPolys)
-{
-  if (u == v) return false;
-  // Midpoint test to catch "goes through interior" even if it doesn't cross edges (rare but possible).
-  // Use integer midpoint (floor); good enough for conservative test.
-  cv::Point2i mid{ (u.x + v.x) / 2, (u.y + v.y) / 2 };
-
-  for (const auto& poly : inputPolys) {
-    if (poly.size() < 3) continue;
-
-    // If midpoint is inside, chord goes through filled region (unless chord lies exactly on boundary,
-    // but then midpoint might still be on boundary; we treat boundary as inside -> conservative).
-    if (pointInConvexPoly(mid, poly)) {
-      // Allow the case where chord is exactly an existing polygon edge:
-      // If u-v is an edge of this poly, accept.
-      bool isEdge = false;
-      for (size_t i = 0; i < poly.size(); ++i) {
-        const auto& a = poly[i];
-        const auto& b = poly[(i + 1) % poly.size()];
-        if ((a == u && b == v) || (a == v && b == u)) { isEdge = true; break; }
+    // Signed area*2. In standard Cartesian coords, + => CCW.
+    // (In image coords with y down, sign flips, but we only use it for consistency.)
+    static inline int64_t signedArea2(const std::vector<cv::Point2i> &p) {
+      int64_t a2 = 0;
+      for (size_t i = 0; i < p.size(); ++i) {
+        const auto &A = p[i];
+        const auto &B = p[(i + 1) % p.size()];
+        a2 += int64_t(A.x) * int64_t(B.y) - int64_t(B.x) * int64_t(A.y);
       }
-      if (!isEdge) return false;
+      return a2;
     }
 
-    // Edge intersection test: disallow proper crossings with polygon edges
-    for (size_t i = 0; i < poly.size(); ++i) {
-      const auto& a = poly[i];
-      const auto& b = poly[(i + 1) % poly.size()];
-
-      // If intersection is only at shared endpoints, that's fine.
-      if ((a == u || a == v || b == u || b == v)) continue;
-
-      if (segIntersects(u, v, a, b)) return false;
+    static inline void ensureClockwise(std::vector<cv::Point2i> &poly) {
+      if (poly.size() < 3) return;
+      // If positive area => CCW (cartesian). Reverse to CW.
+      if (signedArea2(poly) > 0) std::reverse(poly.begin(), poly.end());
     }
-  }
-  return true;
-}
 
-// Convert cv::Point2i polygon -> Clipper Path64
-static Path64 toPath64(const std::vector<cv::Point2i>& poly) {
-  Path64 p;
-  p.reserve(poly.size());
-  for (const auto& pt : poly) p.push_back(Point64(pt.x, pt.y));
-  return p;
-}
+    static inline void removeDuplicateConsecutive(std::vector<cv::Point2i> &poly) {
+      poly.erase(std::unique(poly.begin(), poly.end(),
+                             [](const cv::Point2i &a, const cv::Point2i &b) { return a == b; }),
+                 poly.end());
+      // Also remove closing duplicate if present
+      if (poly.size() >= 2 && poly.front() == poly.back()) poly.pop_back();
+    }
 
-// Convert Clipper Path64 -> cv::Point2i (dropping 64->32 assuming it fits)
-static std::vector<cv::Point2i> fromPath64(const Path64& p) {
-  std::vector<cv::Point2i> out;
-  out.reserve(p.size());
-  for (const auto& pt : p) out.push_back(cv::Point2i((int)pt.x, (int)pt.y));
-  return out;
-}
+    static inline void removeCollinear(std::vector<cv::Point2i> &poly) {
+      if (poly.size() < 4) return;
+      std::vector<cv::Point2i> out;
+      out.reserve(poly.size());
+      auto sgn = [](int v) { return (v > 0) - (v < 0); };
 
-// Choose the outer boundary path from union result.
-// If union returns multiple outer polygons, pick the one with largest absolute area.
-static Path64 pickLargestOuter(const Paths64& sol) {
-  if (sol.empty()) return {};
-  auto area = [](const Path64& p) -> double { return Clipper2Lib::Area(p); };
-  size_t best = 0;
-  double bestAbs = std::abs(area(sol[0]));
-  for (size_t i = 1; i < sol.size(); ++i) {
-    double a = std::abs(area(sol[i]));
-    if (a > bestAbs) { bestAbs = a; best = i; }
-  }
-  return sol[best];
-}
+      const size_t n = poly.size();
+      for (size_t i = 0; i < n; ++i) {
+        const auto &prev = poly[(i + n - 1) % n];
+        const auto &cur = poly[i];
+        const auto &next = poly[(i + 1) % n];
 
-// ------------------------- main function -------------------------
+        int dx1 = sgn(cur.x - prev.x), dy1 = sgn(cur.y - prev.y);
+        int dx2 = sgn(next.x - cur.x), dy2 = sgn(next.y - cur.y);
 
-std::vector<cv::Point2i> union_boundary_then_chord_simplify_CW(const std::vector<std::vector<cv::Point2i>>& polysCW);
+        if (dx1 == dx2 && dy1 == dy2) continue;
+        out.push_back(cur);
+      }
+      poly.swap(out);
+    }
 
-} // namespace poly_union_envelope
+    // Segment intersection (including touching) using int64 arithmetic.
+    static inline bool segIntersects(const cv::Point2i &a, const cv::Point2i &b,
+                                     const cv::Point2i &c, const cv::Point2i &d) {
+      auto orient = [](const cv::Point2i &p, const cv::Point2i &q, const cv::Point2i &r) -> int64_t {
+        return int64_t(q.x - p.x) * int64_t(r.y - p.y) - int64_t(q.y - p.y) * int64_t(r.x - p.x);
+      };
+      auto onSeg = [](const cv::Point2i &p, const cv::Point2i &q, const cv::Point2i &r) -> bool {
+        // q on segment pr
+        return std::min(p.x, r.x) <= q.x && q.x <= std::max(p.x, r.x) &&
+               std::min(p.y, r.y) <= q.y && q.y <= std::max(p.y, r.y);
+      };
+
+      int64_t o1 = orient(a, b, c);
+      int64_t o2 = orient(a, b, d);
+      int64_t o3 = orient(c, d, a);
+      int64_t o4 = orient(c, d, b);
+
+      if ((o1 > 0 && o2 < 0 || o1 < 0 && o2 > 0) &&
+          (o3 > 0 && o4 < 0 || o3 < 0 && o4 > 0))
+        return true;
+
+      if (o1 == 0 && onSeg(a, c, b)) return true;
+      if (o2 == 0 && onSeg(a, d, b)) return true;
+      if (o3 == 0 && onSeg(c, a, d)) return true;
+      if (o4 == 0 && onSeg(c, b, d)) return true;
+
+      return false;
+    }
+
+    // Point in convex polygon (CW or CCW). Treat boundary as inside.
+    static inline bool pointInConvexPoly(const cv::Point2i &p, const std::vector<cv::Point2i> &poly) {
+      if (poly.size() < 3) return false;
+
+      // Use half-plane tests. Works for convex polygon either orientation if we track sign.
+      int64_t prev = 0;
+      for (size_t i = 0; i < poly.size(); ++i) {
+        const auto &a = poly[i];
+        const auto &b = poly[(i + 1) % poly.size()];
+        cv::Point2i ab{b.x - a.x, b.y - a.y};
+        cv::Point2i ap{p.x - a.x, p.y - a.y};
+        int64_t c = cross_ll(ab, ap);
+        if (c == 0) continue;
+        if (prev == 0) prev = c;
+        else if ((prev > 0) != (c > 0)) return false;
+      }
+      return true;
+    }
+
+    // Conservative legality: reject chord if it passes through the interior of ANY input polygon.
+    // Implementation: if the segment intersects any polygon edge at a non-endpoint, or if the
+    // midpoint lies inside the polygon. Touching polygon boundaries is allowed.
+    static bool chordIsLegal(const cv::Point2i &u,
+                             const cv::Point2i &v,
+                             const std::vector<std::vector<cv::Point2i> > &inputPolys) {
+      if (u == v) return false;
+      // Midpoint test to catch "goes through interior" even if it doesn't cross edges (rare but possible).
+      // Use integer midpoint (floor); good enough for conservative test.
+      cv::Point2i mid{(u.x + v.x) / 2, (u.y + v.y) / 2};
+
+      for (const auto &poly: inputPolys) {
+        if (poly.size() < 3) continue;
+
+        // If midpoint is inside, chord goes through filled region (unless chord lies exactly on boundary,
+        // but then midpoint might still be on boundary; we treat boundary as inside -> conservative).
+        if (pointInConvexPoly(mid, poly)) {
+          // Allow the case where chord is exactly an existing polygon edge:
+          // If u-v is an edge of this poly, accept.
+          bool isEdge = false;
+          for (size_t i = 0; i < poly.size(); ++i) {
+            const auto &a = poly[i];
+            const auto &b = poly[(i + 1) % poly.size()];
+            if ((a == u && b == v) || (a == v && b == u)) {
+              isEdge = true;
+              break;
+            }
+          }
+          if (!isEdge) return false;
+        }
+
+        // Edge intersection test: disallow proper crossings with polygon edges
+        for (size_t i = 0; i < poly.size(); ++i) {
+          const auto &a = poly[i];
+          const auto &b = poly[(i + 1) % poly.size()];
+
+          // If intersection is only at shared endpoints, that's fine.
+          if ((a == u || a == v || b == u || b == v)) continue;
+
+          if (segIntersects(u, v, a, b)) return false;
+        }
+      }
+      return true;
+    }
+
+    // Convert cv::Point2i polygon -> Clipper Path64
+    static Path64 toPath64(const std::vector<cv::Point2i> &poly) {
+      Path64 p;
+      p.reserve(poly.size());
+      for (const auto &pt: poly) p.push_back(Point64(pt.x, pt.y));
+      return p;
+    }
+
+    // Convert Clipper Path64 -> cv::Point2i (dropping 64->32 assuming it fits)
+    static std::vector<cv::Point2i> fromPath64(const Path64 &p) {
+      std::vector<cv::Point2i> out;
+      out.reserve(p.size());
+      for (const auto &pt: p) out.push_back(cv::Point2i((int) pt.x, (int) pt.y));
+      return out;
+    }
+
+    // Choose the outer boundary path from union result.
+    // If union returns multiple outer polygons, pick the one with largest absolute area.
+    static Path64 pickLargestOuter(const Paths64 &sol) {
+      if (sol.empty()) return {};
+      auto area = [](const Path64 &p) -> double { return Clipper2Lib::Area(p); };
+      size_t best = 0;
+      double bestAbs = std::abs(area(sol[0]));
+      for (size_t i = 1; i < sol.size(); ++i) {
+        double a = std::abs(area(sol[i]));
+        if (a > bestAbs) {
+          bestAbs = a;
+          best = i;
+        }
+      }
+      return sol[best];
+    }
+
+    // ------------------------- main function -------------------------
+
+    std::vector<cv::Point2i> union_boundary_then_chord_simplify_CW(
+      const std::vector<std::vector<cv::Point2i> > &polysCW);
+  } // namespace poly_union_envelope
 }
 
 #endif /* util_h */

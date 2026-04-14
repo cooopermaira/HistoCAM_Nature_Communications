@@ -44,6 +44,7 @@ public:
   std::atomic<bool> inMemory = true;
 
   std::vector<Features> akaze;
+  cv::Point2i akazeMinIdx;
   bool aligned = false;
   cv::Mat H_to_anchor;
 

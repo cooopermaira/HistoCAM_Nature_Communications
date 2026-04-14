@@ -1103,11 +1103,11 @@ namespace pathCam {
     assert(set_slide_label().empty());
     pathcamReady = true;
 
-    // auto start = std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     previousSlides.back()->correct_alignment();
-    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-    //   std::chrono::high_resolution_clock::now() - start).count();
-    // int k = 0;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start).count();
+    int k = 0;
   }
 
   StreamCam::~StreamCam() {

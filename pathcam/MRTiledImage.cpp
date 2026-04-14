@@ -143,23 +143,25 @@ void MRTiledImage::extract_akaze() {
   Point2i minIdx(INT_MAX, INT_MAX);
   Point2i maxIdx(INT_MIN, INT_MIN);
 
-  for (auto & tileIdx : liveTiles) {
-    minIdx.x = std::min(minIdx.x,tileIdx.x);
-    minIdx.y = std::min(minIdx.y,tileIdx.y);
-    maxIdx.x = std::max(maxIdx.x,tileIdx.x);
-    maxIdx.y = std::max(maxIdx.y,tileIdx.y);
+  for (auto &tileIdx: liveTiles) {
+    minIdx.x = std::min(minIdx.x, tileIdx.x);
+    minIdx.y = std::min(minIdx.y, tileIdx.y);
+    maxIdx.x = std::max(maxIdx.x, tileIdx.x);
+    maxIdx.y = std::max(maxIdx.y, tileIdx.y);
   }
 
-  Size size(tile_size * (maxIdx.x - minIdx.x + 1) , tile_size * (maxIdx.y - minIdx.y + 1));
-  Mat data(size,CV_8UC1,Scalar(0));
-  Mat mask(size,CV_8UC1,Scalar(0));
+  akazeMinIdx = minIdx;
 
-  for (auto &tileIdx : liveTiles) {
+  Size size(tile_size * (maxIdx.x - minIdx.x + 1), tile_size * (maxIdx.y - minIdx.y + 1));
+  Mat data(size,CV_8UC1, Scalar(0));
+  Mat mask(size,CV_8UC1, Scalar(0));
+
+  for (auto &tileIdx: liveTiles) {
     auto tileObj = get_base_tile(tileIdx);
     assert(tileObj);
     assert(!tileObj->image.empty());
 
-    Rect roi(tile_size * (tileIdx.x - minIdx.x), tile_size * (tileIdx.y - minIdx.y), tile_size,tile_size);
+    Rect roi(tile_size * (tileIdx.x - minIdx.x), tile_size * (tileIdx.y - minIdx.y), tile_size, tile_size);
     auto dataROI = data(roi);
     auto maskROI = mask(roi);
 
@@ -167,8 +169,8 @@ void MRTiledImage::extract_akaze() {
     cvtColor(tileObj->image, dataROI, COLOR_BGRA2GRAY);
   }
 
-  for (auto s : {1.f,0.5f,0.1f}) {
-    akaze.push_back(buildFeatures(data,s,mask));
+  for (auto s: /*{1.f, 0.5f, 0.1f}*/{0.5, 0.25, 0.1}) {
+    akaze.push_back(buildFeatures(data, s, mask, true));
   }
 }
 
@@ -269,7 +271,7 @@ void MRTiledImage::cache_to_disk(const std::string &_cwd, bool _keepInMemory) {
       throw;
     }
     cachedToDisk = true;
-  } else if (!_keepInMemory){
+  } else if (!_keepInMemory) {
     assert(!liveTilesOrderedVec.empty());
     for (auto &tileIndex: liveTilesOrderedVec) {
       auto tileObj = level[0]->getTile(tileIndex);
@@ -394,7 +396,7 @@ void MRTiledImageSet::write_slide_header() {
 
     write_string(fd, labelName);
 
-    write_all(fd, &framesPerMillisecond,sizeof(framesPerMillisecond)); //float
+    write_all(fd, &framesPerMillisecond, sizeof(framesPerMillisecond)); //float
     // AbCs
     assert(frameLabels.size() == AbCs.size());
     auto numFrames = static_cast<uint16_t>(AbCs.size());
@@ -507,7 +509,7 @@ void MRTiledImageSet::read_slide_header() {
     // AbCs
     // ===============================
 
-    read_all(fd, &framesPerMillisecond,sizeof(float));
+    read_all(fd, &framesPerMillisecond, sizeof(float));
 
     uint16_t numFrames;
     read_all(fd, &numFrames, sizeof(numFrames));
@@ -608,10 +610,9 @@ void MRTiledImageSet::read_slide_header() {
 
 
 std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
-    long msTimeStart, long msTimeEnd,
-    long &startFrameIdx, long &endFrameIdx) const
-{
-  const auto& ts = frameTimeStamps;
+  long msTimeStart, long msTimeEnd,
+  long &startFrameIdx, long &endFrameIdx) const {
+  const auto &ts = frameTimeStamps;
 
   if (ts.empty()) {
     startFrameIdx = endFrameIdx = -1;
@@ -622,7 +623,7 @@ std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
   auto itStart = std::upper_bound(ts.begin(), ts.end(), msTimeStart);
 
   if (itStart == ts.begin()) {
-    startFrameIdx = 0;  // all timestamps > start → clamp to first
+    startFrameIdx = 0; // all timestamps > start → clamp to first
   } else {
     startFrameIdx = static_cast<long>(std::distance(ts.begin(), itStart) - 1);
   }
@@ -631,7 +632,7 @@ std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
   auto itEnd = std::lower_bound(ts.begin(), ts.end(), msTimeEnd);
 
   if (itEnd == ts.end()) {
-    endFrameIdx = static_cast<long>(ts.size() - 1);  // all timestamps < end → clamp to last
+    endFrameIdx = static_cast<long>(ts.size() - 1); // all timestamps < end → clamp to last
   } else {
     endFrameIdx = static_cast<long>(std::distance(ts.begin(), itEnd));
   }
@@ -724,26 +725,21 @@ void MRTiledImageSet::detach() {
 //   }
 // }
 
-void MRTiledImageSet::correct_alignment(){
+void MRTiledImageSet::correct_alignment() {
     if (MRImages.empty()) return;
 
-    // Step 1: extract features
-    for (auto &mrImg : MRImages)
+    for (auto& mrImg : MRImages)
     {
         if (mrImg->suspended) continue;
         mrImg->extract_akaze();
         mrImg->aligned = false;
-        mrImg->H_to_anchor = cv::Mat::eye(3, 3, CV_64F);
     }
 
-    // Step 2: define anchor (layer 0)
-    int anchorIdx = 0;
+    const int anchorIdx = 0;
     MRImages[anchorIdx]->aligned = true;
-    MRImages[anchorIdx]->H_to_anchor = cv::Mat::eye(3, 3, CV_64F);
 
-    // Step 3: build ordering by scale distance to anchor
     std::vector<int> order;
-    for (int i = 0; i < (int)MRImages.size(); i++)
+    for (int i = 0; i < (int)MRImages.size(); ++i)
     {
         if (i == anchorIdx) continue;
         if (MRImages[i]->suspended) continue;
@@ -751,27 +747,24 @@ void MRTiledImageSet::correct_alignment(){
     }
 
     std::sort(order.begin(), order.end(),
-        [&](int a, int b)
-        {
-            return std::abs(MRImages[a]->scale - MRImages[anchorIdx]->scale) <
-                   std::abs(MRImages[b]->scale - MRImages[anchorIdx]->scale);
-        });
+              [&](int a, int b)
+              {
+                  return std::abs(MRImages[a]->scale - MRImages[anchorIdx]->scale) <
+                         std::abs(MRImages[b]->scale - MRImages[anchorIdx]->scale);
+              });
 
-    // Step 4: propagate alignment outward
     for (int idx : order)
     {
-        auto& target = MRImages[idx];
+        auto& root = MRImages[idx];
 
-        // --- find closest aligned neighbor in scale ---
         int bestNeighbor = -1;
         double bestScaleDiff = std::numeric_limits<double>::max();
 
-        for (int j = 0; j < (int)MRImages.size(); j++)
-        {
+        for (int j = 0; j < (int)MRImages.size(); ++j){
             if (!MRImages[j]->aligned) continue;
             if (MRImages[j]->suspended) continue;
 
-            double d = std::abs(MRImages[j]->scale - target->scale);
+            const double d = std::abs(MRImages[j]->scale - root->scale);
             if (d < bestScaleDiff)
             {
                 bestScaleDiff = d;
@@ -780,47 +773,83 @@ void MRTiledImageSet::correct_alignment(){
         }
 
         if (bestNeighbor < 0) continue;
+        auto& target = MRImages[bestNeighbor];
 
-        auto& ref = MRImages[bestNeighbor];
-
-        // --- compute homography target → ref ---
+        // H maps target image coords -> root image coords
         HomographyResultM result =
-            findHomographyAKAZE_allScalePairs(target->akaze, ref->akaze);
+            findHomographyAKAZE_allScalePairs(target->akaze, root->akaze);
 
-        if (!result.valid){
-            continue;
-        }
+        if (!result.valid) continue;
+        if (result.inliers < 20) continue;
+        if (result.H.empty() || result.H.rows != 3 || result.H.cols != 3) continue;
 
-        // --- basic robustness checks ---
-        if (result.inliers < 20){
-            continue;
-        }
+        const double h00 = result.H.at<double>(0, 0);
+        const double h11 = result.H.at<double>(1, 1);
+        const double h01 = result.H.at<double>(0, 1);
+        const double h10 = result.H.at<double>(1, 0);
+        const double tx  = result.H.at<double>(0, 2);
+        const double ty  = result.H.at<double>(1, 2);
 
-        // Optional: check for degenerate H
-        if (result.H.empty() || result.H.rows != 3 || result.H.cols != 3){
-            continue;
-        }
+        // Your matcher already tries to reject rotation/shear/perspective,
+        // so this should be close to a uniform scale + translation.
+        const double sx = h00;
+        const double sy = h11;
+        const double s  = 0.5 * (sx + sy);
 
-        // --- compose transforms ---
-        // result.H maps target → ref
-        // ref->H_to_anchor maps ref → anchor
-        // so:
-        // target → anchor = ref→anchor * target→ref
+        if (!std::isfinite(s) || std::abs(s) < 1e-8) continue;
 
-        target->H_to_anchor = ref->H_to_anchor * result.H;
+        // Extra guard against accidental bad matches
+        if (std::abs(h01) > 0.1 || std::abs(h10) > 0.1) continue;
+        if (result.H.type() != CV_64F && result.H.type() != CV_32F) continue;
 
-      std::cout<<target->H_to_anchor<<std::endl;
+        const cv::Point2f O_target(
+            target->akazeMinIdx.x * target->tile_size,
+            target->akazeMinIdx.y * target->tile_size
+        );
 
-        target->aligned = true;
+        const cv::Point2f O_root(
+            root->akazeMinIdx.x * root->tile_size,
+            root->akazeMinIdx.y * root->tile_size
+        );
 
-    }
+        // world = scale * (component + offset)
+        // component = image + O
+        //
+        // H: u_root = s * u_target + t
+        //
+        // Therefore:
+        // scale_root = scale_target / s
+        // offset_root = s * (O_target + offset_target) - t - O_root
+        //
+        const double newScale = target->scale / s;
 
-    // Optional: report failures
-    for (int i = 0; i < (int)MRImages.size(); i++)
-    {
-        if (!MRImages[i]->aligned)
+        cv::Point2f newOffset;
+        newOffset.x = static_cast<float>(sx * (O_target.x + target->offset.x) - tx - O_root.x);
+        newOffset.y = static_cast<float>(sy * (O_target.y + target->offset.y) - ty - O_root.y);
+
+        if (!std::isfinite(newScale) ||
+            !std::isfinite(newOffset.x) ||
+            !std::isfinite(newOffset.y))
         {
-            std::cout<<"Layer " << i << " failed to align."<<std::endl;
+            continue;
         }
+
+        std::cout << "alignment refinement: layer " << root->componentIndex
+                  << "  scale " << root->scale << " -> " << newScale
+                  << "  offset (" << root->offset.x << "," << root->offset.y
+                  << ") -> (" << newOffset.x << "," << newOffset.y << ")"
+                  << std::endl;
+
+        root->set_scale(newScale);
+        root->set_offset(newOffset);
+        root->aligned = true;
     }
+
+
+  // Optional: report failures
+  for (int i = 0; i < (int) MRImages.size(); i++) {
+    if (!MRImages[i]->aligned) {
+      std::cout << "Layer " << i << " failed to align." << std::endl;
+    }
+  }
 }
