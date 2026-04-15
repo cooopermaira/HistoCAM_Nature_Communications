@@ -139,6 +139,37 @@ std::vector<TileQuery> MRTiledImage::getTiles(cv::Rect_<float> view, cv::Rect_<i
   return level[i_scale]->getTiles(view);
 }
 
+void MRTiledImage::save_to_disk(const std::string &dir) {
+  auto ppath = Poco::Path(dir);
+  ppath.makeDirectory();
+  ppath.setFileName(std::to_string(componentIndex));
+  ppath.setExtension("png");
+
+  Point2i minIdx(INT_MAX, INT_MAX);
+  Point2i maxIdx(INT_MIN, INT_MIN);
+
+  for (auto &tileIdx: liveTiles) {
+    minIdx.x = std::min(minIdx.x, tileIdx.x);
+    minIdx.y = std::min(minIdx.y, tileIdx.y);
+    maxIdx.x = std::max(maxIdx.x, tileIdx.x);
+    maxIdx.y = std::max(maxIdx.y, tileIdx.y);
+  }
+
+  Size size(tile_size * (maxIdx.x - minIdx.x + 1), tile_size * (maxIdx.y - minIdx.y + 1));
+  Mat data(size,CV_8UC4, Scalar(0,0,0,0));
+
+  for (auto &tileIdx: liveTiles) {
+    auto tileObj = get_base_tile(tileIdx);
+    assert(tileObj);
+    assert(!tileObj->image.empty());
+
+    Rect roi(tile_size * (tileIdx.x - minIdx.x), tile_size * (tileIdx.y - minIdx.y), tile_size, tile_size);
+    data(roi) = tileObj->image.clone();
+  }
+
+  imwrite(ppath.toString(),data);
+}
+
 void MRTiledImage::extract_akaze() {
   Point2i minIdx(INT_MAX, INT_MAX);
   Point2i maxIdx(INT_MIN, INT_MIN);

@@ -187,7 +187,7 @@ public:
       const ScopedLock lock(mutex);
       auto b = getLocalBounds();
       int width = 300;
-      captureOverlay->setBounds({b.getWidth() - width - 20, 20, width, 60});
+      captureOverlay->setBounds({b.getWidth() - width - 20, 20, width, 130});
       aiOverlay->setBounds({
         b.getWidth() - 100 - 20,
         b.getHeight() - 100 - 20, 100, 100

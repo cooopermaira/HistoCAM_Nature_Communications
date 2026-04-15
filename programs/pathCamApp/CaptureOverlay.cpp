@@ -65,16 +65,22 @@ CaptureOverlay::CaptureOverlay(CaptureComponent *parent,
       simulateButton->addListener(this);
       addAndMakeVisible(*simulateButton);
     }
+
+    if (iconNames[i] == "save.svg") {
+      saveButton.reset(new SvgButton("save", iconsFromZipFile[i]));
+      saveButton->addListener(this);
+      addAndMakeVisible(*saveButton);
+    }
   }
 }
 
 void CaptureOverlay::resized() {
-  auto area = getLocalBounds().reduced(4);
+  auto topArea = getLocalBounds().removeFromTop(60).reduced(4);
   if (parent->simulating || parent->recording) {
     simulateButton->setVisible(false);
     recordButton->setVisible(false);
     stopButton->setVisible(true);
-    stopButton->setBounds(area.removeFromRight(100).reduced(20, 0));
+    stopButton->setBounds(topArea.removeFromRight(100).reduced(20, 0));
   } else {
     simulateButton->setVisible(true);
 #ifdef WITH_SPINNAKER
@@ -83,8 +89,15 @@ void CaptureOverlay::resized() {
     recordButton->setVisible(false);
 #endif
     stopButton->setVisible(false);
-    simulateButton->setBounds(area.removeFromRight(100).reduced(20, 0));
-    recordButton->setBounds(area.removeFromRight(100).reduced(20, 0));
+    simulateButton->setBounds(topArea.removeFromRight(100).reduced(20, 0));
+    recordButton->setBounds(topArea.removeFromRight(100).reduced(20, 0));
+  }
+
+  bool showSave = (parent->MRImageSet != nullptr);
+  saveButton->setVisible(showSave);
+  if (showSave) {
+    auto bottomArea = getLocalBounds().removeFromBottom(60).reduced(4);
+    saveButton->setBounds(bottomArea.removeFromRight(100).reduced(20, 0));
   }
 
   // Trigger MainComponent to update slideListButton and labelList visibility
@@ -101,6 +114,18 @@ void CaptureOverlay::buttonClicked(juce::Button *button) {
   }
   if (button == stopButton.get()) {
     parent->stop();
+  }
+  if (button == saveButton.get()) {
+    fc.reset(new juce::FileChooser("Select a directory to save images...",
+                                   juce::File::getSpecialLocation(juce::File::userHomeDirectory)));
+    fc->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+      [this](const juce::FileChooser &chooser) {
+        auto result = chooser.getResult();
+        if (result.isDirectory() && parent->MRImageSet != nullptr) {
+          parent->MRImageSet->save_to_disk(result.getFullPathName().toStdString());
+        }
+      });
+    return;
   }
 
   resized();

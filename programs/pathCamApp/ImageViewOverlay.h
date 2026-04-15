@@ -27,7 +27,8 @@ public:
       }
     }
 
-    addAndMakeVisible(*centerButton);
+    if (centerButton)
+      addAndMakeVisible(*centerButton);
   }
 
   ~ImageViewOverlay() {

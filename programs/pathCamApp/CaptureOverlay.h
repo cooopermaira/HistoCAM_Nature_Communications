@@ -204,6 +204,8 @@ private:
   std::unique_ptr<SvgButton> recordButton;
   std::unique_ptr<SvgButton> stopButton;
   std::unique_ptr<SvgButton> simulateButton;
+  std::unique_ptr<SvgButton> saveButton;
+  std::unique_ptr<juce::FileChooser> fc;
 
   CaptureComponent *parent;
 

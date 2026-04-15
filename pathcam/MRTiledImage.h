@@ -91,6 +91,8 @@ public:
 
   void extract_akaze();
 
+  void save_to_disk(const std::string& dir);
+
   std::vector<TileQuery> getTiles(cv::Rect_<float> bounds, cv::Rect_<int> screen, bool pullFromBase = false);
 
 private:
@@ -194,6 +196,12 @@ public:
   void write_slide_header();
 
   void read_slide_header();
+
+  void save_to_disk(const std::string& path) {
+    for (auto &mrImg : MRImages) {
+      mrImg->save_to_disk(path);
+    }
+  }
 
   void cache_to_disk(bool _keepInMemory = false) {
     auto start = std::chrono::high_resolution_clock::now();
