@@ -66,7 +66,7 @@ CaptureOverlay::CaptureOverlay(CaptureComponent *parent,
       addAndMakeVisible(*simulateButton);
     }
 
-    if (iconNames[i] == "save.svg") {
+    if (iconNames[i] == "save11.svg") {
       saveButton.reset(new SvgButton("save", iconsFromZipFile[i]));
       saveButton->addListener(this);
       addAndMakeVisible(*saveButton);
@@ -92,14 +92,14 @@ void CaptureOverlay::resized() {
     simulateButton->setBounds(topArea.removeFromRight(100).reduced(20, 0));
     recordButton->setBounds(topArea.removeFromRight(100).reduced(20, 0));
   }
-
-  bool showSave = (parent->MRImageSet != nullptr);
+if (saveButton) {
+  bool showSave = (parent->MRImageSet && ! parent->recording && !parent->simulating);
   saveButton->setVisible(showSave);
   if (showSave) {
     auto bottomArea = getLocalBounds().removeFromBottom(60).reduced(4);
     saveButton->setBounds(bottomArea.removeFromRight(100).reduced(20, 0));
   }
-
+}
   // Trigger MainComponent to update slideListButton and labelList visibility
   parent->parent->resized();
 }

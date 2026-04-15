@@ -164,7 +164,7 @@ void MRTiledImage::save_to_disk(const std::string &dir) {
     assert(!tileObj->image.empty());
 
     Rect roi(tile_size * (tileIdx.x - minIdx.x), tile_size * (tileIdx.y - minIdx.y), tile_size, tile_size);
-    data(roi) = tileObj->image.clone();
+    tileObj->image.copyTo(data(roi));
   }
 
   imwrite(ppath.toString(),data);
