@@ -16,6 +16,7 @@ namespace pathCam {
     img_->free_memory_RAW();
   }
 
+
   void ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(
     std::unordered_set<Image *> &members,
     const std::vector<std::pair<Image *, Image *> > &overlaps,

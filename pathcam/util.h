@@ -302,6 +302,7 @@ namespace pathCam {
 
   void make_akaze(pathCam::Image *img_, std::vector<float> scales);
 
+
   struct ScaleResult {
     double scale = 0.0;
     double response = -1.0;

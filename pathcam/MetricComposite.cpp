@@ -5,77 +5,6 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  /*
-  inline SiftData collect_SiftData(const std::vector<std::pair<Image *, std::vector<const SiftPoint *> > > &_inVec,
-                                   int _subsample) {
-    SiftData siftData;
-    int totalPoints = 0;
-    for (auto &[img,vec]: _inVec) {
-      totalPoints += vec.size();
-    }
-    totalPoints /= _subsample;
-
-    InitSiftData(siftData, totalPoints, true, true);
-
-
-    int startPos = 0;
-    for (auto &[img,vec]: _inVec) {
-      Point2f shift((img->width - img->parent->siftWindow) / 2 + img->regInfo->absoluteCoords.x,
-                    (img->height - img->parent->siftWindow) / 2 + img->regInfo->absoluteCoords.y);
-      for (int i = 0; i < static_cast<int>(vec.size()) / _subsample; ++i) {
-        const SiftPoint *src = vec[i * _subsample]; // take every 10th input
-        siftData.h_data[startPos + i] = *src; // pack output contiguously
-        siftData.h_data[startPos + i].xpos += shift.x;
-        siftData.h_data[startPos + i].ypos += shift.y;
-      }
-      startPos += static_cast<int>(vec.size()) / _subsample;
-    }
-
-    cudaMemcpy(siftData.d_data, siftData.h_data,
-               static_cast<size_t>(startPos) * sizeof(SiftPoint),
-               cudaMemcpyHostToDevice);
-
-    siftData.numPts = startPos;
-    return siftData;
-  }
-
-  inline void querySiftRect_sortedByX(
-    const SiftData &sd,
-    float xmin, float xmax,
-    float ymin, float ymax,
-    std::vector<const SiftPoint *> &out) {
-    assert(sd.h_data);
-    assert(sd.numPts >= 0 && sd.numPts <= sd.maxPts);
-    if (sd.numPts == 0 || xmin > xmax || ymin > ymax) {
-      out.clear();
-      return;
-    }
-
-    const SiftPoint *begin = sd.h_data;
-    const SiftPoint *end = sd.h_data + sd.numPts;
-
-    // First point with xpos >= xmin
-    auto lo = std::lower_bound(begin, end, xmin,
-                               [](const SiftPoint &p, float v) {
-                                 return p.xpos < v;
-                               });
-
-    // First point with xpos > xmax
-    auto hi = std::upper_bound(lo, end, xmax,
-                               [](float v, const SiftPoint &p) {
-                                 return v < p.xpos;
-                               });
-
-    out.clear();
-    out.reserve(static_cast<size_t>(hi - lo)); // upper bound on hits
-
-    for (auto it = lo; it != hi; ++it) {
-      if (it->ypos >= ymin && it->ypos <= ymax) {
-        out.push_back(it); // pointers into sd.h_data
-      }
-    }
-  }
-  */
 
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
     parent, image_size, _componentIndex) {
@@ -107,7 +36,7 @@ namespace pathCam {
 
       // std::thread t([this, img = staging.front()->image]() {
       std::lock_guard lock(EstRoot_mutex);
-      std::cout << "component " << componentIndex << " establishing scale" << std::endl;
+      // std::cout << "component " << componentIndex << " establishing scale" << std::endl;
       auto start = std::chrono::high_resolution_clock::now();
       establish_scale_at_root_cpu(staging.front()->image);
       std::cout << "XC REGISTERED COMPONENT " << componentIndex << " in " << std::chrono::duration_cast<
@@ -187,7 +116,7 @@ namespace pathCam {
         // check later if frame is less blurry than current source for tile (pyrTileObj)
         else if (ptStat.second == TileObj::singleFrameCoverage) {
           waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(ptStat.first);
-          img->ownedTiles.insert(ptStat.first);
+          // img->ownedTiles.insert(ptStat.first);
         }
       }
       ++positionForNextWaitngFrame;
@@ -234,7 +163,9 @@ namespace pathCam {
                          }
                          if (image_improves_tile(tileObj, img)) {
                            //I can fill this tile and I'm now recognized as the best image to do it, so i keep it
-                           tileObj->owner->ownedTiles.erase(tileIdx);
+                           tileObj->owner->ownedTiles.erase(tileIdx); //tileObj->owner is guaranteed to be non null here
+                           img->ownedTiles.insert(tileObj->index);
+
                            tileObj->owner = img;
                            return false;
                          }
@@ -264,6 +195,67 @@ namespace pathCam {
     }
     // PROCESS OLD FRAMES END
   }
+
+
+  std::vector<long> bfs_path_to_members(
+    const std::unordered_set<std::shared_ptr<Match>>& matches,
+    const std::unordered_set<Image*>& members,
+    long islandIndex)
+  {
+    std::unordered_set<long> targetIndices;
+    for (auto* img : members) {
+      if (img) {
+        targetIndices.insert(img->index);
+      }
+    }
+
+    std::unordered_set<long> visited;
+    std::unordered_map<long, long> parent;
+
+    std::queue<long> q;
+    q.push(islandIndex);
+    visited.insert(islandIndex);
+    parent[islandIndex] = -1;
+
+    while (!q.empty()) {
+      long current = q.front();
+      q.pop();
+
+      if (targetIndices.find(current) != targetIndices.end()) {
+        // Reconstruct path
+        std::vector<long> path;
+        for (long at = current; at != -1; at = parent[at]) {
+          path.push_back(at);
+        }
+        std::reverse(path.begin(), path.end());
+        return path;
+      }
+
+      for (const auto& m : matches) {
+        if (!m) continue;
+
+        long next = -1;
+
+        if (m->image_1 && m->image_1->index == current) {
+          if (m->image_2)
+            next = m->image_2->index;
+        }
+        else if (m->image_2 && m->image_2->index == current) {
+          if (m->image_1)
+            next = m->image_1->index;
+        }
+
+        if (next != -1 && visited.find(next) == visited.end()) {
+          visited.insert(next);
+          parent[next] = current;
+          q.push(next);
+        }
+      }
+    }
+
+    return {}; // empty = no path
+  }
+
 
   void MetricComposite::align_and_rebuild() {
     contributingFrames = find_contributing_images();
@@ -355,30 +347,35 @@ namespace pathCam {
       if (observedLabels.size() > 1) {
         rebuild(membersForRebuild);
       }
-      // for (int ii = 0; ii < graphConnectivityResult.member_islands.size(); ++ii) {
-      //   auto isl = graphConnectivityResult.member_islands[ii];
-      //   for (auto &mem:isl) {
-      //     auto adj = adjacency[parent->get_image_ref(mem)];
-      //     for (auto &m : adj) {
-      //       long otherIndex;
-      //       if (m->image_1->index == mem) {
-      //         otherIndex = m->image_2->index;
-      //       }else {
-      //         otherIndex = m->image_1->index;
-      //       }
-      //       for (int jj = 0; jj < graphConnectivityResult.member_islands.size(); ++jj) {
-      //         if (jj == ii){continue;}
-      //         auto isl2 = graphConnectivityResult.member_islands[jj];
-      //         for (auto ind : isl2) {
-      //           if (ind == otherIndex) {
-      //             int k = 0;
-      //           }
-      //         }
-      //       }
-      //     }
-      //   }
-      //   int k = 0;
-      // }
+      for (int ii = 0; ii < graphConnectivityResult.member_islands.size(); ++ii) {
+        auto isl = graphConnectivityResult.member_islands[ii];
+        for (auto &mem:isl) {
+          auto adj = adjacency[parent->get_image_ref(mem)];
+          for (auto &m : adj) {
+            long otherIndex;
+            if (m->image_1->index == mem) {
+              otherIndex = m->image_2->index;
+            }else {
+              otherIndex = m->image_1->index;
+            }
+            for (int jj = 0; jj < graphConnectivityResult.member_islands.size(); ++jj) {
+              if (jj == ii){continue;}
+              auto isl2 = graphConnectivityResult.member_islands[jj];
+              for (auto ind : isl2) {
+                if (ind == otherIndex) {
+                  int k = 0;
+                }
+              }
+            }
+          }
+        }
+        // auto otherIs = graphConnectivityResult.member_islands[0];
+        // auto otherIsland = parent->get_image_ref(otherIs);
+        // std::unordered_set<Image*> otherIslSet(otherIsland.begin(),otherIsland.end());
+        // auto ans = bfs_path_to_members(matches,otherIslSet,3303);
+        int k = 0;
+
+      }
       return;
     }
 
@@ -424,31 +421,13 @@ namespace pathCam {
     if (graphConnectivityResult.used_sift) {
       std::cout << "Component " << componentIndex << " using sift in BA" << std::endl;
       return;
-      for (auto [img1,img2,kp1,kp2]: extraMatches) {
-        if (members.find(img1) != members.end() && members.find(img2) != members.end()) {
-          assert(kp1.size() == kp2.size());
-          img1->keypointsImageSpace.reserve(img1->keypointsImageSpace.size() + kp1.size());
-          img2->keypointsImageSpace.reserve(img2->keypointsImageSpace.size() + kp2.size());
-
-          for (int i = 0; i < min(int(kp1.size()), 300); ++i) {
-            DMatch dm;
-            dm.queryIdx = img1->keypointsImageSpace.size();
-            dm.trainIdx = img2->keypointsImageSpace.size();
-
-            img1->keypointsImageSpace.push_back(kp1[i]);
-            img2->keypointsImageSpace.push_back(kp2[i]);
-
-            ftg->process_match(img1->index, img2->index, dm);
-          }
-        }
-      }
     }
 
     //GENERATE TRACKS AND RUN
     std::vector memberImages(members.begin(), members.end());
 
     auto tracks = ftg->generateCurrentTracks(memberImages);
-    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks, memberImages, 2 * memberImages.size() + 200);
+    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks, memberImages, 2 * memberImages.size() + 500);
 
     rebuild(membersForRebuild);
 
@@ -530,13 +509,16 @@ namespace pathCam {
     successfullyAligned = true;
   }
 
-  std::unordered_set<Image *> MetricComposite::reduce_members_through_competition(
-    std::unordered_set<Image *> _members) const {
+  std::unordered_set<Image *> MetricComposite::reduce_members_through_competition(std::unordered_set<Image *> _members) const {
+
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
     }
-    auto liveTilesCopy = imagePyramid->liveTiles;
+
+    for (auto &img : _members) {
+      img->ownedTiles.clear();
+    }
     imagePyramid->liveTiles.clear();
 
     for (auto &img: _members) {
@@ -545,7 +527,13 @@ namespace pathCam {
       for (auto &p: affectedTilesWithStatus) {
         if (p.second == TileObj::singleFrameCoverage) {
           auto tileObj = imagePyramid->get_base_tile(p.first);
+
           if (image_improves_tile(tileObj, img)) {
+            if (tileObj->owner) {
+              tileObj->owner->ownedTiles.erase(tileObj->index);
+            }
+            img->ownedTiles.insert(tileObj->index);
+
             tileObj->owner = img;
             imagePyramid->liveTiles.insert(p.first);
           }
@@ -722,8 +710,7 @@ namespace pathCam {
       }
 
       auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
-      return (v1 > 25 * parent->tileSize * parent->tileSize) && (v1 > get_sqrd_center_distance_tile_to_img(
-                                                                   _img->regInfo->absoluteCoords, _to->index));
+      return v1 > 25 * parent->tileSize * parent->tileSize + get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index);
     }
 
     //amount of motion blur is significantly different, choose clearest image
@@ -738,6 +725,13 @@ namespace pathCam {
       auto to = imagePyramid->get_base_tile(tileIdx);
       members.insert(to->owner);
     }
+
+    for (auto &[img,tileIdx] : waitingFrames) {
+      if (img) {
+        members.insert(img);
+      }
+    }
+
     return members;
   }
 
@@ -774,6 +768,7 @@ namespace pathCam {
 
   void MetricComposite::launch_component_match_search_with_XC(Image *img_) {
     auto members = find_contributing_images();
+    members.insert(root);
 
     Poco::FastMutex::ScopedLock lock(parent->component_mutex);
 
@@ -782,6 +777,7 @@ namespace pathCam {
       if (component->componentMagLabel == componentMagLabel) {
         auto ans = component->find_contributing_images();
         members.insert(ans.begin(),ans.end());
+        members.insert(component->root);
       }
     }
 

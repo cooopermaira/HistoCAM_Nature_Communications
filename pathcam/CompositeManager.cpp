@@ -128,7 +128,9 @@ namespace pathCam {
     parent->notify_observers();
     threads.clear();
 
-    combine_components();
+    // debug_print_component_status();
+    // combine_components();
+    // debug_print_component_status();
 
     if (align) {
       auto tAlign = std::chrono::high_resolution_clock::now();
@@ -177,37 +179,8 @@ namespace pathCam {
       }
     }
 
-    std::cout<< parent->cmsCount<<" "<<parent->cmsTime<<std::endl;
-
-
-    int count = 0;
-    long total = 0;
-    for (auto img: parent->images) {
-      if (!img) { continue; }
-      if (img->profileTime > 0) {
-        total += img->profileTime;
-        ++count;
-      }
-    }
-    std::cout << "total and count " << total << " " << count << std::endl;
-
-
-    //
-    // tAlign = std::chrono::high_resolution_clock::now();
-    // MatchSiftData(reinterpret_cast<MetricComposite *>(parent->composites[0])->compSiftData,reinterpret_cast<MetricComposite *>(parent->composites[1])->compSiftData);
-    // std::vector<float> homography(9);
-    // int numMatches;
-    // FindHomography(reinterpret_cast<MetricComposite *>(parent->composites[0])->compSiftData,homography.data(),&numMatches,10000,0.8,0.9,5);
-    // tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - tAlign).count();
-    // std::cout << "xc homography time " << tAlignEnd << std::endl;
-
-    push_remaining_tiles_for_inference();
-
-
-    // save_components_to_disk();
 
     parent->compositing = false;
-    parent->inferenceWait.set();
   }
 
   void CompositeManager::push_remaining_tiles_for_inference() {
@@ -322,65 +295,13 @@ namespace pathCam {
     _regInfo->accessMutex.unlock();
   }
 
-  /*
-  void CompositeManager::debug_termination_check() {
-    if (parent->matchableCount > 0) {
-      hasBeenNonZero = true;
-    }
-    if (!hasBeenNonZero) { return; }
-
-    if (parent->microscopeInput || parent->diskCount > 0 || parent->regCount > 0 || parent->loaderCount > 0 || parent->
-        matchableCount == 0
-        || !parent->compositeQ_empty() || !parent->newComponentQ.empty()) {
-      return;
-    }
-
-    if (parent->matchableCount == lastMC) {
-      //matchableCount has changed in how long now??
-      --countDown;
-      if (countDown > 0) {
-        return;
-      }
-      countDown = 100;
-    } else {
-      //ok, matchableCount changed so things are still going on
-      lastMC = parent->matchableCount;
-      countDown = 100;
-      return;
-    }
-
-    std::vector<long> emptyList;
-    auto ans = parent->get_image_ref(emptyList);
-
-    std::vector<RunnableIntermediate *> somehowOutstandingMatchables;
-    for (auto &img: ans) {
-      auto sojr = parent->JobQ->get_job_ref_index_and_sort_order(2, img->index);
-      if (parent->JobQ->jobRefs.size() <= sojr.first) {
-        return;
-      }
-      auto job = parent->JobQ->jobRefs[sojr.first];
-      if (job && !job->successful) {
-        somehowOutstandingMatchables.push_back(job);
+  void CompositeManager::debug_print_component_status() const {
+    for (auto &comp : parent->composites) {
+      if (comp->suspended) {
+        std::cout << "component "<<comp->componentIndex <<" SUSPENDED"<<std::endl;
+      }else {
+        std::cout << "component "<<comp->componentIndex <<" ACTIVE"<<std::endl;
       }
     }
-    std::vector<RunnableIntermediate *> unprocessedJobs, canceledJobs;
-    for (auto &job: somehowOutstandingMatchables) {
-      if (job->unprocessed) {
-        unprocessedJobs.push_back(job);
-      } else {
-        canceledJobs.push_back(job);
-      }
-    }
-    for (int i = 0; i <= parent->maxIndex; ++i) {
-      if (parent->matchablesIncremented[i] != 1) {
-        std::cout << i << " incremented " << parent->matchablesIncremented[i] << " times" << std::endl;
-      }
-      if (parent->matchablesDecremented[i] != 1) {
-        std::cout << i << " decremented " << parent->matchablesDecremented[i] << " times" << std::endl;
-      }
-    }
-    //parent->compositing = false;
-    int k = 0;
   }
-*/
 }

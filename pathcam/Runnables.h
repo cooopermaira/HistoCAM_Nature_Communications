@@ -141,6 +141,8 @@ namespace pathCam {
     void submit_outstanding_jobs();
 
     void combine_components() const;
+
+    void debug_print_component_status() const;
   };
 
   class RegistrationRunnable : public RunnableIntermediate {
