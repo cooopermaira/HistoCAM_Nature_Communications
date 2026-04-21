@@ -54,6 +54,7 @@ namespace pathCam {
       auto m = std::make_shared<Match>(candidate, image);
       matcher.match(m);
 
+
       if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 30)) {
         m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
         //forward match to feature track generator (ftg)
@@ -76,36 +77,63 @@ namespace pathCam {
   std::chrono::high_resolution_clock::now() - start).count();
     parent->cmsTime += v;
 
-    //store INTRA component matches
+
     {
       Poco::FastMutex::ScopedLock lock(component->ftg->accessMutex);
       for (auto &match : matches) {
-        component->ftg->store_match(match);
 
+        //store INTER component matches
         if (match->image_1->regInfo->component_membership != component->componentIndex) {
           component->relatedComponents.insert(match->image_1->regInfo->component_membership);
+          component->ftg->interComponentMatches[match->image_1->regInfo->component_membership].insert(match);
         }
-        if (match->image_2->regInfo->component_membership != component->componentIndex) {
-          component->relatedComponents.insert(match->image_2->regInfo->component_membership);
+
+        //store INTRA component matches
+        else {
+          component->ftg->store_match(match);
         }
       }
     }
 
-    //store INTER component matches
+    //loop back through to store XC matches on their FTG as well, second loop to avoid deadlock
     for (auto &match : matches) {
-      if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
+      if (match->image_1->regInfo->component_membership != component->componentIndex) {
+        Poco::RWLock::ScopedReadLock lockC(parent->component_mutex);
         auto theirComp = parent->composites[match->image_1->regInfo->component_membership];
 
         Poco::FastMutex::ScopedLock lock(theirComp->ftg->accessMutex);
-        if (match->image_1->regInfo->component_membership != theirComp->componentIndex) {
-          theirComp->relatedComponents.insert(match->image_1->regInfo->component_membership);
-        }
-        if (match->image_2->regInfo->component_membership != component->componentIndex) {
-          theirComp->relatedComponents.insert(match->image_2->regInfo->component_membership);
-        }
-        theirComp->ftg->store_match(match);
+        theirComp->ftg->interComponentMatches[match->image_2->regInfo->component_membership].insert(match);
+        theirComp->relatedComponents.insert(match->image_2->regInfo->component_membership);
       }
     }
+    // {
+    //   Poco::FastMutex::ScopedLock lock(component->ftg->accessMutex);
+    //   for (auto &match : matches) {
+    //     component->ftg->store_match(match);
+    //
+    //     if (match->image_1->regInfo->component_membership != component->componentIndex) {
+    //       component->relatedComponents.insert(match->image_1->regInfo->component_membership);
+    //     }
+    //     if (match->image_2->regInfo->component_membership != component->componentIndex) {
+    //       component->relatedComponents.insert(match->image_2->regInfo->component_membership);
+    //     }
+    //   }
+    // }
+
+    // for (auto &match : matches) {
+    //   if (match->image_1->regInfo->component_membership != match->image_2->regInfo->component_membership) {
+    //     auto theirComp = parent->composites[match->image_1->regInfo->component_membership];
+    //
+    //     Poco::FastMutex::ScopedLock lock(theirComp->ftg->accessMutex);
+    //     if (match->image_1->regInfo->component_membership != theirComp->componentIndex) {
+    //       theirComp->relatedComponents.insert(match->image_1->regInfo->component_membership);
+    //     }
+    //     if (match->image_2->regInfo->component_membership != component->componentIndex) {
+    //       theirComp->relatedComponents.insert(match->image_2->regInfo->component_membership);
+    //     }
+    //     theirComp->ftg->store_match(match);
+    //   }
+    // }
 
 
     --component->outstandingCMS_jobs;

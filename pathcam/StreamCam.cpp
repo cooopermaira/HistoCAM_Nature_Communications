@@ -633,7 +633,7 @@ namespace pathCam {
 
     {
       Poco::Mutex::ScopedLock lock1(ri->rAccessMutex);
-      Poco::FastMutex::ScopedLock lock2(component_mutex);
+      Poco::RWLock::ScopedWriteLock lock2(component_mutex);
 
       ri->component_membership = component_index;
       ri->stayFixedDuringBundleAdjustment = true;

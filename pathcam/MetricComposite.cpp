@@ -260,10 +260,14 @@ namespace pathCam {
   void MetricComposite::align_and_rebuild() {
     contributingFrames = find_contributing_images();
 
+    // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment
     for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
       for (auto &img: loser->landmarkFrames) {
         landmarkFrames.push_back(img);
+      }
+      for (auto &match : ftg->interComponentMatches[loser->componentIndex]) {
+        ftg->storedMatches.insert(match);
       }
       loser->root->regInfo->root = false;
     }
@@ -317,6 +321,9 @@ namespace pathCam {
           other->regInfo->relativeCoords = offset;
 
           members.insert(other);
+          if (other->regInfo->component_membership != componentIndex) {
+            int k = 0;
+          }
           q.push(other);
         }
       }
@@ -375,6 +382,8 @@ namespace pathCam {
         // auto ans = bfs_path_to_members(matches,otherIslSet,3303);
         int k = 0;
 
+        // first evaluate islands, if each island is ,
+
       }
       return;
     }
@@ -387,6 +396,9 @@ namespace pathCam {
       for (auto img: parent->get_image_ref(graphConnectivityResult.promoted_nodes)) {
         ig.setMember(img->index, true);
         members.insert(img);
+        if (img->regInfo->component_membership != componentIndex) {
+          int k = 0;
+        }
       }
     }
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
@@ -436,6 +448,12 @@ namespace pathCam {
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
+  bool check_tile_img(Point2i abc_, Point2i tileIdx_, int tileSize_, Size imageSize_) {
+    auto ul = tileIdx_ * tileSize_;
+    bool crit1 = abc_.x <= ul.x && abc_.y <= ul.y;
+    return crit1 && abc_.x + imageSize_.width >= ul.x + tileSize_ && abc_.y + imageSize_.height >= ul.y;
+  }
+
 
   void MetricComposite::rebuild(const std::vector<Image *> &members) {
     for (auto &tileIdx: imagePyramid->liveTiles) {
@@ -450,6 +468,7 @@ namespace pathCam {
 
       for (auto &p: affectedTilesWithStatus) {
         if (p.second == TileObj::singleFrameCoverage) {
+          assert(check_tile_img(img->regInfo->absoluteCoords,p.first,parent->tileSize,imageSize));
           auto tileObj = imagePyramid->get_base_tile(p.first);
           if (image_improves_tile(tileObj, img)) {
             tileObj->owner = img;
@@ -468,10 +487,7 @@ namespace pathCam {
         auto tileObj = imagePyramid->get_base_tile(tileIdx);
         if (tileObj->owner == img) {
           tileIndexes.push_back(tileIdx);
-          auto ul = tileIdx * parent->tileSize;
-          assert(img->regInfo->absoluteCoords.x <= ul.x && img->regInfo->absoluteCoords.y <= ul.y &&
-            img->regInfo->absoluteCoords.x + imageSize.width >= ul.x + parent->tileSize &&
-            img->regInfo->absoluteCoords.y + imageSize.height >= ul.y + parent->tileSize);
+          assert(check_tile_img(img->regInfo->absoluteCoords,tileIdx,parent->tileSize,imageSize));
         }
       }
       img->subsequentMatchLaunched = true;
@@ -770,7 +786,7 @@ namespace pathCam {
     auto members = find_contributing_images();
     members.insert(root);
 
-    Poco::FastMutex::ScopedLock lock(parent->component_mutex);
+    Poco::RWLock::ScopedReadLock lock(parent->component_mutex);
 
     for (auto &component : parent->composites) {
       if (component->componentIndex == componentIndex){continue;}

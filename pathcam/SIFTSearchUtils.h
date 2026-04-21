@@ -160,6 +160,8 @@ namespace pathCam {
 
     std::unordered_set<std::shared_ptr<Match> > storedMatches;
 
+    std::unordered_map<int,std::unordered_set<std::shared_ptr<Match>>> interComponentMatches;
+
   private:
     int getOrCreateFeatureIndex(const ImageFeaturePair &_pair);
 

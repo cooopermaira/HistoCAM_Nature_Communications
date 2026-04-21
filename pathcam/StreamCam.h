@@ -121,7 +121,7 @@ namespace pathCam {
     Poco::FastMutex resize_buffer_mutex;
     Poco::FastMutex buffer_mutex;
     Poco::FastMutex compositeQ_mutex;
-    Poco::FastMutex component_mutex;
+    Poco::RWLock component_mutex;
     Poco::FastMutex lastFrameMutex;
     Poco::FastMutex scaleRepoMutex;
     Poco::FastMutex inferenceQMutex;

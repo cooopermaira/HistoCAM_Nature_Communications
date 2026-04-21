@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
 
     pngDir.pushDirectory("png");
     // dftDir.pushDirectory("dft");
-    // cropDir.pushDirectory("png_crop");
+    cropDir.pushDirectory("png_crop");
 
     Poco::File dir(pngDir);
     if (!dir.exists()){dir.createDirectories();}

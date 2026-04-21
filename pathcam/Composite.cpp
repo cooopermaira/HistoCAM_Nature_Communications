@@ -209,7 +209,7 @@ namespace pathCam {
       make_akaze(_rootImg,{0.25,0.1});
     }
 
-    Poco::FastMutex::ScopedLock lock(parent->component_mutex);
+    Poco::RWLock::ScopedReadLock lock(parent->component_mutex);
 
     //find most recent resolved frame
     if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
