@@ -287,53 +287,76 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   const int N = (int) mrImages.size();
   if (N == 0) return;
 
-  // Build ordered list of unique magLabels (preserving MRImages sort order, skipping suspended).
-  std::vector<unsigned int> uniqueLabels;
-  for (auto &img : mrImages) {
-    if (img->suspended) continue;
-    if (uniqueLabels.empty() || uniqueLabels.back() != img->magLabel)
-      uniqueLabels.push_back(img->magLabel);
-  }
+  // BEHAVIOR A: cycle one individual component at a time, then all
+  // Collect non-suspended images in order.
+  std::vector<std::shared_ptr<MRTiledImage>> activeImages;
+  for (auto &img : mrImages) { if (!img->suspended) activeImages.push_back(img); }
+  const int numActive = (int) activeImages.size();
+  const int modeA = wrapMod(componentSelector, numActive + 1); // 0 = all, 1..N = individual
+  const bool showAllA = (modeA == 0);
 
-  const int numGroups = (int) uniqueLabels.size();
-  const int mode = wrapMod(componentSelector, numGroups + 1); // 0 = all, 1..numGroups = group
-  const bool showAll = (mode == 0);
-  const unsigned int selectedLabel = showAll ? 0 : uniqueLabels[mode - 1];
-
-  if (!showAll) {
-    g.beginTransparencyLayer(0.3f);
-  }
-
-  for (auto &img : mrImages) {
-    if (img->suspended) continue;
-    if (!showAll && img->magLabel == selectedLabel) continue;
-
+  if (!showAllA) { g.beginTransparencyLayer(0.3f); }
+  for (auto &img : activeImages) {
+    if (!showAllA && img == activeImages[modeA - 1]) continue;
     g.setColour(juce::Colours::white);
     drawLayer(g, scale, img);
   }
-
-  if (!showAll) {
+  if (!showAllA) {
     g.endTransparencyLayer();
-
-    // draw selected group at full opacity
-    for (auto &img : mrImages) {
-      if (img->suspended || img->magLabel != selectedLabel) continue;
-      if (img->scale == 0) continue;
+    auto &sel = activeImages[modeA - 1];
+    if (sel->scale != 0) {
       g.setColour(juce::Colours::white);
-      drawLayer(g, scale, img);
+      drawLayer(g, scale, sel);
     }
-
     if (!parent->sCam->microscopeInput) {
       g.setColour(juce::Colours::red);
       g.setFont(15);
       g.drawText("current objective", 5, getHeight() - 30, 110,
                  Justification::centredLeft, true);
       g.setFont(40.0f);
-      g.drawText(pathCam::Image::get_label(selectedLabel),
+      g.drawText(pathCam::Image::get_label(sel->magLabel),
                  20, getHeight() - 50, 100,
                  Justification::centredLeft, true);
     }
   }
+
+  // BEHAVIOR B: cycle all components of the same magLabel together
+  // std::vector<unsigned int> uniqueLabels;
+  // for (auto &img : mrImages) {
+  //   if (img->suspended) continue;
+  //   if (uniqueLabels.empty() || uniqueLabels.back() != img->magLabel)
+  //     uniqueLabels.push_back(img->magLabel);
+  // }
+  // const int numGroups = (int) uniqueLabels.size();
+  // const int mode = wrapMod(componentSelector, numGroups + 1); // 0 = all, 1..numGroups = group
+  // const bool showAll = (mode == 0);
+  // const unsigned int selectedLabel = showAll ? 0 : uniqueLabels[mode - 1];
+  // if (!showAll) { g.beginTransparencyLayer(0.3f); }
+  // for (auto &img : mrImages) {
+  //   if (img->suspended) continue;
+  //   if (!showAll && img->magLabel == selectedLabel) continue;
+  //   g.setColour(juce::Colours::white);
+  //   drawLayer(g, scale, img);
+  // }
+  // if (!showAll) {
+  //   g.endTransparencyLayer();
+  //   for (auto &img : mrImages) {
+  //     if (img->suspended || img->magLabel != selectedLabel) continue;
+  //     if (img->scale == 0) continue;
+  //     g.setColour(juce::Colours::white);
+  //     drawLayer(g, scale, img);
+  //   }
+  //   if (!parent->sCam->microscopeInput) {
+  //     g.setColour(juce::Colours::red);
+  //     g.setFont(15);
+  //     g.drawText("current objective", 5, getHeight() - 30, 110,
+  //                Justification::centredLeft, true);
+  //     g.setFont(40.0f);
+  //     g.drawText(pathCam::Image::get_label(selectedLabel),
+  //                20, getHeight() - 50, 100,
+  //                Justification::centredLeft, true);
+  //   }
+  // }
 
 
   //Define buffer space from the edges
@@ -534,17 +557,23 @@ bool ImageViewComponent::keyPressed(const juce::KeyPress &key, juce::Component *
     if (!MRImageSet) return true;
     const auto &mrImages = MRImageSet->MRImages;
 
-    // Build ordered unique magLabels from non-suspended images (same as drawSlide)
-    std::vector<unsigned int> uniqueLabels;
-    for (auto &img : mrImages) {
-      if (img->suspended) continue;
-      if (uniqueLabels.empty() || uniqueLabels.back() != img->magLabel)
-        uniqueLabels.push_back(img->magLabel);
-    }
-    const int numGroups = (int) uniqueLabels.size();
-    if (numGroups == 0) return true;
+    // BEHAVIOR A: cycle one individual component at a time, then all
+    int numActive = 0;
+    for (auto &img : mrImages) { if (!img->suspended) ++numActive; }
+    if (numActive == 0) return true;
+    componentSelector = wrapMod(componentSelector + 1, numActive + 1);
 
-    componentSelector = wrapMod(componentSelector + 1, numGroups + 1);
+    // BEHAVIOR B: cycle all components of the same magLabel together
+    // std::vector<unsigned int> uniqueLabels;
+    // for (auto &img : mrImages) {
+    //   if (img->suspended) continue;
+    //   if (uniqueLabels.empty() || uniqueLabels.back() != img->magLabel)
+    //     uniqueLabels.push_back(img->magLabel);
+    // }
+    // const int numGroups = (int) uniqueLabels.size();
+    // if (numGroups == 0) return true;
+    // componentSelector = wrapMod(componentSelector + 1, numGroups + 1);
+
     repaint();
     return true;
   }

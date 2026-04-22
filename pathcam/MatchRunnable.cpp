@@ -93,6 +93,9 @@ namespace pathCam {
           component->ftg->store_match(match);
         }
       }
+      if (image->regInfo->winningVote.m) {
+        component->ftg->store_match(image->regInfo->winningVote.m);
+      }
     }
 
     //loop back through to store XC matches on their FTG as well, second loop to avoid deadlock

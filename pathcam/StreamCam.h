@@ -131,6 +131,7 @@ namespace pathCam {
     Poco::FastMutex blurMutex;
     Poco::FastMutex previousSlidesMutex;
     Poco::Mutex componentQmutex;
+    Poco::FastMutex printToScreenMutex;
 
     Poco::Path givenWorkingDirectory;
     std::vector<Poco::Path> fileSaveFolders;

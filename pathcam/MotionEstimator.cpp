@@ -85,7 +85,7 @@ namespace pathCam {
       int minCluster = 3;
       int bestClusterScore = -1;
       int bestClusterIndex = -1;
-      vote winningVote;
+
 
       for (size_t i = 0; i < votes.size(); ++i) {
 

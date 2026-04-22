@@ -186,7 +186,7 @@ namespace pathCam {
     static void run_coopers_planar_bundle_adjustment(const std::vector<FeatureTrack> &_tracks,
                                                      const std::vector<Image *> &_images);
 
-    static void run_coopers_planar_ba_edge_list(
+    static std::pair<int, int> run_coopers_planar_ba_edge_list(
       const std::vector<FeatureTrack> &tracks,
       std::vector<Image *> &images,
       int maxIters = 2000,

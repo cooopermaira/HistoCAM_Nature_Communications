@@ -128,9 +128,9 @@ namespace pathCam {
     parent->notify_observers();
     threads.clear();
 
-    // debug_print_component_status();
-    // combine_components();
-    // debug_print_component_status();
+    debug_print_component_status();
+    combine_components();
+    debug_print_component_status();
 
     if (align) {
       auto tAlign = std::chrono::high_resolution_clock::now();

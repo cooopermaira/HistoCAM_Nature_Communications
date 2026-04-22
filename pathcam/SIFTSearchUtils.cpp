@@ -371,6 +371,7 @@ static inline double rms_residual(
 //
 bool coopers_cg_edge_list(
     const std::vector<EdgeObs>& edges,
+    int &ranIters,
     int numCams, int numLms,
     std::vector<double>& x,          // size N, in/out
     int maxIters = 200,
@@ -439,6 +440,7 @@ bool coopers_cg_edge_list(
               << "\n";
   }
 
+  ranIters = iters;
   return iters < maxIters;
 }
 
@@ -466,12 +468,12 @@ struct PlanarBAResult {
   std::vector<double> x_y; // solution vector for y axis, size Nc+Nl
 };
 
-void BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
-    const std::vector<FeatureTrack>& tracks,
-    std::vector<Image*>& images,
-    int maxIters,
-    double tolRel)
-{
+std::pair<int, int> BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
+  const std::vector<FeatureTrack> &tracks,
+  std::vector<Image *> &images,
+  int maxIters,
+  double tolRel){
+
   // Map images (excluding root) -> camera variable index
   int rootCount = 0;
   std::unordered_map<long,int> imageToCam;
@@ -539,8 +541,9 @@ void BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
   }
 
   // Solve
-  bool okx = coopers_cg_edge_list(edgesX, Nc, Nl, x0x, maxIters, tolRel, 1e-12, true);
-  bool oky = coopers_cg_edge_list(edgesY, Nc, Nl, x0y, maxIters, tolRel, 1e-12, true);
+  int xIters = 0,yIters = 0;
+  bool okx = coopers_cg_edge_list(edgesX, xIters, Nc, Nl, x0x, maxIters, tolRel, 1e-12, false);
+  bool oky = coopers_cg_edge_list(edgesY, yIters, Nc, Nl, x0y, maxIters, tolRel, 1e-12, false);
   (void)okx; (void)oky;
 
   for (auto* img : images) {
@@ -549,6 +552,7 @@ void BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
     img->regInfo->absoluteCoords.x = x0x[ci];
     img->regInfo->absoluteCoords.y = x0y[ci];
   }
+  return {xIters,yIters};
 }
 
 // After you get PlanarBAResult, write back camera coords:

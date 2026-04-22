@@ -5,7 +5,6 @@
 #include "pathCam.h"
 
 namespace pathCam {
-
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
     parent, image_size, _componentIndex) {
     waitingFrames.resize(frameDelay, {nullptr, {}});
@@ -197,76 +196,15 @@ namespace pathCam {
   }
 
 
-  std::vector<long> bfs_path_to_members(
-    const std::unordered_set<std::shared_ptr<Match>>& matches,
-    const std::unordered_set<Image*>& members,
-    long islandIndex)
-  {
-    std::unordered_set<long> targetIndices;
-    for (auto* img : members) {
-      if (img) {
-        targetIndices.insert(img->index);
-      }
-    }
-
-    std::unordered_set<long> visited;
-    std::unordered_map<long, long> parent;
-
-    std::queue<long> q;
-    q.push(islandIndex);
-    visited.insert(islandIndex);
-    parent[islandIndex] = -1;
-
-    while (!q.empty()) {
-      long current = q.front();
-      q.pop();
-
-      if (targetIndices.find(current) != targetIndices.end()) {
-        // Reconstruct path
-        std::vector<long> path;
-        for (long at = current; at != -1; at = parent[at]) {
-          path.push_back(at);
-        }
-        std::reverse(path.begin(), path.end());
-        return path;
-      }
-
-      for (const auto& m : matches) {
-        if (!m) continue;
-
-        long next = -1;
-
-        if (m->image_1 && m->image_1->index == current) {
-          if (m->image_2)
-            next = m->image_2->index;
-        }
-        else if (m->image_2 && m->image_2->index == current) {
-          if (m->image_1)
-            next = m->image_1->index;
-        }
-
-        if (next != -1 && visited.find(next) == visited.end()) {
-          visited.insert(next);
-          parent[next] = current;
-          q.push(next);
-        }
-      }
-    }
-
-    return {}; // empty = no path
-  }
-
 
   void MetricComposite::align_and_rebuild() {
-    contributingFrames = find_contributing_images();
-
     // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment
     for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
       for (auto &img: loser->landmarkFrames) {
         landmarkFrames.push_back(img);
       }
-      for (auto &match : ftg->interComponentMatches[loser->componentIndex]) {
+      for (auto &match: ftg->interComponentMatches[loser->componentIndex]) {
         ftg->storedMatches.insert(match);
       }
       loser->root->regInfo->root = false;
@@ -277,7 +215,7 @@ namespace pathCam {
 
     auto ig = ImageGraph();
 
-    std::unordered_set<Image *> members = contributingFrames;
+    std::unordered_set<Image *> members = find_contributing_images();
     members.insert(root);
     for (auto img: landmarkFrames) {
       members.insert(img);
@@ -347,51 +285,42 @@ namespace pathCam {
       ig.setMember(img->index, true);
     }
 
+    std::vector<size_t> discardedIslands;
     auto graphConnectivityResult = ig.computeMinPromotionsToConnectMembersPreferORB();
     if (!graphConnectivityResult.success) {
-      std::cout << "component " << componentIndex << " failed to connect graph, frames " << root->index << ", " <<
-          maxIndex << std::endl;
-      if (observedLabels.size() > 1) {
-        rebuild(membersForRebuild);
-      }
-      for (int ii = 0; ii < graphConnectivityResult.member_islands.size(); ++ii) {
-        auto isl = graphConnectivityResult.member_islands[ii];
-        for (auto &mem:isl) {
-          auto adj = adjacency[parent->get_image_ref(mem)];
-          for (auto &m : adj) {
-            long otherIndex;
-            if (m->image_1->index == mem) {
-              otherIndex = m->image_2->index;
-            }else {
-              otherIndex = m->image_1->index;
-            }
-            for (int jj = 0; jj < graphConnectivityResult.member_islands.size(); ++jj) {
-              if (jj == ii){continue;}
-              auto isl2 = graphConnectivityResult.member_islands[jj];
-              for (auto ind : isl2) {
-                if (ind == otherIndex) {
-                  int k = 0;
-                }
-              }
-            }
+      std::sort(graphConnectivityResult.member_islands.begin(), graphConnectivityResult.member_islands.end(),
+                [](const std::vector<long> &a, const std::vector<long> &b) {
+                  return a.size() > b.size();
+                });
+
+      members.clear();
+      assert(!graphConnectivityResult.member_islands[0].empty());
+      auto imgRefs = parent->get_image_ref(graphConnectivityResult.member_islands[0]);
+      members.insert(imgRefs.begin(), imgRefs.end());
+
+      Image* closestIndexToRoot = nullptr;
+      for (auto el : members) {
+        if (el->index >= root->index) {
+          if (closestIndexToRoot && closestIndexToRoot->index - root->index > el->index - root->index) {
+            closestIndexToRoot = el;
+          }else {
+            closestIndexToRoot = el;
           }
         }
-        // auto otherIs = graphConnectivityResult.member_islands[0];
-        // auto otherIsland = parent->get_image_ref(otherIs);
-        // std::unordered_set<Image*> otherIslSet(otherIsland.begin(),otherIsland.end());
-        // auto ans = bfs_path_to_members(matches,otherIslSet,3303);
-        int k = 0;
-
-        // first evaluate islands, if each island is ,
-
+        if (el == root){break;}
       }
-      return;
+
+      if (closestIndexToRoot != root) {
+        closestIndexToRoot->regInfo->root = true;
+        imagePyramid->offset += Point2f(closestIndexToRoot->regInfo->absoluteCoords);
+      }
+
+      for (int i = 1; i < graphConnectivityResult.member_islands.size(); ++i) {
+        discardedIslands.push_back(graphConnectivityResult.member_islands[i].size());
+      }
     }
 
     if (!graphConnectivityResult.promoted_nodes.empty()) {
-      std::cout << "Component " << componentIndex << " promoting additional " << graphConnectivityResult.promoted_nodes.
-          size() <<
-          " frames in BA" << std::endl;
       //important to check if empty or get_image_ref returns every image known to StreamCam
       for (auto img: parent->get_image_ref(graphConnectivityResult.promoted_nodes)) {
         ig.setMember(img->index, true);
@@ -439,19 +368,30 @@ namespace pathCam {
     std::vector memberImages(members.begin(), members.end());
 
     auto tracks = ftg->generateCurrentTracks(memberImages);
-    BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(tracks, memberImages, 2 * memberImages.size() + 500);
+    auto iters = BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
+      tracks, memberImages, 2 * memberImages.size() + 5000);
 
     rebuild(membersForRebuild);
 
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start).count();
-    std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
-  }
 
-  bool check_tile_img(Point2i abc_, Point2i tileIdx_, int tileSize_, Size imageSize_) {
-    auto ul = tileIdx_ * tileSize_;
-    bool crit1 = abc_.x <= ul.x && abc_.y <= ul.y;
-    return crit1 && abc_.x + imageSize_.width >= ul.x + tileSize_ && abc_.y + imageSize_.height >= ul.y;
+    Poco::FastMutex::ScopedLock lock(parent->printToScreenMutex);
+    std::cout << "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(componentMagLabel) <<
+        std::endl;
+
+    if (!discardedIslands.empty()) {
+      std::cout << "failed to connect graph, discarded " << discardedIslands.size() << " islands, "
+          << std::accumulate(discardedIslands.begin(), discardedIslands.end(), size_t{0}) << " frames" << std::endl;
+    }
+
+    if (!graphConnectivityResult.promoted_nodes.empty()) {
+      std::cout << "promoted " << graphConnectivityResult.promoted_nodes.size() << " frames" << std::endl;
+    }
+
+    std::cout << memberImages.size() << " frames aligned in " << iters.first << " and " << iters.second << " iterations"
+        << std::endl;
+    std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
 
@@ -462,6 +402,15 @@ namespace pathCam {
     }
     auto liveTilesCopy = imagePyramid->liveTiles;
     imagePyramid->liveTiles.clear();
+
+    //debug/assert lambda funciton for checking tiles owned by an image fully reside within that image
+    auto check_tile_img = [](cv::Point2i abc_, cv::Point2i tileIdx_, int tileSize_, cv::Size imageSize_) {
+      auto ul = tileIdx_ * tileSize_;
+      bool crit1 = abc_.x <= ul.x && abc_.y <= ul.y;
+      return crit1 &&
+             abc_.x + imageSize_.width >= ul.x + tileSize_ &&
+             abc_.y + imageSize_.height >= ul.y + tileSize_;
+    };
 
     for (auto &img: members) {
       auto affectedTilesWithStatus = calculate_affected_tiles_with_status(img->regInfo->absoluteCoords);
@@ -525,14 +474,14 @@ namespace pathCam {
     successfullyAligned = true;
   }
 
-  std::unordered_set<Image *> MetricComposite::reduce_members_through_competition(std::unordered_set<Image *> _members) const {
-
+  std::unordered_set<Image *> MetricComposite::reduce_members_through_competition(
+    std::unordered_set<Image *> _members) const {
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
       to->owner = nullptr;
     }
 
-    for (auto &img : _members) {
+    for (auto &img: _members) {
       img->ownedTiles.clear();
     }
     imagePyramid->liveTiles.clear();
@@ -726,7 +675,8 @@ namespace pathCam {
       }
 
       auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
-      return v1 > 25 * parent->tileSize * parent->tileSize + get_sqrd_center_distance_tile_to_img(_img->regInfo->absoluteCoords, _to->index);
+      return v1 > 25 * parent->tileSize * parent->tileSize + get_sqrd_center_distance_tile_to_img(
+               _img->regInfo->absoluteCoords, _to->index);
     }
 
     //amount of motion blur is significantly different, choose clearest image
@@ -742,7 +692,7 @@ namespace pathCam {
       members.insert(to->owner);
     }
 
-    for (auto &[img,tileIdx] : waitingFrames) {
+    for (auto &[img,tileIdx]: waitingFrames) {
       if (img) {
         members.insert(img);
       }
@@ -777,7 +727,7 @@ namespace pathCam {
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       auto members = find_contributing_images();
-      auto cms = new ComponentMatchSearch(parent, img, this,{members.begin(),members.end()});
+      auto cms = new ComponentMatchSearch(parent, img, this, {members.begin(), members.end()});
       parent->jqSecondary->add_runnable(cms);
     }
   }
@@ -788,15 +738,15 @@ namespace pathCam {
 
     Poco::RWLock::ScopedReadLock lock(parent->component_mutex);
 
-    for (auto &component : parent->composites) {
-      if (component->componentIndex == componentIndex){continue;}
+    for (auto &component: parent->composites) {
+      if (component->componentIndex == componentIndex) { continue; }
       if (component->componentMagLabel == componentMagLabel) {
         auto ans = component->find_contributing_images();
-        members.insert(ans.begin(),ans.end());
+        members.insert(ans.begin(), ans.end());
         members.insert(component->root);
       }
     }
 
-    launch_component_match_search(img_,{members.begin(),members.end()});
+    launch_component_match_search(img_, {members.begin(), members.end()});
   }
 }

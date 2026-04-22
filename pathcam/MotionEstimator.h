@@ -67,6 +67,7 @@ public:
   std::vector<std::pair<unsigned int, Match*>> componentCallersWaiting;
   std::vector<std::pair<Point2f,double>> rootHomographies;
   std::vector<vote> votes;
+  vote winningVote;
   std::vector<std::shared_ptr<Match>> pollers;
 
   int bestMatch;
