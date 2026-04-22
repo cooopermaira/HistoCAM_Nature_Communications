@@ -63,6 +63,7 @@ namespace pathCam {
 
       launch_component_match_search_with_XC(img);
 
+      // vote on what objective lens this component is
       if (img->labelObserved) {
         ++observedLabels[img->label];
         int maxObservations = 0;
@@ -97,6 +98,9 @@ namespace pathCam {
       //calculate: for which of the affected tiles is this frame an improvement?
       for (auto &ptStat: affectedPyramidTilesWithStatus) {
         auto pyrTileObj = imagePyramid->get_base_tile(ptStat.first);
+
+        //debug
+        pyrTileObj->coveringFrames.insert(img);
 
         //check if frame improves status of tile, if so process immediately
         if (pyrTileObj->status < ptStat.second) {

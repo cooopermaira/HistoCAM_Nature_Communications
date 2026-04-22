@@ -72,6 +72,8 @@ struct TileObj {
 
   std::map<int, std::pair<Mat, void *> > SAMMasks;
 
+  std::unordered_set<Image*> coveringFrames;
+
   TileObj(int _tileSize, Point2i _index = {}) : index(_index) {
     image = cv::Mat(_tileSize, _tileSize, CV_8UC4, cv::Scalar(0, 0, 0, 0));
     preferredObj = nullptr;
