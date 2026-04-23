@@ -336,6 +336,40 @@ namespace pathCam {
     return buf;
   }
 
+  inline float sobel_focus_green_even_odd(const cv::Mat& bayer)
+  {
+    CV_Assert(!bayer.empty());
+    CV_Assert(bayer.type() == CV_8UC1 || bayer.type() == CV_16UC1);
+    CV_Assert(bayer.rows % 2 == 0 && bayer.cols % 2 == 0);
+
+    const int h = bayer.rows / 2;
+    const int w = bayer.cols / 2;
+
+    // Extract G plane: (even rows, odd cols)
+    cv::Mat g(h, w, CV_32F);
+
+    for (int y = 0; y < h; ++y)
+    {
+      const uchar* row = bayer.ptr<uchar>(2 * y);
+      float* out = g.ptr<float>(y);
+
+      for (int x = 0; x < w; ++x)
+      {
+        out[x] = static_cast<float>(row[2 * x + 1]);
+      }
+    }
+
+    // Sobel gradients
+    cv::Mat gx, gy;
+    cv::Sobel(g, gx, CV_32F, 1, 0, 3);
+    cv::Sobel(g, gy, CV_32F, 0, 1, 3);
+
+    // Gradient magnitude squared
+    cv::Mat mag2 = gx.mul(gx) + gy.mul(gy);
+
+    // Return mean energy
+    return cv::mean(mag2)[0];
+  }
 
   template<typename T>
   class OrderedSet {

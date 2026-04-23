@@ -31,6 +31,7 @@ namespace pathCam {
 
     float reg_full_scale;
     float motionBlur;
+    float focusBlur;
     // static inline int blurPatch = 1024;
 
     enum {

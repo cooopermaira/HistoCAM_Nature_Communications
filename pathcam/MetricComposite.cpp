@@ -99,27 +99,18 @@ namespace pathCam {
       for (auto &ptStat: affectedPyramidTilesWithStatus) {
         auto pyrTileObj = imagePyramid->get_base_tile(ptStat.first);
 
-        //debug
-        pyrTileObj->coveringFrames.insert(img);
+        if (ptStat.second == TileObj::singleFrameCoverage) {
+          //debug
+          pyrTileObj->coveringFrames.insert(img);
 
-        //check if frame improves status of tile, if so process immediately
-        if (pyrTileObj->status < ptStat.second) {
-          //if the tile is promoting to singleFrameCoverage, set owner and motionBlur from this frame
-          if (ptStat.second == TileObj::singleFrameCoverage) {
+          if (pyrTileObj->status < ptStat.second) {
             img->ownedTiles.insert(ptStat.first);
             pyrTileObj->owner = img;
             pyrTileObj->status = ptStat.second;
             immediateProcessingTiles.push_back(ptStat.first);
+          } else {
+            waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(ptStat.first);
           }
-          // //this if you want edge tiles. not very functional
-          // pyrTileObj->status = el.second;
-          // immediateProcessingTiles.push_back(el.first);
-        }
-
-        // check later if frame is less blurry than current source for tile (pyrTileObj)
-        else if (ptStat.second == TileObj::singleFrameCoverage) {
-          waitingFrames[positionForNextWaitngFrame % frameDelay].second.push_back(ptStat.first);
-          // img->ownedTiles.insert(ptStat.first);
         }
       }
       ++positionForNextWaitngFrame;
@@ -198,7 +189,6 @@ namespace pathCam {
     }
     // PROCESS OLD FRAMES END
   }
-
 
 
   void MetricComposite::align_and_rebuild() {
@@ -302,16 +292,16 @@ namespace pathCam {
       auto imgRefs = parent->get_image_ref(graphConnectivityResult.member_islands[0]);
       members.insert(imgRefs.begin(), imgRefs.end());
 
-      Image* closestIndexToRoot = nullptr;
-      for (auto el : members) {
+      Image *closestIndexToRoot = nullptr;
+      for (auto el: members) {
         if (el->index >= root->index) {
           if (closestIndexToRoot && closestIndexToRoot->index - root->index > el->index - root->index) {
             closestIndexToRoot = el;
-          }else {
+          } else {
             closestIndexToRoot = el;
           }
         }
-        if (el == root){break;}
+        if (el == root) { break; }
       }
 
       if (closestIndexToRoot != root) {
@@ -656,35 +646,45 @@ namespace pathCam {
   }
 
   bool MetricComposite::image_improves_tile(const std::shared_ptr<TileObj> &_to, Image *_img) const {
+    if (_to->index.x == 19 && _to->index.y == 21) {
+      int k = 0;
+    }
     //tile has no owner, candidate frame wins by default
     if (!_to->owner) {
       return true;
     }
 
-    float myBlur, theirBlur;
+    float myMotionBlur, theirMotionBlur, myFocusBlur, theirFocusBlur;
     {
       std::lock_guard lock(_img->blurMutex);
-      myBlur = _img->motionBlur;
+      myMotionBlur = _img->motionBlur;
+      myFocusBlur = _img->focusBlur;
     }
     {
       std::lock_guard lock(_to->owner->blurMutex);
-      theirBlur = _to->owner->motionBlur;
+      theirMotionBlur = _to->owner->motionBlur;
+      theirFocusBlur = _to->owner->focusBlur;
     }
     //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
     //pretty close to the center of the frame
-    if (std::abs(theirBlur - myBlur) < /*0.01f*/50) {
-      if (_to->owner->ownedTiles.size() < 12 && _img->ownedTiles.size() > 12) {
-        //owner does not have sufficient presence and should be removed to reduce member image count
-        return true;
-      }
+    if (std::abs(theirMotionBlur - myMotionBlur) < /*0.01f*/50) {
+      if (std::abs(theirFocusBlur - myFocusBlur) < 1000) {
+        if (_to->owner->ownedTiles.size() < 12 && _img->ownedTiles.size() > 12) {
+          //owner does not have sufficient presence and should be removed to reduce member image count
+          return true;
+        }
 
-      auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
-      return v1 > 25 * parent->tileSize * parent->tileSize + get_sqrd_center_distance_tile_to_img(
-               _img->regInfo->absoluteCoords, _to->index);
+        auto v1 = get_sqrd_center_distance_tile_to_img(_to->owner->regInfo->absoluteCoords, _to->index);
+        bool ans = v1 > 25 * parent->tileSize * parent->tileSize + get_sqrd_center_distance_tile_to_img(
+                     _img->regInfo->absoluteCoords, _to->index);
+        return ans;
+      }
+      return myFocusBlur > theirFocusBlur;
     }
 
     //amount of motion blur is significantly different, choose clearest image
-    return theirBlur > myBlur;
+    bool ans = theirMotionBlur > myMotionBlur;
+    return ans;
   }
 
 

@@ -102,7 +102,7 @@ namespace pathCam {
     }
     std::cout << "composite loop time: " + std::to_string(duration) << std::endl;
 
-    bool align = false;
+    bool align = true;
 
     // *******************************************************
     //    ******************** BEGIN POST PROCESSING  ********************

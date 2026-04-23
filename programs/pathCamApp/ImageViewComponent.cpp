@@ -162,18 +162,18 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
       }
       g.setOpacity(1.f);
       g.drawImage(*im, bounds);
-      //
-      //draw tile bounds with owner frame
-      // g.setColour(juce::Colours::greenyellow);
-      // g.drawRect(bounds, 3);
-      //
-      // std::string ij;
-      // if (tile->owner) {
-      //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
-      // }
-      // g.setFont(20);
-      // g.drawText(ij, bounds.getCentreX() - 250,
-      //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
+
+       // // draw tile bounds with owner frame
+       // g.setColour(juce::Colours::greenyellow);
+       // g.drawRect(bounds, 3);
+       //
+       // std::string ij;
+       // if (tile->owner) {
+       //   ij = Poco::format("(%ld,%f)", tile->owner->index, static_cast<double>(tile->owner->motionBlur));
+       // }
+       // g.setFont(20);
+       // g.drawText(ij, bounds.getCentreX() - 250,
+       //            bounds.getCentreY() - 15, 500, 30, Justification::centred);
 
       for (auto &mask: tile->SAMMasks) {
         auto jImg = static_cast<juce::Image *>(mask.second.second);
@@ -214,16 +214,16 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
     }
     tile->mutex.unlock();
   }
-  // //draws grid on image with indexes
-  // for (unsigned int t = 0; t < tiles.size(); t++) {
-  //   auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
-  //   g.setColour(juce::Colours::greenyellow);
-  //   g.drawRect(bounds, 3);
-  //   std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
-  //   g.setFont(20);
-  //   g.drawText(ij, bounds.getCentreX() - 50,
-  //              bounds.getCentreY() - 45, 100, 30, Justification::centred);
-  // }
+  //draws grid on image with indexes
+  for (unsigned int t = 0; t < tiles.size(); t++) {
+    auto bounds = RectCtoJ<float>(tiles[t].bounds) * scale;
+    g.setColour(juce::Colours::greenyellow);
+    g.drawRect(bounds, 3);
+    std::string ij = Poco::format("(%i,%i)", tiles[t].i, tiles[t].j);
+    g.setFont(20);
+    g.drawText(ij, bounds.getCentreX() - 50,
+               bounds.getCentreY() - 45, 100, 30, Justification::centred);
+  }
 
   //tile classification
   /*
@@ -432,6 +432,82 @@ void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
 }
 
 void ImageViewComponent::mouseDown(const juce::MouseEvent &event) {
+  if (event.mods.isLeftButtonDown() && event.mods.isCtrlDown()) {
+    if (!MRImageSet) return;
+
+    Poco::FastMutex::ScopedLock lock(MRImageSet->mutex);
+    std::vector<std::shared_ptr<MRTiledImage>> activeImages;
+    for (auto &img : MRImageSet->MRImages)
+      if (!img->suspended) activeImages.push_back(img);
+    if (activeImages.empty()) return;
+
+    const int numActive = (int) activeImages.size();
+    const int modeA = wrapMod(componentSelector, numActive + 1);
+
+    // Use the selected component, or all active images if showing all
+    std::vector<std::shared_ptr<MRTiledImage>> candidates;
+    if (modeA > 0)
+      candidates.push_back(activeImages[modeA - 1]);
+    else
+      candidates = activeImages;
+
+    auto clickPt = event.getPosition().toFloat();
+
+    for (int ci = 0; ci < (int) candidates.size(); ++ci) {
+      auto &tiledImage = candidates[ci];
+
+      // Replicate the imageview transform from drawLayer
+      auto imageview = *view;
+      if (tiledImage->scale == 0) {
+        auto ans = MRImageSet->get_display_coords_for_zero_scale(tiledImage);
+        imageview -= fPoint(ans.x, ans.y);
+      } else {
+        imageview *= 1.0 / tiledImage->scale;
+        imageview -= fPoint(tiledImage->offset.x, tiledImage->offset.y);
+      }
+
+      std::vector<TileQuery> tiles = tiledImage->getTiles(RectJtoC(imageview), RectJtoC(getLocalBounds()));
+
+      for (auto &tile : tiles) {
+        auto bounds = RectCtoJ<float>(tile.bounds);
+        bounds *= view2screenScale(imageview); // paint passes scale=1.0
+        bounds.expand(0.5f, 0.5f);
+
+        if (bounds.contains(clickPt)) {
+          int compIdx = (modeA > 0) ? (modeA - 1) : ci;
+          std::cout << "Ctrl+click: component=" << compIdx
+                    << " tile=(" << tile.i << "," << tile.j << ")"
+                    << " screen=(" << (int) bounds.getX() << "," << (int) bounds.getY()
+                    << " " << (int) bounds.getWidth() << "x" << (int) bounds.getHeight() << ")"
+                    << std::endl;
+          std::cout<<std::endl;
+
+          if (tile.image->owner) {
+            std::cout<<"owned by "<<tile.image->owner->index<<" motionblur "<<tile.image->owner->motionBlur<<" "<<tile.image->owner->focusBlur<<std::endl;
+          }
+          std::cout<<std::endl;
+
+          std::vector coveringFrames(tile.image->coveringFrames.begin(),tile.image->coveringFrames.end());
+          std::sort(coveringFrames.begin(),coveringFrames.end(),[](const pathCam::Image* a,const pathCam::Image* b){return a->index>b->index;});
+          for (auto &f : coveringFrames) {
+            std::cout<<f->index<<" "<<f->motionBlur<<" "<<f->focusBlur<<std::endl;
+            // if (tiledImage->parent) {
+            //   auto mc = static_cast<MetricComposite*>(tiledImage->parent->composites[tiledImage->componentIndex].get());
+            //   mc->image_improves_tile(tile.image,f);
+            // }
+          }
+          std::cout<<std::endl;
+
+          return;
+        }
+      }
+    }
+
+    std::cout << "Ctrl+click: no tile at ("
+              << event.getPosition().x << "," << event.getPosition().y << ")" << std::endl;
+    return;
+  }
+
   if (event.mods.isLeftButtonDown()) {
     lastMousePosition = event.getPosition();
   }

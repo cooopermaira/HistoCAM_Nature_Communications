@@ -126,20 +126,31 @@ namespace pathCam {
         relativeCoords = Point2i(winningVote.m->t_x,winningVote.m->t_y);
         component_membership = wImg->regInfo->component_membership;
 
+        long dt = index - wImg->index;
+        if (dt > 0) {
+          Point2f dist = Point2f(relativeCoords) / static_cast<float>(dt);
+          image->motionBlur = dist.dot(dist);
+          if (image->motionBlur < 10) {
+            Mat raw(image->height,image->width,CV_8UC1,image->get_Raw());
+            Rect roi((image->width - 256) / 2, (image->height - 256) / 2,256,256);
+            image->focusBlur = sobel_focus_green_even_odd(raw(roi));
+          }
+        }
+
         wImg->regInfo->children.push_back(this);
         wImg->regInfo->matchedBy = index;
 
-        std::scoped_lock lock2(wImg->blurMutex);
-        if (!wImg->blurSet) {
-          auto dist_i = wImg->regInfo->relativeCoords + relativeCoords;
-          long dt = index - wImg->regInfo->matchedTo;
-
-          if (dt > 0) {
-            Point2f dist = Point2f(dist_i) / static_cast<float>(dt);
-            wImg->motionBlur = dist.dot(dist);
-            wImg->blurSet = true;
-          }
-        }
+        // std::scoped_lock lock2(wImg->blurMutex);
+        // if (!wImg->blurSet) {
+        //   auto dist_i = wImg->regInfo->relativeCoords + relativeCoords;
+        //   long dt = index - wImg->regInfo->matchedTo;
+        //
+        //   if (dt > 0) {
+        //     Point2f dist = Point2f(dist_i) / static_cast<float>(dt);
+        //     wImg->motionBlur = dist.dot(dist);
+        //     wImg->blurSet = true;
+        //   }
+        // }
       }
     }else {
       absoluteCoords = {0,0};
