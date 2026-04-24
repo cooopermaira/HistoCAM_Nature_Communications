@@ -357,15 +357,20 @@ namespace pathCam {
       std::cout << "Component " << componentIndex << " using sift in BA" << std::endl;
       return;
     }
-
-    //GENERATE TRACKS AND RUN
     std::vector memberImages(members.begin(), members.end());
 
+    //**************** GENERATE TRACKS ****************
     auto tracks = ftg->generateCurrentTracks(memberImages);
+    //**************** GENERATE TRACKS ****************
+
+    //**************** RUN SPARSE CONJUGATE GRADIENT ****************
     auto iters = BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
       tracks, memberImages, 2 * memberImages.size() + 5000);
+    //**************** RUN SPARSE CONJUGATE GRADIENT ****************
 
+    //**************** REBUILD ****************
     rebuild(membersForRebuild);
+    //**************** REBUILD ****************
 
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start).count();
