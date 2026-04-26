@@ -163,9 +163,10 @@ namespace pathCam {
         t.join();
       }
       parent->notify_observers();
+
       auto tAlignEnd = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::high_resolution_clock::now() - tAlign).count();
-      std::cout << "total align time " << tAlignEnd << std::endl;
+      std::cout << std::endl << "total align time " << tAlignEnd << std::endl;
     } else {
       for (auto comp: parent->composites) {
         comp->xcMatchShouldContinue = false;
@@ -303,5 +304,6 @@ namespace pathCam {
         std::cout << "component "<<comp->componentIndex <<" ACTIVE"<<std::endl;
       }
     }
+    std::cout<<std::endl;
   }
 }

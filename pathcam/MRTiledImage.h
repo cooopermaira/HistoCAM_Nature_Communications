@@ -30,7 +30,7 @@ public:
   cv::Rect_<float> bounds;
   int tile_size, magLabel, componentIndex = 0;
   float scale;
-  Point2f offset;
+  Point2f offset; //offset is in component space, not base space. baseCoord = scale * (offset + compCoord)
   Poco::Event scaleSet;
   pathCam::StreamCam *parent;
   std::weak_ptr<MRTiledImageSet> MRImageSet;
@@ -135,7 +135,7 @@ public:
   int index;
 
   std::vector<Point2i> AbCs;
-  std::vector<unsigned> frameLabels;
+  std::vector<int> frameComponentMembership;
   std::vector<long> frameTimeStamps;
   std::unordered_map<int,float> labelScaleLookup;
   float framesPerMillisecond;

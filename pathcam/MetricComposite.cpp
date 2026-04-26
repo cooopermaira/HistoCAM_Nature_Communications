@@ -324,6 +324,9 @@ namespace pathCam {
         }
       }
     }
+
+    //This is done to attempt to close long cycles where two overlapping frames don't have a match, but we might be able
+    //to promote a frame that's between them and thereby close the loop. This is not absolutely necessary but improves performance
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
     auto start1 = std::chrono::high_resolution_clock::now();
     ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps,
@@ -376,7 +379,7 @@ namespace pathCam {
         (std::chrono::high_resolution_clock::now() - start).count();
 
     Poco::FastMutex::ScopedLock lock(parent->printToScreenMutex);
-    std::cout << "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(componentMagLabel) <<
+    std::cout << std::endl<< "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(componentMagLabel) <<
         std::endl;
 
     if (!discardedIslands.empty()) {

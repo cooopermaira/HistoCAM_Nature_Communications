@@ -53,6 +53,7 @@ std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc
     result.push_back(Abc + scale * Point2i(MRTiledImageSet::frameWidth, 0));
     result.push_back(Abc + scale * Point2i(MRTiledImageSet::frameWidth, MRTiledImageSet::frameHeight));
     result.push_back(Abc + scale * Point2i(0, MRTiledImageSet::frameHeight));
+
   } else if (label == Image::_2X) {
     //using octagon
     auto centerPoint = Abc + scale * Point2i(MRTiledImageSet::frameWidth / 2, MRTiledImageSet::frameHeight / 2);
@@ -84,7 +85,7 @@ std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc
     result.push_back(Point2i(cx - r, cy + (r - d))); // lower-left chamfer point
     result.push_back(Point2i(cx - r, cy - (r - d))); // upper-left chamfer point
   }
-  return result; //could be empty, idk. better check return value just sayin
+  return result; //could be empty, idk. better check return value just sayin //who tf made this comment?
 }
 
 static void write_all(int fd, const void *data, size_t size) {
@@ -429,7 +430,7 @@ void MRTiledImageSet::write_slide_header() {
 
     write_all(fd, &framesPerMillisecond, sizeof(framesPerMillisecond)); //float
     // AbCs
-    assert(frameLabels.size() == AbCs.size());
+    assert(frameComponentMembership.size() == AbCs.size());
     auto numFrames = static_cast<uint16_t>(AbCs.size());
     write_all(fd, &numFrames, sizeof(numFrames));
     for (const auto &abc: AbCs) {
@@ -439,7 +440,7 @@ void MRTiledImageSet::write_slide_header() {
       write_all(fd, &x, sizeof(int32_t));
       write_all(fd, &y, sizeof(int32_t));
     }
-    for (const auto &fl: frameLabels) {
+    for (const auto &fl: frameComponentMembership) {
       auto fl8 = static_cast<uint8_t>(fl);
       write_all(fd, &fl8, sizeof(fl8));
     }
@@ -553,11 +554,11 @@ void MRTiledImageSet::read_slide_header() {
       AbCs.emplace_back(x, y);
     }
 
-    frameLabels.reserve(numFrames);
+    frameComponentMembership.reserve(numFrames);
     for (uint16_t i = 0; i < numFrames; ++i) {
       uint8_t fl;
       read_all(fd, &fl, sizeof(fl));
-      frameLabels.push_back(fl);
+      frameComponentMembership.push_back(fl);
     }
 
     // ===============================
@@ -677,7 +678,10 @@ std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long 
     frameBoundaries.reserve(endFrameIdx - startFrameIdx + 1);
 
     for (long i = startFrameIdx; i <= endFrameIdx; ++i) {
-      auto res = generate_frame_vertices(AbCs[i], frameLabels[i]);
+      auto mrImg = MRImages[frameComponentMembership[i]];
+      auto label = mrImg->magLabel;
+      auto coords = mrImg->scale * (mrImg->offset + Point2f(AbCs[i]));
+      auto res = generate_frame_vertices(coords, label);
       if (!res.empty()) {
         frameBoundaries.push_back(res);
       }

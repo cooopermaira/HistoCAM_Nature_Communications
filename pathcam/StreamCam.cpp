@@ -107,7 +107,7 @@ namespace pathCam {
       inference_thread.join();
     }
 
-    // cleanup_and_reset();
+    cleanup_and_reset();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::high_resolution_clock::now() - start).count();
@@ -972,16 +972,18 @@ namespace pathCam {
   }
 
   void StreamCam::cleanup_and_reset() {
-    float minBlur = 1, maxBlur = 0;
+
     for (auto comp: composites) {
       comp->correct_offset();
     }
 
     // save_velocity_data();
 
+
     std::vector<Point2i> AbCs(maxIndex + 1);
-    std::vector<unsigned> frameLabels(maxIndex + 1);
+    std::vector<int> frameComponentMembership(maxIndex + 1);
     std::vector<long> frameTimeStamps(maxIndex + 1);
+
     for (auto &img: images) {
       if (img && img->index <= maxIndex) {
         if (img->regInfo && img->is_good()) {
@@ -989,31 +991,30 @@ namespace pathCam {
             // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
             auto abc = Point2f(
               -img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
-            abc = get_AbC_relative_from_relative(img->regInfo->component_membership, abc, 0);
+            // abc = get_AbC_relative_from_relative(img->regInfo->component_membership, abc, 0);
             AbCs[img->index] = abc;
           } else {
             // Abc was aligned during BA, trust its coords
-            AbCs[img->index] = get_AbC_relative_from_relative(img->regInfo->component_membership,
-                                                              Point2f(img->regInfo->absoluteCoords), 0);
+            // AbCs[img->index] = get_AbC_relative_from_relative(img->regInfo->component_membership,
+            //                                                   Point2f(img->regInfo->absoluteCoords), 0);
+            AbCs[img->index] = img->regInfo->absoluteCoords;
           }
-          frameLabels[img->index] = img->label;
+          frameComponentMembership[img->index] = img->regInfo->component_membership;
         } else {
           if (img->label == Image::_UNDEREXP || img->label == Image::_LOWFEAT) {
             if (img->index > 0) {
               AbCs[img->index] = AbCs[img->index - 1];
-              frameLabels[img->index] = frameLabels[img->index - 1];
+              frameComponentMembership[img->index] = frameComponentMembership[img->index - 1];
             } //else it just stays (0,0) because that's what it inits to.
           } else {
             std::cout << img->index << " " << Image::get_label(img->label) << "no reginfo but non black label" <<
                 std::endl;
           }
         }
-        if (img->motionBlur < minBlur) { minBlur = img->motionBlur; }
-        if (img->motionBlur > maxBlur) { maxBlur = img->motionBlur; }
         frameTimeStamps[img->index] = img->timeStamp;
       }
     }
-    std::cout << "minBlur maxBlur " << minBlur << " " << maxBlur << std::endl;
+
     std::unordered_map<int, float> labelScaleLookup;
     create_mag_label_to_scale_lookup(labelScaleLookup);
 
@@ -1026,7 +1027,7 @@ namespace pathCam {
 
     MRImageSet->labelScaleLookup = labelScaleLookup;
     MRImageSet->AbCs = AbCs;
-    MRImageSet->frameLabels = frameLabels;
+    MRImageSet->frameComponentMembership = frameComponentMembership;
     MRImageSet->frameTimeStamps = frameTimeStamps;
     MRImageSet->framesPerMillisecond = float(maxIndex) / float(captureTimeMS);
     MRImageSet->captureTimeMS = captureTimeMS;
