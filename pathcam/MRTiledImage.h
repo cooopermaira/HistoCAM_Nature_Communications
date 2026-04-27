@@ -197,7 +197,7 @@ public:
 
   bool empty() { return MRImages.empty(); }
 
-  cv::Rect_<float> get_component_bounds(int _component_index) { return MRImages[_component_index]->bounds; }
+  cv::Rect_<float> get_component_bounds(int _component_index) const { return get_mrImg_by_comp_idx(_component_index)->bounds; }
 
   void update_bounds();
 
@@ -253,6 +253,15 @@ public:
   void generate_nav_paths();
 
   void correct_alignment();
+
+  std::shared_ptr<MRTiledImage> get_mrImg_by_comp_idx(int componentIndex_) const {
+    for (auto &mrImg : MRImages) {
+      if (mrImg->componentIndex == componentIndex_) {
+        return mrImg;
+      }
+    }
+    return nullptr;
+  }
 };
 
 
