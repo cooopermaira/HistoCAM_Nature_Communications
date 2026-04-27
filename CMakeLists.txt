@@ -17,6 +17,8 @@ option(BUILD_PATHCAM_GUI "" ON)
 option(BUILD_SPINNAKER "" OFF)
 option(OVERRRIDE_SPINNAKER "" OFF)
 
+option(PATHCAM_ENABLE_CUDA "Enable CUDA support" ON)
+
 # TensorRT path (user supplied)
 set(TENSORRT_ROOT "" CACHE PATH "Path to TensorRT installation")
 
@@ -34,60 +36,64 @@ find_package(CURL REQUIRED)
 # OPTIONAL: CUDA
 # =========================
 
-find_package(CUDAToolkit QUIET)
 
 set(PATHCAM_HAS_CUDA OFF)
 set(PATHCAM_HAS_TENSORRT OFF)
 set(PATHCAM_OPENCV_CUDA OFF)
 
-if (CUDAToolkit_FOUND)
-    enable_language(CUDA)
-    set(CMAKE_CUDA_STANDARD 17)
+if (PATHCAM_ENABLE_CUDA)
+    find_package(CUDAToolkit QUIET)
 
-    set(PATHCAM_HAS_CUDA ON)
-    add_compile_definitions(PATHCAM_HAS_CUDA)
+    if (CUDAToolkit_FOUND)
+        enable_language(CUDA)
+        set(CMAKE_CUDA_STANDARD 17)
 
-    message(STATUS "CUDA found: enabling GPU support")
+        set(PATHCAM_HAS_CUDA ON)
+        add_compile_definitions(PATHCAM_HAS_CUDA)
 
-    # Detect OpenCV CUDA modules
-    foreach(lib ${OpenCV_LIBS})
-        if (lib MATCHES "opencv_cuda")
-            set(PATHCAM_OPENCV_CUDA ON)
-            add_compile_definitions(PATHCAM_OPENCV_CUDA)
-            message(STATUS "OpenCV CUDA modules detected")
-            break()
-        endif()
-    endforeach()
+        message(STATUS "CUDA found: enabling GPU support")
 
-    # =========================
-    # OPTIONAL: TensorRT
-    # =========================
-    if (TENSORRT_ROOT)
-        message(STATUS "Looking for TensorRT in ${TENSORRT_ROOT}")
+        # Detect OpenCV CUDA modules
+        foreach (lib ${OpenCV_LIBS})
+            if (lib MATCHES "opencv_cuda")
+                set(PATHCAM_OPENCV_CUDA ON)
+                add_compile_definitions(PATHCAM_OPENCV_CUDA)
+                message(STATUS "OpenCV CUDA modules detected")
+                break()
+            endif ()
+        endforeach ()
 
-        find_path(TENSORRT_INCLUDE_DIR NvInfer.h
-                PATHS ${TENSORRT_ROOT}/include)
+        # =========================
+        # OPTIONAL: TensorRT
+        # =========================
+        if (TENSORRT_ROOT)
+            message(STATUS "Looking for TensorRT in ${TENSORRT_ROOT}")
 
-        find_library(TENSORRT_LIB nvinfer
-                PATHS ${TENSORRT_ROOT}/lib)
+            find_path(TENSORRT_INCLUDE_DIR NvInfer.h
+                    PATHS ${TENSORRT_ROOT}/include)
 
-        if (TENSORRT_INCLUDE_DIR AND TENSORRT_LIB)
-            set(PATHCAM_HAS_TENSORRT ON)
-            add_compile_definitions(PATHCAM_HAS_TENSORRT)
+            find_library(TENSORRT_LIB nvinfer
+                    PATHS ${TENSORRT_ROOT}/lib)
 
-            message(STATUS "TensorRT found")
+            if (TENSORRT_INCLUDE_DIR AND TENSORRT_LIB)
+                set(PATHCAM_HAS_TENSORRT ON)
+                add_compile_definitions(PATHCAM_HAS_TENSORRT)
 
-            include_directories(${TENSORRT_INCLUDE_DIR})
-            set(TENSORRT_LIBRARIES ${TENSORRT_LIB})
-        else()
-            message(WARNING "TensorRT not found at provided path")
-        endif()
-    endif()
+                message(STATUS "TensorRT found")
 
-else()
-    message(STATUS "CUDA not found: building CPU-only version")
-endif()
+                include_directories(${TENSORRT_INCLUDE_DIR})
+                set(TENSORRT_LIBRARIES ${TENSORRT_LIB})
+            else ()
+                message(WARNING "TensorRT not found at provided path")
+            endif ()
+        endif ()
 
+    else ()
+        message(STATUS "CUDA not found: building CPU-only version")
+    endif ()
+else ()
+    message(STATUS "CUDA explicitly disabled")
+endif ()
 # =========================
 # OPTIONAL: SPINNAKER
 # =========================
@@ -102,8 +108,8 @@ if (NOT OVERRRIDE_SPINNAKER)
                 "/opt/spinnaker/lib/libSpinnaker.so"
                 "/opt/spinnaker/lib/libSpinUpdate.so"
                 "/opt/spinnaker/lib/libSpinVideo.so")
-    endif()
-endif()
+    endif ()
+endif ()
 
 # =========================
 # CLIPPER
@@ -129,12 +135,12 @@ if (PATHCAM_HAS_CUDA)
     file(GLOB PATHCAM_CU pathcam/*.cu)
     list(APPEND PATHCAM_FILES ${PATHCAM_CU})
 
-endif()
+endif ()
 
 # Remove Spinnaker files if disabled
 if (NOT BUILD_SPINNAKER)
     list(FILTER PATHCAM_FILES EXCLUDE REGEX SpinPath)
-endif()
+endif ()
 
 # =========================
 # LIBRARY
@@ -156,17 +162,17 @@ set(PATHCAM_LIBS
 # Optional CUDA libs
 if (PATHCAM_HAS_CUDA)
     list(APPEND PATHCAM_LIBS CUDA::cudart)
-endif()
+endif ()
 
 # Optional TensorRT
 if (PATHCAM_HAS_TENSORRT)
     list(APPEND PATHCAM_LIBS ${TENSORRT_LIBRARIES})
-endif()
+endif ()
 
 # Optional Spinnaker
 if (BUILD_SPINNAKER)
     list(APPEND PATHCAM_LIBS ${SPINNAKER_LIBRARIES})
-endif()
+endif ()
 
 target_link_libraries(pathCamLib ${PATHCAM_LIBS})
 
@@ -224,4 +230,4 @@ if (BUILD_PATHCAM_GUI)
             JUCE_WEB_BROWSER=0
             JUCE_USE_CURL=1
     )
-endif()
+endif ()
