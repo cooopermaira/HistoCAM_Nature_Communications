@@ -640,6 +640,35 @@ void MRTiledImageSet::read_slide_header() {
   }
 }
 
+std::vector<Point2i> MRTiledImageSet::frame_centers_from_time_interval(long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const {
+  const auto &ts = frameTimeStamps;
+
+  if (ts.empty()) {
+    startFrameIdx = endFrameIdx = -1;
+    return {};
+  }
+
+  // ---- startFrameIdx: last index with ts[i] <= msTimeStart ----
+  auto itStart = std::upper_bound(ts.begin(), ts.end(), msTimeStart);
+
+  if (itStart == ts.begin()) {
+    startFrameIdx = 0; // all timestamps > start → clamp to first
+  } else {
+    startFrameIdx = std::distance(ts.begin(), itStart) - 1;
+  }
+
+  // ---- endFrameIdx: first index with ts[i] >= msTimeEnd ----
+  auto itEnd = std::lower_bound(ts.begin(), ts.end(), msTimeEnd);
+
+  if (itEnd == ts.end()) {
+    endFrameIdx = static_cast<long>(ts.size() - 1); // all timestamps < end → clamp to last
+  } else {
+    endFrameIdx = std::distance(ts.begin(), itEnd);
+  }
+
+  return frame_centers_from_frame_interval(startFrameIdx, endFrameIdx);
+}
+
 
 std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
   long msTimeStart, long msTimeEnd,
@@ -672,8 +701,32 @@ std::vector<Point2i> MRTiledImageSet::poly_annotation_from_time_interval(
   return poly_annotations_from_frame_interval(startFrameIdx, endFrameIdx);
 }
 
-std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const {
+
+std::vector<Point2i> MRTiledImageSet::frame_centers_from_frame_interval(long startFrameIdx, long endFrameIdx) const {
+
   if (startFrameIdx <= endFrameIdx) {
+
+    std::vector<Point2i> frameCenters;
+    frameCenters.reserve(endFrameIdx - startFrameIdx + 1);
+
+    Point2i center(MRTiledImageSet::frameWidth / 2, MRTiledImageSet::frameHeight / 2);
+
+    for (long i = startFrameIdx; i <= endFrameIdx; ++i) {
+      auto mrImg = MRImages[frameComponentMembership[i]];
+      auto coords = mrImg->scale * (Point2i(mrImg->offset) + AbCs[i] + center);
+      frameCenters.push_back(coords);
+    }
+
+    return frameCenters;
+  }
+  return {};
+}
+
+
+std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const {
+
+  if (startFrameIdx <= endFrameIdx) {
+
     std::vector<std::vector<Point2i> > frameBoundaries;
     frameBoundaries.reserve(endFrameIdx - startFrameIdx + 1);
 

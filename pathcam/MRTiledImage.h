@@ -234,6 +234,10 @@ public:
 
   std::vector<Point2i> poly_annotations_from_frame_interval(long startFrameIdx, long endFrameIdx) const;
 
+  std::vector<Point2i> frame_centers_from_time_interval(long msTimeStart, long msTimeEnd, long &startFrameIdx, long &endFrameIdx) const;
+
+  std::vector<Point2i> frame_centers_from_frame_interval(long startFrameIdx, long endFrameIdx) const;
+
   std::vector<Point2i> generate_frame_vertices(const Point2i &Abc, unsigned label) const;
 
   void correct_alignment();
