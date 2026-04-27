@@ -76,8 +76,12 @@ Component *AnnoListBoxModel::refreshComponentForRow(int rowNumber,
 
 void AnnoListComponent::initAlphaSliders() {
   selectedAlphaSlider.onValueChange = [this]() {
-    parent->annotationVisibility = (float)selectedAlphaSlider.getValue();
+    parent->annotationVisibility = (float) selectedAlphaSlider.getValue();
     parent->rightComponent->repaint();
+  };
+  pathHistorySlider.onValueChange = [this]() {
+    parent->pathHistory = (float) pathHistorySlider.getValue();
+    parent->updateEphemeralNavPath();
   };
 }
 

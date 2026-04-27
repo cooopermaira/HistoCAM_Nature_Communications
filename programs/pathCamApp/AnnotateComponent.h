@@ -128,6 +128,8 @@ public:
   NavPathListComponent *getNavPathList() { return navPathList.get(); }
 
   const NavigationPath *getSelectedNavPath() const {
+    if (ephemeralNavPath.has_value())
+      return &ephemeralNavPath.value();
     return navPathList ? navPathList->getSelectedPath() : nullptr;
   }
 
@@ -147,7 +149,37 @@ public:
   void annotationsUpdated() { leftComponent->updatelist(); }
 
   std::shared_ptr<Annotation> getSelected() { return selected; }
-  void setSelected(std::shared_ptr<Annotation> annotation) { selected = annotation; }
+
+  void setSelected(std::shared_ptr<Annotation> annotation) {
+    selected = annotation;
+    updateEphemeralNavPath();
+  }
+
+  void updateEphemeralNavPath() {
+    ephemeralNavPath.reset();
+
+    auto *vpp = dynamic_cast<VoicePointPoly *>(selected.get());
+    if (!vpp || vpp->startFrameIdx < 0 || !rightComponent->MRImageSet) {
+      rightComponent->repaint();
+      return;
+    }
+
+    long pathStartIdx = (long) ((1.0f - pathHistory) * (float) vpp->startFrameIdx);
+    pathStartIdx = std::max(0L, pathStartIdx);
+
+    auto centers = rightComponent->MRImageSet->frame_centers_from_frame_interval(
+      pathStartIdx, vpp->startFrameIdx);
+
+    if (!centers.empty()) {
+      NavigationPath path;
+      path.frameCenters.reserve(centers.size());
+      for (const auto &c : centers)
+        path.frameCenters.emplace_back((float) c.x, (float) c.y);
+      ephemeralNavPath = std::move(path);
+    }
+
+    rightComponent->repaint();
+  }
 
   void removeSelected();
 
@@ -168,7 +200,8 @@ public:
   int mode;
 
   float annotationVisibility = 0.5f;
-  float pathHistory = 0.5f;
+  float pathHistory = 0.0f;
+  std::optional<NavigationPath> ephemeralNavPath;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnnotateComponent)
 };

@@ -368,10 +368,32 @@ private:
 
 class VoicePointPoly : public PointClickPoly {
 public:
+  int spanStartI = -1;
+  int spanEndI = -1;
+  long startMS = -1;
+  long endMS = -1;
+  long startFrameIdx = -1;
+  long endFrameIdx = -1;
+
   AnnotationSpan annospan;
   ConceptSpan conceptSpan;
-  VoicePointPoly(AnnotationSpan _annospan) : PointClickPoly(_annospan.label), annospan(std::move(_annospan)){};
-  VoicePointPoly(ConceptSpan _conceptSpan) : PointClickPoly(_conceptSpan.concept_type), conceptSpan(_conceptSpan){};
+
+  VoicePointPoly(AnnotationSpan _annospan) : PointClickPoly(_annospan.label), annospan(std::move(_annospan)) {
+    spanStartI = annospan.spanStartI;
+    spanEndI = annospan.spanEndI;
+    startMS = annospan.startMS;
+    endMS = annospan.endMS;
+    startFrameIdx = annospan.startFrameIdx;
+    endFrameIdx = annospan.endFrameIdx;
+  };
+  VoicePointPoly(ConceptSpan _conceptSpan) : PointClickPoly(_conceptSpan.concept_type), conceptSpan(_conceptSpan) {
+    spanStartI = conceptSpan.spanStartI;
+    spanEndI = conceptSpan.spanEndI;
+    startMS = conceptSpan.startMS;
+    endMS = conceptSpan.endMS;
+    startFrameIdx = conceptSpan.startFrameIdx;
+    endFrameIdx = conceptSpan.endFrameIdx;
+  };
 
 };
 
