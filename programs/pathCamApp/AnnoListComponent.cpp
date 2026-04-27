@@ -76,11 +76,7 @@ Component *AnnoListBoxModel::refreshComponentForRow(int rowNumber,
 
 void AnnoListComponent::initAlphaSliders() {
   selectedAlphaSlider.onValueChange = [this]() {
-    parent->selectedAlpha = (float)selectedAlphaSlider.getValue();
-    parent->rightComponent->repaint();
-  };
-  unselectedAlphaSlider.onValueChange = [this]() {
-    parent->unselectedAlpha = (float)unselectedAlphaSlider.getValue();
+    parent->annotationVisibility = (float)selectedAlphaSlider.getValue();
     parent->rightComponent->repaint();
   };
 }

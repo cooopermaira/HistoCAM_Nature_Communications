@@ -101,20 +101,20 @@ public:
     selectedAlphaSlider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
     addAndMakeVisible(selectedAlphaSlider);
 
-    selectedAlphaLabel.setText("Selected Alpha", juce::dontSendNotification);
+    selectedAlphaLabel.setText("Annotation Visibility", juce::dontSendNotification);
     selectedAlphaLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(selectedAlphaLabel);
 
     // Unselected annotation alpha slider
-    unselectedAlphaSlider.setRange(0.0, 1.0, 0.01);
-    unselectedAlphaSlider.setValue(0.5);
-    unselectedAlphaSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-    unselectedAlphaSlider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
-    addAndMakeVisible(unselectedAlphaSlider);
+    pathHistorySlider.setRange(0.0, 1.0, 0.01);
+    pathHistorySlider.setValue(0.0);
+    pathHistorySlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    pathHistorySlider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
+    addAndMakeVisible(pathHistorySlider);
 
-    unselectedAlphaLabel.setText("Unselected Alpha", juce::dontSendNotification);
-    unselectedAlphaLabel.setJustificationType(juce::Justification::centredLeft);
-    addAndMakeVisible(unselectedAlphaLabel);
+    pathHistoryLabel.setText("Path History", juce::dontSendNotification);
+    pathHistoryLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(pathHistoryLabel);
 
     initAlphaSliders();
     
@@ -198,9 +198,9 @@ public:
     b.removeFromTop(5);
 
     auto unselectedLabelArea = b.removeFromBottom(18);
-    unselectedAlphaLabel.setBounds(unselectedLabelArea);
+    pathHistoryLabel.setBounds(unselectedLabelArea);
     auto unselectedSliderArea = b.removeFromBottom(24);
-    unselectedAlphaSlider.setBounds(unselectedSliderArea);
+    pathHistorySlider.setBounds(unselectedSliderArea);
 
     auto selectedLabelArea = b.removeFromBottom(18);
     selectedAlphaLabel.setBounds(selectedLabelArea);
@@ -227,8 +227,8 @@ private:
 
   juce::Slider selectedAlphaSlider;
   juce::Label selectedAlphaLabel;
-  juce::Slider unselectedAlphaSlider;
-  juce::Label unselectedAlphaLabel;
+  juce::Slider pathHistorySlider;
+  juce::Label pathHistoryLabel;
 
   AnnotateComponent * parent;
 

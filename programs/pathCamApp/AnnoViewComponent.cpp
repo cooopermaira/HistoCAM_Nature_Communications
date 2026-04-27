@@ -340,9 +340,11 @@ void AnnoViewComponent::paint(juce::Graphics &g) {
   ImageViewComponent::paint(g);
   {
     const ScopedLock lock(mutex);
+    bool anySelected = (annotateParent->getSelected() != nullptr);
     for (unsigned int i = 0; i < annotations->size(); i++) {
       bool isSelected = (*annotations)[i].get() == annotateParent->getSelected().get();
-      float alpha = isSelected ? annotateParent->selectedAlpha : annotateParent->unselectedAlpha;
+      float alpha = anySelected ? (isSelected ? annotateParent->annotationVisibility : 0.0f)
+                                : annotateParent->annotationVisibility;
       (*annotations)[i]->paint(g, view->getPosition(), isSelected,
                                view2screenScale(*view), alpha);
     }

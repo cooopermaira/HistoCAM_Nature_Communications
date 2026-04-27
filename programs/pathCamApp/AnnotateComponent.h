@@ -167,8 +167,8 @@ public:
 
   int mode;
 
-  float selectedAlpha = 0.5f;
-  float unselectedAlpha = 0.5f;
+  float annotationVisibility = 0.5f;
+  float pathHistory = 0.5f;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnnotateComponent)
 };
