@@ -489,7 +489,7 @@ static std::string buildConceptExtractionRequestBody_JSON_Llama(const juce::Stri
   // optional but useful: stop generation drift
   juce::Array<juce::var> stopArr;
   stopArr.add("\n\n");
-  root->setProperty("stop", juce::var(stopArr));
+  // root->setProperty("stop", juce::var(stopArr));
 
   // serialize
   return juce::JSON::toString(juce::var(root.get()), true).toStdString();
@@ -1345,7 +1345,7 @@ std::vector<ConceptSpan> reduceToAnnotations_LLM(const std::string &text,
   std::string apiKey(
     "REDACTED_OPENAI_API_KEY");
 
-  bool extractConceptFirst = true;
+  bool extractConceptFirst = false;
 
   if (extractConceptFirst) {
     auto resp = reduceToConcepts_LLM(text);
@@ -1360,7 +1360,8 @@ std::vector<ConceptSpan> reduceToAnnotations_LLM(const std::string &text,
     }
 
     auto pResp = parseConceptsFromResponses(resp);
-    return {};
+    resolveEvidenceSpans(text, pResp);
+    return pResp;
     // resolveEvidenceSpans(text, pResp);
     // return pResp;
   }
@@ -1432,7 +1433,8 @@ void AnnotateComponent::voice_annotation_handler() {
         continue;
       }
 
-
+      conceptSpan.startMS = wordVec[conceptSpan.spanStartI].startMS;
+      conceptSpan.endMS = wordVec[conceptSpan.spanEndI].endMS;
 
       long startFrameIndex, endFrameIndex;
       auto polyAnnoVertices = mrImgSet->poly_annotation_from_time_interval(conceptSpan.startMS,
@@ -1471,17 +1473,72 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-  for (int i = 10; i < 15; ++i) {
+
+  auto [fullText,wordVec] = send_transcribe_call(juce::File("/home/cm/Documents/data/Andrew_data_march/cap1/dictation.wav"));
+  auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
+
+  for (auto &annospan: annoSpanVec) {
+    std::cout << annospan.concept_type;
+
+    if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
+      std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
+      for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
+        std::cout << wordVec[i].word;
+        if (i < annospan.spanEndI) {
+          std::cout << " ";
+        }
+      }
+      std::cout << "\"" << std::endl;
+    }
+
+    if (!annospan.evidence_text.empty()) {
+      std::cout << ", \"" << annospan.evidence_text << "\"" << std::endl;
+    }
+  }
+
+  std::ofstream outFile("/home/cm/Documents/data/Andrew_data_march/transcriptions.txt");
+  for (int i = 0; i < 15; ++i) {
     juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/dictation.wav");
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     std::cout << std::endl << std::endl << i << std::endl;
+
     size_t width = 120;
-    for (size_t i = 0; i < fullText.size(); i += width) {
-      std::cout << fullText.substr(i, width) << "\n";
+    size_t pos = 0;
+
+    outFile<<i<<std::endl;
+    while (pos < fullText.size()) {
+      size_t end = pos + width;
+
+      // If we're at the end, just print the rest
+      if (end >= fullText.size()) {
+        outFile << fullText.substr(pos) << "\n";
+        break;
+      }
+
+      // Find last space before the cutoff
+      size_t spacePos = fullText.rfind(' ', end);
+
+      // If no space found or it's behind current pos (very long word)
+      if (spacePos == std::string::npos || spacePos < pos) {
+        // fallback: hard break (rare case: huge token)
+        spacePos = end;
+      }
+
+      outFile << fullText.substr(pos, spacePos - pos) << "\n";
+
+      // Move past the space
+      pos = spacePos + 1;
+    }
+    outFile<<std::endl;
+
+    for (size_t ii = 0; ii < fullText.size(); ii += width) {
+      std::cout << fullText.substr(ii, width) << "\n";
     }
     for (auto &word : wordVec) {
       std::cout<<word.word<<" "<<word.startMS << " "<<word.endMS<<std::endl;
     }
+
+
     auto start = std::chrono::high_resolution_clock::now();
 
     auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
@@ -1514,16 +1571,17 @@ void AnnotateComponent::silly_test() {
     // }
   }
 
+  outFile.close();
 
   juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap1/dictation.wav");
 
   auto start = std::chrono::high_resolution_clock::now();
-  auto [fullText,wordVec] = send_transcribe_call(dictPath);
-
-  auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-      count();
-  std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
-  auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
+  // auto [fullText,wordVec] = send_transcribe_call(dictPath);
+  //
+  // auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+  //     count();
+  // std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
+  // auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
 
   int k = 0;
 }
