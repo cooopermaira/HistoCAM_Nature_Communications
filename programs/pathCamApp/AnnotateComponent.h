@@ -35,6 +35,7 @@ public:
 
   void silly_test();
 
+
   std::vector<std::string> get_preconfig_anno();
 
   AnnotateComponent(std::shared_ptr<fRectangle> view,
@@ -45,8 +46,10 @@ public:
     allSlideAnnotations.push_back(activeAnnotations);
 
     leftComponent.reset(new AnnoListComponent(this, activeAnnotations, iconNames, iconsFromZipFile));
-
     addChildComponent(leftComponent.get());
+
+    navPathList.reset(new NavPathListComponent(this));
+    addChildComponent(navPathList.get());
 
     rightComponent.reset(new AnnoViewComponent(this, view, iconNames, iconsFromZipFile, activeAnnotations));
 
@@ -94,6 +97,13 @@ public:
     juce::Component *components[] = {leftComponent.get(), resizerBar.get(), rightComponent.get()};
 
     layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+
+    // Split the left column: leftComponent gets top 3/4, navPathList gets bottom 1/4.
+    auto leftBounds = leftComponent->getBounds();
+    int navHeight = leftBounds.getHeight() / 4;
+    leftComponent->setBounds(leftBounds.withTrimmedBottom(navHeight));
+    navPathList->setBounds(leftBounds.removeFromBottom(navHeight));
+
     rightComponent->resized();
   }
 
@@ -101,14 +111,25 @@ public:
     Component::setVisible(shouldBeVisible);
 
     leftComponent->setVisible(shouldBeVisible);
+    navPathList->setVisible(shouldBeVisible);
     rightComponent->setVisible(shouldBeVisible);
     resizerBar->setVisible(shouldBeVisible);
+
+    if (shouldBeVisible && rightComponent->MRImageSet) {
+      getNavPathList()->setPaths(rightComponent->MRImageSet->navPaths);
+    }
+
   }
 
   void fixAspectRatio() { rightComponent->fixAspectRatio(); }
 
   AnnoViewComponent *getViewComp() { return rightComponent.get(); }
   AnnoListComponent *getListComp() { return leftComponent.get(); }
+  NavPathListComponent *getNavPathList() { return navPathList.get(); }
+
+  const NavigationPath *getSelectedNavPath() const {
+    return navPathList ? navPathList->getSelectedPath() : nullptr;
+  }
 
   void toggleMode(int mode_in) {
     if (mode_in == mode) {
@@ -138,6 +159,7 @@ public:
   std::shared_ptr<Annotation> selected;
 
   std::unique_ptr<AnnoListComponent> leftComponent;
+  std::unique_ptr<NavPathListComponent> navPathList;
   std::unique_ptr<AnnoViewComponent> rightComponent;
   std::unique_ptr<juce::StretchableLayoutResizerBar> resizerBar;
   juce::StretchableLayoutManager layout;

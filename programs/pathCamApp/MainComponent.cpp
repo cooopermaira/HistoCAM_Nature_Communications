@@ -408,6 +408,7 @@ void MainComponent::GuiEventHandler(std::string event) {
     {
       const ScopedLock lock(mutex);
       annotate->setVisible(true);
+
       annotate->fixAspectRatio();
       capture->setVisible(false);
       if (dirBrowser) dirBrowser->setVisible(false);

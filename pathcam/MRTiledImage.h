@@ -13,6 +13,14 @@ using namespace pathCam;
 #include "StreamCam.h"
 #include "TiledImage.h"
 
+struct NavigationPath {
+  unsigned magLabel;
+  int componentIndex;
+  long startTime, endTime;
+  long startFrame, endFrame;
+  std::vector<Point2i> frameCenters;
+};
+
 struct Point2iLess {
   bool operator()(const cv::Point2i &a,
                   const cv::Point2i &b) const {
@@ -141,6 +149,8 @@ public:
   float framesPerMillisecond;
   long captureTimeMS;
 
+  std::vector<NavigationPath> navPaths;
+
   inline static int frameHeight = 0;
   inline static int frameWidth = 0;
   inline static int scopeRadius = 0;
@@ -239,6 +249,8 @@ public:
   std::vector<Point2i> frame_centers_from_frame_interval(long startFrameIdx, long endFrameIdx) const;
 
   std::vector<Point2i> generate_frame_vertices(const Point2i &Abc, unsigned label) const;
+
+  void generate_nav_paths();
 
   void correct_alignment();
 };

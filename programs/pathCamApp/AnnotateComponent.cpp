@@ -231,7 +231,10 @@ void AnnotateComponent::removeSelected() {
 
 void AnnotateComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   rightComponent->setImage(image);
-  if (image) { update_active_annotations(image->index); }
+  if (image) {
+    update_active_annotations(image->index);
+    getNavPathList()->setPaths(image->navPaths);
+  }
 }
 
 std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File audioFile) {

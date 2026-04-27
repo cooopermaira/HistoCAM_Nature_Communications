@@ -963,3 +963,34 @@ void MRTiledImageSet::correct_alignment()
         }
     }
 }
+
+void MRTiledImageSet::generate_nav_paths() {
+  navPaths.clear();
+
+  NavigationPath currentNavPath;
+  currentNavPath.magLabel = MRImages[frameComponentMembership[0]]->magLabel; //assumes the first frame was valid. there will undoubtedly be a case where that isnt true eventually;
+  currentNavPath.startTime = frameTimeStamps[0];
+  currentNavPath.startFrame = 0L;
+  currentNavPath.componentIndex = frameComponentMembership[0];
+
+  for (int i = 1; i < frameComponentMembership.size(); ++i) {
+    auto mrImg = MRImages[frameComponentMembership[i]];
+    if (mrImg->magLabel != currentNavPath.magLabel) {
+      currentNavPath.endTime = frameTimeStamps[i - 1];
+      currentNavPath.endFrame = i - 1;
+      currentNavPath.frameCenters = frame_centers_from_frame_interval(currentNavPath.startFrame,currentNavPath.endFrame);
+      navPaths.push_back(currentNavPath);
+
+      currentNavPath = NavigationPath{};
+      currentNavPath.magLabel = mrImg->magLabel;
+      currentNavPath.startFrame = i;
+      currentNavPath.startTime = frameTimeStamps[i];
+      currentNavPath.componentIndex = frameComponentMembership[i];
+    }
+  }
+
+  currentNavPath.endTime = frameTimeStamps.back();
+  currentNavPath.endFrame = frameComponentMembership.size() - 1;
+  currentNavPath.frameCenters = frame_centers_from_frame_interval(currentNavPath.startFrame,currentNavPath.endFrame);
+  navPaths.push_back(currentNavPath);
+}

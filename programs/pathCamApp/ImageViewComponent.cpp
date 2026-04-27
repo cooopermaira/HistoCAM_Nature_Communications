@@ -295,7 +295,11 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   const int modeA = wrapMod(componentSelector, numActive + 1); // 0 = all, 1..N = individual
   const bool showAllA = (modeA == 0);
 
-  if (!showAllA) { g.beginTransparencyLayer(0.3f); }
+  if (!showAllA) {
+    g.beginTransparencyLayer(0.3f);
+  }else {
+    compIndex = -1;
+  }
   for (auto &img : activeImages) {
     if (!showAllA && img == activeImages[modeA - 1]) continue;
     g.setColour(juce::Colours::white);
@@ -304,6 +308,8 @@ void ImageViewComponent::drawSlide(Graphics &g, float scale) {
   if (!showAllA) {
     g.endTransparencyLayer();
     auto &sel = activeImages[modeA - 1];
+    compIndex = sel->componentIndex;
+
     if (sel->scale != 0) {
       g.setColour(juce::Colours::white);
       drawLayer(g, scale, sel);
@@ -418,8 +424,10 @@ void ImageViewComponent::refreshImage() {
 void ImageViewComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   const ScopedLock lock(mutex);
 
+  componentSelector = 0;
   MRImageSet = image;
   if (!image) { return; }
+
 
   horizontalScrollBar.setRangeLimits(MRImageSet->bounds.x, MRImageSet->bounds.width);
   verticalScrollBar.setRangeLimits(MRImageSet->bounds.y, MRImageSet->bounds.height);

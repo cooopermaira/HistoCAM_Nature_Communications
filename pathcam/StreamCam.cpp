@@ -1091,8 +1091,9 @@ namespace pathCam {
     components = 0;
     maxIndex = -1;
 
-    //store slide and reset slide member variable
+    MRImageSet->generate_nav_paths();
 
+    //store slide and reset slide member variable
     MRImageSet->detach();
     {
       Poco::FastMutex::ScopedLock lock(previousSlidesMutex);

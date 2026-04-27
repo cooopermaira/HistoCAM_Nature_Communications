@@ -174,6 +174,7 @@ public:
   MainComponent *parent;
   std::atomic<bool> newData;
   std::atomic<bool> cacherKeepGoing = true;
+  std::atomic<int> compIndex;
   cv::Mat greenShade;
   cv::Mat holding1;
   cv::Mat holding2;

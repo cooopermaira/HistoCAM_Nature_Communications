@@ -346,5 +346,39 @@ void AnnoViewComponent::paint(juce::Graphics &g) {
       (*annotations)[i]->paint(g, view->getPosition(), isSelected,
                                view2screenScale(*view), alpha);
     }
+
+    // Draw the selected navigation path as a line through frameCenters,
+    // transitioning red → yellow → green from start to finish.
+    if (const NavigationPath *navPath = annotateParent->getSelectedNavPath()) {
+      const auto &centers = navPath->frameCenters;
+      const int n = (int) centers.size();
+      if (n >= 2) {
+        // t in [0,1]: red→yellow for t<0.5, yellow→green for t>=0.5
+        auto pathColour = [](float t) -> juce::Colour {
+          t = juce::jlimit(0.0f, 1.0f, t);
+          if (t < 0.5f)
+            return juce::Colour::fromFloatRGBA(1.0f, t * 2.0f, 0.0f, 1.0f);
+          else
+            return juce::Colour::fromFloatRGBA(1.0f - (t - 0.5f) * 2.0f, 1.0f, 0.0f, 1.0f);
+        };
+
+        // Draw each segment with the colour at its start point.
+        for (int i = 0; i < n - 1; ++i) {
+          float t = (float) i / (float) (n - 1);
+          auto p1 = view2screen(fPoint(centers[i].x,     centers[i].y),     *view);
+          auto p2 = view2screen(fPoint(centers[i+1].x,   centers[i+1].y),   *view);
+          g.setColour(pathColour(t));
+          g.drawLine(p1.getX(), p1.getY(), p2.getX(), p2.getY(), 3.0f);
+        }
+
+        // Draw a dot at each frame center with the same colour gradient.
+        for (int i = 0; i < n; ++i) {
+          float t = (float) i / (float) (n - 1);
+          auto pt = view2screen(fPoint(centers[i].x, centers[i].y), *view);
+          g.setColour(pathColour(t));
+          g.fillEllipse(pt.getX() - 4.0f, pt.getY() - 4.0f, 8.0f, 8.0f);
+        }
+      }
+    }
   }
 }

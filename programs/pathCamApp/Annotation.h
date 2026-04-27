@@ -575,7 +575,6 @@ private:
 
   }
 
-
 };
 
 #endif /* Annotation_hpp */

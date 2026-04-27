@@ -235,4 +235,32 @@ private:
 };
 
 
+class NavPathListComponent : public juce::Component, private juce::ListBoxModel {
+public:
+  NavPathListComponent(AnnotateComponent *parent);
+
+  void setPaths(const std::vector<NavigationPath> &newPaths);
+
+  // Returns the currently selected path, or nullptr if none selected.
+  const NavigationPath *getSelectedPath() const;
+
+  void resized() override;
+  void paint(juce::Graphics &g) override {}
+
+private:
+  int getNumRows() override { return (int) paths.size(); }
+
+  void paintListBoxItem(int row, juce::Graphics &g, int width, int height, bool rowIsSelected) override;
+
+  void listBoxItemClicked(int row, const juce::MouseEvent &) override;
+
+  void backgroundClicked(const juce::MouseEvent &) override;
+
+  AnnotateComponent *parent;
+  std::vector<NavigationPath> paths;
+  int selectedIndex = -1;
+  juce::ListBox listBox {"nav paths", this};
+  juce::Label titleLabel;
+};
+
 #endif /* AnnoListComponent_hpp */
