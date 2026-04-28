@@ -999,9 +999,12 @@ namespace pathCam {
         if (img->regInfo && img->is_good()) {
           if (!img->regInfo->wasAligned) {
             // AbC wasn't aligned in bundle adjustment, recalculate based on relative coords
-            auto abc = Point2f(
-              -img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords);
-            // abc = get_AbC_relative_from_relative(img->regInfo->component_membership, abc, 0);
+            auto abc = -img->regInfo->relativeCoords + images[img->regInfo->matchedTo]->regInfo->absoluteCoords;
+
+            auto d = abc - img->regInfo->absoluteCoords;
+            if (d.dot(d) > 1000000) {
+              int k = 0;
+            }
             AbCs[img->index] = abc;
           } else {
             // Abc was aligned during BA, trust its coords

@@ -277,7 +277,7 @@ void CaptureComponent::stop() {
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
       auto p = Poco::Path(sCam->inputFileOverride).parent().pushDirectory("dictation.wav").toString();
       auto d = MRImageSet->cwd.makeDirectory();
-      d.setFileName("dication.wav");
+      d.setFileName("dictation.wav");
       Poco::File(p).copyTo(d.toString());
       parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(p)));
     parent->annotate->newVoiceAnnotation.set();

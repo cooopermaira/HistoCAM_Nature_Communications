@@ -350,7 +350,7 @@ static std::string buildConceptExtractionRequestBody_JSON_Llama(const juce::Stri
   "For each concept, output:\n"
   "- evidence_text: the EXACT contiguous substring from the transcript\n"
   "- concept_text: a concise interpretation (1 to 10 words, NOT a final label)\n"
-  "- concept_type: one of ['inflammation','invasion','margin','gleason_grade','extraprostatic_extension','tumor','architecture','other']\n"
+  "- concept_type: one of ['inflammation','invasion','margin','gleason_grade','extraprostatic_extension','carcinoma','architecture','other']\n"
   "- assertion: one of ['present','absent','uncertain','revised']\n"
   "- attributes: object (may be empty)\n"
   "\n"

@@ -215,12 +215,16 @@ namespace pathCam {
       members.insert(img);
     }
     auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
+
+
     std::unordered_map<Image *, std::vector<std::shared_ptr<Match> > > adjacency;
 
     for (auto &m: matches) {
       adjacency[m->image_1].push_back(m);
       adjacency[m->image_2].push_back(m);
     }
+
+
     std::queue<Image *> q;
 
     // Seed with confirmed members
@@ -249,13 +253,10 @@ namespace pathCam {
         if (other->regInfo->component_membership != componentIndex) {
           other->regInfo->component_membership = componentIndex;
           other->regInfo->absoluteCoords = img->regInfo->absoluteCoords - offset;
-          other->regInfo->matchedTo = img->index;
-          other->regInfo->relativeCoords = offset;
+          // other->regInfo->matchedTo = img->index;
+          // other->regInfo->relativeCoords = offset;
 
           members.insert(other);
-          if (other->regInfo->component_membership != componentIndex) {
-            int k = 0;
-          }
           q.push(other);
         }
       }
@@ -350,12 +351,9 @@ namespace pathCam {
         img->keypointsImageSpace[i].pt = img->keypoints[i].pt / parent->scale_factor;
       }
       img->regInfo->wasAligned = true;
+      q.push(img);
     }
 
-    if (graphConnectivityResult.used_sift) {
-      std::cout << "Component " << componentIndex << " using sift in BA" << std::endl;
-      return;
-    }
     std::vector memberImages(members.begin(), members.end());
 
     //**************** GENERATE TRACKS ****************
@@ -370,6 +368,35 @@ namespace pathCam {
     //**************** REBUILD ****************
     rebuild(membersForRebuild);
     //**************** REBUILD ****************
+
+    while (!q.empty()) {
+      Image *img = q.front();
+      q.pop();
+
+      for (auto m: adjacency[img]) {
+        Image *other;
+        Point2i offset;
+
+        if (m->image_1 == img) {
+          other = m->image_2;
+          offset = Point2i(m->t_x, m->t_y);
+        } else {
+          other = m->image_1;
+          offset = Point2i(-m->t_x, -m->t_y);
+        }
+
+        // If not yet assigned
+        if (!other->regInfo->wasAligned) {
+          other->regInfo->wasAligned = true;
+          other->regInfo->absoluteCoords = img->regInfo->absoluteCoords - offset;
+          // other->regInfo->matchedTo = img->index;
+          // other->regInfo->relativeCoords = offset;
+
+          members.insert(other);
+          q.push(other);
+        }
+      }
+    }
 
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start).count();

@@ -56,7 +56,16 @@ public:
   }
 
   ~Match(){};
-  
+
+  Image* get_other(Image* me_) {
+    if (me_==image_1) {
+      return image_2;
+    }
+    if (me_ == image_2) {
+      return image_1;
+    }
+    return nullptr;
+  }
   
 };
 

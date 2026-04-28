@@ -331,6 +331,7 @@ void MainComponent::findSlideDirectories() {
 
 void MainComponent::load_case(std::vector<juce::File> slideDirs) {
   if (slideDirs.empty()){return;}
+  annotate->allSlideAnnotations.resize(slideDirs.size(), std::make_shared<std::vector<std::shared_ptr<Annotation>>>());
   {
     Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
     for (auto &p :slideDirs) {
