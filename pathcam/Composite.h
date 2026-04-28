@@ -69,7 +69,7 @@ namespace pathCam {
     std::vector<Image *> landmarkFrames;
     Image *xcRegLandmark = nullptr;
     Point2f xcPwDist;
-    std::vector<std::tuple<Image*,Image*,std::vector<KeyPoint>,std::vector<KeyPoint>>> extraMatches;
+
 
     std::shared_ptr<MRTiledImage> imagePyramid;
 
@@ -183,8 +183,6 @@ namespace pathCam {
     void establish_scale_at_root(Image *_rootImg);
 
     void establish_scale_at_root_cpu(Image *_rootImg);
-
-    void suspend_and_join(RegInfo *ri_, Image *matchedTo_, Point2i relCoords_);
 
     // static void sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,
     //                             const std::vector<uint8_t> &inlierMask, std::vector<

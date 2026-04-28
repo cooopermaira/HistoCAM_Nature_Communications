@@ -445,6 +445,11 @@ void MRTiledImageSet::write_slide_header() {
       write_all(fd, &fl8, sizeof(fl8));
     }
 
+    for (const auto &ts : frameTimeStamps) {
+      int64_t t = static_cast<int64_t>(ts);
+      write_all(fd, &t, sizeof(t));
+    }
+
     //scale lookup
     auto slSize = static_cast<uint8_t>(labelScaleLookup.size());
     write_all(fd, &slSize, sizeof(slSize));
@@ -559,6 +564,13 @@ void MRTiledImageSet::read_slide_header() {
       uint8_t fl;
       read_all(fd, &fl, sizeof(fl));
       frameComponentMembership.push_back(fl);
+    }
+
+    frameTimeStamps.reserve(numFrames);
+    for (uint16_t i = 0; i < numFrames; ++i) {
+      uint64_t ts;
+      read_all(fd, &ts,sizeof(ts));
+      frameTimeStamps.push_back(ts);
     }
 
     // ===============================
@@ -965,6 +977,9 @@ void MRTiledImageSet::correct_alignment()
 }
 
 void MRTiledImageSet::generate_nav_paths() {
+  if (MRImages.empty() || frameComponentMembership.empty() || frameTimeStamps.empty() || AbCs.empty()) {
+    return;
+  }
   navPaths.clear();
 
   NavigationPath currentNavPath;

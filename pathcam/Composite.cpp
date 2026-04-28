@@ -439,30 +439,6 @@ namespace pathCam {
     }
   }
 
-  void Composite::suspend_and_join(RegInfo *ri_, Image *matchedTo_, const Point2i relCoords_) {
-    suspended = true;
-    imagePyramid->suspended = true;
-
-    for (auto img: memberFrames) {
-      img->regInfo->component_membership = matchedTo_->regInfo->component_membership;
-    }
-
-    for (auto &p: imagePyramid->liveTiles) {
-      auto tObj = imagePyramid->level[0]->getTile(p.x, p.y);
-      tObj.reset();
-    }
-
-    ri_->root = false;
-    ri_->stayFixedDuringBundleAdjustment = false;
-    ri_->matchedTo = matchedTo_->index;
-    ri_->relativeCoords = relCoords_;
-
-    Poco::ScopedWriteRWLock lock(RegInfo::registrationProcessMutex);
-    ri_->attempt_absolute_reg(true);
-    if (componentIndex == 6) {
-      RegInfo::flag = true;
-    }
-  }
 
   void Composite::set_candidate_scale_ratios() {
     switch (componentMagLabel) {

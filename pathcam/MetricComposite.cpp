@@ -269,10 +269,6 @@ namespace pathCam {
     for (auto m: matches) {
       ig.addEdge(m->image_1->index, m->image_2->index, ImageGraph::EdgeKind::ORB);
     }
-    for (int ii = 0; ii < extraMatches.size(); ++ii) {
-      auto [img1,img2,kp1,kp2] = extraMatches[ii];
-      ig.addEdge(img1->index, img2->index, ImageGraph::EdgeKind::SIFT);
-    }
 
 
     for (auto img: members) {

@@ -977,6 +977,16 @@ namespace pathCam {
       comp->correct_offset();
     }
 
+    for (auto &comp: composites) {
+      if (comp->frameCount < 5) {
+        comp->suspended = true;
+        comp->imagePyramid->suspended = true;
+        for (auto &frame : comp->memberFrames) {
+          frame->label = Image::_LOWFEAT;
+        }
+      }
+    }
+
     // save_velocity_data();
 
 
@@ -1000,6 +1010,13 @@ namespace pathCam {
             AbCs[img->index] = img->regInfo->absoluteCoords;
           }
           frameComponentMembership[img->index] = img->regInfo->component_membership;
+
+          if (img->index > 0) {
+            auto d = AbCs[img->index] - AbCs[img->index - 1];
+            if (frameComponentMembership[img->index] == frameComponentMembership[img->index - 1] && d.dot(d) > 1000000) {
+              int k = 0;
+            }
+          }
         } else {
           if (img->label == Image::_UNDEREXP || img->label == Image::_LOWFEAT) {
             if (img->index > 0) {
@@ -1018,12 +1035,6 @@ namespace pathCam {
     std::unordered_map<int, float> labelScaleLookup;
     create_mag_label_to_scale_lookup(labelScaleLookup);
 
-    for (auto &comp: composites) {
-      if (comp->frameCount < 5) {
-        comp->suspended = true;
-        comp->imagePyramid->suspended = true;
-      }
-    }
 
     MRImageSet->labelScaleLookup = labelScaleLookup;
     MRImageSet->AbCs = AbCs;
