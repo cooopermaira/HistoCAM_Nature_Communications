@@ -39,14 +39,14 @@ int preallocate_file(int fd, off_t length) {
 
 std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc, unsigned label) const {
   std::vector<Point2i> result;
-  if (!(label == Image::_2X || label == Image::_4X || label == Image::_10X || label ==
-        Image::_20X || label ==
-        Image::_40X)) { return {}; }
+  if (!(label == pathCam::Image::_2X || label == pathCam::Image::_4X || label == pathCam::Image::_10X || label ==
+        pathCam::Image::_20X || label ==
+        pathCam::Image::_40X)) { return {}; }
 
   auto scale = labelScaleLookup.at((int) label);
 
-  if (label == Image::_4X || label == Image::_10X || label == Image::_20X || label ==
-      Image::_40X) {
+  if (label == pathCam::Image::_4X || label == pathCam::Image::_10X || label == pathCam::Image::_20X || label ==
+      pathCam::Image::_40X) {
     //rectangle
     result.reserve(4);
     result.push_back(Abc);
@@ -54,7 +54,7 @@ std::vector<Point2i> MRTiledImageSet::generate_frame_vertices(const Point2i &Abc
     result.push_back(Abc + scale * Point2i(MRTiledImageSet::frameWidth, MRTiledImageSet::frameHeight));
     result.push_back(Abc + scale * Point2i(0, MRTiledImageSet::frameHeight));
 
-  } else if (label == Image::_2X) {
+  } else if (label == pathCam::Image::_2X) {
     //using octagon
     auto centerPoint = Abc + scale * Point2i(MRTiledImageSet::frameWidth / 2, MRTiledImageSet::frameHeight / 2);
     const int r = scale * MRTiledImageSet::scopeRadius;

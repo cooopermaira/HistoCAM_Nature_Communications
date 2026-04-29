@@ -211,8 +211,10 @@ namespace pathCam {
   void CompositeManager::save_components_to_disk() {
     for (auto i: parent->composites) {
       //i->imagePyramid->level[0]->saveBaseTilesToDisk();
+      auto basePath = Poco::Path(parent->inputFileOverride);
+      basePath = basePath.parent();
 
-      i->save_pyramid_as_image("/home/cm/Desktop/10x.png", false, false);
+      i->save_pyramid_as_image(basePath.toString() + std::to_string(i->componentIndex)+".png", false, false);
     }
   }
 

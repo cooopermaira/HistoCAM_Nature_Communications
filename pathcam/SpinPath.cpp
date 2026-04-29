@@ -220,7 +220,7 @@ namespace pathCam {
       // Release system
       system->ReleaseInstance();
 
-      camlogger.error("No or multiple cameras deteched!");
+      camlogger.error("No or multiple cameras detected!");
     }
 
     pCam = nullptr;
@@ -367,7 +367,8 @@ namespace pathCam {
       //Set exposure mode to "Timed"
       pCam->ExposureMode.SetValue(Spinnaker::ExposureModeEnums::ExposureMode_Timed);
       //Set absolute value of shutter exposure time to 1500 microseconds
-      pCam->ExposureTime.SetValue(1504);
+      pCam->ExposureTime.SetValue(1300);
+      //pCam->ExposureTime.SetValue(1504);
 
       //Turn auto gain off
       pCam->GainAuto.SetValue(Spinnaker::GainAutoEnums::GainAuto_Off);
@@ -379,7 +380,7 @@ namespace pathCam {
 
       pCam->BlackLevelSelector.SetValue(Spinnaker::BlackLevelSelectorEnums::BlackLevelSelector_All);
       //Set the absolute value of brightness to 1.5%.
-      pCam->BlackLevel.SetValue(1.5);
+      pCam->BlackLevel.SetValue(3);
 
       //Set auto white balance to off
       pCam->BalanceWhiteAuto.SetValue(Spinnaker::BalanceWhiteAutoEnums::BalanceWhiteAuto_Off);
@@ -387,7 +388,7 @@ namespace pathCam {
       pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Red);
       pCam->BalanceRatio.SetValue(1.7);
       pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Blue);
-      pCam->BalanceRatio.SetValue(2.5);
+      pCam->BalanceRatio.SetValue(2.0);
     } catch (Spinnaker::Exception &e) {
       camlogger.error(Poco::format("Error Spinning up camera: %s", e.what()));
       result = -1;
@@ -569,7 +570,7 @@ namespace pathCam {
     int result = spinUpCamera();
 
     if (result != -1) {
-      Poco::Path root_path = Poco::Path("/home/pathcam/pcamdata/camRecord/data/");
+      Poco::Path root_path = Poco::Path("/home/pathcam/pcamdata/reg/2x/");
 
       setRootPath(root_path);
       newCaptureSet();
