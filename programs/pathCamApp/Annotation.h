@@ -386,7 +386,7 @@ public:
     startFrameIdx = annospan.startFrameIdx;
     endFrameIdx = annospan.endFrameIdx;
   };
-  VoicePointPoly(ConceptSpan _conceptSpan) : PointClickPoly(_conceptSpan.concept_text), conceptSpan(_conceptSpan) {
+  VoicePointPoly(ConceptSpan _conceptSpan) : PointClickPoly(_conceptSpan.concept_text + " - " + _conceptSpan.assertion), conceptSpan(_conceptSpan) {
     spanStartI = conceptSpan.spanStartI;
     spanEndI = conceptSpan.spanEndI;
     startMS = conceptSpan.startMS;
