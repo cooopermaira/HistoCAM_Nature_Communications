@@ -116,6 +116,11 @@ public:
     pathHistoryLabel.setJustificationType(juce::Justification::centredLeft);
     addAndMakeVisible(pathHistoryLabel);
 
+    distancePerFrameLabel.setFont(juce::Font(11.0f));
+    distancePerFrameLabel.setJustificationType(juce::Justification::centredRight);
+    distancePerFrameLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible(distancePerFrameLabel);
+
     initAlphaSliders();
     
     
@@ -190,6 +195,12 @@ public:
 
   void paint(Graphics &g) override {  }
 
+  void setDistancePerFrame(std::optional<double> val, size_t frameCount = 0) {
+    if (val.has_value())
+      distancePerFrameLabel.setText(juce::String((int) frameCount) + " frames  |  " + juce::String(val.value(), 2) + " px/frame", juce::dontSendNotification);
+    else
+      distancePerFrameLabel.setText("", juce::dontSendNotification);
+  }
 
   void resized() override {
     auto b = getLocalBounds().reduced(10);
@@ -197,6 +208,8 @@ public:
     searchBox.setBounds(searchArea);
     b.removeFromTop(5);
 
+    auto distanceLabelArea = b.removeFromBottom(14);
+    distancePerFrameLabel.setBounds(distanceLabelArea);
     auto unselectedLabelArea = b.removeFromBottom(18);
     pathHistoryLabel.setBounds(unselectedLabelArea);
     auto unselectedSliderArea = b.removeFromBottom(24);
@@ -229,6 +242,7 @@ private:
   juce::Label selectedAlphaLabel;
   juce::Slider pathHistorySlider;
   juce::Label pathHistoryLabel;
+  juce::Label distancePerFrameLabel;
 
   AnnotateComponent * parent;
 

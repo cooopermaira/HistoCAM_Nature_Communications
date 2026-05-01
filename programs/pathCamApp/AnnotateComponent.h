@@ -160,6 +160,7 @@ public:
 
     auto *vpp = dynamic_cast<VoicePointPoly *>(selected.get());
     if (!vpp || vpp->startFrameIdx < 0 || !rightComponent->MRImageSet) {
+      getListComp()->setDistancePerFrame(std::nullopt);
       rightComponent->repaint();
       return;
     }
@@ -175,7 +176,11 @@ public:
       path.frameCenters.reserve(centers.size());
       for (const auto &c : centers)
         path.frameCenters.emplace_back((float) c.x, (float) c.y);
+      path.distancePerFrame = path.calc_dist_per_frame();
+      getListComp()->setDistancePerFrame(path.distancePerFrame, path.frameCenters.size());
       ephemeralNavPath = std::move(path);
+    } else {
+      getListComp()->setDistancePerFrame(std::nullopt);
     }
 
     rightComponent->repaint();
