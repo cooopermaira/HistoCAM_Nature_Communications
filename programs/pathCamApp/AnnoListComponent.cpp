@@ -93,6 +93,16 @@ void AnnoListComponent::initAlphaSliders() {
     parent->pathHistory = (float) pathHistorySlider.getValue();
     parent->updateEphemeralNavPath();
   };
+  pathSectionSlider.onValueChange = [this]() {
+    parent->pathSection = (float) pathSectionSlider.getValue();
+    parent->updatePathSection();
+  };
+  auto updateSectionFrames = [this]() {
+    parent->pathSectionFrames = pathSectionFramesEditor.getText().getFloatValue();
+    parent->updatePathSection();
+  };
+  pathSectionFramesEditor.onReturnKey = updateSectionFrames;
+  pathSectionFramesEditor.onFocusLost = updateSectionFrames;
 }
 
 void AnnoListComponent::newSelection() {

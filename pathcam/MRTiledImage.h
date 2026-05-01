@@ -26,13 +26,13 @@ struct NavigationPath {
     if (end_ < 0){end_ = frameCenters.size() - 1;}
     start_ = max(1,start_);
     end_ = min(end_,(int)frameCenters.size() - 1);
-    if (end_ - start_ > 1) {
+    if (end_ - start_ > 0) {
       double dist = 0;
       for (int ii = start_; ii <= end_; ++ii) {
         auto p = frameCenters[ii] - frameCenters[ii - 1];
         dist += sqrt(p.x * p.x + p.y * p.y);
       }
-      return dist / frameCenters.size();
+      return dist / (end_ - start_);
     }
     return 0;
   }

@@ -364,20 +364,31 @@ void AnnoViewComponent::paint(juce::Graphics &g) {
             return juce::Colour::fromFloatRGBA(1.0f - (t - 0.5f) * 2.0f, 1.0f, 0.0f, 1.0f);
         };
 
+        const int intervalFrames = (int) annotateParent->pathSectionFrames;
+        const bool hasSection = (intervalFrames > 0 && intervalFrames < n);
+        int sectionStart = 0, sectionEnd = n;
+        if (hasSection) {
+          sectionStart = (int) (annotateParent->pathSection * (float) (n - intervalFrames));
+          sectionStart = juce::jlimit(0, n - intervalFrames, sectionStart);
+          sectionEnd = sectionStart + intervalFrames;
+        }
+
         // Draw each segment with the colour at its start point.
         for (int i = 0; i < n - 1; ++i) {
           float t = (float) i / (float) (n - 1);
-          auto p1 = view2screen(fPoint(centers[i].x,     centers[i].y),     *view);
-          auto p2 = view2screen(fPoint(centers[i+1].x,   centers[i+1].y),   *view);
-          g.setColour(pathColour(t));
+          float alpha = (!hasSection || (i >= sectionStart && i < sectionEnd)) ? 1.0f : 0.3f;
+          auto p1 = view2screen(fPoint(centers[i].x,   centers[i].y),   *view);
+          auto p2 = view2screen(fPoint(centers[i+1].x, centers[i+1].y), *view);
+          g.setColour(pathColour(t).withAlpha(alpha));
           g.drawLine(p1.getX(), p1.getY(), p2.getX(), p2.getY(), 3.0f);
         }
 
         // Draw a dot at each frame center with the same colour gradient.
         for (int i = 0; i < n; ++i) {
           float t = (float) i / (float) (n - 1);
+          float alpha = (!hasSection || (i >= sectionStart && i <= sectionEnd)) ? 1.0f : 0.5f;
           auto pt = view2screen(fPoint(centers[i].x, centers[i].y), *view);
-          g.setColour(pathColour(t));
+          g.setColour(pathColour(t).withAlpha(alpha));
           g.fillEllipse(pt.getX() - 4.0f, pt.getY() - 4.0f, 8.0f, 8.0f);
         }
       }

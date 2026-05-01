@@ -121,6 +121,26 @@ public:
     distancePerFrameLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
     addAndMakeVisible(distancePerFrameLabel);
 
+    pathSectionSlider.setRange(0.0, 1.0, 0.001);
+    pathSectionSlider.setValue(0.0);
+    pathSectionSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    pathSectionSlider.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
+    addAndMakeVisible(pathSectionSlider);
+
+    pathSectionLabel.setText("Path Section", juce::dontSendNotification);
+    pathSectionLabel.setJustificationType(juce::Justification::centredLeft);
+    addAndMakeVisible(pathSectionLabel);
+
+    pathSectionFramesEditor.setFont(juce::Font(11.0f));
+    pathSectionFramesEditor.setInputRestrictions(8, "0123456789.");
+    pathSectionFramesEditor.setText("0", false);
+    addAndMakeVisible(pathSectionFramesEditor);
+
+    pathSectionDistLabel.setFont(juce::Font(11.0f));
+    pathSectionDistLabel.setJustificationType(juce::Justification::centredRight);
+    pathSectionDistLabel.setColour(juce::Label::textColourId, juce::Colours::grey);
+    addAndMakeVisible(pathSectionDistLabel);
+
     initAlphaSliders();
     
     
@@ -202,11 +222,27 @@ public:
       distancePerFrameLabel.setText("", juce::dontSendNotification);
   }
 
+  void setPathSectionDist(std::optional<double> val) {
+    if (val.has_value())
+      pathSectionDistLabel.setText(juce::String(val.value(), 2) + " px/frame", juce::dontSendNotification);
+    else
+      pathSectionDistLabel.setText("", juce::dontSendNotification);
+  }
+
   void resized() override {
     auto b = getLocalBounds().reduced(10);
     auto searchArea = b.removeFromTop(30);
     searchBox.setBounds(searchArea);
     b.removeFromTop(5);
+
+    auto pathSectionDistArea = b.removeFromBottom(14);
+    pathSectionDistLabel.setBounds(pathSectionDistArea);
+    auto pathSectionRow = b.removeFromBottom(24);
+    auto pathSectionEditorArea = pathSectionRow.removeFromRight(52);
+    pathSectionFramesEditor.setBounds(pathSectionEditorArea);
+    pathSectionSlider.setBounds(pathSectionRow);
+    auto pathSectionLabelArea = b.removeFromBottom(18);
+    pathSectionLabel.setBounds(pathSectionLabelArea);
 
     auto distanceLabelArea = b.removeFromBottom(14);
     distancePerFrameLabel.setBounds(distanceLabelArea);
@@ -243,6 +279,11 @@ private:
   juce::Slider pathHistorySlider;
   juce::Label pathHistoryLabel;
   juce::Label distancePerFrameLabel;
+
+  juce::Slider pathSectionSlider;
+  juce::Label pathSectionLabel;
+  juce::TextEditor pathSectionFramesEditor;
+  juce::Label pathSectionDistLabel;
 
   AnnotateComponent * parent;
 

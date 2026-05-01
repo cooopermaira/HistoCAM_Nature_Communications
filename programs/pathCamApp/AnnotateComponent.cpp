@@ -232,6 +232,7 @@ void AnnotateComponent::removeSelected() {
 void AnnotateComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   ephemeralNavPath.reset();
   getListComp()->setDistancePerFrame(std::nullopt);
+  getListComp()->setPathSectionDist(std::nullopt);
   rightComponent->setImage(image);
   if (image) {
     update_active_annotations(image->index);

@@ -155,13 +155,31 @@ public:
     updateEphemeralNavPath();
   }
 
+  void updatePathSection() {
+    if (const NavigationPath *navPath = getSelectedNavPath()) {
+      const int n = (int) navPath->frameCenters.size();
+      const int intervalFrames = (int) pathSectionFrames;
+      if (intervalFrames > 0 && intervalFrames < n && n > 1) {
+        int startI = (int) (pathSection * (float) (n - intervalFrames));
+        startI = juce::jlimit(0, n - intervalFrames, startI);
+        double dist = navPath->calc_dist_per_frame(startI, startI + intervalFrames);
+        getListComp()->setPathSectionDist(dist);
+      } else {
+        getListComp()->setPathSectionDist(std::nullopt);
+      }
+    } else {
+      getListComp()->setPathSectionDist(std::nullopt);
+    }
+    rightComponent->repaint();
+  }
+
   void updateEphemeralNavPath() {
     ephemeralNavPath.reset();
 
     auto *vpp = dynamic_cast<VoicePointPoly *>(selected.get());
     if (!vpp || vpp->startFrameIdx < 0 || !rightComponent->MRImageSet) {
       getListComp()->setDistancePerFrame(std::nullopt);
-      rightComponent->repaint();
+      updatePathSection();
       return;
     }
 
@@ -183,7 +201,7 @@ public:
       getListComp()->setDistancePerFrame(std::nullopt);
     }
 
-    rightComponent->repaint();
+    updatePathSection();
   }
 
   void removeSelected();
@@ -206,6 +224,8 @@ public:
 
   float annotationVisibility = 0.5f;
   float pathHistory = 0.0f;
+  float pathSection = 0.0f;
+  float pathSectionFrames = 0.0f;
   std::optional<NavigationPath> ephemeralNavPath;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnnotateComponent)
