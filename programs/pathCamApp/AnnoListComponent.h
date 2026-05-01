@@ -237,12 +237,12 @@ public:
 
     auto pathSectionDistArea = b.removeFromBottom(14);
     pathSectionDistLabel.setBounds(pathSectionDistArea);
+    auto pathSectionLabelArea = b.removeFromBottom(18);
+    pathSectionLabel.setBounds(pathSectionLabelArea);
     auto pathSectionRow = b.removeFromBottom(24);
     auto pathSectionEditorArea = pathSectionRow.removeFromRight(52);
     pathSectionFramesEditor.setBounds(pathSectionEditorArea);
     pathSectionSlider.setBounds(pathSectionRow);
-    auto pathSectionLabelArea = b.removeFromBottom(18);
-    pathSectionLabel.setBounds(pathSectionLabelArea);
 
     auto distanceLabelArea = b.removeFromBottom(14);
     distancePerFrameLabel.setBounds(distanceLabelArea);
