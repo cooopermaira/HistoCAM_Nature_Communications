@@ -229,6 +229,22 @@ void AnnotateComponent::removeSelected() {
 }
 
 
+void AnnotateComponent::resized() {
+  auto area = getLocalBounds();
+  juce::Component *components[] = {leftComponent.get(), resizerBar.get(), rightComponent.get()};
+
+  layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+
+  auto leftBounds = leftComponent->getBounds();
+  int navHeight = leftBounds.getHeight() / 4;
+  leftComponent->setBounds(leftBounds.withTrimmedBottom(navHeight));
+  navPathList->setBounds(leftBounds.removeFromBottom(navHeight));
+
+  rightComponent->resized();
+
+  parent->repositionSlideListButton();
+}
+
 void AnnotateComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   ephemeralNavPath.reset();
   getListComp()->setDistancePerFrame(std::nullopt);

@@ -92,20 +92,7 @@ public:
 
   void refreshImage() { rightComponent->refreshImage(); }
 
-  void resized() override {
-    auto area = getLocalBounds();
-    juce::Component *components[] = {leftComponent.get(), resizerBar.get(), rightComponent.get()};
-
-    layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
-
-    // Split the left column: leftComponent gets top 3/4, navPathList gets bottom 1/4.
-    auto leftBounds = leftComponent->getBounds();
-    int navHeight = leftBounds.getHeight() / 4;
-    leftComponent->setBounds(leftBounds.withTrimmedBottom(navHeight));
-    navPathList->setBounds(leftBounds.removeFromBottom(navHeight));
-
-    rightComponent->resized();
-  }
+  void resized() override;
 
   void setVisible(bool shouldBeVisible) override {
     Component::setVisible(shouldBeVisible);

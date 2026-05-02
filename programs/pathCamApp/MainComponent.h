@@ -27,6 +27,7 @@ public:
   void paint(juce::Graphics &g) override;
 
   void resized() override;
+  void repositionSlideListButton();
 
   void buttonClicked(juce::Button* button) override;
 
