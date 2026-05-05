@@ -43,6 +43,8 @@ namespace pathCam {
 
         void align_and_rebuild() override;
 
+        void test_add_align_image();
+
         void rebuild(const std::vector<Image *> &members);
 
         bool image_improves_tile(const std::shared_ptr<TileObj>& _to, Image *_img) const;

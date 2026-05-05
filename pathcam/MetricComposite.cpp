@@ -192,6 +192,49 @@ namespace pathCam {
     // PROCESS OLD FRAMES END
   }
 
+  void MetricComposite::test_add_align_image() {
+    std::unordered_map<Image*,std::vector<std::shared_ptr<Match>>> imageMatches;
+    for (auto & img : memberFrames) {
+      imageMatches[img] = {};
+      for (auto &match : ftg->storedMatches) {
+        if (match->image_2->index == img->index) {
+          imageMatches[img].push_back(match);
+        }
+      }
+    }
+
+    for (auto &img : memberFrames) {
+      auto start = std::chrono::high_resolution_clock::now();
+
+      ftg->add_image(img);
+      for (auto &m : imageMatches[img]) {
+        ftg->process_match(m);
+      }
+
+      auto t = std::chrono::duration_cast<std::chrono::milliseconds>
+    (std::chrono::high_resolution_clock::now() - start).count();
+
+      start = std::chrono::high_resolution_clock::now();
+
+      int totalSize = 0;
+      for (int i = 0; i <= img->index; ++i) {
+        totalSize += img->observations.size();
+      }
+
+      std::vector<Observation*> observations;
+      observations.reserve(totalSize);
+
+      for (int i = 0; i <= img->index; ++i) {
+        auto mf = memberFrames[i];
+        observations.insert(observations.end(),mf->observations.begin(),mf->observations.end());
+      }
+
+      ftg->launch_inprocess_sparse_CG_iterator(observations);
+      t = std::chrono::duration_cast<std::chrono::milliseconds>
+    (std::chrono::high_resolution_clock::now() - start).count();
+      std::cout<<img->index<<" matches " << imageMatches[img].size()<<" "
+    }
+  }
 
   void MetricComposite::align_and_rebuild() {
     // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment

@@ -60,36 +60,78 @@ namespace pathCam {
 
   void FeatureTrackGenerator::add_image(Image *img) {
     img->observations.resize(img->keypoints.size(), nullptr);
-    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, false, img->regInfo, -1);
+    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, false, img->regInfo);
     baImages.push_back(baImg);
+    imageRefs.emplace(img->index,img);
 
     const float regScale = img->get_reg_scale();
     for (int i = 0; i < img->observations.size(); ++i) {
       auto ind = get_or_create_feature_index({img->index, i});
       const auto ftPixelCoords = img->keypoints[i].pt / regScale;
-      img->observations[i] = new Observation(baImg, baFeatures[ind], -1, -1, ftPixelCoords.x, ftPixelCoords.y, 1);
+      auto feat = baFeatures[ind]->find();
+      img->observations[i] = new Observation(baImg, feat, -1, -1, ftPixelCoords.x, ftPixelCoords.y, 1);
 
       auto ftWorldCoords = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
-      baFeatures[ind]->x = ftWorldCoords.x;
-      baFeatures[ind]->y = ftWorldCoords.y;
+      feat->x = ftWorldCoords.x;
+      feat->y = ftWorldCoords.y;
+      feat->imageFeatures.emplace(img,i);
     }
   }
 
-
-  // for (int i = 0; i < m->good_matches.size(); ++i) {
-  //   if (m->inliers[i]) {
-  //     ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i], m);
-  //   }
-  // }
-  void FeatureTrackGenerator::process_match(const std::shared_ptr<Match> &match_) {
+  void FeatureTrackGenerator::process_match2(const std::shared_ptr<Match> &match_) {
     auto srcImgIdx = match_->image_1->index;
     auto dstImgIdx = match_->image_2->index;
 
     auto img1 = match_->image_1;
     auto img2 = match_->image_2;
 
-    imageRefs.emplace(srcImgIdx, img1);
-    imageRefs.emplace(dstImgIdx, img2);
+    for (int i = 0; i < match_->good_matches.size(); ++i) {
+      if (match_->inliers[i]) {
+        auto qInd = match_->good_matches[i].queryIdx;
+        auto tInd = match_->good_matches[i].trainIdx;
+
+        //path compression happens here, so baFeat1 and baFeat2 are their own parents
+        auto baFeat1 = img1->observations[qInd]->feature->find();
+        auto baFeat2 = img2->observations[tInd]->feature->find();
+
+        if (baFeat1 != baFeat2) {
+          bool conflict = false;
+          auto* small = (baFeat1->imageFeatures.size() < baFeat2->imageFeatures.size()) ? baFeat1 : baFeat2;
+          auto* large = (small == baFeat1) ? baFeat2 : baFeat1;
+
+          for (const auto& [img, feat_id] : small->imageFeatures) {
+            auto it = large->imageFeatures.find(img);
+            if (it != large->imageFeatures.end() && it->second != feat_id) {
+              conflict = true;
+              break;
+            }
+          }
+
+
+          if (baFeat1->lastIteration < baFeat2->lastIteration) {
+            baFeat1->parent = baFeat2;
+            baFeat2->imageFeatures.insert(baFeat1->imageFeatures.begin(),baFeat1->imageFeatures.end());
+            baFeat1->imageFeatures.clear();
+          }else {
+            baFeat2->parent = baFeat1;
+            baFeat1->imageFeatures.insert(baFeat2->imageFeatures.begin(),baFeat2->imageFeatures.end());
+            baFeat2->imageFeatures.clear();
+          }
+
+          if (conflict) {
+            baFeat1->find()->active = false;
+          }
+        }
+      }
+    }
+  }
+
+  void FeatureTrackGenerator::process_match(const std::shared_ptr<Match> &match_) {
+    auto srcImgIdx = match_->image_1->index;
+    auto dstImgIdx = match_->image_2->index;
+
+    auto img1 = match_->image_1;
+    auto img2 = match_->image_2;
 
     for (int i = 0; i < match_->good_matches.size(); ++i) {
       if (match_->inliers[i]) {
@@ -125,6 +167,12 @@ namespace pathCam {
               }
             }
           }
+
+          // uf_ptr->unite(root1,root2);
+          // auto newRoot = uf_ptr->find(root1);
+
+
+
 
           if (conflict) {
             ++invalidCount;

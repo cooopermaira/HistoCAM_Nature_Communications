@@ -5,6 +5,7 @@
 
 
 namespace pathCam {
+struct Observation;
 
   using Poco::MemoryPool;
   class RegInfo;
@@ -55,7 +56,7 @@ namespace pathCam {
     std::unordered_set<cv::Point2i> ownedTiles;
     std::vector<std::shared_ptr<Match>> matches;
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
-    std::vector<void*> observations;
+    std::vector<Observation*> observations;
     std::vector<Features> akazeFeatures;
     cv::Mat descriptors;
 

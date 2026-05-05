@@ -113,10 +113,16 @@ namespace pathCam {
     int systemIdx = -1;
     BAFeature *parent = this;
 
+    std::unordered_map<Image*,int> imageFeatures;
+
     BAFeature *find() {
       if (parent != this)
         parent = parent->find();
       return parent;
+    }
+
+    static BAFeature* unite(BAFeature* a, BAFeature* b) {
+      return a->find();
     }
   };
 
@@ -212,6 +218,8 @@ namespace pathCam {
 
 
     void process_match(const std::shared_ptr<Match> &match_);
+
+    void process_match2(const std::shared_ptr<Match> &match_);
 
     void add_image(Image *img);
 
