@@ -10,16 +10,25 @@
 
 namespace pathCam {
 
-  void ComponentMatchSearch::run() {
-    auto matcher = DescriptorMatcher(parent->matcher_type);
-    std::vector<std::shared_ptr<Match> > matches;
+  DescriptorMatcher& getThreadLocalMatcher(cv::DescriptorMatcher::MatcherType matcher_type,
+                                           float ratio_thresh = 0.75f)
+  {
+    thread_local std::unique_ptr<DescriptorMatcher> matcher;
 
-    // image->siftMutex.lock();
-    // image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
-    //                     getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
-    //                     true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
-    // image->siftMutex.unlock();
-    image->free_memory_RAW(); //incremented in MetricComposite::process_tiles(...)
+    // Recreate if not initialized OR config changed
+    if (!matcher ||
+        matcher->matcher_type != matcher_type ||
+        matcher->ratio_thresh != ratio_thresh)
+    {
+      matcher = std::make_unique<DescriptorMatcher>(matcher_type, ratio_thresh);
+    }
+
+    return *matcher;
+  }
+
+  void ComponentMatchSearch::run() {
+    auto& matcher = getThreadLocalMatcher(parent->matcher_type);
+    std::vector<std::shared_ptr<Match> > matches;
 
     bool empty = false;
     if (candidates.empty() && image_index > 0) {
@@ -28,13 +37,14 @@ namespace pathCam {
       for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
         indexes.push_back(prev_idx);
       }
+      candidates = parent->get_image_ref(indexes);
     }
 
     auto start = std::chrono::high_resolution_clock::now();
     int count = 0;
     for (auto candidate : candidates) {
 
-      if (candidate == nullptr) {continue;}
+      if (candidate == nullptr || candidate->index == image->index) {continue;}
       if (!candidate->is_good()) {continue;}
       if (image->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && image->label != candidate->label){continue;}
 
@@ -72,6 +82,10 @@ namespace pathCam {
 
       ++count;
     }
+
+    // if (candidates.size() > 200) {
+    //   int k = 0;
+    // }
     parent->cmsCount += count;
     auto v = std::chrono::duration_cast<std::chrono::milliseconds>(
   std::chrono::high_resolution_clock::now() - start).count();

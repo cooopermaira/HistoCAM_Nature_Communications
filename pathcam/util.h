@@ -371,6 +371,8 @@ namespace pathCam {
     return cv::mean(mag2)[0];
   }
 
+
+
   template<typename T>
   class OrderedSet {
   public:

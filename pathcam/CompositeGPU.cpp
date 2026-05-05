@@ -9,7 +9,6 @@ namespace pathCam {
 #ifdef PATHCAM_OPENCV_CUDA
 
 
-
   void CompositeVoronoi::clean_face(std::vector<Point2i> &_face) {
     _face.push_back(_face[0]);
     int i = 1;
@@ -131,7 +130,7 @@ namespace pathCam {
         if (intersectionInCompSpace.empty()) { continue; }
 
         auto intersectionInImageSpace = intersectionInCompSpace - AbC;
-        
+
         ans = ans || prepare_4CPA(img, intersectionInImageSpace);
       }
       img->buffer_mutex.unlock();
@@ -143,7 +142,6 @@ namespace pathCam {
     img->buffer_mutex.unlock();
     return ans;
   }
-
 
 
   bool Composite::prepare_4CPA(Image *img, Rect roi_) {
@@ -191,13 +189,13 @@ namespace pathCam {
       cuda::merge(channelsGPU, fourChannelPrealGPU(roi_), parent->cvCompositeStream);
 
       parent->cvCompositeStream.waitForCompletion();
-    }catch (...) {
+    } catch (...) {
       int k = 0;
     }
     return wholeImage;
   }
 
-void CompositeVoronoi::update() {
+  void CompositeVoronoi::update() {
     if (suspended) { return; }
 
     //place component in MR image
@@ -207,10 +205,10 @@ void CompositeVoronoi::update() {
       xcMatchInitiated = true;
 
       // std::thread t([this, img = staging.front()->image]() {
-        std::lock_guard lock(EstRoot_mutex);
-        std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
-        establish_scale_at_root_cpu(staging.front()->image);
-        xcInProgress = false;
+      std::lock_guard lock(EstRoot_mutex);
+      std::cout << "component " << componentIndex << " establishing scale on separate thread" << std::endl;
+      establish_scale_at_root_cpu(staging.front()->image);
+      xcInProgress = false;
       // });
       // t.detach();
     }
@@ -300,7 +298,7 @@ void CompositeVoronoi::update() {
 
           img->load_raw_from_disk();
 
-          launch_component_match_search(img,{});
+          launch_component_match_search(img, {});
 
 
           std::vector<Point2i> effectedTiles;
@@ -316,16 +314,15 @@ void CompositeVoronoi::update() {
           } else {
             noMask = true;
             calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
-
           }
 
           auto tiles = effectedTilesNoMask;
-          tiles.insert(tiles.end(),effectedTiles.begin(),effectedTiles.end());
+          tiles.insert(tiles.end(), effectedTiles.begin(), effectedTiles.end());
           prepare_4CPA(img, tiles);
           img->free_memory_RAW();
 
           if (!effectedTilesNoMask.empty()) {
-            imagePyramid->insertTilesAtBase(fourChannelPreallocated,rectMask,imageBox,effectedTilesNoMask);
+            imagePyramid->insertTilesAtBase(fourChannelPreallocated, rectMask, imageBox, effectedTilesNoMask);
           }
           imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
         }
@@ -342,6 +339,7 @@ void CompositeVoronoi::update() {
                                 Image::get_label(componentMagLabel), get_scale());
     }
   }
+
   void CompositeVoronoi::self_reset() {
     imagePyramid->level[0]->resetEdges(Point2i(root_offset.x, root_offset.y), Point2i(max_offset.x, max_offset.y));
     subdiv_Bbox = Bbox(-50000, -50000, 50000, 50000);
@@ -709,26 +707,26 @@ void CompositeVoronoi::update() {
   }
 
   void CompositeVoronoi::update(std::vector<RegInfo *> new_info, bool _force_add) {
-//     if (new_info.empty()) { return; }
-//
-//     update_mutex.lock();
-//
-//     if (new_info.size() > 1) {
-//       // this shuffle is very important for reducing image count in the DT.
-//       auto rng = std::default_random_engine{};
-//       std::shuffle(std::begin(new_info), std::end(new_info), rng);
-//     }
-//
-//     update_Bbox_no_composite(new_info);
-//     expand_subdiv(new_info);
-// #ifdef HAVE_OPENCV_CUDAARITHM
-//     GPU_add_images_no_composite(new_info, _force_add);
-//
-//
-// #else
-//     add_images_no_composite(new_info, _force_add);
-// #endif
-//     update_mutex.unlock();
+    //     if (new_info.empty()) { return; }
+    //
+    //     update_mutex.lock();
+    //
+    //     if (new_info.size() > 1) {
+    //       // this shuffle is very important for reducing image count in the DT.
+    //       auto rng = std::default_random_engine{};
+    //       std::shuffle(std::begin(new_info), std::end(new_info), rng);
+    //     }
+    //
+    //     update_Bbox_no_composite(new_info);
+    //     expand_subdiv(new_info);
+    // #ifdef HAVE_OPENCV_CUDAARITHM
+    //     GPU_add_images_no_composite(new_info, _force_add);
+    //
+    //
+    // #else
+    //     add_images_no_composite(new_info, _force_add);
+    // #endif
+    //     update_mutex.unlock();
   }
 
   void CompositeVoronoi::store_new_info(pathCam::RegInfo *_new_info) {
@@ -1290,6 +1288,7 @@ void CompositeVoronoi::update() {
 
     //}
   }
+
   void CompositeVoronoi::add_images_with_composite(std::vector<RegInfo *> new_info) {
     // get a copy of references to all images at once so that only one mutex lock is needed
     std::vector<long> indexes;
@@ -1374,7 +1373,7 @@ void CompositeVoronoi::update() {
     float yPixelBoundHigh = float(rowBoundFalseHigh) * float(imagePyramid->tile_size);
 
     //for each edge of the voronoi mask
-    for (int ii = 0; ii < maskAsPolygon.size() ; ii++) {
+    for (int ii = 0; ii < maskAsPolygon.size(); ii++) {
       //if we are at the last point, make the next point the first point (this makes the last edge)
       int ii2 = (ii + 1) == maskAsPolygon.size() ? 0 : ii + 1;
       // int ii2 = ii + 1;
@@ -1491,6 +1490,7 @@ void CompositeVoronoi::update() {
       }
     }
   }
+
   /*
   void CompositeVoronoi::GPU_add_images_no_composite(std::vector<RegInfo *> _newInfo, bool _force_add) {
     // get a copy of references to all images at once so that only one mutex lock is needed
@@ -1636,9 +1636,9 @@ void CompositeVoronoi::update() {
     auto start = std::chrono::high_resolution_clock::now();
 
 
-    for (auto &loser : absorbedComponents) {
+    for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
-      for (auto &img : loser->landmarkFrames) {
+      for (auto &img: loser->landmarkFrames) {
         landmarkFrames.push_back(img);
       }
       loser->root->regInfo->root = false;
@@ -1649,7 +1649,7 @@ void CompositeVoronoi::update() {
 
     std::unordered_set<Image *> members = contributingFrames;
     members.insert(root);
-    for (auto img : landmarkFrames) {
+    for (auto img: landmarkFrames) {
       members.insert(img);
     }
     auto matches = ftg->storedMatches; //matches are just stored here before being processed all at once.
@@ -1659,10 +1659,10 @@ void CompositeVoronoi::update() {
       adjacency[m->image_1].push_back(m);
       adjacency[m->image_2].push_back(m);
     }
-    std::queue<Image*> q;
+    std::queue<Image *> q;
 
     // Seed with confirmed members
-    for (auto img : members) {
+    for (auto img: members) {
       img->regInfo->component_membership = componentIndex;
       q.push(img);
     }
@@ -1726,18 +1726,17 @@ void CompositeVoronoi::update() {
     }
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
     auto start1 = std::chrono::high_resolution_clock::now();
-    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps, std::vector(ftg->storedMatches.begin(),ftg->storedMatches.end()));
+    ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps,
+                                                                std::vector(
+                                                                  ftg->storedMatches.begin(),
+                                                                  ftg->storedMatches.end()));
     auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
         (std::chrono::high_resolution_clock::now() - start1).count();
 
 
     for (auto m: matches) {
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-        for (int i = 0; i < m->good_matches.size(); ++i) {
-          if (m->inliers[i]) {
-            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
-          }
-        }
+        ftg->process_match(m);
       }
     }
 
@@ -1768,181 +1767,182 @@ void CompositeVoronoi::update() {
         (std::chrono::high_resolution_clock::now() - start).count();
     std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
-/*
-  void CompositeVoronoi::rebuild_and_initialize_SAM() {
-    //currently SAM only works for one component at a time. Ensure this is a single resolution composite
-    assert(componentIndex == 0);
 
-    self_reset();
-    cudaSetDevice(parent->compositorCudaDevice);
+  /*
+    void CompositeVoronoi::rebuild_and_initialize_SAM() {
+      //currently SAM only works for one component at a time. Ensure this is a single resolution composite
+      assert(componentIndex == 0);
 
-    //do this first so we have root and max offset determined ahead of time
-    for (auto &img: contributingImages) {
-      Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
-      std::vector<Point2i> face;
-      if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
-        max_offset.x = max(max_offset.x, img->absoluteCoords.x + img->width);
-        max_offset.y = max(max_offset.y, img->absoluteCoords.y + img->height);
-        root_offset.x = min(root_offset.x, img->absoluteCoords.x);
-        root_offset.y = min(root_offset.y, img->absoluteCoords.y);
+      self_reset();
+      cudaSetDevice(parent->compositorCudaDevice);
+
+      //do this first so we have root and max offset determined ahead of time
+      for (auto &img: contributingImages) {
+        Point2f absC(img->absoluteCoords.x, img->absoluteCoords.y);
+        std::vector<Point2i> face;
+        if (add_point_to_delaunay_triangulation(absC, img, face, true, false) >= 0) {
+          max_offset.x = max(max_offset.x, img->absoluteCoords.x + img->width);
+          max_offset.y = max(max_offset.y, img->absoluteCoords.y + img->height);
+          root_offset.x = min(root_offset.x, img->absoluteCoords.x);
+          root_offset.y = min(root_offset.y, img->absoluteCoords.y);
+        }
       }
-    }
 
-    int interval = (parent->SAMTileSize / parent->tileSize);
+      int interval = (parent->SAMTileSize / parent->tileSize);
 
-    auto ul = imagePyramid->level[0]->getIJ(Point2f(root_offset.x, root_offset.y));
-    auto lr = imagePyramid->level[0]->getIJ(Point2f(max_offset.x, max_offset.y));
+      auto ul = imagePyramid->level[0]->getIJ(Point2f(root_offset.x, root_offset.y));
+      auto lr = imagePyramid->level[0]->getIJ(Point2f(max_offset.x, max_offset.y));
 
-    int id = 0;
-    int yTileCount = 0;
-    auto accessSAM = parent->as;
+      int id = 0;
+      int yTileCount = 0;
+      auto accessSAM = parent->as;
 
-    for (int y = ul.y; y <= lr.y; ++y) {
-      if ((yTileCount - 1) % (interval - 1) == 0) {
-        int xTileCount = 0;
+      for (int y = ul.y; y <= lr.y; ++y) {
+        if ((yTileCount - 1) % (interval - 1) == 0) {
+          int xTileCount = 0;
 
-        for (int x = ul.x; x <= lr.x; ++x) {
-          if ((xTileCount - 1) % (interval - 1) == 0) {
-            auto st = new SAMTile(id, {x - 1, y - 1}, accessSAM.get(), 0, parent->SAMTileSize);
+          for (int x = ul.x; x <= lr.x; ++x) {
+            if ((xTileCount - 1) % (interval - 1) == 0) {
+              auto st = new SAMTile(id, {x - 1, y - 1}, accessSAM.get(), 0, parent->SAMTileSize);
 
-            accessSAM->tiles.push_back(st);
-            ++id;
+              accessSAM->tiles.push_back(st);
+              ++id;
 
-            //add links to neighbors
-            if (xTileCount > 0) {
-              auto brotherX = accessSAM->tiles[accessSAM->get_tile_id({x - interval + 1, y}, componentIndex)];
-              std::vector<Point2i> temp;
-              for (int yy = 0; yy < interval; ++yy) {
-                temp.emplace_back(x - 1, y - 1 + yy);
+              //add links to neighbors
+              if (xTileCount > 0) {
+                auto brotherX = accessSAM->tiles[accessSAM->get_tile_id({x - interval + 1, y}, componentIndex)];
+                std::vector<Point2i> temp;
+                for (int yy = 0; yy < interval; ++yy) {
+                  temp.emplace_back(x - 1, y - 1 + yy);
+                }
+                accessSAM->tiles.back()->neighbors.emplace_back(brotherX, temp);
+                brotherX->neighbors.emplace_back(accessSAM->tiles.back(), temp);
               }
-              accessSAM->tiles.back()->neighbors.emplace_back(brotherX, temp);
-              brotherX->neighbors.emplace_back(accessSAM->tiles.back(), temp);
-            }
-            if (yTileCount > 0) {
-              auto brotherY = accessSAM->tiles[accessSAM->get_tile_id({x, y - interval + 1}, componentIndex)];
-              std::vector<Point2i> temp;
-              for (int xx = 0; xx < interval; ++xx) {
-                temp.emplace_back(x - 1 + xx, y - 1);
+              if (yTileCount > 0) {
+                auto brotherY = accessSAM->tiles[accessSAM->get_tile_id({x, y - interval + 1}, componentIndex)];
+                std::vector<Point2i> temp;
+                for (int xx = 0; xx < interval; ++xx) {
+                  temp.emplace_back(x - 1 + xx, y - 1);
+                }
+                accessSAM->tiles.back()->neighbors.emplace_back(brotherY, temp);
+                brotherY->neighbors.emplace_back(accessSAM->tiles.back(), temp);
               }
-              accessSAM->tiles.back()->neighbors.emplace_back(brotherY, temp);
-              brotherY->neighbors.emplace_back(accessSAM->tiles.back(), temp);
-            }
 
-            //choose image
-            Rect tileRect(st->location.x * parent->tileSize, st->location.y * parent->tileSize, parent->SAMTileSize,
-                          parent->SAMTileSize);
-            for (auto &brother: st->neighbors) {
-              if (brother.first->img) {
-                int coverage = pixels_overlapping_between(brother.first->img, tileRect);
-                if (coverage == parent->SAMTileSize * parent->SAMTileSize) {
-                  //take this image as st's image
-                  st->img = brother.first->img;
-                  st->imgIndex = st->img->index;
+              //choose image
+              Rect tileRect(st->location.x * parent->tileSize, st->location.y * parent->tileSize, parent->SAMTileSize,
+                            parent->SAMTileSize);
+              for (auto &brother: st->neighbors) {
+                if (brother.first->img) {
+                  int coverage = pixels_overlapping_between(brother.first->img, tileRect);
+                  if (coverage == parent->SAMTileSize * parent->SAMTileSize) {
+                    //take this image as st's image
+                    st->img = brother.first->img;
+                    st->imgIndex = st->img->index;
+                  }
+                }
+              }
+
+              if (!st->img) {
+                int bestCoverage = 0;
+                for (auto &img: contributingImages) {
+                  int val = pixels_overlapping_between(img, tileRect);
+                  if (val > bestCoverage) {
+                    bestCoverage = val;
+                    st->img = img;
+                    st->imgIndex = img->index;
+                  }
+                  if (bestCoverage == parent->SAMTileSize * parent->SAMTileSize) { break; }
                 }
               }
             }
+            ++xTileCount;
+          }
+        }
+        ++yTileCount;
+      }
 
-            if (!st->img) {
-              int bestCoverage = 0;
-              for (auto &img: contributingImages) {
-                int val = pixels_overlapping_between(img, tileRect);
-                if (val > bestCoverage) {
-                  bestCoverage = val;
-                  st->img = img;
-                  st->imgIndex = img->index;
-                }
-                if (bestCoverage == parent->SAMTileSize * parent->SAMTileSize) { break; }
-              }
+      auto tempTiles = accessSAM->tiles;
+      std::sort(tempTiles.begin(), tempTiles.end(),
+                [](const SAMTile *a, const SAMTile *b) {
+                  return a->imgIndex < b->imgIndex;
+                });
+
+      auto currentInd = tempTiles[0]->imgIndex;
+      for (auto &samTile: tempTiles) {
+        if (!samTile->img) { continue; }
+
+        samTile->valid = true;
+        auto img = samTile->img;
+
+        //check if we need to load a new image for the next group of SAM tiles
+        if (samTile->imgIndex != currentInd) {
+          //wait for buffer to be on GPU
+          {
+            std::unique_lock<std::mutex> lock(img->cudaBufferMutex);
+            img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
+          }
+
+          //prepare 3 channel image
+          cuda::GpuMat image_Mat(imageSize, CV_8U, img->get_raw_cuda());
+          cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
+
+          img->free_memory_cuda();
+
+          if (componentMagLabel != 0) {
+            //flatfield correct
+            ff_correct_and_brighten();
+          }
+
+          //add alpha channel
+          cuda::split(threeChannelPrealGPU, channelsGPU);
+          if (componentMagLabel == Image::_2X) {
+            for (auto &channel: channelsGPU) {
+              cuda::multiply(channel, circleMaskGPU, channel);
+            }
+            channelsGPU.push_back(circleMaskGPU255);
+          } else {
+            channelsGPU.push_back(rectMaskGPU);
+          }
+          cuda::merge(channelsGPU, fourChannelPrealGPU);
+
+          currentInd = samTile->imgIndex;
+        }
+
+
+        //populate SAM gpu mat with data from 3channel preal
+        Rect tileRect(samTile->location.x * parent->tileSize, samTile->location.y * parent->tileSize,
+                      parent->SAMTileSize, parent->SAMTileSize);
+        Rect imageRect(img->absoluteCoords.x, img->absoluteCoords.y, img->width, img->height);
+        Rect roi = tileRect & imageRect;
+
+        Rect imageRoi = roi;
+        imageRoi.x -= imageRect.x;
+        imageRoi.y -= imageRect.y;
+
+        Rect tileRoi = roi;
+        tileRoi.x -= tileRect.x;
+        tileRoi.y -= tileRect.y;
+
+        fourChannelPrealGPU(imageRoi).copyTo(samTile->noncontiguousWrapper(tileRoi));
+        samTile->noncontiguousWrapper.download(samTile->ncwStoreLocal);
+
+        samTile->make_raw_buffer();
+
+        std::vector<Point2i> retileIndices(9);
+        for (int xx = 0; xx < 4; ++xx) {
+          for (int yy = 0; yy < 4; ++yy) {
+            Point2i sublocation(xx, yy);
+            Point2i tileID(samTile->location.x + xx, samTile->location.y + yy);
+            samTile->componentTiles.emplace_back(sublocation, tileID);
+            if (xx < 3 && yy < 3) {
+              retileIndices[3 * xx + yy] = tileID;
             }
           }
-          ++xTileCount;
         }
+        imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageRect, retileIndices);
       }
-      ++yTileCount;
     }
-
-    auto tempTiles = accessSAM->tiles;
-    std::sort(tempTiles.begin(), tempTiles.end(),
-              [](const SAMTile *a, const SAMTile *b) {
-                return a->imgIndex < b->imgIndex;
-              });
-
-    auto currentInd = tempTiles[0]->imgIndex;
-    for (auto &samTile: tempTiles) {
-      if (!samTile->img) { continue; }
-
-      samTile->valid = true;
-      auto img = samTile->img;
-
-      //check if we need to load a new image for the next group of SAM tiles
-      if (samTile->imgIndex != currentInd) {
-        //wait for buffer to be on GPU
-        {
-          std::unique_lock<std::mutex> lock(img->cudaBufferMutex);
-          img->cudaBufferConVar.wait(lock, [&] { return img->cudaBufferReady; });
-        }
-
-        //prepare 3 channel image
-        cuda::GpuMat image_Mat(imageSize, CV_8U, img->get_raw_cuda());
-        cuda::cvtColor(image_Mat, threeChannelPrealGPU, COLOR_BayerBG2BGR);
-
-        img->free_memory_cuda();
-
-        if (componentMagLabel != 0) {
-          //flatfield correct
-          ff_correct_and_brighten();
-        }
-
-        //add alpha channel
-        cuda::split(threeChannelPrealGPU, channelsGPU);
-        if (componentMagLabel == Image::_2X) {
-          for (auto &channel: channelsGPU) {
-            cuda::multiply(channel, circleMaskGPU, channel);
-          }
-          channelsGPU.push_back(circleMaskGPU255);
-        } else {
-          channelsGPU.push_back(rectMaskGPU);
-        }
-        cuda::merge(channelsGPU, fourChannelPrealGPU);
-
-        currentInd = samTile->imgIndex;
-      }
-
-
-      //populate SAM gpu mat with data from 3channel preal
-      Rect tileRect(samTile->location.x * parent->tileSize, samTile->location.y * parent->tileSize,
-                    parent->SAMTileSize, parent->SAMTileSize);
-      Rect imageRect(img->absoluteCoords.x, img->absoluteCoords.y, img->width, img->height);
-      Rect roi = tileRect & imageRect;
-
-      Rect imageRoi = roi;
-      imageRoi.x -= imageRect.x;
-      imageRoi.y -= imageRect.y;
-
-      Rect tileRoi = roi;
-      tileRoi.x -= tileRect.x;
-      tileRoi.y -= tileRect.y;
-
-      fourChannelPrealGPU(imageRoi).copyTo(samTile->noncontiguousWrapper(tileRoi));
-      samTile->noncontiguousWrapper.download(samTile->ncwStoreLocal);
-
-      samTile->make_raw_buffer();
-
-      std::vector<Point2i> retileIndices(9);
-      for (int xx = 0; xx < 4; ++xx) {
-        for (int yy = 0; yy < 4; ++yy) {
-          Point2i sublocation(xx, yy);
-          Point2i tileID(samTile->location.x + xx, samTile->location.y + yy);
-          samTile->componentTiles.emplace_back(sublocation, tileID);
-          if (xx < 3 && yy < 3) {
-            retileIndices[3 * xx + yy] = tileID;
-          }
-        }
-      }
-      imagePyramid->insertTilesAtBase(fourChannelPrealGPU, rectMaskGPU, imageRect, retileIndices);
-    }
-  }
-*/
+  */
 
   void CompositeVoronoi::rebuild() {
     if (contributingFrames.size() == 1) {
@@ -2009,14 +2009,13 @@ void CompositeVoronoi::update() {
       } else {
         noMask = true;
         calculate_effected_tiles(face, effectedTiles, ri->absoluteCoords, &effectedTilesNoMask);
-
       }
 
       auto tiles = effectedTilesNoMask;
-      tiles.insert(tiles.end(),effectedTiles.begin(),effectedTiles.end());
+      tiles.insert(tiles.end(), effectedTiles.begin(), effectedTiles.end());
       prepare_4CPA(img, tiles);
       if (!effectedTilesNoMask.empty()) {
-        imagePyramid->insertTilesAtBase(fourChannelPreallocated,rectMask,imageBox,effectedTilesNoMask);
+        imagePyramid->insertTilesAtBase(fourChannelPreallocated, rectMask, imageBox, effectedTilesNoMask);
       }
       imagePyramid->insertTilesAtBase(fourChannelPreallocated, polyMaskOutput, imageBox, effectedTiles);
       polyMaskOutput.setTo(Scalar(0));

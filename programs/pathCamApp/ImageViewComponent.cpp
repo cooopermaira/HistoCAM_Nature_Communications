@@ -161,6 +161,7 @@ void ImageViewComponent::drawLayer(Graphics &g, float scale, std::shared_ptr<MRT
         }
       }
       g.setOpacity(1.f);
+      g.setImageResamplingQuality(juce::Graphics::lowResamplingQuality);
       g.drawImage(*im, bounds);
 
        // // draw tile bounds with owner frame

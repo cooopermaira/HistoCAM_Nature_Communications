@@ -13,27 +13,20 @@
 namespace pathCam{
 
 class DescriptorMatcher{
-  
+public:
+
   cv::DescriptorMatcher::MatcherType matcher_type;
-  Ptr<cv::DescriptorMatcher> matcher;
-  
+  Ptr<cv::DescriptorMatcher> matcher,matcher2;
   float ratio_thresh = 0.75f;
 
-public:
-    
+
   DescriptorMatcher(cv::DescriptorMatcher::MatcherType matcher_type, float ratio_thresh = 0.75f);
   
-  ~DescriptorMatcher(){};
+  ~DescriptorMatcher()= default;
 
-  
-  
+
   void match(const std::shared_ptr<Match> &match) const;
-  
-  
-  
-  
-  
-  
+
 };
 
 

@@ -8,6 +8,36 @@
 #include "pathCam.h"
 
 namespace pathCam {
+  struct MatchPtrHash {
+    size_t operator()(const std::shared_ptr<Match> &m) const {
+      auto a = m->image_1;
+      auto b = m->image_2;
+
+      // order-independent: sort pointers
+      if (a > b) std::swap(a, b);
+
+      size_t h1 = std::hash<Image *>{}(a);
+      size_t h2 = std::hash<Image *>{}(b);
+
+      // combine hashes
+      return h1 ^ (h2 << 1);
+    }
+  };
+
+  struct MatchPtrEqual {
+    bool operator()(const std::shared_ptr<Match> &m1,
+                    const std::shared_ptr<Match> &m2) const {
+      auto a1 = m1->image_1;
+      auto b1 = m1->image_2;
+
+      auto a2 = m2->image_1;
+      auto b2 = m2->image_2;
+
+      return (a1 == a2 && b1 == b2) ||
+             (a1 == b2 && b1 == a2);
+    }
+  };
+
   struct FeatureObservation {
     int image_id;
     int feature_id; // feature index within that image
@@ -49,6 +79,58 @@ namespace pathCam {
     }
   };
 
+  struct SolverState {
+    std::vector<float> img_r_x, img_r_y;
+    std::vector<float> img_p_x, img_p_y;
+    std::vector<float> img_Ap_x, img_Ap_y;
+    std::vector<float> feat_r_x, feat_r_y;
+    std::vector<float> feat_p_x, feat_p_y;
+    std::vector<float> feat_Ap_x, feat_Ap_y;
+
+    std::vector<float> img_z_x, img_z_y;
+    std::vector<float> feat_z_x, feat_z_y;
+
+    std::vector<float> img_inv_diag;
+    std::vector<float> feat_inv_diag;
+  };
+
+  struct BAImage {
+    float x = 0;
+    float y = 0;
+    bool fixed = false;
+
+    RegInfo *regInfo = nullptr;
+    int systemIdx = -1;
+    int touchIdx = -1;
+  };
+
+  struct BAFeature {
+    float x = 0;
+    float y = 0;
+    bool active = true;
+    int lastIteration = 0;
+
+    int systemIdx = -1;
+    BAFeature *parent = this;
+
+    BAFeature *find() {
+      if (parent != this)
+        parent = parent->find();
+      return parent;
+    }
+  };
+
+  struct Observation {
+    BAImage *image;
+    BAFeature *feature;
+
+    int image_idx;
+    int feature_idx;
+
+    float obs_x, obs_y;
+    float weight = 1.0;
+  };
+
 
   class UnionFind {
   private:
@@ -62,43 +144,13 @@ namespace pathCam {
       }
     }
 
-    int find(int x) const {
-      if (parent[x] != x) {
-        parent[x] = find(parent[x]); // path compression
-      }
-      return parent[x];
-    }
+    int find(int x) const;
 
-    void expand(int new_size) {
-      if (new_size <= parent.size()) return;
+    void expand(int new_size);
 
-      int old_size = parent.size();
-      parent.resize(new_size);
-      rank.resize(new_size, 0);
+    void unite(int x, int y);
 
-      // Initialize new elements
-      for (int i = old_size; i < new_size; i++) {
-        parent[i] = i;
-      }
-    }
-
-    void unite(int x, int y) {
-      int px = find(x);
-      int py = find(y);
-
-      if (px == py) return;
-
-      if (rank[px] < rank[py]) {
-        parent[px] = py;
-      } else if (rank[px] > rank[py]) {
-        parent[py] = px;
-      } else {
-        parent[py] = px;
-        rank[px]++;
-      }
-    }
-
-    bool connected(int x, int y) {
+    bool connected(int x, int y) const {
       return find(x) == find(y);
     }
 
@@ -113,7 +165,6 @@ namespace pathCam {
 
 
   class FeatureTrackGenerator {
-  private:
     struct ImageFeaturePair {
       long image_id;
       int feature_id;
@@ -128,6 +179,7 @@ namespace pathCam {
       }
     };
 
+
     struct PairHash {
       size_t operator()(const ImageFeaturePair &p) const {
         return std::hash<unsigned long>()(p.image_id) ^ (std::hash<int>()(p.feature_id) << 1);
@@ -136,8 +188,17 @@ namespace pathCam {
 
     // Map from (image_id, feature_id) to unique global index
     std::unordered_map<ImageFeaturePair, int, PairHash> feature_to_index;
+    std::vector<std::unordered_map<long, int> > component_features;
+    std::vector<std::vector<std::shared_ptr<Match> > > adjacency;
+    std::unordered_map<long, Image *> imageRefs;
     std::vector<ImageFeaturePair> index_to_feature;
     std::unique_ptr<UnionFind> uf_ptr;
+
+    std::vector<BAFeature *> baFeatures;
+    std::vector<BAImage *> baImages;
+    SolverState solverState;
+
+    int invalidCount = 0;
 
   public:
     std::vector<FeatureTrack> generateTracks(const std::vector<Image *> &images,
@@ -150,24 +211,24 @@ namespace pathCam {
     }
 
 
-    void process_match(long _srcImgIdx, long _dstImgIdx, const DMatch &_match);
+    void process_match(const std::shared_ptr<Match> &match_);
+
+    void add_image(Image *img);
 
     void store_match(std::shared_ptr<Match> _match) { storedMatches.insert(_match); }
+
+    void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 20, float tol = 1e-4f);
 
     std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image *> &images);
 
     Poco::FastMutex accessMutex;
 
+    // std::unordered_set<std::shared_ptr<Match>, MatchPtrHash, MatchPtrEqual> storedMatches;
     std::unordered_set<std::shared_ptr<Match> > storedMatches;
-
-    std::unordered_map<int,std::unordered_set<std::shared_ptr<Match>>> interComponentMatches;
+    std::unordered_map<int, std::unordered_set<std::shared_ptr<Match> > > interComponentMatches;
 
   private:
-    int getOrCreateFeatureIndex(const ImageFeaturePair &_pair);
-
-    void createGlobalFeatureIndex(const std::vector<Image *> &images);
-
-    void buildConnectionGraph(const std::vector<pMatch> &all_matches, UnionFind &uf);
+    int get_or_create_feature_index(const ImageFeaturePair &_pair);
 
     std::vector<FeatureTrack> createTracksFromConnections(const std::vector<Image *> &images, const UnionFind &uf);
   };

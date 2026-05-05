@@ -6,7 +6,30 @@
 #include <unordered_map>
 
 namespace pathCam {
-  int FeatureTrackGenerator::getOrCreateFeatureIndex(const ImageFeaturePair &_pair) {
+  bool are_same_feature(const Image *img, int f1, int f2) {
+    const auto &kp1 = img->keypoints[f1];
+    const auto &kp2 = img->keypoints[f2];
+
+    float dx = kp1.pt.x - kp2.pt.x;
+    float dy = kp1.pt.y - kp2.pt.y;
+
+    if (dx * dx + dy * dy > 3 * 3) return false;
+
+    float angleDiff = std::abs(kp1.angle - kp2.angle);
+    angleDiff = std::min(angleDiff, 360.f - angleDiff);
+    if (angleDiff > 10.f) return false;
+
+    if (kp1.octave != kp2.octave) return false;
+
+    int hamming = cv::norm(img->descriptors.row(f1),
+                           img->descriptors.row(f2),
+                           cv::NORM_HAMMING);
+
+    return hamming < 20;
+  }
+
+
+  int FeatureTrackGenerator::get_or_create_feature_index(const ImageFeaturePair &_pair) {
     auto it = feature_to_index.find(_pair);
     if (it != feature_to_index.end()) {
       return it->second;
@@ -16,6 +39,13 @@ namespace pathCam {
     int new_index = index_to_feature.size();
     feature_to_index[_pair] = new_index;
     index_to_feature.push_back(_pair);
+    baFeatures.push_back(new BAFeature);
+
+
+    // add spot for tracking its members
+    component_features.resize(new_index + 1);
+    component_features[new_index][_pair.image_id] = _pair.feature_id;
+    adjacency.resize(new_index + 1);
 
     // Expand Union-Find if necessary
     if (!uf_ptr) {
@@ -28,20 +58,370 @@ namespace pathCam {
     return new_index;
   }
 
+  void FeatureTrackGenerator::add_image(Image *img) {
+    img->observations.resize(img->keypoints.size(), nullptr);
+    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, false, img->regInfo, -1);
+    baImages.push_back(baImg);
 
+    const float regScale = img->get_reg_scale();
+    for (int i = 0; i < img->observations.size(); ++i) {
+      auto ind = get_or_create_feature_index({img->index, i});
+      const auto ftPixelCoords = img->keypoints[i].pt / regScale;
+      img->observations[i] = new Observation(baImg, baFeatures[ind], -1, -1, ftPixelCoords.x, ftPixelCoords.y, 1);
 
-
-  void FeatureTrackGenerator::process_match(long _srcImgIdx, long _dstImgIdx, const DMatch &_match) {
-    ImageFeaturePair feat1{(long) _srcImgIdx, _match.queryIdx};
-    ImageFeaturePair feat2{(long) _dstImgIdx, _match.trainIdx};
-
-    // Get or create indices for both features
-    int idx1 = getOrCreateFeatureIndex(feat1);
-    int idx2 = getOrCreateFeatureIndex(feat2);
-
-    // Unite them in the Union-Find structure
-    uf_ptr->unite(idx1, idx2);
+      auto ftWorldCoords = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
+      baFeatures[ind]->x = ftWorldCoords.x;
+      baFeatures[ind]->y = ftWorldCoords.y;
+    }
   }
+
+
+  // for (int i = 0; i < m->good_matches.size(); ++i) {
+  //   if (m->inliers[i]) {
+  //     ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i], m);
+  //   }
+  // }
+  void FeatureTrackGenerator::process_match(const std::shared_ptr<Match> &match_) {
+    auto srcImgIdx = match_->image_1->index;
+    auto dstImgIdx = match_->image_2->index;
+
+    auto img1 = match_->image_1;
+    auto img2 = match_->image_2;
+
+    imageRefs.emplace(srcImgIdx, img1);
+    imageRefs.emplace(dstImgIdx, img2);
+
+    for (int i = 0; i < match_->good_matches.size(); ++i) {
+      if (match_->inliers[i]) {
+        auto qInd = match_->good_matches[i].queryIdx;
+        auto tInd = match_->good_matches[i].trainIdx;
+        ImageFeaturePair feat1{srcImgIdx, qInd};
+        ImageFeaturePair feat2{dstImgIdx, tInd};
+
+        // Get or create indices for both features
+        int idx1 = get_or_create_feature_index(feat1);
+        int idx2 = get_or_create_feature_index(feat2);
+
+        int root1 = uf_ptr->find(idx1);
+        int root2 = uf_ptr->find(idx2);
+
+        if (root1 != root2) {
+          const auto &set1 = component_features[root1];
+          const auto &set2 = component_features[root2];
+
+          // Check if merging would close a loop
+          bool conflict = false;
+          for (const auto &[img_id, feat_idx]: component_features[root1]) {
+            auto it = component_features[root2].find(img_id);
+            if (it != component_features[root2].end()) {
+              //this match closes a loop, check if there is an inconsistency for this feature
+              if (it->second != feat_idx) {
+                // auto img = imageRefs[img_id];
+                // if (are_same_feature(img,it->second,feat_idx)) {
+                //
+                // }
+                conflict = true; // same image, different feature -> conflict
+                break;
+              }
+            }
+          }
+
+          if (conflict) {
+            ++invalidCount;
+          } else {
+            // safe to merge
+            uf_ptr->unite(root1, root2);
+
+            int new_root = uf_ptr->find(root1);
+
+            // merge metadata
+            if (new_root == root1) {
+              component_features[root1].insert(set2.begin(), set2.end());
+              adjacency[root1].insert(adjacency[root1].end(), adjacency[root2].begin(), adjacency[root2].end());
+              adjacency[root1].push_back(match_);
+            } else {
+              component_features[root2].insert(set1.begin(), set1.end());
+              adjacency[root2].insert(adjacency[root2].end(), adjacency[root1].begin(), adjacency[root1].end());
+              adjacency[root2].push_back(match_);
+            }
+
+            //feature track will be constructed here in mirror of the union find
+          }
+        }
+        // Unite them in the Union-Find structure
+        // uf_ptr->unite(idx1, idx2);
+      }
+    }
+  }
+
+
+  void FeatureTrackGenerator::launch_inprocess_sparse_CG_iterator(const std::vector<Observation*>& observations,
+                                   int maxIters,
+                                   float tol)
+{
+    std::vector<BAImage*> activeImages;   // free images only
+    std::vector<BAImage*> touchedImages;  // all images, for reset/check
+    std::vector<BAFeature*> activeFeatures;
+
+    // ---- build local system ----
+
+    for (auto* ob : observations) {
+        BAImage* img = ob->image;
+
+        if (img->touchIdx < 0) { // add this field, or use another temp marker
+            img->touchIdx = touchedImages.size();
+            touchedImages.push_back(img);
+        }
+
+        if (!img->fixed && img->systemIdx < 0) {
+            img->systemIdx = activeImages.size();
+            activeImages.push_back(img);
+        }
+
+        BAFeature* root = ob->feature->find();
+        ob->feature = root; // IMPORTANT: always canonicalize
+
+        if (root->systemIdx < 0) {
+            root->systemIdx = activeFeatures.size();
+            activeFeatures.push_back(root);
+        }
+    }
+
+    int fixedCount = 0;
+    for (auto* img : touchedImages) {
+        if (img->fixed) ++fixedCount;
+    }
+    assert(fixedCount == 1);
+
+    const int nI = (int)activeImages.size();   // free images only
+    const int nF = (int)activeFeatures.size();
+
+    // ---- allocate ----
+
+    auto ensureSize = [](std::vector<float>& v, int n, int pad) {
+        if ((int)v.size() < n) v.resize(n + pad);
+    };
+
+    ensureSize(solverState.img_r_x, nI, 50);
+    ensureSize(solverState.img_r_y, nI, 50);
+    ensureSize(solverState.img_p_x, nI, 50);
+    ensureSize(solverState.img_p_y, nI, 50);
+    ensureSize(solverState.img_Ap_x, nI, 50);
+    ensureSize(solverState.img_Ap_y, nI, 50);
+    ensureSize(solverState.img_z_x, nI, 50);
+    ensureSize(solverState.img_z_y, nI, 50);
+    ensureSize(solverState.img_inv_diag, nI, 50);
+
+    ensureSize(solverState.feat_r_x, nF, 5000);
+    ensureSize(solverState.feat_r_y, nF, 5000);
+    ensureSize(solverState.feat_p_x, nF, 5000);
+    ensureSize(solverState.feat_p_y, nF, 5000);
+    ensureSize(solverState.feat_Ap_x, nF, 5000);
+    ensureSize(solverState.feat_Ap_y, nF, 5000);
+    ensureSize(solverState.feat_z_x, nF, 5000);
+    ensureSize(solverState.feat_z_y, nF, 5000);
+    ensureSize(solverState.feat_inv_diag, nF, 5000);
+
+    auto zeroN = [](std::vector<float>& v, int n) {
+        std::fill(v.begin(), v.begin() + n, 0.0f);
+    };
+
+    zeroN(solverState.img_r_x, nI);
+    zeroN(solverState.img_r_y, nI);
+    zeroN(solverState.img_p_x, nI);
+    zeroN(solverState.img_p_y, nI);
+    zeroN(solverState.img_inv_diag, nI);
+
+    zeroN(solverState.feat_r_x, nF);
+    zeroN(solverState.feat_r_y, nF);
+    zeroN(solverState.feat_p_x, nF);
+    zeroN(solverState.feat_p_y, nF);
+    zeroN(solverState.feat_inv_diag, nF);
+
+    // ---- build RHS and diagonal preconditioner ----
+
+    for (const auto* o : observations) {
+        const int ii = o->image->systemIdx;   // -1 if fixed
+        const int fi = o->feature->systemIdx;
+
+        BAImage* img = o->image;
+        BAFeature* feat = o->feature;
+
+        const float w = o->weight;
+
+        const float rx = feat->x - img->x - o->obs_x;
+        const float ry = feat->y - img->y - o->obs_y;
+
+        solverState.feat_r_x[fi] += -w * rx;
+        solverState.feat_r_y[fi] += -w * ry;
+        solverState.feat_inv_diag[fi] += w;
+
+        if (ii >= 0) {
+            solverState.img_r_x[ii] += w * rx;
+            solverState.img_r_y[ii] += w * ry;
+            solverState.img_inv_diag[ii] += w;
+        }
+    }
+
+    constexpr float eps = 1e-8f;
+
+    for (int i = 0; i < nI; ++i)
+        solverState.img_inv_diag[i] = 1.0f / (solverState.img_inv_diag[i] + eps);
+
+    for (int i = 0; i < nF; ++i)
+        solverState.feat_inv_diag[i] = 1.0f / (solverState.feat_inv_diag[i] + eps);
+
+    // ---- PCG init: z = M^-1 r, p = z ----
+
+    float prev_rTz = 0.0f;
+
+    for (int i = 0; i < nI; ++i) {
+        solverState.img_z_x[i] = solverState.img_inv_diag[i] * solverState.img_r_x[i];
+        solverState.img_z_y[i] = solverState.img_inv_diag[i] * solverState.img_r_y[i];
+
+        solverState.img_p_x[i] = solverState.img_z_x[i];
+        solverState.img_p_y[i] = solverState.img_z_y[i];
+
+        prev_rTz += solverState.img_r_x[i] * solverState.img_z_x[i]
+                  + solverState.img_r_y[i] * solverState.img_z_y[i];
+    }
+
+    for (int i = 0; i < nF; ++i) {
+        solverState.feat_z_x[i] = solverState.feat_inv_diag[i] * solverState.feat_r_x[i];
+        solverState.feat_z_y[i] = solverState.feat_inv_diag[i] * solverState.feat_r_y[i];
+
+        solverState.feat_p_x[i] = solverState.feat_z_x[i];
+        solverState.feat_p_y[i] = solverState.feat_z_y[i];
+
+        prev_rTz += solverState.feat_r_x[i] * solverState.feat_z_x[i]
+                  + solverState.feat_r_y[i] * solverState.feat_z_y[i];
+    }
+
+    int c = 0;
+
+    for (int iteration = 0; iteration < maxIters; ++iteration) {
+        ++c;
+
+        if (prev_rTz < 1e-12f) break;
+
+        zeroN(solverState.img_Ap_x, nI);
+        zeroN(solverState.img_Ap_y, nI);
+        zeroN(solverState.feat_Ap_x, nF);
+        zeroN(solverState.feat_Ap_y, nF);
+
+        // ---- Ap = A p ----
+
+        for (const auto* o : observations) {
+            const int ii = o->image->systemIdx; // -1 if fixed
+            const int fi = o->feature->systemIdx;
+            const float w = o->weight;
+
+            const float img_px = (ii >= 0) ? solverState.img_p_x[ii] : 0.0f;
+            const float img_py = (ii >= 0) ? solverState.img_p_y[ii] : 0.0f;
+
+            const float vx = solverState.feat_p_x[fi] - img_px;
+            const float vy = solverState.feat_p_y[fi] - img_py;
+
+            solverState.feat_Ap_x[fi] += w * vx;
+            solverState.feat_Ap_y[fi] += w * vy;
+
+            if (ii >= 0) {
+                solverState.img_Ap_x[ii] -= w * vx;
+                solverState.img_Ap_y[ii] -= w * vy;
+            }
+        }
+
+        float pAp = 0.0f;
+
+        for (int i = 0; i < nI; ++i) {
+            pAp += solverState.img_p_x[i] * solverState.img_Ap_x[i]
+                 + solverState.img_p_y[i] * solverState.img_Ap_y[i];
+        }
+
+        for (int i = 0; i < nF; ++i) {
+            pAp += solverState.feat_p_x[i] * solverState.feat_Ap_x[i]
+                 + solverState.feat_p_y[i] * solverState.feat_Ap_y[i];
+        }
+
+        if (std::abs(pAp) < 1e-12f) break;
+
+        const float alpha = prev_rTz / pAp;
+
+        // ---- update solution and residual ----
+
+        for (int i = 0; i < nI; ++i) {
+            activeImages[i]->x += alpha * solverState.img_p_x[i];
+            activeImages[i]->y += alpha * solverState.img_p_y[i];
+
+            solverState.img_r_x[i] -= alpha * solverState.img_Ap_x[i];
+            solverState.img_r_y[i] -= alpha * solverState.img_Ap_y[i];
+        }
+
+        for (int i = 0; i < nF; ++i) {
+            activeFeatures[i]->x += alpha * solverState.feat_p_x[i];
+            activeFeatures[i]->y += alpha * solverState.feat_p_y[i];
+
+            solverState.feat_r_x[i] -= alpha * solverState.feat_Ap_x[i];
+            solverState.feat_r_y[i] -= alpha * solverState.feat_Ap_y[i];
+        }
+
+        // ---- z = M^-1 r, compute rTz and residual norm ----
+
+        float new_rTz = 0.0f;
+        float residualNorm2 = 0.0f;
+
+        for (int i = 0; i < nI; ++i) {
+            solverState.img_z_x[i] = solverState.img_inv_diag[i] * solverState.img_r_x[i];
+            solverState.img_z_y[i] = solverState.img_inv_diag[i] * solverState.img_r_y[i];
+
+            new_rTz += solverState.img_r_x[i] * solverState.img_z_x[i]
+                     + solverState.img_r_y[i] * solverState.img_z_y[i];
+
+            residualNorm2 += solverState.img_r_x[i] * solverState.img_r_x[i]
+                           + solverState.img_r_y[i] * solverState.img_r_y[i];
+        }
+
+        for (int i = 0; i < nF; ++i) {
+            solverState.feat_z_x[i] = solverState.feat_inv_diag[i] * solverState.feat_r_x[i];
+            solverState.feat_z_y[i] = solverState.feat_inv_diag[i] * solverState.feat_r_y[i];
+
+            new_rTz += solverState.feat_r_x[i] * solverState.feat_z_x[i]
+                     + solverState.feat_r_y[i] * solverState.feat_z_y[i];
+
+            residualNorm2 += solverState.feat_r_x[i] * solverState.feat_r_x[i]
+                           + solverState.feat_r_y[i] * solverState.feat_r_y[i];
+        }
+
+        if (std::sqrt(residualNorm2) < tol) break;
+
+        const float beta = new_rTz / (prev_rTz + eps);
+
+        // ---- p = z + beta p ----
+
+        for (int i = 0; i < nI; ++i) {
+            solverState.img_p_x[i] = solverState.img_z_x[i] + beta * solverState.img_p_x[i];
+            solverState.img_p_y[i] = solverState.img_z_y[i] + beta * solverState.img_p_y[i];
+        }
+
+        for (int i = 0; i < nF; ++i) {
+            solverState.feat_p_x[i] = solverState.feat_z_x[i] + beta * solverState.feat_p_x[i];
+            solverState.feat_p_y[i] = solverState.feat_z_y[i] + beta * solverState.feat_p_y[i];
+        }
+
+        prev_rTz = new_rTz;
+    }
+
+    for (auto* ft : activeFeatures) {
+        ft->systemIdx = -1;
+        ft->lastIteration += c;
+    }
+
+    for (auto* img : activeImages)
+        img->systemIdx = -1;
+
+    for (auto* img : touchedImages)
+        img->touchIdx = -1;
+}
 
 
   // Generate tracks from current state
@@ -57,6 +437,8 @@ namespace pathCam {
   std::vector<FeatureTrack> FeatureTrackGenerator::createTracksFromConnections(
     const std::vector<Image *> &images,
     const UnionFind &uf) {
+    invalidCount = 0;
+
     // Group features by their root in Union-Find
     std::unordered_map<int, std::vector<int> > root_to_features;
 
@@ -88,9 +470,11 @@ namespace pathCam {
       for (int global_idx: feature_indices) {
         const auto &pair = index_to_feature[global_idx];
 
+        //check if the image is already in the feature track
         if (images_in_track.count(pair.image_id)) {
           // Multiple features from same image in track - invalid
           valid_track = false;
+          ++invalidCount;
           break;
         }
         images_in_track.insert(pair.image_id);
@@ -103,11 +487,11 @@ namespace pathCam {
 
 
           auto fo = FeatureObservation(int(pair.image_id), pair.feature_id,
-            pos.pt.x, pos.pt.y, img_it->second);
+                                       pos.pt.x, pos.pt.y, img_it->second);
           track.addObservation(fo);
           track.world_x += pos.pt.x + img_it->second->regInfo->absoluteCoords.x;
           track.world_y += pos.pt.y + img_it->second->regInfo->absoluteCoords.y;
-        }else {
+        } else {
           int k = 0;
         }
       }
@@ -155,30 +539,30 @@ namespace pathCam {
       double adjustment = r.dot(r) / rdr;
       p = r + adjustment * p;
     }
-    std::cout<<"conjugate gradient ran "<<iters<<" iterations"<<std::endl;
+    std::cout << "conjugate gradient ran " << iters << " iterations" << std::endl;
     return iters < maxIters;
   }
 
-  void BundleAdjustmentIntegrator::run_coopers_planar_bundle_adjustment(const std::vector<FeatureTrack> &_tracks, const std::vector<Image *> &_images) {
-
+  void BundleAdjustmentIntegrator::run_coopers_planar_bundle_adjustment(const std::vector<FeatureTrack> &_tracks,
+                                                                        const std::vector<Image *> &_images) {
     int totalConstraints = 0;
-    for (auto &t:_tracks) {
+    for (auto &t: _tracks) {
       totalConstraints += t.observations.size();
     }
 
-    Mat A(totalConstraints,_images.size() - 1 + _tracks.size(),CV_64FC1,Scalar(0));
-    Mat xx(_images.size() - 1 + _tracks.size(),1,CV_64FC1,Scalar(0));
-    Mat xy(_images.size() - 1 + _tracks.size(),1,CV_64FC1,Scalar(0));
-    Mat bx(totalConstraints,1,CV_64FC1,Scalar(0));
-    Mat by(totalConstraints,1,CV_64FC1,Scalar(0));
+    Mat A(totalConstraints, _images.size() - 1 + _tracks.size(),CV_64FC1, Scalar(0));
+    Mat xx(_images.size() - 1 + _tracks.size(), 1,CV_64FC1, Scalar(0));
+    Mat xy(_images.size() - 1 + _tracks.size(), 1,CV_64FC1, Scalar(0));
+    Mat bx(totalConstraints, 1,CV_64FC1, Scalar(0));
+    Mat by(totalConstraints, 1,CV_64FC1, Scalar(0));
 
-    std::map<long,int> imageToSystem;
-    std::map<int,Image*> systemToImage;
+    std::map<long, int> imageToSystem;
+    std::map<int, Image *> systemToImage;
 
     {
       int rootCount = 0;
       int i = 0;
-      for (auto & img : _images) {
+      for (auto &img: _images) {
         if (img->regInfo->root) {
           ++rootCount;
           continue;
@@ -186,8 +570,8 @@ namespace pathCam {
         imageToSystem[img->index] = i;
         systemToImage[i] = img;
 
-        xx.at<double>(i,0) = img->regInfo->absoluteCoords.x;
-        xy.at<double>(i,0) = img->regInfo->absoluteCoords.y;
+        xx.at<double>(i, 0) = img->regInfo->absoluteCoords.x;
+        xy.at<double>(i, 0) = img->regInfo->absoluteCoords.y;
 
         ++i;
       }
@@ -195,16 +579,16 @@ namespace pathCam {
     }
 
     int rowConstraintIdx = 0;
-    for (int i = 0; i < _tracks.size(); ++i){
+    for (int i = 0; i < _tracks.size(); ++i) {
       int landmarkCol = i + _images.size() - 1;
 
       xx.at<double>(landmarkCol) = _tracks[i].world_x;
       xy.at<double>(landmarkCol) = _tracks[i].world_y;
 
-      for (auto &obs : _tracks[i].observations) {
-        A.at<double>(rowConstraintIdx,landmarkCol) = 1;
+      for (auto &obs: _tracks[i].observations) {
+        A.at<double>(rowConstraintIdx, landmarkCol) = 1;
         if (!obs.imgRef->regInfo->root) {
-          A.at<double>(rowConstraintIdx,imageToSystem[obs.image_id]) = -1;
+          A.at<double>(rowConstraintIdx, imageToSystem[obs.image_id]) = -1;
         }
         bx.at<double>(rowConstraintIdx) = obs.x;
         by.at<double>(rowConstraintIdx) = obs.y;
@@ -212,428 +596,458 @@ namespace pathCam {
       }
     }
 
-    coopers_conjugate_gradient(A,xx,bx);
-    coopers_conjugate_gradient(A,xy,by);
+    coopers_conjugate_gradient(A, xx, bx);
+    coopers_conjugate_gradient(A, xy, by);
 
-    for (auto img : _images) {
-      if (img->regInfo->root) {continue;}
+    for (auto img: _images) {
+      if (img->regInfo->root) { continue; }
       img->regInfo->absoluteCoords.x = xx.at<double>(imageToSystem[img->index]);
       img->regInfo->absoluteCoords.y = xy.at<double>(imageToSystem[img->index]);
     }
-
   }
 
-// CPU edge-list conjugate gradient solver for planar (no-rotation) "bundle adjustment"
-// Model per observation k (camera i observes landmark j):
-//   (L_j - C_i) = u_ij
-// Solve least squares:  min_x ||A x - b||^2  where x = [C (Nc), L (Nl)]  (scalar per axis)
-// We solve x and y separately with identical structure.
-//
-// Key points:
-// - No OpenCV, no dense matrices
-// - No explicit A, no At, no AtA
-// - CG is run on normal equations implicitly using edge list
-// - Work per CG iteration is O(M) where M=#observations
-// - Gauge: root camera is removed from variables (no entry) => treated as fixed at 0
-//
-// Typical sizes: Nc~299, Nl~20k, M~100k+
-// This should be orders of magnitude faster than dense cv::Mat.
+  // CPU edge-list conjugate gradient solver for planar (no-rotation) "bundle adjustment"
+  // Model per observation k (camera i observes landmark j):
+  //   (L_j - C_i) = u_ij
+  // Solve least squares:  min_x ||A x - b||^2  where x = [C (Nc), L (Nl)]  (scalar per axis)
+  // We solve x and y separately with identical structure.
+  //
+  // Key points:
+  // - No OpenCV, no dense matrices
+  // - No explicit A, no At, no AtA
+  // - CG is run on normal equations implicitly using edge list
+  // - Work per CG iteration is O(M) where M=#observations
+  // - Gauge: root camera is removed from variables (no entry) => treated as fixed at 0
+  //
+  // Typical sizes: Nc~299, Nl~20k, M~100k+
+  // This should be orders of magnitude faster than dense cv::Mat.
 
-#include <vector>
-#include <cstdint>
-#include <cmath>
-#include <iostream>
-#include <unordered_map>
-#include <cassert>
-#include <algorithm>
 
-// ------------------------- Edge list -------------------------
+  // ------------------------- Edge list -------------------------
 
-struct EdgeObs {
-  int cam;       // 0..Nc-1 (for non-root cameras only)
-  int lm;        // 0..Nl-1
-  double u;      // observed coordinate (x or y) in camera coords
-  bool hasCam;   // false means observation came from root camera (cam term omitted)
-};
+  struct EdgeObs {
+    int cam; // 0..Nc-1 (for non-root cameras only)
+    int lm; // 0..Nl-1
+    double u; // observed coordinate (x or y) in camera coords
+    bool hasCam; // false means observation came from root camera (cam term omitted)
+  };
 
-// ------------------------- Small vector ops -------------------------
+  // ------------------------- Small vector ops -------------------------
 
-static inline double dot(const std::vector<double>& a, const std::vector<double>& b) {
-  assert(a.size() == b.size());
-  double s = 0.0;
-  for (size_t i = 0; i < a.size(); ++i) s += a[i] * b[i];
-  return s;
-}
+  static inline double dot(const std::vector<double> &a, const std::vector<double> &b) {
+    assert(a.size() == b.size());
+    double s = 0.0;
+    for (size_t i = 0; i < a.size(); ++i) s += a[i] * b[i];
+    return s;
+  }
 
-static inline double norm2(const std::vector<double>& a) {
-  return dot(a, a);
-}
+  static inline double norm2(const std::vector<double> &a) {
+    return dot(a, a);
+  }
 
-static inline void axpy(std::vector<double>& y, double alpha, const std::vector<double>& x) {
-  assert(y.size() == x.size());
-  for (size_t i = 0; i < y.size(); ++i) y[i] += alpha * x[i];
-}
+  static inline void axpy(std::vector<double> &y, double alpha, const std::vector<double> &x) {
+    assert(y.size() == x.size());
+    for (size_t i = 0; i < y.size(); ++i) y[i] += alpha * x[i];
+  }
 
-static inline void xpay(std::vector<double>& y, const std::vector<double>& x, double beta) {
-  // y = x + beta*y
-  assert(y.size() == x.size());
-  for (size_t i = 0; i < y.size(); ++i) y[i] = x[i] + beta * y[i];
-}
+  static inline void xpay(std::vector<double> &y, const std::vector<double> &x, double beta) {
+    // y = x + beta*y
+    assert(y.size() == x.size());
+    for (size_t i = 0; i < y.size(); ++i) y[i] = x[i] + beta * y[i];
+  }
 
-// ------------------------- Core operator: AtA * p -------------------------
-//
-// For each observation (i,j):
-//   row residual on vector v is: q = (v_L[j] - (hasCam ? v_C[i] : 0))
-// Then (AtA v) accumulates:
-//   out_L[j] += q
-//   if hasCam: out_C[i] += -q
-//
-static inline void apply_AtA(
-    const std::vector<EdgeObs>& edges,
+  // ------------------------- Core operator: AtA * p -------------------------
+  //
+  // For each observation (i,j):
+  //   row residual on vector v is: q = (v_L[j] - (hasCam ? v_C[i] : 0))
+  // Then (AtA v) accumulates:
+  //   out_L[j] += q
+  //   if hasCam: out_C[i] += -q
+  //
+  static inline void apply_AtA(
+    const std::vector<EdgeObs> &edges,
     int numCams, int numLms,
-    const std::vector<double>& v,   // size = numCams + numLms
-    std::vector<double>& out)       // size = numCams + numLms
-{
-  const int N = numCams + numLms;
-  assert((int)v.size() == N);
-  out.assign(N, 0.0);
+    const std::vector<double> &v, // size = numCams + numLms
+    std::vector<double> &out) // size = numCams + numLms
+  {
+    const int N = numCams + numLms;
+    assert((int)v.size() == N);
+    out.assign(N, 0.0);
 
-  // index helpers: cams [0..numCams-1], lms [numCams..numCams+numLms-1]
-  for (const auto& e : edges) {
-    const int camIdx = e.cam;
-    const int lmIdx  = numCams + e.lm;
+    // index helpers: cams [0..numCams-1], lms [numCams..numCams+numLms-1]
+    for (const auto &e: edges) {
+      const int camIdx = e.cam;
+      const int lmIdx = numCams + e.lm;
 
-    double q = v[lmIdx];
-    if (e.hasCam) q -= v[camIdx];
+      double q = v[lmIdx];
+      if (e.hasCam) q -= v[camIdx];
 
-    out[lmIdx] += q;
-    if (e.hasCam) out[camIdx] -= q;
+      out[lmIdx] += q;
+      if (e.hasCam) out[camIdx] -= q;
+    }
   }
-}
 
-// ------------------------- Core operator: At*(A x - b) -------------------------
-//
-// e = (x_L[j] - (hasCam ? x_C[i] : 0)) - u
-// Then gradient g = At e is:
-//   g_L[j] += e
-//   if hasCam: g_C[i] += -e
-//
-static inline void apply_At_residual(
-    const std::vector<EdgeObs>& edges,
+  // ------------------------- Core operator: At*(A x - b) -------------------------
+  //
+  // e = (x_L[j] - (hasCam ? x_C[i] : 0)) - u
+  // Then gradient g = At e is:
+  //   g_L[j] += e
+  //   if hasCam: g_C[i] += -e
+  //
+  static inline void apply_At_residual(
+    const std::vector<EdgeObs> &edges,
     int numCams, int numLms,
-    const std::vector<double>& x,   // size N
-    std::vector<double>& g)         // size N
-{
-  const int N = numCams + numLms;
-  assert((int)x.size() == N);
-  g.assign(N, 0.0);
+    const std::vector<double> &x, // size N
+    std::vector<double> &g) // size N
+  {
+    const int N = numCams + numLms;
+    assert((int)x.size() == N);
+    g.assign(N, 0.0);
 
-  for (const auto& e : edges) {
-    const int camIdx = e.cam;
-    const int lmIdx  = numCams + e.lm;
+    for (const auto &e: edges) {
+      const int camIdx = e.cam;
+      const int lmIdx = numCams + e.lm;
 
-    double pred = x[lmIdx];
-    if (e.hasCam) pred -= x[camIdx];
+      double pred = x[lmIdx];
+      if (e.hasCam) pred -= x[camIdx];
 
-    const double err = pred - e.u;
+      const double err = pred - e.u;
 
-    g[lmIdx] += err;
-    if (e.hasCam) g[camIdx] -= err;
+      g[lmIdx] += err;
+      if (e.hasCam) g[camIdx] -= err;
+    }
   }
-}
 
-// Optional: compute RMS of Ax-b without forming Ax (for reporting only)
-static inline double rms_residual(
-    const std::vector<EdgeObs>& edges,
+  // Optional: compute RMS of Ax-b without forming Ax (for reporting only)
+  static inline double rms_residual(
+    const std::vector<EdgeObs> &edges,
     int numCams, int numLms,
-    const std::vector<double>& x)
-{
-  double sse = 0.0;
-  for (const auto& e : edges) {
-    const int camIdx = e.cam;
-    const int lmIdx  = numCams + e.lm;
-    double pred = x[lmIdx];
-    if (e.hasCam) pred -= x[camIdx];
-    double r = pred - e.u;
-    sse += r * r;
+    const std::vector<double> &x) {
+    double sse = 0.0;
+    for (const auto &e: edges) {
+      const int camIdx = e.cam;
+      const int lmIdx = numCams + e.lm;
+      double pred = x[lmIdx];
+      if (e.hasCam) pred -= x[camIdx];
+      double r = pred - e.u;
+      sse += r * r;
+    }
+    return edges.empty() ? 0.0 : std::sqrt(sse / (double) edges.size());
   }
-  return edges.empty() ? 0.0 : std::sqrt(sse / (double)edges.size());
-}
 
-// ------------------------- Conjugate Gradient on normal equations -------------------------
-//
-// We solve: (AtA) x = Atb
-// but we do it without forming AtA or Atb:
-//   r = Atb - AtA x  = -At(Ax - b)
-// We compute g = At(Ax - b), then set r = -g.
-//
-// Stop criterion: sqrt(r·r) <= tolAbs OR relative reduction <= tolRel
-//
-bool coopers_cg_edge_list(
-    const std::vector<EdgeObs>& edges,
+  // ------------------------- Conjugate Gradient on normal equations -------------------------
+  //
+  // We solve: (AtA) x = Atb
+  // but we do it without forming AtA or Atb:
+  //   r = Atb - AtA x  = -At(Ax - b)
+  // We compute g = At(Ax - b), then set r = -g.
+  //
+  // Stop criterion: sqrt(r·r) <= tolAbs OR relative reduction <= tolRel
+  //
+  bool coopers_cg_edge_list(
+    const std::vector<EdgeObs> &edges,
     int &ranIters,
     int numCams, int numLms,
-    std::vector<double>& x,          // size N, in/out
+    std::vector<double> &x, // size N, in/out
     int maxIters = 200,
     double tolRel = 1e-8,
     double tolAbs = 1e-12,
-    bool verbose = true)
-{
-  const int N = numCams + numLms;
-  assert((int)x.size() == N);
+    bool verbose = true) {
+    const int N = numCams + numLms;
+    assert((int)x.size() == N);
 
-  std::vector<double> g, r, p, Ap;
+    std::vector<double> g, r, p, Ap;
 
-  // r = -At(Ax - b)
-  apply_At_residual(edges, numCams, numLms, x, g);
-  r.resize(N);
-  for (int i = 0; i < N; ++i) r[i] = -g[i];
+    // r = -At(Ax - b)
+    apply_At_residual(edges, numCams, numLms, x, g);
+    r.resize(N);
+    for (int i = 0; i < N; ++i) r[i] = -g[i];
 
-  p = r;
-  double rsold = norm2(r);
-  const double rs0 = rsold;
+    p = r;
+    double rsold = norm2(r);
+    const double rs0 = rsold;
 
-  if (std::sqrt(rsold) <= tolAbs) {
-    if (verbose) std::cout << "CG: already converged (abs)\n";
-    return true;
-  }
-
-  int iters = 0;
-  for (; iters < maxIters; ++iters) {
-    apply_AtA(edges, numCams, numLms, p, Ap);
-
-    const double denom = dot(p, Ap);
-    if (std::abs(denom) < 1e-30) {
-      if (verbose) std::cout << "CG: breakdown (singular / bad gauge)\n";
-      return false;
+    if (std::sqrt(rsold) <= tolAbs) {
+      if (verbose) std::cout << "CG: already converged (abs)\n";
+      return true;
     }
 
-    const double alpha = rsold / denom;
+    int iters = 0;
+    for (; iters < maxIters; ++iters) {
+      apply_AtA(edges, numCams, numLms, p, Ap);
 
-    // x += alpha p
-    axpy(x, alpha, p);
-
-    // r -= alpha Ap
-    axpy(r, -alpha, Ap);
-
-    const double rsnew = norm2(r);
-
-    // stopping
-    const double rel = (rs0 > 0.0) ? std::sqrt(rsnew / rs0) : std::sqrt(rsnew);
-    if (std::sqrt(rsnew) <= tolAbs || rel <= tolRel) {
-      ++iters; // count this iteration
-      break;
-    }
-
-    const double beta = rsnew / rsold;
-
-    // p = r + beta p
-    for (int i = 0; i < N; ++i) p[i] = r[i] + beta * p[i];
-
-    rsold = rsnew;
-  }
-
-  if (verbose) {
-    std::cout << "CG ran " << iters << " iterations"
-              << ", rel_res=" << ((rs0 > 0.0) ? std::sqrt(rsold / rs0) : std::sqrt(rsold))
-              << ", rms=" << rms_residual(edges, numCams, numLms, x)
-              << "\n";
-  }
-
-  ranIters = iters;
-  return iters < maxIters;
-}
-
-// ------------------------- Building the edge list -------------------------
-//
-// You’ll adapt these to your types; here’s the shape:
-//
-// - exactly one root image is fixed => not included in variables
-// - cameras are remapped to 0..Nc-1 excluding root
-// - landmarks are 0..Nl-1 in track vector order (your track_id is already dense)
-//
-// The resulting unknown vector per axis is:
-//   x[0..Nc-1]          = camera coordinate (non-root cams)
-//   x[Nc..Nc+Nl-1]      = landmark coordinate
-//
-// You run twice: one edge list with u=obs.x, and another with u=obs.y
-//
-
-// Forward declare your types (replace with your actual includes)
-
-struct PlanarBAResult {
-  int numCams = 0;
-  int numLms  = 0;
-  std::vector<double> x_x; // solution vector for x axis, size Nc+Nl
-  std::vector<double> x_y; // solution vector for y axis, size Nc+Nl
-};
-
-std::pair<int, int> BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
-  const std::vector<FeatureTrack> &tracks,
-  std::vector<Image *> &images,
-  int maxIters,
-  double tolRel){
-
-  // Map images (excluding root) -> camera variable index
-  int rootCount = 0;
-  std::unordered_map<long,int> imageToCam;
-  imageToCam.reserve(images.size() * 2);
-
-  int camIdx = 0;
-  for (auto* img : images) {
-    if (img->regInfo->root) { ++rootCount; continue; }
-    imageToCam[img->index] = camIdx++;
-  }
-
-
-  assert(rootCount == 1);
-
-  const int Nc = camIdx;
-  const int Nl = (int)tracks.size();
-  const int N  = Nc + Nl;
-
-  // Build edges for x and y
-  size_t totalObs = 0;
-  for (auto& t : tracks) totalObs += t.observations.size();
-
-  std::vector<EdgeObs> edgesX;
-  std::vector<EdgeObs> edgesY;
-  edgesX.reserve(totalObs);
-  edgesY.reserve(totalObs);
-
-  for (int lm = 0; lm < Nl; ++lm) {
-    for (const auto& obs : tracks[lm].observations) {
-      EdgeObs ex;
-      ex.lm = lm;
-      ex.u  = obs.x;
-
-      if (obs.imgRef->regInfo->root) {
-        ex.hasCam = false;
-        ex.cam = 0; // unused
-      } else {
-        ex.hasCam = true;
-        auto it = imageToCam.find(obs.image_id);
-        assert(it != imageToCam.end());
-        ex.cam = it->second;
+      const double denom = dot(p, Ap);
+      if (std::abs(denom) < 1e-30) {
+        if (verbose) std::cout << "CG: breakdown (singular / bad gauge)\n";
+        return false;
       }
-      edgesX.push_back(ex);
 
-      EdgeObs ey = ex;
-      ey.u = obs.y;
-      edgesY.push_back(ey);
+      const double alpha = rsold / denom;
+
+      // x += alpha p
+      axpy(x, alpha, p);
+
+      // r -= alpha Ap
+      axpy(r, -alpha, Ap);
+
+      const double rsnew = norm2(r);
+
+      // stopping
+      const double rel = (rs0 > 0.0) ? std::sqrt(rsnew / rs0) : std::sqrt(rsnew);
+      if (std::sqrt(rsnew) <= tolAbs || rel <= tolRel) {
+        ++iters; // count this iteration
+        break;
+      }
+
+      const double beta = rsnew / rsold;
+
+      // p = r + beta p
+      for (int i = 0; i < N; ++i) p[i] = r[i] + beta * p[i];
+
+      rsold = rsnew;
     }
-  }
 
-  // Initial guess from existing regInfo + track world coords
-  std::vector<double> x0x(N, 0.0), x0y(N, 0.0);
-
-  // cameras
-  for (auto* img : images) {
-    if (img->regInfo->root) continue;
-    int ci = imageToCam.at(img->index);
-    x0x[ci] = img->regInfo->absoluteCoords.x;
-    x0y[ci] = img->regInfo->absoluteCoords.y;
-  }
-  // landmarks
-  for (int lm = 0; lm < Nl; ++lm) {
-    x0x[Nc + lm] = tracks[lm].world_x;
-    x0y[Nc + lm] = tracks[lm].world_y;
-  }
-
-  // Solve
-  int xIters = 0,yIters = 0;
-  bool okx = coopers_cg_edge_list(edgesX, xIters, Nc, Nl, x0x, maxIters, tolRel, 1e-12, false);
-  bool oky = coopers_cg_edge_list(edgesY, yIters, Nc, Nl, x0y, maxIters, tolRel, 1e-12, false);
-  (void)okx; (void)oky;
-
-  for (auto* img : images) {
-    if (img->regInfo->root) continue;
-    int ci = imageToCam.at(img->index);
-    img->regInfo->absoluteCoords.x = x0x[ci];
-    img->regInfo->absoluteCoords.y = x0y[ci];
-  }
-  return {xIters,yIters};
-}
-
-// After you get PlanarBAResult, write back camera coords:
-//   img->regInfo->absoluteCoords.x = res.x_x[camIdx]
-// landmarks are in res.x_x[Nc + lm]
-
-
-/*
-  void BundleAdjustmentIntegrator::run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks,
-                                                         const std::vector<Image *> &_images) {
-    optimizer->clear();
-    //camera poses represent absolute coordinates of images
-    int stayFixedCount = 0;
-    for (const auto &img: _images) {
-      cuba::CameraParams camParams;
-
-      //10000 is for numerical stability.
-      camParams.fx = 10000;
-      camParams.fy = 10000;
-
-      //this is essentially "where the camera sits relative to the image it took" ie the middle (generally)
-      //but for simplicity we say the camera was at the image origin (upper left corner)
-      camParams.cx = 0; //parent->image_width / 2;
-      camParams.cy = 0; //parent->image_height / 2;
-
-      //bf only used for stereo photos - not relevant. this is actually set in the constructor as well.
-      camParams.bf = 0;
-
-      //images have no rotation
-      auto AbC = img->regInfo->absoluteCoords;
-
-      auto camRotation = Eigen::Quaterniond::Identity();
-      cuba::Array<double, 3> translation(-AbC.x,-AbC.y,10000);// * scale);
-
-      bool fixed = img->regInfo->rootOfRoot || img->regInfo->stayFixedDuringBundleAdjustment;
-      if (fixed){++stayFixedCount;}
-
-      auto poseVertex = new cuba::PoseVertex(img->index, camRotation, translation, camParams, fixed);
-
-      //add it to the optimizer
-      optimizer->addPoseVertex(poseVertex);
-
-      //keep possession of it
-      poseVertices[img->index] = poseVertex;
+    if (verbose) {
+      std::cout << "CG ran " << iters << " iterations"
+          << ", rel_res=" << ((rs0 > 0.0) ? std::sqrt(rsold / rs0) : std::sqrt(rsold))
+          << ", rms=" << rms_residual(edges, numCams, numLms, x)
+          << "\n";
     }
-    assert(stayFixedCount == 1);
+
+    ranIters = iters;
+    return iters < maxIters;
+  }
+
+  // ------------------------- Building the edge list -------------------------
+  //
+  // You’ll adapt these to your types; here’s the shape:
+  //
+  // - exactly one root image is fixed => not included in variables
+  // - cameras are remapped to 0..Nc-1 excluding root
+  // - landmarks are 0..Nl-1 in track vector order (your track_id is already dense)
+  //
+  // The resulting unknown vector per axis is:
+  //   x[0..Nc-1]          = camera coordinate (non-root cams)
+  //   x[Nc..Nc+Nl-1]      = landmark coordinate
+  //
+  // You run twice: one edge list with u=obs.x, and another with u=obs.y
+  //
+
+  // Forward declare your types (replace with your actual includes)
+
+  struct PlanarBAResult {
+    int numCams = 0;
+    int numLms = 0;
+    std::vector<double> x_x; // solution vector for x axis, size Nc+Nl
+    std::vector<double> x_y; // solution vector for y axis, size Nc+Nl
+  };
+
+  std::pair<int, int> BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
+    const std::vector<FeatureTrack> &tracks,
+    std::vector<Image *> &images,
+    int maxIters,
+    double tolRel) {
+    // Map images (excluding root) -> camera variable index
+    int rootCount = 0;
+    std::unordered_map<long, int> imageToCam;
+    imageToCam.reserve(images.size() * 2);
+
+    int camIdx = 0;
+    for (auto *img: images) {
+      if (img->regInfo->root) {
+        ++rootCount;
+        continue;
+      }
+      imageToCam[img->index] = camIdx++;
+    }
 
 
-    //landmark vertexes are feature points placed in world/composite pixel coordinates
-    for (const auto &track: _tracks) {
-      cuba::Array<double, 3> featurePositionInComposite = {track.world_x, track.world_y, 0};
+    assert(rootCount == 1);
 
-      auto landmarkVertex = new cuba::LandmarkVertex(track.track_id, featurePositionInComposite, false);
+    const int Nc = camIdx;
+    const int Nl = (int) tracks.size();
+    const int N = Nc + Nl;
 
-      optimizer->addLandmarkVertex(landmarkVertex);
+    // Build edges for x and y
+    size_t totalObs = 0;
+    for (auto &t: tracks) totalObs += t.observations.size();
 
-      landmarkVertices[track.track_id] = landmarkVertex;
+    std::vector<EdgeObs> edgesX;
+    std::vector<EdgeObs> edgesY;
+    edgesX.reserve(totalObs);
+    edgesY.reserve(totalObs);
 
-      //add edges (observations) for this track
-      for (const auto &obs: track.observations) {
-        //get the pose (image) associated with the obervation
-        auto poseVertex = optimizer->poseVertex(obs.image_id);
+    for (int lm = 0; lm < Nl; ++lm) {
+      for (const auto &obs: tracks[lm].observations) {
+        EdgeObs ex;
+        ex.lm = lm;
+        ex.u = obs.x;
 
-        cuba::Array<double, 2> landmarkPositionInFrame = {obs.x, obs.y};
+        if (obs.imgRef->regInfo->root) {
+          ex.hasCam = false;
+          ex.cam = 0; // unused
+        } else {
+          ex.hasCam = true;
+          auto it = imageToCam.find(obs.image_id);
+          assert(it != imageToCam.end());
+          ex.cam = it->second;
+        }
+        edgesX.push_back(ex);
 
-        auto edge = new cuba::MonoEdge(landmarkPositionInFrame, 1.0, poseVertex, landmarkVertex);
-
-        optimizer->addMonocularEdge(edge);
-
-        monoEdges.push_back(edge);
+        EdgeObs ey = ex;
+        ey.u = obs.y;
+        edgesY.push_back(ey);
       }
     }
-    constexpr auto robustKernelType = cuba::RobustKernelType::HUBER;
-    const double deltaMono = sqrt(5.9);
 
-    //optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
+    // Initial guess from existing regInfo + track world coords
+    std::vector<double> x0x(N, 0.0), x0y(N, 0.0);
 
-    optimizer->initialize();
-    optimizer->setPoseUpdateAllowance(true, true);
+    // cameras
+    for (auto *img: images) {
+      if (img->regInfo->root) continue;
+      int ci = imageToCam.at(img->index);
+      x0x[ci] = img->regInfo->absoluteCoords.x;
+      x0y[ci] = img->regInfo->absoluteCoords.y;
+    }
+    // landmarks
+    for (int lm = 0; lm < Nl; ++lm) {
+      x0x[Nc + lm] = tracks[lm].world_x;
+      x0y[Nc + lm] = tracks[lm].world_y;
+    }
 
-    optimizer->optimize(100);
+    // Solve
+    int xIters = 0, yIters = 0;
+    bool okx = coopers_cg_edge_list(edgesX, xIters, Nc, Nl, x0x, maxIters, tolRel, 1e-12, false);
+    bool oky = coopers_cg_edge_list(edgesY, yIters, Nc, Nl, x0y, maxIters, tolRel, 1e-12, false);
+    (void) okx;
+    (void) oky;
+
+    for (auto *img: images) {
+      if (img->regInfo->root) continue;
+      int ci = imageToCam.at(img->index);
+      img->regInfo->absoluteCoords.x = x0x[ci];
+      img->regInfo->absoluteCoords.y = x0y[ci];
+    }
+    return {xIters, yIters};
   }
-  */
+
+
+  int UnionFind::find(int x) const {
+    if (parent[x] != x) {
+      parent[x] = find(parent[x]); // path compression
+    }
+    return parent[x];
+  }
+
+  void UnionFind::expand(int new_size) {
+    if (new_size <= parent.size()) return;
+
+    int old_size = parent.size();
+    parent.resize(new_size);
+    rank.resize(new_size, 0);
+
+    // Initialize new elements
+    for (int i = old_size; i < new_size; i++) {
+      parent[i] = i;
+    }
+  }
+
+  void UnionFind::unite(int x, int y) {
+    int px = find(x);
+    int py = find(y);
+
+    if (px == py) return;
+
+    if (rank[px] < rank[py]) {
+      parent[px] = py;
+    } else if (rank[px] > rank[py]) {
+      parent[py] = px;
+    } else {
+      parent[py] = px;
+      rank[px]++;
+    }
+  }
+
+  // After you get PlanarBAResult, write back camera coords:
+  //   img->regInfo->absoluteCoords.x = res.x_x[camIdx]
+  // landmarks are in res.x_x[Nc + lm]
+
+
+  /*
+    void BundleAdjustmentIntegrator::run_bundle_adjustment(const std::vector<FeatureTrack> &_tracks,
+                                                           const std::vector<Image *> &_images) {
+      optimizer->clear();
+      //camera poses represent absolute coordinates of images
+      int stayFixedCount = 0;
+      for (const auto &img: _images) {
+        cuba::CameraParams camParams;
+
+        //10000 is for numerical stability.
+        camParams.fx = 10000;
+        camParams.fy = 10000;
+
+        //this is essentially "where the camera sits relative to the image it took" ie the middle (generally)
+        //but for simplicity we say the camera was at the image origin (upper left corner)
+        camParams.cx = 0; //parent->image_width / 2;
+        camParams.cy = 0; //parent->image_height / 2;
+
+        //bf only used for stereo photos - not relevant. this is actually set in the constructor as well.
+        camParams.bf = 0;
+
+        //images have no rotation
+        auto AbC = img->regInfo->absoluteCoords;
+
+        auto camRotation = Eigen::Quaterniond::Identity();
+        cuba::Array<double, 3> translation(-AbC.x,-AbC.y,10000);// * scale);
+
+        bool fixed = img->regInfo->rootOfRoot || img->regInfo->stayFixedDuringBundleAdjustment;
+        if (fixed){++stayFixedCount;}
+
+        auto poseVertex = new cuba::PoseVertex(img->index, camRotation, translation, camParams, fixed);
+
+        //add it to the optimizer
+        optimizer->addPoseVertex(poseVertex);
+
+        //keep possession of it
+        poseVertices[img->index] = poseVertex;
+      }
+      assert(stayFixedCount == 1);
+
+
+      //landmark vertexes are feature points placed in world/composite pixel coordinates
+      for (const auto &track: _tracks) {
+        cuba::Array<double, 3> featurePositionInComposite = {track.world_x, track.world_y, 0};
+
+        auto landmarkVertex = new cuba::LandmarkVertex(track.track_id, featurePositionInComposite, false);
+
+        optimizer->addLandmarkVertex(landmarkVertex);
+
+        landmarkVertices[track.track_id] = landmarkVertex;
+
+        //add edges (observations) for this track
+        for (const auto &obs: track.observations) {
+          //get the pose (image) associated with the obervation
+          auto poseVertex = optimizer->poseVertex(obs.image_id);
+
+          cuba::Array<double, 2> landmarkPositionInFrame = {obs.x, obs.y};
+
+          auto edge = new cuba::MonoEdge(landmarkPositionInFrame, 1.0, poseVertex, landmarkVertex);
+
+          optimizer->addMonocularEdge(edge);
+
+          monoEdges.push_back(edge);
+        }
+      }
+      constexpr auto robustKernelType = cuba::RobustKernelType::HUBER;
+      const double deltaMono = sqrt(5.9);
+
+      //optimizer->setRobustKernels(robustKernelType, deltaMono, cuba::EdgeType::MONOCULAR);
+
+      optimizer->initialize();
+      optimizer->setPoseUpdateAllowance(true, true);
+
+      optimizer->optimize(100);
+    }
+    */
 }

@@ -22,7 +22,7 @@ namespace pathCam {
 
     // v DEBUG v
     int matchCount = 0;
-    long profileTime = 0;
+    // long profileTime = 0;
     // ^ DEBUG ^
 
     int width, height;
@@ -55,6 +55,7 @@ namespace pathCam {
     std::unordered_set<cv::Point2i> ownedTiles;
     std::vector<std::shared_ptr<Match>> matches;
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
+    std::vector<void*> observations;
     std::vector<Features> akazeFeatures;
     cv::Mat descriptors;
 

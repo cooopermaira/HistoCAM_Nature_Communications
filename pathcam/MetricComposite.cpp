@@ -5,6 +5,8 @@
 #include "pathCam.h"
 
 namespace pathCam {
+
+
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
     parent, image_size, _componentIndex) {
     waitingFrames.resize(frameDelay, {nullptr, {}});
@@ -325,25 +327,20 @@ namespace pathCam {
     //This is done to attempt to close long cycles where two overlapping frames don't have a match, but we might be able
     //to promote a frame that's between them and thereby close the loop. This is not absolutely necessary but improves performance
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
-    auto start1 = std::chrono::high_resolution_clock::now();
     ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps,
                                                                 std::vector(
                                                                   ftg->storedMatches.begin(),
                                                                   ftg->storedMatches.end()));
-    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start1).count();
 
 
+    auto start1 = std::chrono::high_resolution_clock::now();
     for (auto m: matches) {
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-        for (int i = 0; i < m->good_matches.size(); ++i) {
-          if (m->inliers[i]) {
-            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
-          }
-        }
+        ftg->process_match(m);
       }
     }
-
+    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start1).count();
 
     for (auto &img: members) {
       img->keypointsImageSpace.resize(img->keypoints.size());
@@ -359,6 +356,7 @@ namespace pathCam {
     //**************** GENERATE TRACKS ****************
     auto tracks = ftg->generateCurrentTracks(memberImages);
     //**************** GENERATE TRACKS ****************
+
 
     //**************** RUN SPARSE CONJUGATE GRADIENT ****************
     auto iters = BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
@@ -402,7 +400,8 @@ namespace pathCam {
         (std::chrono::high_resolution_clock::now() - start).count();
 
     Poco::FastMutex::ScopedLock lock(parent->printToScreenMutex);
-    std::cout << std::endl<< "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(componentMagLabel) <<
+    std::cout << std::endl << "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(
+          componentMagLabel) <<
         std::endl;
 
     if (!discardedIslands.empty()) {
@@ -781,7 +780,7 @@ namespace pathCam {
         members.insert(component->root);
       }
     }
-
+    members.clear();
     launch_component_match_search(img_, {members.begin(), members.end()});
   }
 }
