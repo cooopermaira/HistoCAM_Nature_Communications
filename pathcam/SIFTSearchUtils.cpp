@@ -60,21 +60,27 @@ namespace pathCam {
 
   void FeatureTrackGenerator::add_image(Image *img) {
     img->observations.resize(img->keypoints.size(), nullptr);
-    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->regInfo->root, img->regInfo);
+    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->regInfo->root,
+                             img->regInfo);
     baImages.push_back(baImg);
-    imageRefs.emplace(img->index,img);
 
+    baFeatures.reserve(baFeatures.size() + img->keypoints.size());
     const float regScale = img->get_reg_scale();
+
     for (int i = 0; i < img->observations.size(); ++i) {
-      auto ind = get_or_create_feature_index({img->index, i});
       const auto ftPixelCoords = img->keypoints[i].pt / regScale;
-      auto feat = baFeatures[ind]->find();
+
+      auto feat = new BAFeature;
+      baFeatures.push_back(feat);
+
       img->observations[i] = new Observation(baImg, feat, -1, -1, ftPixelCoords.x, ftPixelCoords.y, 1);
 
       auto ftWorldCoords = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
       feat->x = ftWorldCoords.x;
       feat->y = ftWorldCoords.y;
-      feat->imageFeatures.emplace(img,i);
+      feat->imageFeatures.emplace(img, i);
+
+      featureGrid.insert(feat);
     }
   }
 
@@ -96,10 +102,10 @@ namespace pathCam {
 
         if (baFeat1 != baFeat2) {
           bool conflict = false;
-          auto* small = (baFeat1->imageFeatures.size() < baFeat2->imageFeatures.size()) ? baFeat1 : baFeat2;
-          auto* large = (small == baFeat1) ? baFeat2 : baFeat1;
+          auto *small = (baFeat1->imageFeatures.size() < baFeat2->imageFeatures.size()) ? baFeat1 : baFeat2;
+          auto *large = (small == baFeat1) ? baFeat2 : baFeat1;
 
-          for (const auto& [img, feat_id] : small->imageFeatures) {
+          for (const auto &[img, feat_id]: small->imageFeatures) {
             auto it = large->imageFeatures.find(img);
             if (it != large->imageFeatures.end() && it->second != feat_id) {
               conflict = true;
@@ -107,19 +113,24 @@ namespace pathCam {
             }
           }
 
-
+          /*
+           make the merge, deactivate if there was a conflict. clear
+           imageFeature list from loser, remove loser from featureGrid */
           if (baFeat1->lastIteration < baFeat2->lastIteration) {
             baFeat1->parent = baFeat2;
-            baFeat2->imageFeatures.insert(baFeat1->imageFeatures.begin(),baFeat1->imageFeatures.end());
+            baFeat2->imageFeatures.insert(baFeat1->imageFeatures.begin(), baFeat1->imageFeatures.end());
             baFeat1->imageFeatures.clear();
-          }else {
+            featureGrid.remove(baFeat1);
+          } else {
             baFeat2->parent = baFeat1;
-            baFeat1->imageFeatures.insert(baFeat2->imageFeatures.begin(),baFeat2->imageFeatures.end());
+            baFeat1->imageFeatures.insert(baFeat2->imageFeatures.begin(), baFeat2->imageFeatures.end());
             baFeat2->imageFeatures.clear();
+            featureGrid.remove(baFeat2);
           }
 
           if (conflict) {
             baFeat1->find()->active = false;
+            featureGrid.remove(baFeat1->find());
           }
         }
       }
@@ -172,8 +183,6 @@ namespace pathCam {
           // auto newRoot = uf_ptr->find(root1);
 
 
-
-
           if (conflict) {
             ++invalidCount;
           } else {
@@ -203,51 +212,51 @@ namespace pathCam {
   }
 
 
-  void FeatureTrackGenerator::launch_inprocess_sparse_CG_iterator(const std::vector<Observation*>& observations,
-                                   int maxIters,
-                                   float tol)
-{
-    std::vector<BAImage*> activeImages;   // free images only
-    std::vector<BAImage*> touchedImages;  // all images, for reset/check
-    std::vector<BAFeature*> activeFeatures;
+  void FeatureTrackGenerator::launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations,
+                                                                  int maxIters,
+                                                                  float tol) {
+    std::vector<BAImage *> activeImages; // free images only
+    std::vector<BAImage *> touchedImages; // all images, for reset/check
+    std::vector<BAFeature *> activeFeatures;
 
     // ---- build local system ----
 
-    for (auto* ob : observations) {
-        BAImage* img = ob->image;
+    for (auto *ob: observations) {
+      BAImage *img = ob->image;
 
-        if (img->touchIdx < 0) { // add this field, or use another temp marker
-            img->touchIdx = touchedImages.size();
-            touchedImages.push_back(img);
-        }
+      if (img->touchIdx < 0) {
+        // add this field, or use another temp marker
+        img->touchIdx = touchedImages.size();
+        touchedImages.push_back(img);
+      }
 
-        if (!img->fixed && img->systemIdx < 0) {
-            img->systemIdx = activeImages.size();
-            activeImages.push_back(img);
-        }
+      if (!img->fixed && img->systemIdx < 0) {
+        img->systemIdx = activeImages.size();
+        activeImages.push_back(img);
+      }
 
-        BAFeature* root = ob->feature->find();
-        ob->feature = root; // IMPORTANT: always canonicalize
+      BAFeature *root = ob->feature->find();
+      ob->feature = root; // IMPORTANT: always canonicalize
 
-        if (root->systemIdx < 0) {
-            root->systemIdx = activeFeatures.size();
-            activeFeatures.push_back(root);
-        }
+      if (root->systemIdx < 0) {
+        root->systemIdx = activeFeatures.size();
+        activeFeatures.push_back(root);
+      }
     }
 
     int fixedCount = 0;
-    for (auto* img : touchedImages) {
-        if (img->fixed) ++fixedCount;
+    for (auto *img: touchedImages) {
+      if (img->fixed) ++fixedCount;
     }
     assert(fixedCount == 1);
 
-    const int nI = (int)activeImages.size();   // free images only
-    const int nF = (int)activeFeatures.size();
+    const int nI = (int) activeImages.size(); // free images only
+    const int nF = (int) activeFeatures.size();
 
     // ---- allocate ----
 
-    auto ensureSize = [](std::vector<float>& v, int n, int pad) {
-        if ((int)v.size() < n) v.resize(n + pad);
+    auto ensureSize = [](std::vector<float> &v, int n, int pad) {
+      if ((int) v.size() < n) v.resize(n + pad);
     };
 
     ensureSize(solverState.img_r_x, nI, 50);
@@ -270,8 +279,8 @@ namespace pathCam {
     ensureSize(solverState.feat_z_y, nF, 5000);
     ensureSize(solverState.feat_inv_diag, nF, 5000);
 
-    auto zeroN = [](std::vector<float>& v, int n) {
-        std::fill(v.begin(), v.begin() + n, 0.0f);
+    auto zeroN = [](std::vector<float> &v, int n) {
+      std::fill(v.begin(), v.begin() + n, 0.0f);
     };
 
     zeroN(solverState.img_r_x, nI);
@@ -288,194 +297,263 @@ namespace pathCam {
 
     // ---- build RHS and diagonal preconditioner ----
 
-    for (const auto* o : observations) {
-        const int ii = o->image->systemIdx;   // -1 if fixed
-        const int fi = o->feature->systemIdx;
+    for (const auto *o: observations) {
+      const int ii = o->image->systemIdx; // -1 if fixed
+      const int fi = o->feature->systemIdx;
 
-        BAImage* img = o->image;
-        BAFeature* feat = o->feature;
+      BAImage *img = o->image;
+      BAFeature *feat = o->feature;
 
-        const float w = o->weight;
+      const float w = o->weight;
 
-        const float rx = feat->x - img->x - o->obs_x;
-        const float ry = feat->y - img->y - o->obs_y;
+      const float rx = feat->x - img->x - o->obs_x;
+      const float ry = feat->y - img->y - o->obs_y;
 
-        solverState.feat_r_x[fi] += -w * rx;
-        solverState.feat_r_y[fi] += -w * ry;
-        solverState.feat_inv_diag[fi] += w;
+      solverState.feat_r_x[fi] += -w * rx;
+      solverState.feat_r_y[fi] += -w * ry;
+      solverState.feat_inv_diag[fi] += w;
 
-        if (ii >= 0) {
-            solverState.img_r_x[ii] += w * rx;
-            solverState.img_r_y[ii] += w * ry;
-            solverState.img_inv_diag[ii] += w;
-        }
+      if (ii >= 0) {
+        solverState.img_r_x[ii] += w * rx;
+        solverState.img_r_y[ii] += w * ry;
+        solverState.img_inv_diag[ii] += w;
+      }
     }
 
     constexpr float eps = 1e-8f;
 
     for (int i = 0; i < nI; ++i)
-        solverState.img_inv_diag[i] = 1.0f / (solverState.img_inv_diag[i] + eps);
+      solverState.img_inv_diag[i] = 1.0f / (solverState.img_inv_diag[i] + eps);
 
     for (int i = 0; i < nF; ++i)
-        solverState.feat_inv_diag[i] = 1.0f / (solverState.feat_inv_diag[i] + eps);
+      solverState.feat_inv_diag[i] = 1.0f / (solverState.feat_inv_diag[i] + eps);
 
     // ---- PCG init: z = M^-1 r, p = z ----
 
     float prev_rTz = 0.0f;
 
     for (int i = 0; i < nI; ++i) {
-        solverState.img_z_x[i] = solverState.img_inv_diag[i] * solverState.img_r_x[i];
-        solverState.img_z_y[i] = solverState.img_inv_diag[i] * solverState.img_r_y[i];
+      solverState.img_z_x[i] = solverState.img_inv_diag[i] * solverState.img_r_x[i];
+      solverState.img_z_y[i] = solverState.img_inv_diag[i] * solverState.img_r_y[i];
 
-        solverState.img_p_x[i] = solverState.img_z_x[i];
-        solverState.img_p_y[i] = solverState.img_z_y[i];
+      solverState.img_p_x[i] = solverState.img_z_x[i];
+      solverState.img_p_y[i] = solverState.img_z_y[i];
 
-        prev_rTz += solverState.img_r_x[i] * solverState.img_z_x[i]
-                  + solverState.img_r_y[i] * solverState.img_z_y[i];
+      prev_rTz += solverState.img_r_x[i] * solverState.img_z_x[i]
+          + solverState.img_r_y[i] * solverState.img_z_y[i];
     }
 
     for (int i = 0; i < nF; ++i) {
-        solverState.feat_z_x[i] = solverState.feat_inv_diag[i] * solverState.feat_r_x[i];
-        solverState.feat_z_y[i] = solverState.feat_inv_diag[i] * solverState.feat_r_y[i];
+      solverState.feat_z_x[i] = solverState.feat_inv_diag[i] * solverState.feat_r_x[i];
+      solverState.feat_z_y[i] = solverState.feat_inv_diag[i] * solverState.feat_r_y[i];
 
-        solverState.feat_p_x[i] = solverState.feat_z_x[i];
-        solverState.feat_p_y[i] = solverState.feat_z_y[i];
+      solverState.feat_p_x[i] = solverState.feat_z_x[i];
+      solverState.feat_p_y[i] = solverState.feat_z_y[i];
 
-        prev_rTz += solverState.feat_r_x[i] * solverState.feat_z_x[i]
-                  + solverState.feat_r_y[i] * solverState.feat_z_y[i];
+      prev_rTz += solverState.feat_r_x[i] * solverState.feat_z_x[i]
+          + solverState.feat_r_y[i] * solverState.feat_z_y[i];
     }
 
     int c = 0;
 
+    // ---- convergence tracking ----
+
+    const float initial_rTz = prev_rTz;
+
+    float last_rel_improvement = std::numeric_limits<float>::infinity();
+    int stagnantIters = 0;
+
     for (int iteration = 0; iteration < maxIters; ++iteration) {
-        ++c;
+      ++c;
 
-        if (prev_rTz < 1e-12f) {
-          break;
+      // --------------------------------------------
+      // early-out: invalid / converged residual
+      // --------------------------------------------
+
+      if (!std::isfinite(prev_rTz) || prev_rTz <= 1e-20f) {
+        break;
+      }
+
+      zeroN(solverState.img_Ap_x, nI);
+      zeroN(solverState.img_Ap_y, nI);
+      zeroN(solverState.feat_Ap_x, nF);
+      zeroN(solverState.feat_Ap_y, nF);
+
+      // ---- Ap = A p ----
+
+      for (const auto *o: observations) {
+        const int ii = o->image->systemIdx;
+        const int fi = o->feature->systemIdx;
+        const float w = o->weight;
+
+        const float img_px = (ii >= 0) ? solverState.img_p_x[ii] : 0.0f;
+        const float img_py = (ii >= 0) ? solverState.img_p_y[ii] : 0.0f;
+
+        const float vx = solverState.feat_p_x[fi] - img_px;
+        const float vy = solverState.feat_p_y[fi] - img_py;
+
+        solverState.feat_Ap_x[fi] += w * vx;
+        solverState.feat_Ap_y[fi] += w * vy;
+
+        if (ii >= 0) {
+          solverState.img_Ap_x[ii] -= w * vx;
+          solverState.img_Ap_y[ii] -= w * vy;
         }
+      }
 
-        zeroN(solverState.img_Ap_x, nI);
-        zeroN(solverState.img_Ap_y, nI);
-        zeroN(solverState.feat_Ap_x, nF);
-        zeroN(solverState.feat_Ap_y, nF);
+      float pAp = 0.0f;
 
-        // ---- Ap = A p ----
+      for (int i = 0; i < nI; ++i) {
+        pAp += solverState.img_p_x[i] * solverState.img_Ap_x[i]
+            + solverState.img_p_y[i] * solverState.img_Ap_y[i];
+      }
 
-        for (const auto* o : observations) {
-            const int ii = o->image->systemIdx; // -1 if fixed
-            const int fi = o->feature->systemIdx;
-            const float w = o->weight;
+      for (int i = 0; i < nF; ++i) {
+        pAp += solverState.feat_p_x[i] * solverState.feat_Ap_x[i]
+            + solverState.feat_p_y[i] * solverState.feat_Ap_y[i];
+      }
 
-            const float img_px = (ii >= 0) ? solverState.img_p_x[ii] : 0.0f;
-            const float img_py = (ii >= 0) ? solverState.img_p_y[ii] : 0.0f;
+      // --------------------------------------------
+      // early-out: degenerate denominator
+      // --------------------------------------------
 
-            const float vx = solverState.feat_p_x[fi] - img_px;
-            const float vy = solverState.feat_p_y[fi] - img_py;
+      if (!std::isfinite(pAp) || std::abs(pAp) < 1e-20f) {
+        break;
+      }
 
-            solverState.feat_Ap_x[fi] += w * vx;
-            solverState.feat_Ap_y[fi] += w * vy;
+      const float alpha = prev_rTz / pAp;
 
-            if (ii >= 0) {
-                solverState.img_Ap_x[ii] -= w * vx;
-                solverState.img_Ap_y[ii] -= w * vy;
-            }
-        }
+      if (!std::isfinite(alpha)) {
+        break;
+      }
 
-        float pAp = 0.0f;
+      // ---- update solution and residual ----
 
-        for (int i = 0; i < nI; ++i) {
-            pAp += solverState.img_p_x[i] * solverState.img_Ap_x[i]
-                 + solverState.img_p_y[i] * solverState.img_Ap_y[i];
-        }
+      for (int i = 0; i < nI; ++i) {
+        activeImages[i]->x += alpha * solverState.img_p_x[i];
+        activeImages[i]->y += alpha * solverState.img_p_y[i];
 
-        for (int i = 0; i < nF; ++i) {
-            pAp += solverState.feat_p_x[i] * solverState.feat_Ap_x[i]
-                 + solverState.feat_p_y[i] * solverState.feat_Ap_y[i];
-        }
+        solverState.img_r_x[i] -= alpha * solverState.img_Ap_x[i];
+        solverState.img_r_y[i] -= alpha * solverState.img_Ap_y[i];
+      }
 
-        if (std::abs(pAp) < 1e-12f) {
-          break;
-        }
+      for (int i = 0; i < nF; ++i) {
+        activeFeatures[i]->x += alpha * solverState.feat_p_x[i];
+        activeFeatures[i]->y += alpha * solverState.feat_p_y[i];
 
-        const float alpha = prev_rTz / pAp;
+        solverState.feat_r_x[i] -= alpha * solverState.feat_Ap_x[i];
+        solverState.feat_r_y[i] -= alpha * solverState.feat_Ap_y[i];
+      }
 
-        // ---- update solution and residual ----
+      // ---- z = M^-1 r, compute rTz and residual norm ----
 
-        for (int i = 0; i < nI; ++i) {
-            activeImages[i]->x += alpha * solverState.img_p_x[i];
-            activeImages[i]->y += alpha * solverState.img_p_y[i];
+      float new_rTz = 0.0f;
+      float residualNorm2 = 0.0f;
 
-            solverState.img_r_x[i] -= alpha * solverState.img_Ap_x[i];
-            solverState.img_r_y[i] -= alpha * solverState.img_Ap_y[i];
-        }
+      for (int i = 0; i < nI; ++i) {
+        solverState.img_z_x[i] = solverState.img_inv_diag[i] * solverState.img_r_x[i];
+        solverState.img_z_y[i] = solverState.img_inv_diag[i] * solverState.img_r_y[i];
 
-        for (int i = 0; i < nF; ++i) {
-            activeFeatures[i]->x += alpha * solverState.feat_p_x[i];
-            activeFeatures[i]->y += alpha * solverState.feat_p_y[i];
+        new_rTz += solverState.img_r_x[i] * solverState.img_z_x[i]
+            + solverState.img_r_y[i] * solverState.img_z_y[i];
 
-            solverState.feat_r_x[i] -= alpha * solverState.feat_Ap_x[i];
-            solverState.feat_r_y[i] -= alpha * solverState.feat_Ap_y[i];
-        }
+        residualNorm2 += solverState.img_r_x[i] * solverState.img_r_x[i]
+            + solverState.img_r_y[i] * solverState.img_r_y[i];
+      }
 
-        // ---- z = M^-1 r, compute rTz and residual norm ----
+      for (int i = 0; i < nF; ++i) {
+        solverState.feat_z_x[i] = solverState.feat_inv_diag[i] * solverState.feat_r_x[i];
+        solverState.feat_z_y[i] = solverState.feat_inv_diag[i] * solverState.feat_r_y[i];
 
-        float new_rTz = 0.0f;
-        float residualNorm2 = 0.0f;
+        new_rTz += solverState.feat_r_x[i] * solverState.feat_z_x[i]
+            + solverState.feat_r_y[i] * solverState.feat_z_y[i];
 
-        for (int i = 0; i < nI; ++i) {
-            solverState.img_z_x[i] = solverState.img_inv_diag[i] * solverState.img_r_x[i];
-            solverState.img_z_y[i] = solverState.img_inv_diag[i] * solverState.img_r_y[i];
+        residualNorm2 += solverState.feat_r_x[i] * solverState.feat_r_x[i]
+            + solverState.feat_r_y[i] * solverState.feat_r_y[i];
+      }
 
-            new_rTz += solverState.img_r_x[i] * solverState.img_z_x[i]
-                     + solverState.img_r_y[i] * solverState.img_z_y[i];
+      // --------------------------------------------
+      // convergence checks
+      // --------------------------------------------
 
-            residualNorm2 += solverState.img_r_x[i] * solverState.img_r_x[i]
-                           + solverState.img_r_y[i] * solverState.img_r_y[i];
-        }
+      if (!std::isfinite(new_rTz) || !std::isfinite(residualNorm2)) {
+        break;
+      }
 
-        for (int i = 0; i < nF; ++i) {
-            solverState.feat_z_x[i] = solverState.feat_inv_diag[i] * solverState.feat_r_x[i];
-            solverState.feat_z_y[i] = solverState.feat_inv_diag[i] * solverState.feat_r_y[i];
+      const float residualNorm = std::sqrt(residualNorm2);
 
-            new_rTz += solverState.feat_r_x[i] * solverState.feat_z_x[i]
-                     + solverState.feat_r_y[i] * solverState.feat_z_y[i];
+      // absolute residual
+      if (residualNorm < tol) {
+        break;
+      }
 
-            residualNorm2 += solverState.feat_r_x[i] * solverState.feat_r_x[i]
-                           + solverState.feat_r_y[i] * solverState.feat_r_y[i];
-        }
+      // relative preconditioned residual reduction
+      const float relResidual = new_rTz / (initial_rTz + eps);
 
-        if (std::sqrt(residualNorm2) < tol) {
-          break;
-        }
+      if (relResidual < 1e-4f) {
+        break;
+      }
 
-        const float beta = new_rTz / (prev_rTz + eps);
+      // stagnation detection
+      const float relImprovement =
+          std::abs(prev_rTz - new_rTz) / (prev_rTz + eps);
 
-        // ---- p = z + beta p ----
+      if (relImprovement < 1e-3f) {
+        ++stagnantIters;
+      } else {
+        stagnantIters = 0;
+      }
 
-        for (int i = 0; i < nI; ++i) {
-            solverState.img_p_x[i] = solverState.img_z_x[i] + beta * solverState.img_p_x[i];
-            solverState.img_p_y[i] = solverState.img_z_y[i] + beta * solverState.img_p_y[i];
-        }
+      // require several stagnant iterations in a row
+      // to avoid premature exits
+      if (stagnantIters >= 3) {
+        break;
+      }
 
-        for (int i = 0; i < nF; ++i) {
-            solverState.feat_p_x[i] = solverState.feat_z_x[i] + beta * solverState.feat_p_x[i];
-            solverState.feat_p_y[i] = solverState.feat_z_y[i] + beta * solverState.feat_p_y[i];
-        }
+      last_rel_improvement = relImprovement;
 
-        prev_rTz = new_rTz;
+      // ---- p = z + beta p ----
+
+      const float beta = new_rTz / (prev_rTz + eps);
+
+      if (!std::isfinite(beta)) {
+        break;
+      }
+
+      for (int i = 0; i < nI; ++i) {
+        solverState.img_p_x[i] =
+            solverState.img_z_x[i] + beta * solverState.img_p_x[i];
+
+        solverState.img_p_y[i] =
+            solverState.img_z_y[i] + beta * solverState.img_p_y[i];
+      }
+
+      for (int i = 0; i < nF; ++i) {
+        solverState.feat_p_x[i] =
+            solverState.feat_z_x[i] + beta * solverState.feat_p_x[i];
+
+        solverState.feat_p_y[i] =
+            solverState.feat_z_y[i] + beta * solverState.feat_p_y[i];
+      }
+
+      prev_rTz = new_rTz;
+    }
+    std::cout<<"iters "<<c<<std::endl;
+
+    for (auto *ft: activeFeatures) {
+      ft->systemIdx = -1;
+      ft->lastIteration += c;
+      featureGrid.update(ft);
     }
 
-    for (auto* ft : activeFeatures) {
-        ft->systemIdx = -1;
-        ft->lastIteration += c;
+    for (auto *img: activeImages) {
+      img->systemIdx = -1;
     }
 
-    for (auto* img : activeImages)
-        img->systemIdx = -1;
-
-    for (auto* img : touchedImages)
-        img->touchIdx = -1;
-}
+    for (auto *img: touchedImages) {
+      img->touchIdx = -1;
+    }
+  }
 
 
   // Generate tracks from current state

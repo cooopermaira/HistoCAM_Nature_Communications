@@ -517,6 +517,107 @@ namespace pathCam {
     delete ftg;
   }
 
+  std::pair<std::vector<Image *>, int> Composite::get_match_candidates(const Rect &rect, const int n, const std::vector<Image *> &alreadyMatched) const {
+    std::vector<BAFeature*> features;
+
+    // ---- query grid ----
+    ftg->featureGrid.query(rect.x,
+               rect.y,
+               rect.x + rect.width,
+               rect.y + rect.height,
+               [&](BAFeature* f) {
+                   features.push_back(f);
+               });
+
+    int radSq = parent->scope_radius * parent->scope_radius;
+    Point2i center = rect.tl() + Point2i(rect.size());
+
+    features.erase(
+        std::remove_if(features.begin(), features.end(), [&](BAFeature* feat) {
+            if (componentMagLabel == Image::_2X) {
+                auto p = center - Point2i(feat->x, feat->y);
+                auto v = p.dot(p);
+                return v > radSq;
+            }
+          return !rect.contains(Point2f(feat->x,feat->y));
+        }),
+        features.end()
+    );
+
+
+    const int F = (int)features.size();
+
+    // ---- build image → feature list ----
+    std::unordered_map<Image*, std::vector<int>> imageToFeatures;
+
+    for (int i = 0; i < F; ++i) {
+        BAFeature* f = features[i];
+
+        for (const auto& [img, feat_id] : f->imageFeatures) {
+            imageToFeatures[img].push_back(i);
+        }
+    }
+
+    // ---- mark already covered features ----
+    std::vector<char> covered(F, 0);
+    int totalCovered = 0;
+
+    for (Image* img : alreadyMatched) {
+        auto it = imageToFeatures.find(img);
+        if (it == imageToFeatures.end()) continue;
+
+        for (int idx : it->second) {
+            if (!covered[idx]) {
+                covered[idx] = 1;
+                totalCovered++;
+            }
+        }
+    }
+
+    // ---- remove alreadySelected images from candidates ----
+    for (Image* img : alreadyMatched) {
+        imageToFeatures.erase(img);
+    }
+
+    // ---- greedy selection ----
+    std::vector<Image*> selected;
+    selected.reserve(n);
+
+    for (int iter = 0; iter < n; ++iter) {
+        Image* bestImg = nullptr;
+        int bestGain = 0;
+
+        for (auto& [img, featIdxs] : imageToFeatures) {
+            int gain = 0;
+
+            for (int idx : featIdxs) {
+                if (!covered[idx]) gain++;
+            }
+
+            if (gain > bestGain) {
+                bestGain = gain;
+                bestImg = img;
+            }
+        }
+
+        if (!bestImg || bestGain == 0)
+            break;
+
+        selected.push_back(bestImg);
+
+        // mark newly covered features
+        for (int idx : imageToFeatures[bestImg]) {
+            if (!covered[idx]) {
+                covered[idx] = 1;
+                totalCovered++;
+            }
+        }
+
+        imageToFeatures.erase(bestImg);
+    }
+
+    return {selected, totalCovered};
+  }
 
   void Composite::launch_component_match_search(Image *img, std::vector<Image*> candidates_) {
     if (!img->subsequentMatchLaunched) {

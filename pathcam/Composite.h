@@ -20,6 +20,7 @@
 namespace pathCam {
   class FeatureTrackGenerator;
   class BundleAdjustmentIntegrator;
+
   // class MRTiledImage;
   template<typename T>
   struct PointCompare {
@@ -44,6 +45,8 @@ namespace pathCam {
     friend class RebuildRunnable;
 
   public:
+    Composite(StreamCam *parent, Size image_size, int _componentIndex);
+
     virtual ~Composite();
 
     StreamCam *parent;
@@ -61,7 +64,7 @@ namespace pathCam {
     std::atomic<bool> alignmentHasBegun = false;
     std::atomic<bool> suspended = false;
     std::atomic<int> outstandingCMS_jobs = 0;
-    std::vector<std::shared_ptr<Composite>> absorbedComponents;
+    std::vector<std::shared_ptr<Composite> > absorbedComponents;
 
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
@@ -111,9 +114,9 @@ namespace pathCam {
 #endif
     Mat circleMask;
 
-    char* threeChnBuf;
-    char* fourChnBuf;
-    char* rectMaskBuf;
+    char *threeChnBuf;
+    char *fourChnBuf;
+    char *rectMaskBuf;
 
     Mat rectMask;
     Mat threeChannelPreallocated;
@@ -128,7 +131,7 @@ namespace pathCam {
     std::map<int, long> delaunayMembers;
     std::queue<RegInfo *> staging;
 
-    std::vector<Image*> memberFrames;
+    std::vector<Image *> memberFrames;
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
     int frameCount = 0;
 
@@ -136,8 +139,8 @@ namespace pathCam {
     inline static std::mutex EstRoot_mutex;
 
 
-    FeatureTrackGenerator* ftg;
-    BundleAdjustmentIntegrator* bai;
+    FeatureTrackGenerator *ftg;
+    BundleAdjustmentIntegrator *bai;
 
     // SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
 
@@ -147,19 +150,20 @@ namespace pathCam {
 
     bool prepare_4CPA(Image *img, Rect roi_ = Rect());
 
-    bool prepare_4CPA_cpu(Image *img,Rect roi_ = Rect());
+    bool prepare_4CPA_cpu(Image *img, Rect roi_ = Rect());
 
     Size imageSize;
 
     std::vector<float> candidateScaleRatios;
 
-    Composite(StreamCam *parent, Size image_size, int _componentIndex);
+    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n, const std::vector<Image *> &alreadyMatched) const;
 
-    void launch_component_match_search(Image* img_, std::vector<Image*> candidates_);
+    void launch_component_match_search(Image *img_, std::vector<Image *> candidates_);
 
-    virtual int get_exit_rep_count(){ return 0;}
+    virtual int get_exit_rep_count() { return 0; }
 
-    virtual void align_and_rebuild() {};
+    virtual void align_and_rebuild() {
+    };
 
     virtual std::unordered_set<Image *> find_contributing_images() const {
       return contributingFrames;
@@ -168,9 +172,11 @@ namespace pathCam {
     std::vector<std::pair<Image *, Image *> > calculate_member_overlaps(std::vector<Image *> images) const;
 
 
-    void sort_overlaps_by_likelihood(std::vector<std::pair<pathCam::Image *, cv::Rect> > &_overlaps, const float &_targetScale);
+    void sort_overlaps_by_likelihood(std::vector<std::pair<pathCam::Image *, cv::Rect> > &_overlaps,
+                                     const float &_targetScale);
 
-    virtual void add_landmark_frame(Image* img){};
+    virtual void add_landmark_frame(Image *img) {
+    };
 
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);
@@ -220,8 +226,6 @@ namespace pathCam {
                                bool _withEffectedTiles = true, bool _outline = false,
                                std::vector<Point2i> effectedTiles = {});
   };
-
-
 }
 
 #endif /* Composite_h */

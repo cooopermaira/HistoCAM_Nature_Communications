@@ -151,7 +151,7 @@ namespace pathCam {
       tiles.erase(
         std::remove_if(tiles.begin(),
                        tiles.end(),
-                       [&](Point2i &tileIdx) {
+                       [&](const Point2i &tileIdx) {
                          auto tileObj = imagePyramid->get_base_tile(tileIdx);
                          if (tileObj->owner == img) {
                            //im marked as the owner, so i keep it
@@ -248,7 +248,36 @@ namespace pathCam {
     }
     auto t111 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start11).count();
     std::cout<<"total iterative time "<<t111<<std::endl;
+
+
     rebuild(memberFrames);
+
+    int count = 0,invalid = 0;
+    for (auto ft : ftg->baFeatures) {
+      if (ft->parent == ft) {
+        ++count;
+        if (!ft->active) {
+          ++invalid;
+        }
+      }
+    }
+    std::cout<<"total features and invalid "<<count<<" "<<invalid<<std::endl;
+
+
+    auto startf = std::chrono::high_resolution_clock::now();
+
+    for (auto &img : memberFrames) {
+      std::vector<Image*> wv;
+      if (img->regInfo && img->regInfo->winningVote.m) {
+        wv.push_back(img->regInfo->winningVote.m->get_other(img));
+      }
+      auto [imageCandidates,covered] = get_match_candidates(Rect(img->regInfo->absoluteCoords,imageSize),3,wv);
+    }
+
+    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+
+    std::cout<<"total coverage search time "<<t11<<std::endl;
+    int k = 0;
   }
 
   void MetricComposite::align_and_rebuild() {
