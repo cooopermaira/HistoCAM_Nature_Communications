@@ -225,7 +225,7 @@ namespace pathCam {
 
     void store_match(std::shared_ptr<Match> _match) { storedMatches.insert(_match); }
 
-    void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 20, float tol = 1e-4f);
+    void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 30, float tol = 1e-4f);
 
     std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image *> &images);
 

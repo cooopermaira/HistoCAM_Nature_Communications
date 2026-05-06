@@ -33,7 +33,8 @@ namespace pathCam {
     bool empty = false;
     if (candidates.empty() && image_index > 0) {
       empty = true;
-      std::vector<long> indexes(image_index);
+      std::vector<long> indexes;
+      indexes.reserve(image_index);
       for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
         indexes.push_back(prev_idx);
       }

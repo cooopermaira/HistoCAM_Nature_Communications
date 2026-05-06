@@ -60,7 +60,7 @@ namespace pathCam {
 
   void FeatureTrackGenerator::add_image(Image *img) {
     img->observations.resize(img->keypoints.size(), nullptr);
-    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, false, img->regInfo);
+    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->regInfo->root, img->regInfo);
     baImages.push_back(baImg);
     imageRefs.emplace(img->index,img);
 
@@ -350,7 +350,9 @@ namespace pathCam {
     for (int iteration = 0; iteration < maxIters; ++iteration) {
         ++c;
 
-        if (prev_rTz < 1e-12f) break;
+        if (prev_rTz < 1e-12f) {
+          break;
+        }
 
         zeroN(solverState.img_Ap_x, nI);
         zeroN(solverState.img_Ap_y, nI);
@@ -391,7 +393,9 @@ namespace pathCam {
                  + solverState.feat_p_y[i] * solverState.feat_Ap_y[i];
         }
 
-        if (std::abs(pAp) < 1e-12f) break;
+        if (std::abs(pAp) < 1e-12f) {
+          break;
+        }
 
         const float alpha = prev_rTz / pAp;
 
@@ -440,7 +444,9 @@ namespace pathCam {
                            + solverState.feat_r_y[i] * solverState.feat_r_y[i];
         }
 
-        if (std::sqrt(residualNorm2) < tol) break;
+        if (std::sqrt(residualNorm2) < tol) {
+          break;
+        }
 
         const float beta = new_rTz / (prev_rTz + eps);
 

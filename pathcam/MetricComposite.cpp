@@ -193,6 +193,7 @@ namespace pathCam {
   }
 
   void MetricComposite::test_add_align_image() {
+    auto start11 = std::chrono::high_resolution_clock::now();
     std::unordered_map<Image*,std::vector<std::shared_ptr<Match>>> imageMatches;
     for (auto & img : memberFrames) {
       imageMatches[img] = {};
@@ -203,12 +204,14 @@ namespace pathCam {
       }
     }
 
+    std::vector<Observation*> observations;
+
     for (auto &img : memberFrames) {
       auto start = std::chrono::high_resolution_clock::now();
 
       ftg->add_image(img);
       for (auto &m : imageMatches[img]) {
-        ftg->process_match(m);
+        ftg->process_match2(m);
       }
 
       auto t = std::chrono::duration_cast<std::chrono::milliseconds>
@@ -216,27 +219,41 @@ namespace pathCam {
 
       start = std::chrono::high_resolution_clock::now();
 
-      int totalSize = 0;
-      for (int i = 0; i <= img->index; ++i) {
-        totalSize += img->observations.size();
+
+
+      observations.reserve(observations.size() + img->observations.size());
+      for (auto &obs : img->observations) {
+        if (obs->feature->find()->active) {
+          observations.push_back(obs);
+        }
       }
 
-      std::vector<Observation*> observations;
-      observations.reserve(totalSize);
-
-      for (int i = 0; i <= img->index; ++i) {
-        auto mf = memberFrames[i];
-        observations.insert(observations.end(),mf->observations.begin(),mf->observations.end());
-      }
 
       ftg->launch_inprocess_sparse_CG_iterator(observations);
-      t = std::chrono::duration_cast<std::chrono::milliseconds>
-    (std::chrono::high_resolution_clock::now() - start).count();
-      std::cout<<img->index<<" matches " << imageMatches[img].size()<<" "
+      auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+      std::cout<<"index "<<img->index<<" matches " << imageMatches[img].size()<<" "<<t<<" total observations "<<observations.size()<<" iteration time "<<t1<<std::endl;
+      int k = 0;
     }
+    int maxx = 0,maxy = 0;
+    for (auto &img : memberFrames) {
+      auto baImg = img->observations[0]->image;
+      if (abs(img->regInfo->absoluteCoords.x - baImg->x) > maxx) {
+        maxx = abs(img->regInfo->absoluteCoords.x - baImg->x);
+      }
+      if (abs(img->regInfo->absoluteCoords.y - baImg->y) > maxy) {
+        maxy = abs(img->regInfo->absoluteCoords.y - baImg->y);
+      }
+      img->regInfo->absoluteCoords = Point2i(baImg->x,baImg->y);
+
+    }
+    auto t111 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start11).count();
+    std::cout<<"total iterative time "<<t111<<std::endl;
+    rebuild(memberFrames);
   }
 
   void MetricComposite::align_and_rebuild() {
+    test_add_align_image();
+    return;
     // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment
     for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());

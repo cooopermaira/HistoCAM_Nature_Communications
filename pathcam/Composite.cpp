@@ -520,7 +520,7 @@ namespace pathCam {
 
   void Composite::launch_component_match_search(Image *img, std::vector<Image*> candidates_) {
     if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
+      // img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       const auto cms = new ComponentMatchSearch(parent, img, this,candidates_);
