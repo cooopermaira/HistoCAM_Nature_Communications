@@ -61,9 +61,7 @@ namespace pathCam {
     void addObservation(const FeatureObservation &obs) {
       observations.push_back(obs);
     }
-
   };
-
 
 
   struct SolverState {
@@ -95,14 +93,15 @@ namespace pathCam {
     float x = 0;
     float y = 0;
     bool active = true;
+    bool live = false;
     int lastIteration = 0;
 
     int systemIdx = -1;
     BAFeature *parent = this;
 
-    std::unordered_map<Image*,int> imageFeatures;
+    std::unordered_map<Image *, int> imageFeatures;
 
-    Point2i cellIdx{0,0};
+    Point2i cellIdx{0, 0};
     int indexInCell = -1;
 
     BAFeature *find() {
@@ -111,7 +110,7 @@ namespace pathCam {
       return parent;
     }
 
-    static BAFeature* unite(BAFeature* a, BAFeature* b) {
+    static BAFeature *unite(BAFeature *a, BAFeature *b) {
       return a->find();
     }
   };
@@ -162,36 +161,39 @@ namespace pathCam {
   struct CellCoord {
     int x, y;
 
-    bool operator==(const CellCoord& o) const {
-        return x == o.x && y == o.y;
+    bool operator==(const CellCoord &o) const {
+      return x == o.x && y == o.y;
     }
-};
+  };
 
-struct CellHash {
-    size_t operator()(const CellCoord& c) const {
-        return std::hash<long long>()(((long long)c.x << 32) ^ (long long)c.y);
+  struct CellHash {
+    size_t operator()(const CellCoord &c) const {
+      return std::hash<long long>()(((long long) c.x << 32) ^ (long long) c.y);
     }
-};
+  };
 
-class FeatureGrid {
-public:
+  class FeatureGrid {
+  public:
+    mutable Poco::RWLock rwLock;
+
     explicit FeatureGrid(float cellSize)
-        : cellSize(cellSize), invCellSize(1.0f / cellSize) {}
+      : cellSize(cellSize), invCellSize(1.0f / cellSize) {
+    }
 
     // ---- insert ----
-    void insert(BAFeature* f) {
-        auto [cx, cy] = getCell(f->x, f->y);
-        auto& cell = grid[{cx, cy}];
+    void insert(BAFeature *f) {
+      auto [cx, cy] = getCell(f->x, f->y);
+      auto &cell = grid[{cx, cy}];
 
-        f->cellIdx.x = cx;
-        f->cellIdx.y = cy;
-        f->indexInCell = (int)cell.size();
+      f->cellIdx.x = cx;
+      f->cellIdx.y = cy;
+      f->indexInCell = (int) cell.size();
 
-        cell.push_back(f);
+      cell.push_back(f);
     }
 
     // ---- remove ----
-  void remove(BAFeature* f) {
+    void remove(BAFeature *f) {
       if (f == nullptr) return;
       if (f->indexInCell < 0) return; // already removed / not in grid
 
@@ -201,20 +203,20 @@ public:
         return;
       }
 
-      auto& vec = it->second;
+      auto &vec = it->second;
       int idx = f->indexInCell;
 
-      if (idx < 0 || idx >= (int)vec.size() || vec[idx] != f) {
+      if (idx < 0 || idx >= (int) vec.size() || vec[idx] != f) {
         // stale/corrupt bookkeeping; do slow recovery
         auto vit = std::find(vec.begin(), vec.end(), f);
         if (vit == vec.end()) {
           f->indexInCell = -1;
           return;
         }
-        idx = (int)std::distance(vec.begin(), vit);
+        idx = (int) std::distance(vec.begin(), vit);
       }
 
-      BAFeature* last = vec.back();
+      BAFeature *last = vec.back();
 
       vec[idx] = last;
       last->indexInCell = idx;
@@ -231,64 +233,68 @@ public:
     }
 
     // ---- update position (after BA) ----
-    void update(BAFeature* f) {
-        auto [newX, newY] = getCell(f->x, f->y);
+    void update(BAFeature *f) {
+      auto [newX, newY] = getCell(f->x, f->y);
 
-        if (newX == f->cellIdx.x && newY == f->cellIdx.y)
-            return;
+      if (newX == f->cellIdx.x && newY == f->cellIdx.y)
+        return;
 
-        remove(f);
+      remove(f);
 
-        auto& newCell = grid[{newX, newY}];
-        f->cellIdx.x = newX;
-        f->cellIdx.y = newY;
-        f->indexInCell = (int)newCell.size();
+      auto &newCell = grid[{newX, newY}];
+      f->cellIdx.x = newX;
+      f->cellIdx.y = newY;
+      f->indexInCell = (int) newCell.size();
 
-        newCell.push_back(f);
+      newCell.push_back(f);
     }
 
     // ---- range query (EXACT) ----
-    template <typename Callback>
-    void query(float minX, float minY, float maxX, float maxY, Callback&& cb) const {
-        int cx0 = (int)std::floor(minX * invCellSize);
-        int cy0 = (int)std::floor(minY * invCellSize);
-        int cx1 = (int)std::floor(maxX * invCellSize);
-        int cy1 = (int)std::floor(maxY * invCellSize);
+    template<typename Callback>
+    void query(float minX, float minY, float maxX, float maxY, Callback &&cb) const {
+      Poco::RWLock::ScopedReadLock lock(rwLock); //for .remove()
 
-        for (int cy = cy0; cy <= cy1; ++cy) {
-            for (int cx = cx0; cx <= cx1; ++cx) {
-                auto it = grid.find({cx, cy});
-                if (it == grid.end()) continue;
+      int cx0 = (int) std::floor(minX * invCellSize);
+      int cy0 = (int) std::floor(minY * invCellSize);
+      int cx1 = (int) std::floor(maxX * invCellSize);
+      int cy1 = (int) std::floor(maxY * invCellSize);
 
-                for (BAFeature* f : it->second) {
-                    // exact filter
-                    if (!f->active) continue;
+      for (int cy = cy0; cy <= cy1; ++cy) {
+        for (int cx = cx0; cx <= cx1; ++cx) {
+          auto it = grid.find({cx, cy});
+          if (it == grid.end()) continue;
 
-                    // if (f->x >= minX && f->x <= maxX &&
-                    //     f->y >= minY && f->y <= maxY) {
-                        cb(f);
-                    // }
-                }
-            }
+          for (BAFeature *f: it->second) {
+            // exact filter
+            if (!f->active) continue;
+
+            // if (f->x >= minX && f->x <= maxX &&
+            //     f->y >= minY && f->y <= maxY) {
+            cb(f);
+            // }
+          }
         }
+      }
     }
 
-private:
+  private:
     float cellSize;
     float invCellSize;
 
-    std::unordered_map<CellCoord, std::vector<BAFeature*>, CellHash> grid;
+    std::unordered_map<CellCoord, std::vector<BAFeature *>, CellHash> grid;
 
-    inline std::pair<int,int> getCell(float x, float y) const {
-        return {
-            (int)std::floor(x * invCellSize),
-            (int)std::floor(y * invCellSize)
-        };
+    inline std::pair<int, int> getCell(float x, float y) const {
+      return {
+        (int) std::floor(x * invCellSize),
+        (int) std::floor(y * invCellSize)
+      };
     }
-};
+  };
 
   class FeatureTrackGenerator {
   public:
+    Poco::RWLock rwLock;
+
     struct ImageFeaturePair {
       long image_id;
       int feature_id;
@@ -317,6 +323,8 @@ private:
     std::vector<ImageFeaturePair> index_to_feature;
     std::unique_ptr<UnionFind> uf_ptr;
 
+    std::unordered_set<std::shared_ptr<Match>> matches;
+
     FeatureGrid featureGrid{256};
 
     std::vector<BAFeature *> baFeatures;
@@ -342,9 +350,12 @@ private:
 
     void add_image(Image *img);
 
+    std::pair<Point2i, bool> estimate_image_coords_from_feature_tracks(Image *img);
+
     void store_match(std::shared_ptr<Match> _match) { storedMatches.insert(_match); }
 
-    void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 30, float tol = 1e-4f);
+    void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 30,
+                                             float tol = 1e-4f);
 
     std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image *> &images);
 

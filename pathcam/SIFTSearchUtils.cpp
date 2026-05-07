@@ -58,6 +58,26 @@ namespace pathCam {
     return new_index;
   }
 
+  std::pair<Point2i, bool> FeatureTrackGenerator::estimate_image_coords_from_feature_tracks(Image *img) {
+    Poco::RWLock::ScopedReadLock lock(rwLock);
+
+    float count = 0;
+    float xTotal = 0,yTotal = 0;
+    for (auto &obs : img->observations) {
+      if (obs->feature->live && obs->feature->imageFeatures.size() > 1) {
+        ++count;
+        xTotal += obs->feature->x - obs->obs_x;
+        yTotal += obs->feature->y - obs->obs_y;
+      }
+    }
+    if (count > 0) {
+      xTotal /= count;
+      yTotal /= count;
+      return {Point2i(xTotal,yTotal),true};
+    }
+    return {{},false};
+  }
+
   void FeatureTrackGenerator::add_image(Image *img) {
     img->observations.resize(img->keypoints.size(), nullptr);
     auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->regInfo->root,
@@ -66,6 +86,8 @@ namespace pathCam {
 
     baFeatures.reserve(baFeatures.size() + img->keypoints.size());
     const float regScale = img->get_reg_scale();
+
+    Poco::RWLock::ScopedWriteLock lock(featureGrid.rwLock); //for .insert()
 
     for (int i = 0; i < img->observations.size(); ++i) {
       const auto ftPixelCoords = img->keypoints[i].pt / regScale;
@@ -85,12 +107,13 @@ namespace pathCam {
   }
 
   void FeatureTrackGenerator::process_match2(const std::shared_ptr<Match> &match_) {
-    auto srcImgIdx = match_->image_1->index;
-    auto dstImgIdx = match_->image_2->index;
+    auto [it,inserted] = matches.insert(match_);
+    if (!inserted){return;}
 
     auto img1 = match_->image_1;
     auto img2 = match_->image_2;
 
+    Poco::RWLock::ScopedWriteLock lock(featureGrid.rwLock); //for .remove()
     for (int i = 0; i < match_->good_matches.size(); ++i) {
       if (match_->inliers[i]) {
         auto qInd = match_->good_matches[i].queryIdx;
@@ -140,9 +163,6 @@ namespace pathCam {
   void FeatureTrackGenerator::process_match(const std::shared_ptr<Match> &match_) {
     auto srcImgIdx = match_->image_1->index;
     auto dstImgIdx = match_->image_2->index;
-
-    auto img1 = match_->image_1;
-    auto img2 = match_->image_2;
 
     for (int i = 0; i < match_->good_matches.size(); ++i) {
       if (match_->inliers[i]) {
@@ -218,6 +238,7 @@ namespace pathCam {
     std::vector<BAImage *> activeImages; // free images only
     std::vector<BAImage *> touchedImages; // all images, for reset/check
     std::vector<BAFeature *> activeFeatures;
+    std::vector<float> ftXY,imgXY;
 
     // ---- build local system ----
 
@@ -244,11 +265,30 @@ namespace pathCam {
       }
     }
 
+    {
+      Poco::RWLock::ScopedWriteLock lock(rwLock);
+
+      ftXY.resize(2 * activeFeatures.size());
+      for (int i = 0; i <activeFeatures.size(); ++i) {
+        ftXY[2 * i] = activeFeatures[i]->x;
+        ftXY[2 * i + 1] = activeFeatures[i]->y;
+      }
+
+      imgXY.resize(activeImages.size() * 2);
+      for (int i = 0; i < activeImages.size(); ++i) {
+        imgXY[2 * i] = activeImages[i]->x;
+        imgXY[2 * i + 1] = activeImages[i]->y;
+      }
+    } //end scoped write lock
+
     int fixedCount = 0;
     for (auto *img: touchedImages) {
       if (img->fixed) ++fixedCount;
     }
-    assert(fixedCount == 1);
+    if (fixedCount < 1) {
+      std::cout<<"SPARSE CONJUGATE GRADIENT LAUNCHED WITH NO ANCHOR"<<std::endl;
+      return;
+    }
 
     const int nI = (int) activeImages.size(); // free images only
     const int nF = (int) activeFeatures.size();
@@ -430,16 +470,16 @@ namespace pathCam {
       // ---- update solution and residual ----
 
       for (int i = 0; i < nI; ++i) {
-        activeImages[i]->x += alpha * solverState.img_p_x[i];
-        activeImages[i]->y += alpha * solverState.img_p_y[i];
+        imgXY[2 * i] += alpha * solverState.img_p_x[i];
+        imgXY[2 * i + 1] += alpha * solverState.img_p_y[i];
 
         solverState.img_r_x[i] -= alpha * solverState.img_Ap_x[i];
         solverState.img_r_y[i] -= alpha * solverState.img_Ap_y[i];
       }
 
       for (int i = 0; i < nF; ++i) {
-        activeFeatures[i]->x += alpha * solverState.feat_p_x[i];
-        activeFeatures[i]->y += alpha * solverState.feat_p_y[i];
+        ftXY[2 * i] += alpha * solverState.feat_p_x[i];
+        ftXY[2 * i + 1] += alpha * solverState.feat_p_y[i];
 
         solverState.feat_r_x[i] -= alpha * solverState.feat_Ap_x[i];
         solverState.feat_r_y[i] -= alpha * solverState.feat_Ap_y[i];
@@ -540,13 +580,20 @@ namespace pathCam {
     }
     std::cout<<"iters "<<c<<std::endl;
 
-    for (auto *ft: activeFeatures) {
+    Poco::RWLock::ScopedWriteLock lock(rwLock);
+    for (int i = 0; i < activeFeatures.size(); ++i) {
+      auto ft = activeFeatures[i];
+      ft->x = ftXY[2 * i];
+      ft->y = ftXY[2 * i + 1];
       ft->systemIdx = -1;
       ft->lastIteration += c;
       featureGrid.update(ft);
     }
 
-    for (auto *img: activeImages) {
+    for (int i = 0; i < activeImages.size(); ++i) {
+      auto img = activeImages[i];
+      img->x = imgXY[2 * i];
+      img->y = imgXY[2 * i + 1];
       img->systemIdx = -1;
     }
 

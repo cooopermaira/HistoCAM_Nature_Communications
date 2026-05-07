@@ -63,7 +63,7 @@ namespace pathCam {
       ++frameCount;
       maxIndex = max(maxIndex, img->index);
 
-      launch_component_match_search_with_XC(img);
+      // launch_component_match_search_with_XC(img);
 
       // vote on what objective lens this component is
       if (img->labelObserved) {
@@ -210,6 +210,13 @@ namespace pathCam {
       auto start = std::chrono::high_resolution_clock::now();
 
       ftg->add_image(img);
+      if (img->regInfo && img->regInfo->winningVote.m) {
+        ftg->process_match2(img->regInfo->winningVote.m);
+        auto [coords,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
+        if (valid) {
+          get_match_candidates(Rect(coords,imageSize),4,{img->regInfo->winningVote.m->image_1});
+        }
+      }
       for (auto &m : imageMatches[img]) {
         ftg->process_match2(m);
       }
@@ -224,7 +231,9 @@ namespace pathCam {
       observations.reserve(observations.size() + img->observations.size());
       for (auto &obs : img->observations) {
         if (obs->feature->find()->active) {
-          observations.push_back(obs);
+          // if (img->regInfo->root || obs->feature->find()->imageFeatures.size() > 1) {
+            observations.push_back(obs);
+          // }
         }
       }
 
@@ -252,6 +261,8 @@ namespace pathCam {
 
     rebuild(memberFrames);
 
+
+    std::map<int,int> trackDepth;
     int count = 0,invalid = 0;
     for (auto ft : ftg->baFeatures) {
       if (ft->parent == ft) {
@@ -259,10 +270,15 @@ namespace pathCam {
         if (!ft->active) {
           ++invalid;
         }
+        ++trackDepth[ft->imageFeatures.size()];
       }
     }
     std::cout<<"total features and invalid "<<count<<" "<<invalid<<std::endl;
 
+    std::cout<<"depth of tracks"<<std::endl;
+    for (auto &[depth,count] : trackDepth) {
+      std::cout<<depth<< " "<<count<<std::endl;
+    }
 
     auto startf = std::chrono::high_resolution_clock::now();
 
@@ -273,6 +289,8 @@ namespace pathCam {
       }
       auto [imageCandidates,covered] = get_match_candidates(Rect(img->regInfo->absoluteCoords,imageSize),3,wv);
     }
+
+
 
     auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
 
@@ -869,6 +887,7 @@ namespace pathCam {
         members.insert(component->root);
       }
     }
+    int k = 0;
     members.clear();
     launch_component_match_search(img_, {members.begin(), members.end()});
   }

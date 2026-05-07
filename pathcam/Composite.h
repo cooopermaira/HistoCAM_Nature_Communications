@@ -139,8 +139,8 @@ namespace pathCam {
     inline static std::mutex EstRoot_mutex;
 
 
-    FeatureTrackGenerator *ftg;
-    BundleAdjustmentIntegrator *bai;
+    FeatureTrackGenerator *ftg = nullptr;
+    BundleAdjustmentIntegrator *bai = nullptr;
 
     // SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
 

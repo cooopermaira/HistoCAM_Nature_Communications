@@ -198,7 +198,7 @@ namespace pathCam {
     std::shared_ptr<AccessSAM> as;
     std::shared_ptr<JobQueue>JobQ;
     std::shared_ptr<JobQueue>jqSecondary;
-    FeatureTrackGenerator *ftg;
+    // FeatureTrackGenerator *ftg;
 
     //std::vector < double > variancesForDebug;
     //std::vector<CompositeVoronoi *> composites;
