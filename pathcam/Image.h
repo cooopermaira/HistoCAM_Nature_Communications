@@ -226,6 +226,7 @@ struct Observation;
 
     inline cv::Mat get_reg_image() { return reg_image; }
 
+    int count_live_feats();
 
     inline bool in_memory() { return (raw_buffer != 0); }
 

@@ -484,6 +484,14 @@ namespace pathCam {
     return parent->scale_factor;
   }
 
+  int Image::count_live_feats() {
+    int ans = 0;
+    for (auto &obs : observations) {
+      if (obs->feature->find()->live){++ans;}
+    }
+    return ans;
+  }
+
   void Image::allocate_memory_RAW() {
     if (!raw_buffer) {
       // if (mempool) {

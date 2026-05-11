@@ -8,6 +8,22 @@
 #include "pathCam.h"
 
 namespace pathCam {
+  inline uint32_t make_stable_id(const long imageIdx, const int featureIdx){
+    return (static_cast<uint32_t>(imageIdx) << 10) | static_cast<uint32_t>(featureIdx);
+  }
+  inline uint32_t image_idx(uint32_t stableID){
+    return stableID >> 10;
+  }
+  inline uint32_t feature_idx(uint32_t stableID){
+    return stableID & ((1 << 10) - 1);
+  }
+  inline uint64_t make_edge_ID(uint32_t a, uint32_t b) {
+    if (a > b) {
+      std::swap(a,b);
+    }
+    return ((uint64_t)a << 32) | b;
+  }
+
   struct MatchPtrHash {
     size_t operator()(const std::shared_ptr<Match> &m) const {
       auto a = m->image_1;
@@ -104,11 +120,15 @@ namespace pathCam {
     Point2i cellIdx{0, 0};
     int indexInCell = -1;
 
+    std::vector<uint32_t> stableID;
+
     BAFeature *find() {
       if (parent != this)
         parent = parent->find();
       return parent;
     }
+
+
 
     static BAFeature *unite(BAFeature *a, BAFeature *b) {
       return a->find();
@@ -118,9 +138,6 @@ namespace pathCam {
   struct Observation {
     BAImage *image;
     BAFeature *feature;
-
-    int image_idx;
-    int feature_idx;
 
     float obs_x, obs_y;
     float weight = 1.0;
@@ -293,7 +310,6 @@ namespace pathCam {
 
   class FeatureTrackGenerator {
   public:
-    Poco::RWLock rwLock;
 
     struct ImageFeaturePair {
       long image_id;
@@ -316,6 +332,8 @@ namespace pathCam {
       }
     };
 
+    Poco::RWLock rwLock;
+
     // Map from (image_id, feature_id) to unique global index
     std::unordered_map<ImageFeaturePair, int, PairHash> feature_to_index;
     std::vector<std::unordered_map<long, int> > component_features;
@@ -330,6 +348,8 @@ namespace pathCam {
     std::vector<BAFeature *> baFeatures;
     std::vector<BAImage *> baImages;
     SolverState solverState;
+
+    std::unordered_map<uint64_t,uint16_t> coVisEdgeSupport;
 
     int invalidCount = 0;
 
@@ -348,11 +368,17 @@ namespace pathCam {
 
     void process_match2(const std::shared_ptr<Match> &match_);
 
+    void update_coVis_support(Image *img);
+
+    int process_match_queue();
+
     void add_image(Image *img);
 
     std::pair<Point2i, bool> estimate_image_coords_from_feature_tracks(Image *img);
 
     void store_match(std::shared_ptr<Match> _match) { storedMatches.insert(_match); }
+
+    void queue_match(std::shared_ptr<Match> _match) { queuedMatches.push(_match); }
 
     void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 30,
                                              float tol = 1e-4f);
@@ -362,6 +388,7 @@ namespace pathCam {
     Poco::FastMutex accessMutex;
 
     // std::unordered_set<std::shared_ptr<Match>, MatchPtrHash, MatchPtrEqual> storedMatches;
+    std::queue<std::shared_ptr<Match>> queuedMatches;
     std::unordered_set<std::shared_ptr<Match> > storedMatches;
     std::unordered_map<int, std::unordered_set<std::shared_ptr<Match> > > interComponentMatches;
 

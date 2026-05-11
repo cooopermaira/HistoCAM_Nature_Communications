@@ -63,13 +63,15 @@ namespace pathCam {
 
     float count = 0;
     float xTotal = 0,yTotal = 0;
+
     for (auto &obs : img->observations) {
-      if (obs->feature->live && obs->feature->imageFeatures.size() > 1) {
+      if (obs->feature->find()->live && obs->feature->find()->lastIteration > 0) {
         ++count;
-        xTotal += obs->feature->x - obs->obs_x;
-        yTotal += obs->feature->y - obs->obs_y;
+        xTotal += obs->feature->find()->x - obs->obs_x;
+        yTotal += obs->feature->find()->y - obs->obs_y;
       }
     }
+
     if (count > 0) {
       xTotal /= count;
       yTotal /= count;
@@ -95,7 +97,7 @@ namespace pathCam {
       auto feat = new BAFeature;
       baFeatures.push_back(feat);
 
-      img->observations[i] = new Observation(baImg, feat, -1, -1, ftPixelCoords.x, ftPixelCoords.y, 1);
+      img->observations[i] = new Observation(baImg, feat, ftPixelCoords.x, ftPixelCoords.y, 1);
 
       auto ftWorldCoords = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
       feat->x = ftWorldCoords.x;
@@ -104,6 +106,17 @@ namespace pathCam {
 
       featureGrid.insert(feat);
     }
+  }
+
+  int FeatureTrackGenerator::process_match_queue() {
+    Poco::FastMutex::ScopedLock lock(accessMutex);
+    int count = queuedMatches.size();
+    while (!queuedMatches.empty()) {
+      auto m = queuedMatches.front();
+      queuedMatches.pop();
+      process_match2(m);
+    }
+    return count;
   }
 
   void FeatureTrackGenerator::process_match2(const std::shared_ptr<Match> &match_) {
@@ -139,21 +152,28 @@ namespace pathCam {
           /*
            make the merge, deactivate if there was a conflict. clear
            imageFeature list from loser, remove loser from featureGrid */
+          BAFeature *winner, *loser;
+          bool winnerIsImg1 = false;
+
           if (baFeat1->lastIteration < baFeat2->lastIteration) {
-            baFeat1->parent = baFeat2;
-            baFeat2->imageFeatures.insert(baFeat1->imageFeatures.begin(), baFeat1->imageFeatures.end());
-            baFeat1->imageFeatures.clear();
-            featureGrid.remove(baFeat1);
+            winner = baFeat2;
+            loser = baFeat1;
           } else {
-            baFeat2->parent = baFeat1;
-            baFeat1->imageFeatures.insert(baFeat2->imageFeatures.begin(), baFeat2->imageFeatures.end());
-            baFeat2->imageFeatures.clear();
-            featureGrid.remove(baFeat2);
+            winner = baFeat1;
+            loser = baFeat2;
           }
 
+          loser->parent = winner;
+          winner->imageFeatures.insert(loser->imageFeatures.begin(),loser->imageFeatures.end());
+          loser->imageFeatures.clear();
+          featureGrid.remove(loser);
+
+          winner->live = true;
+
+
           if (conflict) {
-            baFeat1->find()->active = false;
-            featureGrid.remove(baFeat1->find());
+            winner->active = false;
+            featureGrid.remove(winner);
           }
         }
       }
@@ -227,6 +247,26 @@ namespace pathCam {
         }
         // Unite them in the Union-Find structure
         // uf_ptr->unite(idx1, idx2);
+      }
+    }
+  }
+
+
+  void FeatureTrackGenerator::update_coVis_support(Image *img) {
+    for (int i = 0; i < img->observations.size() - 1; ++i) {
+
+      auto ft1 = img->observations[i]->feature->find();
+      if (!ft1->live || !ft1->active) {
+        continue;
+      }
+
+      for (int j = i + 1; j < img->observations.size(); ++j) {
+        auto ft2 = img->observations[j]->feature->find();
+        if (!ft2->live || !ft2->active) {
+          continue;
+        }
+
+
       }
     }
   }

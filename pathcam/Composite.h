@@ -156,7 +156,7 @@ namespace pathCam {
 
     std::vector<float> candidateScaleRatios;
 
-    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n, const std::vector<Image *> &alreadyMatched) const;
+    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n, const std::vector<Image *> &alreadyMatched, Image *self) const;
 
     void launch_component_match_search(Image *img_, std::vector<Image *> candidates_);
 

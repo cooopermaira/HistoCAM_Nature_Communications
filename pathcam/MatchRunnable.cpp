@@ -66,7 +66,7 @@ namespace pathCam {
       matcher.match(m);
 
 
-      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 30)) {
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
         m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
         //forward match to feature track generator (ftg)
 
@@ -106,6 +106,7 @@ namespace pathCam {
         //store INTRA component matches
         else {
           component->ftg->store_match(match);
+          component->ftg->queue_match(match);
         }
       }
       if (image->regInfo->winningVote.m) {
@@ -155,9 +156,9 @@ namespace pathCam {
 
 
     --component->outstandingCMS_jobs;
-    if (component->alignmentHasBegun) {
-      throw std::runtime_error("CMS jobs still running after CompositeManager thought they were done");
-    }
+    // if (component->alignmentHasBegun) {
+    //   throw std::runtime_error("CMS jobs still running after CompositeManager thought they were done");
+    // }
   }
 
   void MatchRunnable::build_reg_info(Image *img) const {

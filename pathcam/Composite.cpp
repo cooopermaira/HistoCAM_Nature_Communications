@@ -517,7 +517,7 @@ namespace pathCam {
     delete ftg;
   }
 
-  std::pair<std::vector<Image *>, int> Composite::get_match_candidates(const Rect &rect, const int n, const std::vector<Image *> &alreadyMatched) const {
+  std::pair<std::vector<Image *>, int> Composite::get_match_candidates(const Rect &rect, const int n, const std::vector<Image *> &alreadyMatched, Image *self) const {
     std::vector<BAFeature*> features;
 
     // ---- query grid ----
@@ -530,11 +530,12 @@ namespace pathCam {
                });
 
     int radSq = parent->scope_radius * parent->scope_radius;
-    Point2i center = rect.tl() + Point2i(rect.size());
+    Point2i center = rect.tl() + Point2i(rect.size()) / 2;
 
     features.erase(
         std::remove_if(features.begin(), features.end(), [&](BAFeature* feat) {
             if (componentMagLabel == Image::_2X) {
+              feat = feat->find();
                 auto p = center - Point2i(feat->x, feat->y);
                 auto v = p.dot(p);
                 return v > radSq;
@@ -578,6 +579,7 @@ namespace pathCam {
     for (Image* img : alreadyMatched) {
         imageToFeatures.erase(img);
     }
+    imageToFeatures.erase(self);
 
     // ---- greedy selection ----
     std::vector<Image*> selected;

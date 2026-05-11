@@ -194,35 +194,41 @@ namespace pathCam {
 
   void MetricComposite::test_add_align_image() {
     auto start11 = std::chrono::high_resolution_clock::now();
-    std::unordered_map<Image*,std::vector<std::shared_ptr<Match>>> imageMatches;
-    for (auto & img : memberFrames) {
-      imageMatches[img] = {};
-      for (auto &match : ftg->storedMatches) {
-        if (match->image_2->index == img->index) {
-          imageMatches[img].push_back(match);
-        }
-      }
-    }
+
 
     std::vector<Observation*> observations;
 
     for (auto &img : memberFrames) {
+      int matchCount = 0;
       auto start = std::chrono::high_resolution_clock::now();
 
       ftg->add_image(img);
       if (img->regInfo && img->regInfo->winningVote.m) {
+
         ftg->process_match2(img->regInfo->winningVote.m);
         auto [coords,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
+
         if (valid) {
-          get_match_candidates(Rect(coords,imageSize),4,{img->regInfo->winningVote.m->image_1});
+          auto [matchCandidates,featTracksCovered] = get_match_candidates(Rect(coords,imageSize),4,{img->regInfo->winningVote.m->image_1}, img);
+          if (!matchCandidates.empty()) {
+            launch_component_match_search(img,matchCandidates);
+            while (outstandingCMS_jobs > 0) {
+              Poco::Thread::sleep(10);
+            }
+
+            matchCount = ftg->process_match_queue();
+
+            if (matchCount == 0) {
+              int k = 0;
+            }
+          }
+        }else {
+          int k = 0;
         }
-      }
-      for (auto &m : imageMatches[img]) {
-        ftg->process_match2(m);
+      }else if (img->index > 0) {
+        int k = 0;
       }
 
-      auto t = std::chrono::duration_cast<std::chrono::milliseconds>
-    (std::chrono::high_resolution_clock::now() - start).count();
 
       start = std::chrono::high_resolution_clock::now();
 
@@ -236,11 +242,13 @@ namespace pathCam {
           // }
         }
       }
+      auto obs2 = observations;
+      obs2.erase(std::remove_if(obs2.begin(),obs2.end(),[&](Observation* o){return o->feature->find()->imageFeatures.size() < 2;}),obs2.end());
 
 
-      ftg->launch_inprocess_sparse_CG_iterator(observations);
+      ftg->launch_inprocess_sparse_CG_iterator(obs2);
       auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-      std::cout<<"index "<<img->index<<" matches " << imageMatches[img].size()<<" "<<t<<" total observations "<<observations.size()<<" iteration time "<<t1<<std::endl;
+      std::cout<<"index "<<img->index<<" matches " << matchCount <<" total observations "<<obs2.size()<<" iteration time "<<t1<<std::endl;
       int k = 0;
     }
     int maxx = 0,maxy = 0;
@@ -258,6 +266,18 @@ namespace pathCam {
     auto t111 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start11).count();
     std::cout<<"total iterative time "<<t111<<std::endl;
 
+    int max = 0, min = 900000, average = 0;
+    for (auto img : memberFrames) {
+      auto liveFts = img->count_live_feats();
+      average += liveFts;
+      if (max < liveFts) {
+        max = liveFts;
+      }
+      if (min > liveFts) {
+        min = liveFts;
+      }
+    }
+    average /= memberFrames.size();
 
     rebuild(memberFrames);
 
@@ -265,7 +285,7 @@ namespace pathCam {
     std::map<int,int> trackDepth;
     int count = 0,invalid = 0;
     for (auto ft : ftg->baFeatures) {
-      if (ft->parent == ft) {
+      if (ft->parent == ft && ft->live) {
         ++count;
         if (!ft->active) {
           ++invalid;
@@ -282,13 +302,7 @@ namespace pathCam {
 
     auto startf = std::chrono::high_resolution_clock::now();
 
-    for (auto &img : memberFrames) {
-      std::vector<Image*> wv;
-      if (img->regInfo && img->regInfo->winningVote.m) {
-        wv.push_back(img->regInfo->winningVote.m->get_other(img));
-      }
-      auto [imageCandidates,covered] = get_match_candidates(Rect(img->regInfo->absoluteCoords,imageSize),3,wv);
-    }
+
 
 
 
