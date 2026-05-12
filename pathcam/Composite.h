@@ -131,10 +131,15 @@ namespace pathCam {
     std::map<int, long> delaunayMembers;
     std::queue<RegInfo *> staging;
 
+    std::queue<Image*> realTimeAlignmentQueue;
+    Poco::Mutex realTimeAlignmentMutex;
+    Poco::Event realTimeAlignmentEvent;
+
     std::vector<Image *> memberFrames;
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
     int frameCount = 0;
 
+    std::atomic<bool> alignmentShouldProceed = true;
     std::atomic<bool> xcInProgress = false;
     inline static std::mutex EstRoot_mutex;
 
@@ -156,14 +161,23 @@ namespace pathCam {
 
     std::vector<float> candidateScaleRatios;
 
-    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n, const std::vector<Image *> &alreadyMatched, Image *self) const;
+    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n, const std::vector<Image *> &alreadyMatched, Image *self = nullptr) const;
 
     void launch_component_match_search(Image *img_, std::vector<Image *> candidates_);
 
+    void realtime_alignment_thread_loop();
+
+    void realtime_align(std::vector<Image*> images);
+
+    void prep_image_for_alignment(Image *img) const;
+
+    std::vector<std::shared_ptr<Match>> pairwise_match(Image *img, const std::vector<Image *> &targets) const;
+
     virtual int get_exit_rep_count() { return 0; }
 
-    virtual void align_and_rebuild() {
-    };
+    virtual void align_and_rebuild() {};
+
+    virtual Point2i test_add_image_realtime(Image *img){return img->regInfo->absoluteCoords;};
 
     virtual std::unordered_set<Image *> find_contributing_images() const {
       return contributingFrames;

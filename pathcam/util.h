@@ -336,6 +336,7 @@ namespace pathCam {
     return buf;
   }
 
+
   inline float sobel_focus_green_even_odd(const cv::Mat& bayer)
   {
     CV_Assert(!bayer.empty());

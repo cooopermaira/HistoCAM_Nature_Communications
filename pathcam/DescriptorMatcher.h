@@ -29,7 +29,21 @@ public:
 
 };
 
+inline DescriptorMatcher& getThreadLocalMatcher(cv::DescriptorMatcher::MatcherType matcher_type,
+                                                float ratio_thresh = 0.75f)
+  {
+    thread_local std::unique_ptr<DescriptorMatcher> matcher;
 
+    // Recreate if not initialized OR config changed
+    if (!matcher ||
+        matcher->matcher_type != matcher_type ||
+        matcher->ratio_thresh != ratio_thresh)
+    {
+      matcher = std::make_unique<DescriptorMatcher>(matcher_type, ratio_thresh);
+    }
+
+    return *matcher;
+  }
 }
 
 #endif /* DescriptorMatcher_hpp */

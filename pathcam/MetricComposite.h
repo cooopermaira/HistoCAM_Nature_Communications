@@ -43,6 +43,8 @@ namespace pathCam {
 
         void align_and_rebuild() override;
 
+        Point2i test_add_image_realtime(Image *img) override;
+
         void test_add_align_image();
 
         void rebuild(const std::vector<Image *> &members);
@@ -62,9 +64,6 @@ namespace pathCam {
         std::unordered_set<Image *> reduce_members_through_competition(std::unordered_set<Image *> _members) const;
 
         void launch_component_match_search_with_XC(Image* img_);
-
-
-        // SiftData compSiftData;
 
 
         inline static int frameDelay = 10;

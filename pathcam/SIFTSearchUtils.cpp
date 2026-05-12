@@ -153,14 +153,20 @@ namespace pathCam {
            make the merge, deactivate if there was a conflict. clear
            imageFeature list from loser, remove loser from featureGrid */
           BAFeature *winner, *loser;
-          bool winnerIsImg1 = false;
+          long imgIdx;
+          int ftIdx;
 
-          if (baFeat1->lastIteration < baFeat2->lastIteration) {
+          // if (baFeat1->lastIteration < baFeat2->lastIteration) {
+          if (baFeat1->stableID.size() < baFeat2->stableID.size()){
             winner = baFeat2;
             loser = baFeat1;
+            imgIdx = img2->index;
+            ftIdx = tInd;
           } else {
             winner = baFeat1;
             loser = baFeat2;
+            imgIdx = img1->index;
+            ftIdx = qInd;
           }
 
           loser->parent = winner;
@@ -169,6 +175,15 @@ namespace pathCam {
           featureGrid.remove(loser);
 
           winner->live = true;
+
+          if (winner->stableID.empty()) {
+            if(!loser->stableID.empty()) {
+              int k = 0;
+            }
+            winner->stableID.push_back(make_stable_id(imgIdx,ftIdx));
+          }else if (!loser->stableID.empty()) {
+            winner->stableID.insert(winner->stableID.end(),loser->stableID.begin(),loser->stableID.end());
+          }
 
 
           if (conflict) {
@@ -252,24 +267,111 @@ namespace pathCam {
   }
 
 
-  void FeatureTrackGenerator::update_coVis_support(Image *img) {
-    for (int i = 0; i < img->observations.size() - 1; ++i) {
+void FeatureTrackGenerator::update_coVis_support(Image *img) {
 
-      auto ft1 = img->observations[i]->feature->find();
-      if (!ft1->live || !ft1->active) {
-        continue;
-      }
+    long support = 0;
 
-      for (int j = i + 1; j < img->observations.size(); ++j) {
-        auto ft2 = img->observations[j]->feature->find();
-        if (!ft2->live || !ft2->active) {
-          continue;
+    std::vector<BAFeature *> liveRoots;
+    liveRoots.reserve(img->observations.size());
+
+    // --------------------------------------------------
+    // deduplicate roots without unordered_set
+    // --------------------------------------------------
+
+    static uint32_t currentStamp = 1;
+    ++currentStamp;
+
+    for (auto *obs : img->observations) {
+
+        if (!obs) continue;
+
+        auto *root = obs->feature->find();
+
+        if (!root->active) continue;
+        if (!root->live) continue;
+        if (root->stableID.empty()) continue;
+
+        if (root->visitStamp != currentStamp) {
+            root->visitStamp = currentStamp;
+            liveRoots.push_back(root);
         }
-
-
-      }
     }
-  }
+
+    const int n = static_cast<int>(liveRoots.size());
+
+    // --------------------------------------------------
+    // pairwise covis update
+    // --------------------------------------------------
+
+    for (int i = 0; i < n - 1; ++i) {
+
+        BAFeature *ft1 = liveRoots[i];
+
+        const auto &ids1 = ft1->stableID;
+        const int s1 = static_cast<int>(ids1.size());
+
+        for (int j = i + 1; j < n; ++j) {
+
+            BAFeature *ft2 = liveRoots[j];
+
+            const auto &ids2 = ft2->stableID;
+            const int s2 = static_cast<int>(ids2.size());
+
+            bool incremented = false;
+
+            for (int c = 0; c < s1; ++c) {
+
+                const uint32_t id1 = ids1[c];
+
+                for (int d = 0; d < s2; ++d) {
+
+                    const uint32_t id2 = ids2[d];
+
+                    const uint64_t edgeID =
+                        make_edge_ID(id1, id2);
+
+                    auto it = coVisEdgeSupport.find(edgeID);
+
+                    if (it == coVisEdgeSupport.end()) {
+
+                        // first time edge seen
+
+                        if (!incremented) {
+
+                            auto [newIt, _] =
+                                coVisEdgeSupport.emplace(edgeID, 1);
+
+                            support += 1;
+
+                            incremented = true;
+
+                        } else {
+
+                            coVisEdgeSupport.emplace(edgeID, 0);
+                        }
+
+                    } else {
+
+                        if (!incremented) {
+
+                            if (it->second != UINT16_MAX) {
+                                ++it->second;
+                            }
+
+                            support += it->second;
+
+                            incremented = true;
+
+                        } else {
+
+                            support += it->second;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 
   void FeatureTrackGenerator::launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations,
@@ -402,11 +504,13 @@ namespace pathCam {
 
     constexpr float eps = 1e-8f;
 
-    for (int i = 0; i < nI; ++i)
+    for (int i = 0; i < nI; ++i) {
       solverState.img_inv_diag[i] = 1.0f / (solverState.img_inv_diag[i] + eps);
+    }
 
-    for (int i = 0; i < nF; ++i)
+    for (int i = 0; i < nF; ++i) {
       solverState.feat_inv_diag[i] = 1.0f / (solverState.feat_inv_diag[i] + eps);
+    }
 
     // ---- PCG init: z = M^-1 r, p = z ----
 
@@ -443,7 +547,9 @@ namespace pathCam {
     float last_rel_improvement = std::numeric_limits<float>::infinity();
     int stagnantIters = 0;
 
-    for (int iteration = 0; iteration < maxIters; ++iteration) {
+    int runIters = maxIters == 0 ? 30 : maxIters;
+
+    for (int iteration = 0; iteration < runIters; ++iteration) {
       ++c;
 
       // --------------------------------------------
@@ -563,20 +669,19 @@ namespace pathCam {
       const float residualNorm = std::sqrt(residualNorm2);
 
       // absolute residual
-      if (residualNorm < tol) {
+      if (residualNorm < tol && maxIters == 0) {
         break;
       }
 
       // relative preconditioned residual reduction
       const float relResidual = new_rTz / (initial_rTz + eps);
 
-      if (relResidual < 1e-4f) {
+      if (relResidual < 1e-4f && maxIters == 0) {
         break;
       }
 
       // stagnation detection
-      const float relImprovement =
-          std::abs(prev_rTz - new_rTz) / (prev_rTz + eps);
+      const float relImprovement = std::abs(prev_rTz - new_rTz) / (prev_rTz + eps);
 
       if (relImprovement < 1e-3f) {
         ++stagnantIters;
@@ -586,7 +691,7 @@ namespace pathCam {
 
       // require several stagnant iterations in a row
       // to avoid premature exits
-      if (stagnantIters >= 3) {
+      if (stagnantIters >= 3 && maxIters == 0) {
         break;
       }
 

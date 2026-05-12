@@ -90,7 +90,7 @@ namespace pathCam {
 
   void Composite::set_scale(float _scale, bool _ffCorrectExistingTiles) {
     imagePyramid->set_scale(_scale);
-    update_mutex.lock();
+    Poco::FastMutex::ScopedLock lock(update_mutex);
     deduce_label();
 
     if (componentMagLabel > 0) {
@@ -106,7 +106,6 @@ namespace pathCam {
     }
     imagePyramid->set_mag_label(componentMagLabel);
     parent->MRImageSet->sort_by_scale();
-    update_mutex.unlock();
   }
 
 
@@ -517,6 +516,98 @@ namespace pathCam {
     delete ftg;
   }
 
+  void Composite::realtime_alignment_thread_loop() {
+    std::vector<Image*> batch;
+    batch.reserve(256);
+
+    while (!alignmentShouldProceed){
+      realTimeAlignmentEvent.wait();
+
+      if (alignmentShouldProceed) {
+        break;
+      }
+
+      batch.clear();
+
+      {
+        Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
+
+        while (!realTimeAlignmentQueue.empty()){
+          batch.push_back(realTimeAlignmentQueue.front());
+          realTimeAlignmentQueue.pop();
+        }
+
+        // queue now empty
+        realTimeAlignmentEvent.reset();
+      }
+
+      if (!batch.empty()){
+        // process_realtime_alignment_batch(batch);
+      }
+    }
+  }
+
+  void Composite::realtime_align(std::vector<Image *> images) {
+
+  }
+
+
+  void Composite::prep_image_for_alignment(Image *img) const {
+    Point2i coords;
+
+    ftg->add_image(img);
+    if (img->regInfo && img->regInfo->winningVote.m) {
+      coords = img->regInfo->absoluteCoords;
+
+      Poco::FastMutex::ScopedLock lock(ftg->accessMutex);
+      ftg->process_match2(img->regInfo->winningVote.m);
+      auto [c,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
+      coords = c;
+
+      if (valid) {
+        auto [matchCandidates,featTracksCovered] = get_match_candidates(Rect(coords,imageSize),4,{img->regInfo->winningVote.m->image_1}, img);
+
+        if (!matchCandidates.empty()) {
+          auto matches = pairwise_match(img,matchCandidates);
+
+          for (auto &m : matches){
+            ftg->process_match2(m);
+          }
+        }
+
+        Poco::Mutex::ScopedLock lock(img->regInfo->rAccessMutex);
+        img->regInfo->absoluteCoords = coords;
+      }else {
+        int k = 0;
+      }
+    }else {
+      int k = 0;
+    }
+  }
+
+  std::vector<std::shared_ptr<Match>> Composite::pairwise_match(Image *img, const std::vector<Image *> &targets) const {
+    if (targets.empty()) {
+      return {};
+    }
+    auto& matcher = getThreadLocalMatcher(parent->matcher_type);
+    std::vector<std::shared_ptr<Match> > matches;
+
+    for (auto &candidate : targets) {
+      if (candidate == nullptr || candidate->index == img->index) {continue;}
+      if (!candidate->is_good()) {continue;}
+      if (img->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && img->label != candidate->label){continue;}
+
+      auto m = std::make_shared<Match>(candidate, img);
+      matcher.match(m);
+
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
+        m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
+        matches.push_back(m);
+      }
+    }
+    return matches;
+  }
+
   std::pair<std::vector<Image *>, int> Composite::get_match_candidates(const Rect &rect, const int n, const std::vector<Image *> &alreadyMatched, Image *self) const {
     std::vector<BAFeature*> features;
 
@@ -579,8 +670,9 @@ namespace pathCam {
     for (Image* img : alreadyMatched) {
         imageToFeatures.erase(img);
     }
-    imageToFeatures.erase(self);
-
+    if (self) {
+      imageToFeatures.erase(self);
+    }
     // ---- greedy selection ----
     std::vector<Image*> selected;
     selected.reserve(n);
@@ -923,7 +1015,7 @@ namespace pathCam {
   Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : parent(parent),
     componentIndex(_componentIndex), imageSize(image_size),
     root_offset(0.0, 0.0),
-    max_offset(0.0, 0.0), ftg(new FeatureTrackGenerator) {
+    max_offset(0.0, 0.0), ftg(new FeatureTrackGenerator), realTimeAlignmentEvent(false) {
     //flat_field = parent->flat_field2X;
 
     imagePyramid = std::make_shared<MRTiledImage>(parent);

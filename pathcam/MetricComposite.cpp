@@ -48,7 +48,6 @@ namespace pathCam {
       // t.detach();
     }
 
-    Poco::FastMutex::ScopedLock lock(update_mutex);
 
     // PROCESS NEW FRAMES BEGIN
     if (!staging.empty()) {
@@ -64,6 +63,10 @@ namespace pathCam {
       maxIndex = max(maxIndex, img->index);
 
       // launch_component_match_search_with_XC(img);
+      auto coords = test_add_image_realtime(img);
+      img->regInfo->rAccessMutex.lock();
+      img->regInfo->absoluteCoords = coords;
+      img->regInfo->rAccessMutex.unlock();
 
       // vote on what objective lens this component is
       if (img->labelObserved) {
@@ -79,7 +82,6 @@ namespace pathCam {
         if (winner != componentMagLabel) {
           componentMagLabel = winner;
 
-          Poco::FastMutex::ScopedLock lock(update_mutex);
           get_flatfield();
           imagePyramid->set_mag_label(componentMagLabel);
           parent->MRImageSet->sort_by_scale();
@@ -118,6 +120,7 @@ namespace pathCam {
       ++positionForNextWaitngFrame;
 
       if (!immediateProcessingTiles.empty()) {
+        Poco::FastMutex::ScopedLock lock(update_mutex);
         process_tiles(img, immediateProcessingTiles);
       }
 
@@ -183,6 +186,7 @@ namespace pathCam {
     if (positionForNextWaitngFrame > frameDelay && !tiles.empty()) {
       needsAlignment = true;
 
+      Poco::FastMutex::ScopedLock lock(update_mutex);
       process_tiles(img, tiles);
 
       tiles.clear();
@@ -190,6 +194,69 @@ namespace pathCam {
       img = nullptr;
     }
     // PROCESS OLD FRAMES END
+  }
+
+  Point2i MetricComposite::test_add_image_realtime(Image *img) {
+    auto start = std::chrono::high_resolution_clock::now();
+    int obsSize = 0, imgSetSize = 0;
+    Point2i coords;
+
+    ftg->add_image(img);
+    if (img->regInfo && img->regInfo->winningVote.m) {
+      coords = img->regInfo->absoluteCoords;
+
+      ftg->process_match2(img->regInfo->winningVote.m);
+      auto [c,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
+      coords = c;
+
+      if (valid) {
+        auto [matchCandidates,featTracksCovered] = get_match_candidates(Rect(coords,imageSize),4,{img->regInfo->winningVote.m->image_1}, img);
+        if (!matchCandidates.empty()) {
+          launch_component_match_search(img,matchCandidates);
+          while (outstandingCMS_jobs > 0) {
+            Poco::Thread::sleep(10);
+          }
+
+          ftg->process_match_queue();
+        }
+      }else {
+        int k = 0;
+      }
+
+      // auto imageList = find_contributing_images();
+      // imageList.insert(root);
+      // imageList.insert(img);
+      // std::vector imageListVec(imageList.begin(),imageList.end());
+      //
+      // auto ans = get_match_candidates(imagePyramid->bounds,1000,imageListVec);
+      // imageListVec.insert(imageListVec.end(),ans.first.begin(),ans.first.end());
+      // imgSetSize = imageListVec.size();
+      auto imageListVec = memberFrames;
+
+      std::vector<Observation*> observations;
+      observations.reserve(imageListVec.size() * 600);
+
+      for (auto &img : imageListVec) {
+        for (auto &obs : img->observations) {
+          if (obs->feature->find()->active && obs->feature->find()->live) {
+            observations.push_back(obs);
+          }
+        }
+      }
+      obsSize = observations.size();
+      ftg->launch_inprocess_sparse_CG_iterator(observations);
+
+      for (auto &obs : img->observations) {
+        if (obs && obs->image) {
+          coords = Point2i(obs->image->x,obs->image->y);
+          break;
+        }
+      }
+    }
+
+    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    std::cout<<"index "<<img->index<<" observation size "<<obsSize<<" img set size "<< imgSetSize<<" time "<<t1<<std::endl;
+    return coords;
   }
 
   void MetricComposite::test_add_align_image() {
@@ -203,6 +270,8 @@ namespace pathCam {
       auto start = std::chrono::high_resolution_clock::now();
 
       ftg->add_image(img);
+
+      long covisTime = 0;
       if (img->regInfo && img->regInfo->winningVote.m) {
 
         ftg->process_match2(img->regInfo->winningVote.m);
@@ -225,12 +294,17 @@ namespace pathCam {
         }else {
           int k = 0;
         }
+        start = std::chrono::high_resolution_clock::now();
+
+        covisTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
       }else if (img->index > 0) {
         int k = 0;
       }
 
 
+      // build subgraph
       start = std::chrono::high_resolution_clock::now();
+      auto imageList = find_contributing_images();
 
 
 
@@ -248,7 +322,7 @@ namespace pathCam {
 
       ftg->launch_inprocess_sparse_CG_iterator(obs2);
       auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-      std::cout<<"index "<<img->index<<" matches " << matchCount <<" total observations "<<obs2.size()<<" iteration time "<<t1<<std::endl;
+      std::cout<<"index "<<img->index<<" matches " << matchCount <<" coVis time "<<covisTime<<" total observations "<<obs2.size()<<" iteration time "<<t1<<std::endl;
       int k = 0;
     }
     int maxx = 0,maxy = 0;
@@ -313,7 +387,52 @@ namespace pathCam {
   }
 
   void MetricComposite::align_and_rebuild() {
-    test_add_align_image();
+    // return;
+    std::vector<Observation*> observations;
+    observations.reserve(memberFrames.size() * 600);
+
+    for (auto &img : memberFrames) {
+      for (auto &obs : img->observations) {
+        if (obs->feature->find()->active && obs->feature->find()->live) {
+          observations.push_back(obs);
+        }
+      }
+    }
+
+    auto startf = std::chrono::high_resolution_clock::now();
+    ftg->launch_inprocess_sparse_CG_iterator(observations,100);
+    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+
+    std::cout<<"runtime "<<t11<<std::endl;
+    int maxx = 0,maxy = 0;
+    for (auto &img : memberFrames) {
+      auto baImg = img->observations[0]->image;
+      if (abs(img->regInfo->absoluteCoords.x - baImg->x) > maxx) {
+        maxx = abs(img->regInfo->absoluteCoords.x - baImg->x);
+      }
+      if (abs(img->regInfo->absoluteCoords.y - baImg->y) > maxy) {
+        maxy = abs(img->regInfo->absoluteCoords.y - baImg->y);
+      }
+      img->regInfo->absoluteCoords = Point2i(baImg->x,baImg->y);
+    }
+
+    std::unordered_set imageSet(memberFrames.begin(),memberFrames.end());
+    auto mosaicSet = reduce_members_through_competition(imageSet);
+    rebuild({mosaicSet.begin(),mosaicSet.end()});
+    // test_add_align_image();
+
+    std::map<int,int> trackDepth;
+    int count = 0,invalid = 0;
+    for (auto ft : ftg->baFeatures) {
+      if (ft->parent == ft && ft->live) {
+        ++count;
+        if (!ft->active) {
+          ++invalid;
+        }
+        ++trackDepth[ft->imageFeatures.size()];
+      }
+    }
+    std::cout<<"total features and invalid "<<count<<" "<<invalid<<std::endl;
     return;
     // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment
     for (auto &loser: absorbedComponents) {
@@ -847,11 +966,11 @@ namespace pathCam {
       members.insert(to->owner);
     }
 
-    for (auto &[img,tileIdx]: waitingFrames) {
-      if (img) {
-        members.insert(img);
-      }
-    }
+    // for (auto &[img,tileIdx]: waitingFrames) {
+    //   if (img) {
+    //     members.insert(img);
+    //   }
+    // }
 
     return members;
   }

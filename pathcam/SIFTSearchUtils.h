@@ -121,6 +121,7 @@ namespace pathCam {
     int indexInCell = -1;
 
     std::vector<uint32_t> stableID;
+    uint32_t visitStamp = 0;
 
     BAFeature *find() {
       if (parent != this)
@@ -311,6 +312,10 @@ namespace pathCam {
   class FeatureTrackGenerator {
   public:
 
+    FeatureTrackGenerator() {
+      coVisEdgeSupport.reserve(30000000);
+    }
+
     struct ImageFeaturePair {
       long image_id;
       int feature_id;
@@ -380,7 +385,7 @@ namespace pathCam {
 
     void queue_match(std::shared_ptr<Match> _match) { queuedMatches.push(_match); }
 
-    void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 30,
+    void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 0,
                                              float tol = 1e-4f);
 
     std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image *> &images);
