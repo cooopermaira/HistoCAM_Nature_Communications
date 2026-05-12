@@ -143,8 +143,15 @@ namespace pathCam {
 
         threads.emplace_back([comp]() {
           auto t1 = std::chrono::high_resolution_clock::now();
-          while (comp->outstandingCMS_jobs > 0 || comp->xcInProgress) {
-            Poco::Thread::sleep(50);
+          // while (comp->outstandingCMS_jobs > 0 || comp->xcInProgress) {
+          //   Poco::Thread::sleep(50);
+          // }
+          comp->alignmentShouldProceed = false;
+
+          comp->realTimeAlignmentEvent.set();
+
+          if (comp->realtimeAlignmentThread.joinable()) {
+            comp->realtimeAlignmentThread.join();
           }
           for (auto &subComp: comp->absorbedComponents) {
             while (subComp->outstandingCMS_jobs > 0) {
@@ -297,13 +304,13 @@ namespace pathCam {
   }
 
   void CompositeManager::debug_print_component_status() const {
-    for (auto &comp : parent->composites) {
+    for (auto &comp: parent->composites) {
       if (comp->suspended) {
-        std::cout << "component "<<comp->componentIndex <<" SUSPENDED"<<std::endl;
-      }else {
-        std::cout << "component "<<comp->componentIndex <<" ACTIVE"<<std::endl;
+        std::cout << "component " << comp->componentIndex << " SUSPENDED" << std::endl;
+      } else {
+        std::cout << "component " << comp->componentIndex << " ACTIVE" << std::endl;
       }
     }
-    std::cout<<std::endl;
+    std::cout << std::endl;
   }
 }

@@ -57,7 +57,7 @@ namespace pathCam {
 
         int get_exit_rep_count() override {return frameDelay;}
 
-        [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const override;
+        [[nodiscard]] std::unordered_set<Image *> find_contributing_images(bool onlyFTG = false) const override;
 
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
 

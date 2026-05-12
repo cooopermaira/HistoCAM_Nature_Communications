@@ -513,42 +513,90 @@ namespace pathCam {
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
 #endif
+
     delete ftg;
   }
 
   void Composite::realtime_alignment_thread_loop() {
+
     std::vector<Image*> batch;
     batch.reserve(256);
 
-    while (!alignmentShouldProceed){
-      realTimeAlignmentEvent.wait();
+    while (true) {
 
-      if (alignmentShouldProceed) {
-        break;
-      }
+      realTimeAlignmentEvent.wait();
 
       batch.clear();
 
       {
         Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
 
-        while (!realTimeAlignmentQueue.empty()){
+        while (!realTimeAlignmentQueue.empty()) {
           batch.push_back(realTimeAlignmentQueue.front());
           realTimeAlignmentQueue.pop();
         }
 
-        // queue now empty
+        // queue empty now
         realTimeAlignmentEvent.reset();
       }
 
-      if (!batch.empty()){
-        // process_realtime_alignment_batch(batch);
+      if (!batch.empty()) {
+        realtime_align(batch);
+      }
+
+      // -----------------------------------------
+      // only exit AFTER draining remaining work
+      // -----------------------------------------
+
+      if (!alignmentShouldProceed) {
+
+        Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
+
+        if (realTimeAlignmentQueue.empty()) {
+          break;
+        } else {
+          // more work arrived while aligning
+          realTimeAlignmentEvent.set();
+        }
       }
     }
   }
 
   void Composite::realtime_align(std::vector<Image *> images) {
+    auto startf = std::chrono::high_resolution_clock::now();
+    for (auto & img : images) {
+      prep_image_for_alignment(img);
+    }
 
+    update_mutex.lock();
+    auto imageList = find_contributing_images(true);
+    update_mutex.unlock();
+
+    imageList.insert(root);
+    imageList.insert(images.begin(),images.end());
+
+    std::vector imageListVec(imageList.begin(),imageList.end());
+
+    auto ans = get_match_candidates(imagePyramid->bounds,memberFrames.size(),imageListVec);
+    imageListVec.insert(imageListVec.end(),ans.first.begin(),ans.first.end());
+
+    std::vector<Observation*> observations;
+    observations.reserve(imageListVec.size() * 600);
+
+    for (auto &img : imageListVec) {
+      for (auto &obs : img->observations) {
+        if (obs->feature->find()->active && obs->feature->find()->live) {
+          observations.push_back(obs);
+        }
+      }
+    }
+
+    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    std::cout <<"preproc time "<<t11 << " queue size " << images.size() << std::endl;
+
+    ftg->launch_inprocess_sparse_CG_iterator(observations);
+
+    // update coordinates on all regInfo objects before returning.
   }
 
 
@@ -1053,6 +1101,8 @@ namespace pathCam {
              Scalar(255),
              -1);
     }
+
+    realtimeAlignmentThread = std::thread(&Composite::realtime_alignment_thread_loop, this);
   }
 
 

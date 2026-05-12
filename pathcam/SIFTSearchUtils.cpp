@@ -65,6 +65,8 @@ namespace pathCam {
     float xTotal = 0,yTotal = 0;
 
     for (auto &obs : img->observations) {
+      bool one = obs->feature->find()->live;
+      bool two = obs->feature->find()->lastIteration > 0;
       if (obs->feature->find()->live && obs->feature->find()->lastIteration > 0) {
         ++count;
         xTotal += obs->feature->find()->x - obs->obs_x;
@@ -106,6 +108,8 @@ namespace pathCam {
 
       featureGrid.insert(feat);
     }
+
+    img->addedToFTG = true;
   }
 
   int FeatureTrackGenerator::process_match_queue() {
@@ -153,20 +157,20 @@ namespace pathCam {
            make the merge, deactivate if there was a conflict. clear
            imageFeature list from loser, remove loser from featureGrid */
           BAFeature *winner, *loser;
-          long imgIdx;
-          int ftIdx;
+          // long imgIdx;
+          // int ftIdx;
 
           // if (baFeat1->lastIteration < baFeat2->lastIteration) {
           if (baFeat1->stableID.size() < baFeat2->stableID.size()){
             winner = baFeat2;
             loser = baFeat1;
-            imgIdx = img2->index;
-            ftIdx = tInd;
+            // imgIdx = img2->index;
+            // ftIdx = tInd;
           } else {
             winner = baFeat1;
             loser = baFeat2;
-            imgIdx = img1->index;
-            ftIdx = qInd;
+            // imgIdx = img1->index;
+            // ftIdx = qInd;
           }
 
           loser->parent = winner;
@@ -176,14 +180,14 @@ namespace pathCam {
 
           winner->live = true;
 
-          if (winner->stableID.empty()) {
-            if(!loser->stableID.empty()) {
-              int k = 0;
-            }
-            winner->stableID.push_back(make_stable_id(imgIdx,ftIdx));
-          }else if (!loser->stableID.empty()) {
-            winner->stableID.insert(winner->stableID.end(),loser->stableID.begin(),loser->stableID.end());
-          }
+          // if (winner->stableID.empty()) {
+          //   if(!loser->stableID.empty()) {
+          //     int k = 0;
+          //   }
+          //   winner->stableID.push_back(make_stable_id(imgIdx,ftIdx));
+          // }else if (!loser->stableID.empty()) {
+          //   winner->stableID.insert(winner->stableID.end(),loser->stableID.begin(),loser->stableID.end());
+          // }
 
 
           if (conflict) {

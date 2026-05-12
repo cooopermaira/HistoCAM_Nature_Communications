@@ -49,6 +49,7 @@ struct Observation;
     bool blurSet = false;
     bool hasBeenInMemory = false;
     bool labelObserved = false;
+    bool addedToFTG = false;
 
     bool subsequentMatchLaunched = false;
 

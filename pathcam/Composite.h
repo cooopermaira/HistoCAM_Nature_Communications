@@ -134,6 +134,7 @@ namespace pathCam {
     std::queue<Image*> realTimeAlignmentQueue;
     Poco::Mutex realTimeAlignmentMutex;
     Poco::Event realTimeAlignmentEvent;
+    std::thread realtimeAlignmentThread;
 
     std::vector<Image *> memberFrames;
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
@@ -173,15 +174,25 @@ namespace pathCam {
 
     std::vector<std::shared_ptr<Match>> pairwise_match(Image *img, const std::vector<Image *> &targets) const;
 
-    virtual int get_exit_rep_count() { return 0; }
-
     virtual void align_and_rebuild() {};
 
     virtual Point2i test_add_image_realtime(Image *img){return img->regInfo->absoluteCoords;};
 
-    virtual std::unordered_set<Image *> find_contributing_images() const {
+    virtual std::unordered_set<Image *> find_contributing_images(bool onlyFTG = false) const {
+      if (onlyFTG) {
+        std::unordered_set<Image *> ans;
+        for (auto &img : contributingFrames) {
+          if (img->addedToFTG) {
+            ans.insert(img);
+          }
+        }
+        return ans;
+      }
+
       return contributingFrames;
     };
+
+    virtual int get_exit_rep_count() { return 0; }
 
     std::vector<std::pair<Image *, Image *> > calculate_member_overlaps(std::vector<Image *> images) const;
 

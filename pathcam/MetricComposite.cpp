@@ -63,10 +63,13 @@ namespace pathCam {
       maxIndex = max(maxIndex, img->index);
 
       // launch_component_match_search_with_XC(img);
-      auto coords = test_add_image_realtime(img);
-      img->regInfo->rAccessMutex.lock();
-      img->regInfo->absoluteCoords = coords;
-      img->regInfo->rAccessMutex.unlock();
+      prep_image_for_alignment(img);
+      // if (!img->regInfo->root)
+        {
+        Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
+        realTimeAlignmentQueue.push(img);
+        realTimeAlignmentEvent.set();
+      }
 
       // vote on what objective lens this component is
       if (img->labelObserved) {
@@ -223,15 +226,15 @@ namespace pathCam {
         int k = 0;
       }
 
-      // auto imageList = find_contributing_images();
-      // imageList.insert(root);
-      // imageList.insert(img);
-      // std::vector imageListVec(imageList.begin(),imageList.end());
-      //
-      // auto ans = get_match_candidates(imagePyramid->bounds,1000,imageListVec);
-      // imageListVec.insert(imageListVec.end(),ans.first.begin(),ans.first.end());
-      // imgSetSize = imageListVec.size();
-      auto imageListVec = memberFrames;
+      auto imageList = find_contributing_images();
+      imageList.insert(root);
+      imageList.insert(img);
+      std::vector imageListVec(imageList.begin(),imageList.end());
+
+      auto ans = get_match_candidates(imagePyramid->bounds,1000,imageListVec);
+      imageListVec.insert(imageListVec.end(),ans.first.begin(),ans.first.end());
+      imgSetSize = imageListVec.size();
+      // auto imageListVec = memberFrames;
 
       std::vector<Observation*> observations;
       observations.reserve(imageListVec.size() * 600);
@@ -958,11 +961,14 @@ namespace pathCam {
   }
 
 
-  std::unordered_set<Image *> MetricComposite::find_contributing_images() const {
+  std::unordered_set<Image *> MetricComposite::find_contributing_images(bool onlyFTG) const {
     std::unordered_set<Image *> members;
 
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
+
+      if (onlyFTG && !to->owner->addedToFTG){continue;} //skip images that haven't been added to the FTG for alignment
+
       members.insert(to->owner);
     }
 
