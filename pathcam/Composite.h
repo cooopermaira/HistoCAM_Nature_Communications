@@ -131,6 +131,8 @@ namespace pathCam {
     std::map<int, long> delaunayMembers;
     std::queue<RegInfo *> staging;
 
+    // std::vector<
+    std::vector<Image*> realTimeImageList;
     std::queue<Image*> realTimeAlignmentQueue;
     Poco::Mutex realTimeAlignmentMutex;
     Poco::Event realTimeAlignmentEvent;

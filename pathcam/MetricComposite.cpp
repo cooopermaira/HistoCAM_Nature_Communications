@@ -63,7 +63,7 @@ namespace pathCam {
       maxIndex = max(maxIndex, img->index);
 
       // launch_component_match_search_with_XC(img);
-      prep_image_for_alignment(img);
+      // prep_image_for_alignment(img);
       // if (!img->regInfo->root)
         {
         Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
@@ -391,22 +391,22 @@ namespace pathCam {
 
   void MetricComposite::align_and_rebuild() {
     // return;
-    std::vector<Observation*> observations;
-    observations.reserve(memberFrames.size() * 600);
+    // std::vector<Observation*> observations;
+    // observations.reserve(memberFrames.size() * 600);
+    //
+    // for (auto &img : memberFrames) {
+    //   for (auto &obs : img->observations) {
+    //     if (obs->feature->find()->active && obs->feature->find()->live) {
+    //       observations.push_back(obs);
+    //     }
+    //   }
+    // }
+    //
+    // auto startf = std::chrono::high_resolution_clock::now();
+    // ftg->launch_inprocess_sparse_CG_iterator(observations,memberFrames.size());
+    // auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    // std::cout<<"runtime "<<t11<<std::endl;
 
-    for (auto &img : memberFrames) {
-      for (auto &obs : img->observations) {
-        if (obs->feature->find()->active && obs->feature->find()->live) {
-          observations.push_back(obs);
-        }
-      }
-    }
-
-    auto startf = std::chrono::high_resolution_clock::now();
-    ftg->launch_inprocess_sparse_CG_iterator(observations,100);
-    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
-
-    std::cout<<"runtime "<<t11<<std::endl;
     int maxx = 0,maxy = 0;
     for (auto &img : memberFrames) {
       auto baImg = img->observations[0]->image;

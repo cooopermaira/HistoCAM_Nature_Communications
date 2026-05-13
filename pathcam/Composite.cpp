@@ -567,23 +567,34 @@ namespace pathCam {
     for (auto & img : images) {
       prep_image_for_alignment(img);
     }
+    realTimeImageList.insert(realTimeImageList.end(),images.begin(),images.end());
+    // auto t = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    //
+    // startf = std::chrono::high_resolution_clock::now();
+    // update_mutex.lock();
+    // auto imageList = find_contributing_images(true);
+    // update_mutex.unlock();
+    //
+    // imageList.insert(root);
+    // imageList.insert(images.begin(),images.end());
+    //
+    // std::vector imageListVec(imageList.begin(),imageList.end());
+    // auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    // startf = std::chrono::high_resolution_clock::now();
+    //
+    //
+    // auto ans = get_match_candidates(imagePyramid->bounds,memberFrames.size(),imageListVec);
+    // imageListVec.insert(imageListVec.end(),ans.first.begin(),ans.first.end());
+    //
+    // auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    startf = std::chrono::high_resolution_clock::now();
 
-    update_mutex.lock();
-    auto imageList = find_contributing_images(true);
-    update_mutex.unlock();
-
-    imageList.insert(root);
-    imageList.insert(images.begin(),images.end());
-
-    std::vector imageListVec(imageList.begin(),imageList.end());
-
-    auto ans = get_match_candidates(imagePyramid->bounds,memberFrames.size(),imageListVec);
-    imageListVec.insert(imageListVec.end(),ans.first.begin(),ans.first.end());
 
     std::vector<Observation*> observations;
-    observations.reserve(imageListVec.size() * 600);
+    // observations.reserve(imageListVec.size() * 600);
+    observations.reserve(realTimeImageList.size() * 600);
 
-    for (auto &img : imageListVec) {
+    for (auto &img : realTimeImageList) {
       for (auto &obs : img->observations) {
         if (obs->feature->find()->active && obs->feature->find()->live) {
           observations.push_back(obs);
@@ -591,10 +602,14 @@ namespace pathCam {
       }
     }
 
-    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
-    std::cout <<"preproc time "<<t11 << " queue size " << images.size() << std::endl;
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    startf = std::chrono::high_resolution_clock::now();
 
     ftg->launch_inprocess_sparse_CG_iterator(observations);
+
+    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    std::cout <<"preproc time 1, 2, 3: "<</*t<<" , "<<t1<<" , "<<t2<<*/" , "<<t3 <<" solve time "<<t4<<" queue size " << images.size() << std::endl;
+
 
     // update coordinates on all regInfo objects before returning.
   }
