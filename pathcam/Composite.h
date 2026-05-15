@@ -146,7 +146,7 @@ namespace pathCam {
     std::atomic<bool> xcInProgress = false;
     inline static std::mutex EstRoot_mutex;
 
-
+    long qTime = 0;
     FeatureTrackGenerator *ftg = nullptr;
     BundleAdjustmentIntegrator *bai = nullptr;
 
@@ -172,7 +172,7 @@ namespace pathCam {
 
     void realtime_align(std::vector<Image*> images);
 
-    void prep_image_for_alignment(Image *img) const;
+    void prep_image_for_alignment(Image *img);
 
     std::vector<std::shared_ptr<Match>> pairwise_match(Image *img, const std::vector<Image *> &targets) const;
 

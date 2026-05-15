@@ -110,21 +110,6 @@ struct Observation;
       ++reference_count;
     }
 
-    static Features buildFeatures(
-    const cv::Mat& src,
-    float s,
-    cv::Ptr<cv::AKAZE> akaze)
-    {
-      Features f;
-      f.scale = s;
-
-      cv::resize(src, f.image, cv::Size(), s, s, cv::INTER_AREA);
-
-      if (!f.image.empty())
-        akaze->detectAndCompute(f.image, cv::noArray(), f.kp, f.desc);
-
-      return f;
-    }
 
     static float get_mpp(unsigned int _label) {
       switch (_label) {
@@ -142,8 +127,6 @@ struct Observation;
     }
 
 #ifdef HAVE_OPENCV_CUDAARITHM
-    void prepare_blur_check_statics() const;
-    static void cleanup_blur_check_statics();
     bool move_buffer_to_gpu(int _device, bool _freeHostBuffer = false);
 #endif
 
@@ -213,27 +196,27 @@ struct Observation;
       label = _UNDEREXP;
     }
 
-    inline char *get_Raw() {
+    char *get_Raw() {
       //assert(raw_buffer);
       return raw_buffer;
     }
 
     char *get_raw_cuda();
 
-    inline Poco::Path get_ImageFile() { return image_file; }
+    Poco::Path get_ImageFile() { return image_file; }
 
     void create_reg_image(double reg_scale, double reg_crop, bool convert = true, int interpolation = cv::INTER_LINEAR,
                           bool real = false);
 
-    inline cv::Mat get_reg_image() { return reg_image; }
+    cv::Mat get_reg_image() const { return reg_image; }
 
     int count_live_feats();
 
-    inline bool in_memory() { return (raw_buffer != 0); }
+    bool in_memory() { return (raw_buffer != 0); }
 
     double get_reg_scale() const;
 
-    inline void release_reg_image() { reg_image.release(); }
+    void release_reg_image() { reg_image.release(); }
 
     void free_memory_RAW(bool force = false);
 

@@ -79,7 +79,7 @@ namespace pathCam {
       yTotal /= count;
       return {Point2i(xTotal,yTotal),true};
     }
-    return {{},false};
+    return {{},false}; //uh oh, what happens if none of the features have ever been updated? we return false
   }
 
   void FeatureTrackGenerator::add_image(Image *img) {
@@ -160,8 +160,8 @@ namespace pathCam {
           // long imgIdx;
           // int ftIdx;
 
-          // if (baFeat1->lastIteration < baFeat2->lastIteration) {
-          if (baFeat1->stableID.size() < baFeat2->stableID.size()){
+          if (baFeat1->lastIteration < baFeat2->lastIteration) {
+          // if (baFeat1->stableID.size() < baFeat2->stableID.size()){
             winner = baFeat2;
             loser = baFeat1;
             // imgIdx = img2->index;
