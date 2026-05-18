@@ -10,9 +10,86 @@
 
 namespace pathCam {
 
-
-
   void ComponentMatchSearch::run() {
+    if (candidates.empty()){return;}
+
+    auto& matcher = getThreadLocalMatcher(parent->matcher_type);
+    std::vector<std::shared_ptr<Match> > matches;
+
+    auto theirCompIndex = candidates[0]->regInfo->component_membership; //no need to lock any mutex because this image is decidedly sorted and has been composited
+    auto theirComponent = parent->get_composite(theirCompIndex);
+
+
+    for (auto candidate : candidates) {
+      if (!theirComponent->xcMatchShouldContinue || !component->xcMatchShouldContinue){return;}
+      if (candidate == nullptr || candidate->index == image->index) {continue;}
+      if (!candidate->is_good()) {continue;}
+      if (image->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && image->label != candidate->label){continue;}
+
+      auto m = std::make_shared<Match>(candidate, image);
+      matcher.match(m);
+
+
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
+        m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
+        matches.push_back(m);
+        if (matches.size() > 3) {
+          break;
+        }
+      }
+    }
+
+    if (!matches.empty()) {
+      //figure out which component consumes the other
+
+      Poco::RWLock::ScopedWriteLock lock(Composite::compositeProcessHalt);
+      if (theirComponent->suspended){return;}// component was already consumed
+
+      auto theirImages = theirComponent->find_contributing_images();
+      auto myImages = component->find_contributing_images();
+
+      std::shared_ptr<Composite> survivor, consumed;
+
+      if (theirImages.size() > myImages.size()) {
+        survivor = theirComponent;
+        consumed = component;
+      }else {
+        survivor = component;
+        consumed = theirComponent;
+      }
+
+      consumed->suspended = true;
+      consumed->imagePyramid->suspended = true;
+      consumed->xcMatchShouldContinue = false;
+
+      survivor->queue_for_consumption({consumed,matches});
+
+
+      //halt registration process, update all component membership and coordinates for consumed component.
+      Poco::RWLock::ScopedWriteLock haltRegistration(RegInfo::registrationProcessHalt);
+
+
+      //thru averaging, calculate single translation for all images in consumed component into their new component
+
+      //halt FTG (possibly thru compositeProcessHalt since its managed by a composite object thread
+      //shift all objects in consumed FTG (features and images) into surviving FTG space
+      //must now combine FTGs. for each match, find candidate matches and pursue them. then
+      // 1) shift all consumed FTG objects into surviving FTG space
+      // 2) add all consumed FTG objects to surviving FTG
+      // 3) process all matches thru surviving FTG
+
+
+
+
+      //halt composite process
+
+    }
+
+  }
+
+
+
+  void ComponentMatchSearch::run2() {
     auto& matcher = getThreadLocalMatcher(parent->matcher_type);
     std::vector<std::shared_ptr<Match> > matches;
 

@@ -73,7 +73,7 @@ namespace pathCam {
 
   void RegInfo::count_votes() {
     if (!votes.empty()) {
-      Poco::ScopedReadRWLock lock(registrationProcessMutex);
+      Poco::ScopedReadRWLock lock(registrationProcessHalt);
 
       sort(votes.begin(), votes.end(),
            [](const vote &a, const vote &b) { return a.m->inlierCount > b.m->inlierCount; });

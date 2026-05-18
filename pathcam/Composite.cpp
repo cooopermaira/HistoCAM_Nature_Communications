@@ -206,7 +206,7 @@ namespace pathCam {
       make_akaze(_rootImg, {0.25, 0.1});
     }
 
-    Poco::RWLock::ScopedReadLock lock(parent->component_mutex);
+    // Poco::RWLock::ScopedReadLock lock(parent->component_mutex); //already locked in composite manager
 
     //find most recent resolved frame
     if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
@@ -683,200 +683,238 @@ namespace pathCam {
 
 
   std::pair<std::vector<Image *>, int>
-  Composite::get_match_candidates(const Rect &rect,
-                                  const int n,
-                                  const std::vector<Image *> &alreadyMatched,
-                                  Image *self) const {
-    struct Candidate {
-      int gain = 0;
-      bool valid = false;
-      bool selected = false;
+Composite::get_match_candidates(const Rect &rect,
+                                const int n,
+                                const std::vector<Image *> &alreadyMatched,
+                                Image *self) const {
+  struct Candidate {
+    int gain = 0;
+    bool valid = false;
+    bool selected = false;
 
-      // feature indices this image covers
-      std::vector<uint16_t> features;
-    };
+    // feature indices this image covers
+    std::vector<uint16_t> features;
+  };
 
-    // ------------------------------------------------------------------------
-    // Gather valid features directly during query
-    // ------------------------------------------------------------------------
+  // ------------------------------------------------------------------------
+  // Gather valid features directly during query
+  // ------------------------------------------------------------------------
 
-    std::vector<BAFeature *> features;
-    features.reserve(512);
+  std::vector<BAFeature *> features;
+  features.reserve(512);
 
-    const int radSq = parent->scope_radius * parent->scope_radius;
-    const Point2i center = rect.tl() + Point2i(rect.size()) / 2;
+  const int radSq = parent->scope_radius * parent->scope_radius;
+  const Point2i center = rect.tl() + Point2i(rect.size()) / 2;
 
-    ftg->featureGrid.query(
-      rect.x,
-      rect.y,
-      rect.x + rect.width,
-      rect.y + rect.height,
-      [&](BAFeature *f) {
-        if (componentMagLabel == Image::_2X) {
-          f = f->find();
+  ftg->featureGrid.query(
+    rect.x,
+    rect.y,
+    rect.x + rect.width,
+    rect.y + rect.height,
+    [&](BAFeature *f) {
+      if (componentMagLabel == Image::_2X) {
+        f = f->find();
 
-          const int dx = center.x - (int) f->x;
-          const int dy = center.y - (int) f->y;
+        const int dx = center.x - (int) f->x;
+        const int dy = center.y - (int) f->y;
 
-          if (dx * dx + dy * dy > radSq)
-            return;
-        } else {
-          if (!rect.contains(Point2f(f->x, f->y)))
-            return;
-        }
-
-        features.push_back(f);
-      });
-
-    const int F = (int) features.size();
-
-    if (F == 0)
-      return {{}, 0};
-
-    // ------------------------------------------------------------------------
-    // Build dense candidate structures
-    // ------------------------------------------------------------------------
-
-    const int imageCount = (int) memberFrames.size();
-
-    std::vector<Candidate> candidates(imageCount);
-
-    // feature -> observing images
-    std::vector<std::vector<Image *> > featureToImages(F);
-
-    // ------------------------------------------------------------------------
-    // Build graph
-    // ------------------------------------------------------------------------
-
-    for (uint16_t featIdx = 0; featIdx < F; ++featIdx) {
-      BAFeature *f = features[featIdx];
-
-      for (const auto &[img, obsIdx]: f->imageFeatures) {
-        if (!img)
-          continue;
-
-        if (img == self)
-          continue;
-
-        const int imgIdx = img->index;
-
-        Candidate &cand = candidates[imgIdx];
-
-        cand.valid = true;
-        cand.features.push_back(featIdx);
-        cand.gain++;
-
-        featureToImages[featIdx].push_back(img);
+        if (dx * dx + dy * dy > radSq)
+          return;
+      } else {
+        if (!rect.contains(Point2f(f->x, f->y)))
+          return;
       }
+
+      features.push_back(f);
+    });
+
+  const int F = (int) features.size();
+
+  if (F == 0)
+    return {{}, 0};
+
+  // ------------------------------------------------------------------------
+  // Build dense candidate structures
+  // ------------------------------------------------------------------------
+
+  const int imageCount = (int) memberFrames.size();
+
+  std::vector<Candidate> candidates(imageCount);
+
+  // ------------------------------------------------------------------------
+  // Build dense global->local image remap
+  // ------------------------------------------------------------------------
+
+  long maxGlobalIndex = 0;
+
+  for (Image *img: memberFrames) {
+    if (img) {
+      maxGlobalIndex = std::max(maxGlobalIndex, img->index);
     }
+  }
 
-    // ------------------------------------------------------------------------
-    // Covered feature tracking
-    // ------------------------------------------------------------------------
+  std::vector<int> globalToLocal(maxGlobalIndex + 1, -1);
 
-    std::vector<uint8_t> covered(F, 0);
+  for (int localIdx = 0; localIdx < imageCount; ++localIdx) {
+    Image *img = memberFrames[localIdx];
 
-    int totalCovered = 0;
+    if (img) {
+      globalToLocal[img->index] = localIdx;
+    }
+  }
 
-    auto cover_feature = [&](uint16_t featIdx) {
-      if (covered[featIdx])
-        return;
+  // feature -> observing images
+  std::vector<std::vector<Image *> > featureToImages(F);
 
-      covered[featIdx] = 1;
-      totalCovered++;
+  // ------------------------------------------------------------------------
+  // Build graph
+  // ------------------------------------------------------------------------
 
-      // decrement gain for all images observing this feature
-      for (Image *img: featureToImages[featIdx]) {
-        candidates[img->index].gain--;
-      }
-    };
+  for (uint16_t featIdx = 0; featIdx < F; ++featIdx) {
+    BAFeature *f = features[featIdx];
 
-    // ------------------------------------------------------------------------
-    // Apply already matched images
-    // ------------------------------------------------------------------------
-
-    for (Image *img: alreadyMatched) {
+    for (const auto &[img, obsIdx]: f->imageFeatures) {
       if (!img)
         continue;
 
-      const int idx = img->index;
-
-      if (idx < 0 || idx >= imageCount)
+      if (img == self)
         continue;
 
-      Candidate &cand = candidates[idx];
+      if (img->index < 0 || img->index >= (int) globalToLocal.size())
+        continue;
+
+      const int localIdx = globalToLocal[img->index];
+
+      if (localIdx < 0)
+        continue;
+
+      Candidate &cand = candidates[localIdx];
+
+      cand.valid = true;
+      cand.features.push_back(featIdx);
+      cand.gain++;
+
+      featureToImages[featIdx].push_back(img);
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // Covered feature tracking
+  // ------------------------------------------------------------------------
+
+  std::vector<uint8_t> covered(F, 0);
+
+  int totalCovered = 0;
+
+  auto cover_feature = [&](uint16_t featIdx) {
+    if (covered[featIdx])
+      return;
+
+    covered[featIdx] = 1;
+    totalCovered++;
+
+    // decrement gain for all images observing this feature
+    for (Image *img: featureToImages[featIdx]) {
+      if (img->index < 0 || img->index >= (int) globalToLocal.size())
+        continue;
+
+      const int localIdx = globalToLocal[img->index];
+
+      if (localIdx >= 0) {
+        candidates[localIdx].gain--;
+      }
+    }
+  };
+
+  // ------------------------------------------------------------------------
+  // Apply already matched images
+  // ------------------------------------------------------------------------
+
+  for (Image *img: alreadyMatched) {
+    if (!img)
+      continue;
+
+    if (img->index < 0 || img->index >= (int) globalToLocal.size())
+      continue;
+
+    const int localIdx = globalToLocal[img->index];
+
+    if (localIdx < 0)
+      continue;
+
+    Candidate &cand = candidates[localIdx];
+
+    if (!cand.valid)
+      continue;
+
+    cand.selected = true;
+
+    for (uint16_t featIdx: cand.features) {
+      cover_feature(featIdx);
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // Greedy selection
+  // ------------------------------------------------------------------------
+
+  std::vector<Image *> selected;
+  selected.reserve(n);
+
+  for (int iter = 0; iter < n; ++iter) {
+    Image *bestImg = nullptr;
+    int bestIdx = -1;
+    int bestGain = 0;
+
+    // --------------------------------------------------------------------
+    // Find best candidate
+    // --------------------------------------------------------------------
+
+    for (int localIdx = 0; localIdx < imageCount; ++localIdx) {
+      Image *img = memberFrames[localIdx];
+
+      if (!img)
+        continue;
+
+      Candidate &cand = candidates[localIdx];
 
       if (!cand.valid)
         continue;
 
-      cand.selected = true;
+      if (cand.selected)
+        continue;
 
-      for (uint16_t featIdx: cand.features) {
-        cover_feature(featIdx);
+      if (cand.gain > bestGain) {
+        bestGain = cand.gain;
+        bestImg = img;
+        bestIdx = localIdx;
       }
     }
 
-    // ------------------------------------------------------------------------
-    // Greedy selection
-    // ------------------------------------------------------------------------
-
-    std::vector<Image *> selected;
-    selected.reserve(n);
-
-    for (int iter = 0; iter < n; ++iter) {
-      Image *bestImg = nullptr;
-      int bestGain = 0;
-
-      // --------------------------------------------------------------------
-      // Find best candidate
-      // --------------------------------------------------------------------
-
-      for (Image *img: memberFrames) {
-        if (!img)
-          continue;
-
-        const int idx = img->index;
-
-        if (idx < 0 || idx >= imageCount)
-          continue;
-
-        Candidate &cand = candidates[idx];
-
-        if (!cand.valid)
-          continue;
-
-        if (cand.selected)
-          continue;
-
-        if (cand.gain > bestGain) {
-          bestGain = cand.gain;
-          bestImg = img;
-        }
-      }
-
-      if (!bestImg || bestGain <= 0) {
-        break;
-      }
-
-      // --------------------------------------------------------------------
-      // Select image
-      // --------------------------------------------------------------------
-
-      Candidate &bestCand = candidates[bestImg->index];
-      bestCand.selected = true;
-      selected.push_back(bestImg);
-
-      // --------------------------------------------------------------------
-      // Cover newly covered features
-      // --------------------------------------------------------------------
-
-      for (uint16_t featIdx: bestCand.features) {
-        cover_feature(featIdx);
-      }
+    if (!bestImg || bestGain <= 0) {
+      break;
     }
 
-    return {selected, totalCovered};
+    // --------------------------------------------------------------------
+    // Select image
+    // --------------------------------------------------------------------
+
+    Candidate &bestCand = candidates[bestIdx];
+
+    bestCand.selected = true;
+    selected.push_back(bestImg);
+
+    // --------------------------------------------------------------------
+    // Cover newly covered features
+    // --------------------------------------------------------------------
+
+    for (uint16_t featIdx: bestCand.features) {
+      cover_feature(featIdx);
+    }
   }
+
+  return {selected, totalCovered};
+}
 
 
   void Composite::launch_component_match_search(Image *img, std::vector<Image *> candidates_) {
@@ -884,10 +922,53 @@ namespace pathCam {
       // img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
       img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
-      const auto cms = new ComponentMatchSearch(parent, img, this, candidates_);
+      const auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), candidates_);
       parent->jqSecondary->add_runnable(cms);
     }
   }
+
+  void Composite::launch_XC_search(Image *img) {
+    // Poco::RWLock::ScopedReadLock(parent->component_mutex); //already locked in composite manager
+    for (auto & comp : parent->composites) {
+      if (comp->componentIndex == componentIndex){continue;}
+      if (comp->componentMagLabel == componentMagLabel) {
+        auto candidates = comp->find_contributing_images();
+        auto cms = new ComponentMatchSearch(parent,img,shared_from_this(),{candidates.begin(),candidates.end()});
+        parent->jqSecondary->add_runnable(cms);
+      }
+    }
+  }
+
+  void Composite::consume_queued_components() {
+    while (!consumptionQ.empty()) {
+      auto consumable = consumptionQ.front();
+      consumptionQ.pop();
+      bool use1;
+      if (consumable.matches[0]->image_1->regInfo->component_membership == componentIndex) {
+        use1 = true;
+      }else {
+        use1 = false;
+      }
+
+      //figure out translation into my space
+      Point2f translation;
+      float count = consumable.matches.size();
+      for (auto & m : consumable.matches) {
+        auto t = m->t_to(m->image_1);
+      }
+
+      //translate all the reginfo into my space and fix their component index
+
+      //halt FTG
+
+      //translate everything in their FTG into my space
+
+      //process all things in their FTG as find match candidate and if any, add match.
+
+      //process all matches
+    }
+  }
+
 
   bool Composite::prepare_4CPA_cpu(Image *img, const std::vector<Point2i> &affectedTiles, const bool forceFullImage) {
     if (affectedTiles.size() < 100 && !forceFullImage) {

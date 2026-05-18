@@ -28,6 +28,11 @@ namespace pathCam {
    */
   void MetricComposite::update() {
     if (suspended) { return; }
+    Poco::RWLock::ScopedReadLock lock(compositeProcessHalt);
+
+    if (!consumptionQ.empty()) {
+      consume_queued_components();
+    }
 
     //place component in MR image
     if (imagePyramid->scale == 0 && !xcMatchInitiated) {
@@ -36,7 +41,7 @@ namespace pathCam {
       xcMatchInitiated = true;
 
       // std::thread t([this, img = staging.front()->image]() {
-      std::lock_guard lock(EstRoot_mutex);
+      std::scoped_lock lock2(EstRoot_mutex);
       // std::cout << "component " << componentIndex << " establishing scale" << std::endl;
       auto start = std::chrono::high_resolution_clock::now();
       establish_scale_at_root_cpu(staging.front()->image);
@@ -62,10 +67,11 @@ namespace pathCam {
       ++frameCount;
       maxIndex = max(maxIndex, img->index);
 
+      // launch_XC_search(img);
       // launch_component_match_search_with_XC(img);
       // prep_image_for_alignment(img);
       // if (!img->regInfo->root)
-        {
+      {
         Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
         realTimeAlignmentQueue.push(img);
         realTimeAlignmentEvent.set();
@@ -1002,14 +1008,14 @@ namespace pathCam {
 
   void MetricComposite::add_landmark_frame(Image *img) {
     landmarkFrames.push_back(img);
-    if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
-      img->subsequentMatchLaunched = true;
-      ++outstandingCMS_jobs;
-      auto members = find_contributing_images();
-      auto cms = new ComponentMatchSearch(parent, img, this, {members.begin(), members.end()});
-      parent->jqSecondary->add_runnable(cms);
-    }
+    // if (!img->subsequentMatchLaunched) {
+    //   img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
+    //   img->subsequentMatchLaunched = true;
+    //   ++outstandingCMS_jobs;
+    //   auto members = find_contributing_images();
+    //   auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), {members.begin(), members.end()});
+    //   parent->jqSecondary->add_runnable(cms);
+    // }
   }
 
   void MetricComposite::launch_component_match_search_with_XC(Image *img_) {

@@ -167,7 +167,6 @@ namespace pathCam {
     int maxMatchesPerPull = 50;
     int minPixelDistanceBetweenFrames;
     std::vector<Vec2> lastAcceptedCoords;
-    Image* lastViewedFrame = nullptr;
 
 
     std::vector<double> labelScales = { -10.0, 1.0, 0.5, 0.2, 0.1, 0.05 };
@@ -389,6 +388,15 @@ namespace pathCam {
     void set_reg_ref(RegInfo *ri);
 
     std::vector<Image *> get_component_image_refs(unsigned long component);
+
+    std::shared_ptr<Composite> get_composite(int compIndex) {
+      Poco::RWLock::ScopedReadLock lock(component_mutex);
+      if (compIndex >= composites.size()) {
+        return nullptr;
+      }
+      return composites[compIndex];
+    }
+
 
     std::vector<RegInfo*> get_Q_front(bool _pop);
 

@@ -13,11 +13,14 @@
 // #include <numeric>
 #include "pathCam.h"
 #include "MRTiledImage.h"
+#include "StreamCam.h"
 // #include "AccessSAM.h"
 // #include "StreamCam.h"
 
 
 namespace pathCam {
+
+
   class FeatureTrackGenerator;
   class BundleAdjustmentIntegrator;
 
@@ -40,12 +43,18 @@ namespace pathCam {
   };
 
 
-  class Composite {
+  class Composite : public std::enable_shared_from_this<Composite> {
     friend class CompositeManager;
     friend class RebuildRunnable;
 
+    struct ConsumableComponent
+    {
+      std::shared_ptr<Composite> composite;
+      std::vector<std::shared_ptr<Match>> matches;
+    };
+
   public:
-    Composite(StreamCam *parent, Size image_size, int _componentIndex);
+    Composite(StreamCam *parent, Size image_size, int _componentIndex) ;
 
     virtual ~Composite();
 
@@ -68,7 +77,7 @@ namespace pathCam {
 
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
-    bool xcMatchShouldContinue = true;
+    std::atomic<bool> xcMatchShouldContinue = true;
     std::vector<Image *> landmarkFrames;
     Image *xcRegLandmark = nullptr;
     Point2f xcPwDist;
@@ -145,10 +154,14 @@ namespace pathCam {
     std::atomic<bool> alignmentShouldProceed = true;
     std::atomic<bool> xcInProgress = false;
     inline static std::mutex EstRoot_mutex;
+    inline static Poco::RWLock compositeProcessHalt;
 
     long qTime = 0;
     FeatureTrackGenerator *ftg = nullptr;
     BundleAdjustmentIntegrator *bai = nullptr;
+
+    //yikes, what a definition. its a queue of composites with a vector of the matches to process
+    std::queue< ConsumableComponent > consumptionQ;
 
     // SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
 
@@ -211,9 +224,9 @@ namespace pathCam {
 
     void stage(RegInfo *_ri) { staging.push(_ri); }
 
-    bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
-
-    void establish_scale_at_root(Image *_rootImg);
+    // bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
+    //
+    // void establish_scale_at_root(Image *_rootImg);
 
     void establish_scale_at_root_cpu(Image *_rootImg);
 
@@ -222,6 +235,12 @@ namespace pathCam {
     //                               KeyPoint> &keypoints1, std::vector<KeyPoint> &keypoints2);
 
     void set_scale(float _scale, bool _ffCorrectExistingTiles = false);
+
+    void queue_for_consumption(const ConsumableComponent &component){consumptionQ.push(component);}
+
+    void consume_queued_components();
+
+    void launch_XC_search(Image* img);
 
     void ff_correct_existing_tiles();
 

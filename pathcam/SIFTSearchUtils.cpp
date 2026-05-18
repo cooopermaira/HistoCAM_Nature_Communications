@@ -99,7 +99,7 @@ namespace pathCam {
       auto feat = new BAFeature;
       baFeatures.push_back(feat);
 
-      img->observations[i] = new Observation(baImg, feat, ftPixelCoords.x, ftPixelCoords.y, 1);
+      img->observations[i] = new Observation(baImg, feat, ftPixelCoords.x, ftPixelCoords.y);
 
       auto ftWorldCoords = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
       feat->x = ftWorldCoords.x;
@@ -271,116 +271,12 @@ namespace pathCam {
   }
 
 
-void FeatureTrackGenerator::update_coVis_support(Image *img) {
-
-    long support = 0;
-
-    std::vector<BAFeature *> liveRoots;
-    liveRoots.reserve(img->observations.size());
-
-    // --------------------------------------------------
-    // deduplicate roots without unordered_set
-    // --------------------------------------------------
-
-    static uint32_t currentStamp = 1;
-    ++currentStamp;
-
-    for (auto *obs : img->observations) {
-
-        if (!obs) continue;
-
-        auto *root = obs->feature->find();
-
-        if (!root->active) continue;
-        if (!root->live) continue;
-        if (root->stableID.empty()) continue;
-
-        if (root->visitStamp != currentStamp) {
-            root->visitStamp = currentStamp;
-            liveRoots.push_back(root);
-        }
-    }
-
-    const int n = static_cast<int>(liveRoots.size());
-
-    // --------------------------------------------------
-    // pairwise covis update
-    // --------------------------------------------------
-
-    for (int i = 0; i < n - 1; ++i) {
-
-        BAFeature *ft1 = liveRoots[i];
-
-        const auto &ids1 = ft1->stableID;
-        const int s1 = static_cast<int>(ids1.size());
-
-        for (int j = i + 1; j < n; ++j) {
-
-            BAFeature *ft2 = liveRoots[j];
-
-            const auto &ids2 = ft2->stableID;
-            const int s2 = static_cast<int>(ids2.size());
-
-            bool incremented = false;
-
-            for (int c = 0; c < s1; ++c) {
-
-                const uint32_t id1 = ids1[c];
-
-                for (int d = 0; d < s2; ++d) {
-
-                    const uint32_t id2 = ids2[d];
-
-                    const uint64_t edgeID =
-                        make_edge_ID(id1, id2);
-
-                    auto it = coVisEdgeSupport.find(edgeID);
-
-                    if (it == coVisEdgeSupport.end()) {
-
-                        // first time edge seen
-
-                        if (!incremented) {
-
-                            auto [newIt, _] =
-                                coVisEdgeSupport.emplace(edgeID, 1);
-
-                            support += 1;
-
-                            incremented = true;
-
-                        } else {
-
-                            coVisEdgeSupport.emplace(edgeID, 0);
-                        }
-
-                    } else {
-
-                        if (!incremented) {
-
-                            if (it->second != UINT16_MAX) {
-                                ++it->second;
-                            }
-
-                            support += it->second;
-
-                            incremented = true;
-
-                        } else {
-
-                            support += it->second;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 
   void FeatureTrackGenerator::launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations,
                                                                   int maxIters,
                                                                   float tol) {
+    if (observations.empty()){return;}
+
     std::vector<BAImage *> activeImages; // free images only
     std::vector<BAImage *> touchedImages; // all images, for reset/check
     std::vector<BAFeature *> activeFeatures;
@@ -490,19 +386,17 @@ void FeatureTrackGenerator::update_coVis_support(Image *img) {
       BAImage *img = o->image;
       BAFeature *feat = o->feature;
 
-      const float w = o->weight;
-
       const float rx = feat->x - img->x - o->obs_x;
       const float ry = feat->y - img->y - o->obs_y;
 
-      solverState.feat_r_x[fi] += -w * rx;
-      solverState.feat_r_y[fi] += -w * ry;
-      solverState.feat_inv_diag[fi] += w;
+      solverState.feat_r_x[fi] -= rx;
+      solverState.feat_r_y[fi] -= ry;
+      solverState.feat_inv_diag[fi] += 1;
 
       if (ii >= 0) {
-        solverState.img_r_x[ii] += w * rx;
-        solverState.img_r_y[ii] += w * ry;
-        solverState.img_inv_diag[ii] += w;
+        solverState.img_r_x[ii] += rx;
+        solverState.img_r_y[ii] += ry;
+        solverState.img_inv_diag[ii] += 1;
       }
     }
 
@@ -574,7 +468,6 @@ void FeatureTrackGenerator::update_coVis_support(Image *img) {
       for (const auto *o: observations) {
         const int ii = o->image->systemIdx;
         const int fi = o->feature->systemIdx;
-        const float w = o->weight;
 
         const float img_px = (ii >= 0) ? solverState.img_p_x[ii] : 0.0f;
         const float img_py = (ii >= 0) ? solverState.img_p_y[ii] : 0.0f;
@@ -582,12 +475,12 @@ void FeatureTrackGenerator::update_coVis_support(Image *img) {
         const float vx = solverState.feat_p_x[fi] - img_px;
         const float vy = solverState.feat_p_y[fi] - img_py;
 
-        solverState.feat_Ap_x[fi] += w * vx;
-        solverState.feat_Ap_y[fi] += w * vy;
+        solverState.feat_Ap_x[fi] += vx;
+        solverState.feat_Ap_y[fi] += vy;
 
         if (ii >= 0) {
-          solverState.img_Ap_x[ii] -= w * vx;
-          solverState.img_Ap_y[ii] -= w * vy;
+          solverState.img_Ap_x[ii] -= vx;
+          solverState.img_Ap_y[ii] -= vy;
         }
       }
 

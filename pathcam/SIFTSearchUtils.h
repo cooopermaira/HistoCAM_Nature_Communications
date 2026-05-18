@@ -120,8 +120,6 @@ namespace pathCam {
     Point2i cellIdx{0, 0};
     int indexInCell = -1;
 
-    std::vector<uint32_t> stableID;
-    uint32_t visitStamp = 0;
 
     BAFeature *find() {
       if (parent != this)
@@ -141,7 +139,6 @@ namespace pathCam {
     BAFeature *feature;
 
     float obs_x, obs_y;
-    float weight = 1.0;
   };
 
 
