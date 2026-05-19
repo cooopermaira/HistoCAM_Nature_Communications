@@ -77,7 +77,7 @@ namespace pathCam {
         // }
 
         if (!regInfos.empty()) {
-          Poco::RWLock::ScopedWriteLock lock(parent->component_mutex);
+          Poco::RWLock::ScopedReadLock lock(parent->component_mutex);
           for (auto ri: regInfos) {
             stage(ri);
           }

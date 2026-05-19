@@ -139,7 +139,7 @@ namespace pathCam {
     std::vector<RegInfo *> contributingRegInfos;
     std::set<Image *> contributingImages;
     std::map<int, long> delaunayMembers;
-    std::queue<RegInfo *> staging;
+    std::deque<RegInfo *> staging;
 
     // std::vector<
     std::vector<Image*> realTimeImageList;
@@ -189,8 +189,6 @@ namespace pathCam {
 
     void prep_image_for_alignment(Image *img);
 
-    void add_consumable_img(Image* img);
-
     std::vector<std::shared_ptr<Match>> pairwise_match(Image *img, const std::vector<Image *> &targets) const;
 
     virtual void align_and_rebuild() {};
@@ -228,7 +226,7 @@ namespace pathCam {
                                         Point2f absCoord);
 
 
-    void stage(RegInfo *_ri) { staging.push(_ri); }
+    void stage(RegInfo *_ri) { staging.push_back(_ri); }
 
     // bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
     //

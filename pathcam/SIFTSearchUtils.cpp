@@ -101,33 +101,51 @@ namespace pathCam {
 
 
   void FeatureTrackGenerator::add_image(Image *img) {
-    if (img->addedToFTG){return;}
+    if (img->addedToFTG) {
 
-    img->observations.resize(img->keypoints.size(), nullptr);
-    auto baImg = new BAImage(img->regInfo->absoluteCoords, img->regInfo->root,
-                             img->regInfo);
-    baImages.push_back(baImg);
+      bool imgAdded = false;
+      baFeatures.reserve(baFeatures.size() + img->observations.size());
 
-    baFeatures.reserve(baFeatures.size() + img->keypoints.size());
-    const float regScale = img->get_reg_scale();
+      for (auto obs : img->observations) {
+        if (obs) {
+          if (obs->image && !imgAdded) {
+            baImages.push_back(obs->image);
+            imgAdded = true;
+          }
+          if (obs->feature) {
+            baFeatures.push_back(obs->feature);
+          }
+        }
+      }
 
-    Poco::RWLock::ScopedWriteLock lock(featureGrid.rwLock); //for .insert()
+    }else {
 
-    for (int i = 0; i < img->observations.size(); ++i) {
-      const auto ftPixelCoords = img->keypoints[i].pt / regScale;
+      img->observations.resize(img->keypoints.size(), nullptr);
+      auto baImg = new BAImage(img->regInfo->absoluteCoords, img->regInfo->root,
+                               img->regInfo);
+      baImages.push_back(baImg);
 
-      auto feat = new BAFeature;
-      baFeatures.push_back(feat);
+      baFeatures.reserve(baFeatures.size() + img->keypoints.size());
+      const float regScale = img->get_reg_scale();
 
-      img->observations[i] = new Observation(baImg, feat, ftPixelCoords.x, ftPixelCoords.y);
+      Poco::RWLock::ScopedWriteLock lock(featureGrid.rwLock); //for .insert()
 
-      feat->xy = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
-      feat->imageFeatures.emplace(img, i);
+      for (int i = 0; i < img->observations.size(); ++i) {
+        const auto ftPixelCoords = img->keypoints[i].pt / regScale;
 
-      featureGrid.insert(feat);
+        auto feat = new BAFeature;
+        baFeatures.push_back(feat);
+
+        img->observations[i] = new Observation(baImg, feat, ftPixelCoords.x, ftPixelCoords.y);
+
+        feat->xy = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
+        feat->imageFeatures.emplace(img, i);
+
+        featureGrid.insert(feat);
+      }
+
+      img->addedToFTG = true;
     }
-
-    img->addedToFTG = true;
   }
 
   int FeatureTrackGenerator::process_match_queue() {

@@ -521,7 +521,8 @@ namespace pathCam {
       if (comp->suspended) { continue; }
 
       if (comp->componentMagLabel == componentMagLabel) {
-        auto candidates = comp->find_contributing_images(); //ok to call without mutex as long as its from composite thread
+        auto candidates = comp->find_contributing_images();
+        //ok to call without mutex as long as its from composite thread
         auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), {candidates.begin(), candidates.end()});
         parent->jqSecondary->add_runnable(cms);
       }
@@ -564,60 +565,56 @@ namespace pathCam {
     while (!consumptionQ.empty()) {
       auto consumable = std::move(consumptionQ.front());
       consumptionQ.pop();
+      for (auto m : consumable.matches) {
+        m->image_1->combineMatches.push_back(m);
+        m->image_2->combineMatches.push_back(m);
+      }
 
 
       auto translation = get_space_to_space_translation(consumable);
 
-      //translate all the FTG objects into my space
-      Poco::RWLock::ScopedWriteLock ftgProcLock(FeatureTrackGenerator::alignmentProcessHalt);
+      {
+        //translate all the reginfo into my space and fix their component index
+        Poco::RWLock::ScopedWriteLock riLock(RegInfo::registrationProcessHalt);
 
-      //find any potential matches
-      std::vector<std::shared_ptr<Match>> matches;
-      Point2f s(imageSize.width,imageSize.height);
-      for (auto img : consumable.composite->memberFrames) {
-        if (!img->stationary || img->ownedTiles.empty()){continue;}
-        Point2f p = translation + Point2f(img->regInfo->absoluteCoords);
-
-        auto searchSpace = Rect(p - 0.5 * s, p + 1.5 * s);
-        auto [candidates,ftCount] = get_match_candidates(searchSpace,2,{},img);
-
-        if (!candidates.empty()) {
-          auto res = pairwise_match(img, candidates); //pairwise match to those n images
-          if (!res.empty()) {
-            matches.insert(matches.end(),res.begin(),res.end());
+        for (auto &img: parent->images) {
+          if (!img || !img->regInfo) { continue; }
+          auto *ri = img->regInfo;
+          if (ri->component_membership != consumable.composite->componentIndex) {
+            continue;
           }
+          ri->absoluteCoords += Point2i(translation);
+          ri->component_membership = componentIndex;
+          ri->root = false;
         }
       }
 
-      ftg->baFeatures.reserve( ftg->baFeatures.size() + consumable.composite->ftg->baFeatures.size());
-      ftg->baImages.reserve(ftg->baImages.size() + consumable.composite->ftg->baImages.size());
-
-      for (auto baImg : consumable.composite->ftg->baImages) {
-        baImg->xy += translation;
-        ftg->baImages.push_back(baImg);
-      }
-      for (auto baFt : consumable.composite->ftg->baFeatures) {
-        baFt->xy += translation;
-        ftg->baFeatures.push_back(baFt);
-        ftg->featureGrid.insert(baFt);
+      for (auto img : consumable.composite->memberFrames) {
+        staging.push_back(img->regInfo);
+        img->observations.clear();
+        img->addedToFTG = false;
       }
 
-      for (auto &m : matches) {
-        ftg->process_match2(m);
-      }
+      staging.insert(
+          staging.begin(),
+          std::make_move_iterator(consumable.composite->staging.begin()),
+          std::make_move_iterator(consumable.composite->staging.end())
+      );
+      consumable.composite->staging.clear();
 
+      return;
+      {
+        //translate all the FTG objects into my space
+        Poco::RWLock::ScopedWriteLock ftgProcLock(FeatureTrackGenerator::alignmentProcessHalt);
 
-      //translate all the reginfo into my space and fix their component index
-      Poco::RWLock::ScopedWriteLock riLock(RegInfo::registrationProcessHalt);
-
-      for (auto &img: parent->images) {
-        if (!img || !img->regInfo) { continue; }
-        if (img->regInfo->component_membership != consumable.composite->componentIndex) {
-          continue;
+        for (auto img: consumable.composite->memberFrames) {
+          realTimeAlignmentQueue.push(img);
         }
-        img->regInfo->absoluteCoords += Point2i(translation);
-        img->regInfo->component_membership = componentIndex;
+        realTimeAlignmentEvent.set();
       }
+
+
+
       memberFrames.insert(memberFrames.end(), consumable.composite->memberFrames.begin(),
                           consumable.composite->memberFrames.end());
       auto mosaicFrames = find_contributing_images();
@@ -625,7 +622,7 @@ namespace pathCam {
       mosaicFrames.insert(theirMosaicFrames.begin(), theirMosaicFrames.end());
 
       rebuild({mosaicFrames.begin(), mosaicFrames.end()});
-
+      return;
       //halt FTG
 
       //translate everything in their FTG into my space
@@ -683,14 +680,37 @@ namespace pathCam {
     auto startf = std::chrono::high_resolution_clock::now();
     std::vector<Observation *> observations;
 
+    std::vector<Image*> pushGridLater;
+
     for (auto img: images) {
+      if (img->addedToFTG){pushGridLater.push_back(img);}
       prep_image_for_alignment(img);
     }
-
-    //if (alignIterCount % 20 == 0) {
+    if (!pushGridLater.empty()) {
+      std::unordered_set<BAFeature*> ftsToAdd;
+      for (auto img : pushGridLater) {
+        for (auto obs : img->observations) {
+          if (obs->feature) {
+            auto f = obs->feature->find();
+            if (f->active) {
+              ftsToAdd.insert(f);
+            }
+          }
+        }
+      }
+      for (auto f : ftsToAdd) {
+        ftg->featureGrid.insert(f);
+      }
+      for (auto img : pushGridLater) {
+        for (auto m : img->combineMatches) {
+          ftg->process_match2(m);
+        }
+      }
+    }
     realTimeImageList.insert(realTimeImageList.end(), images.begin(), images.end());
 
-    if (true){
+    //if (alignIterCount % 20 == 0) {
+    if (true) {
       //do a full align
 
       observations.reserve(realTimeImageList.size() * 600);
@@ -707,12 +727,12 @@ namespace pathCam {
           }
         }
       }
-    }else {
+    } else {
       update_mutex.lock();
       auto imageList = find_contributing_images(true);
       update_mutex.unlock();
 
-      imageList.insert(images.begin(),images.end());
+      imageList.insert(images.begin(), images.end());
       observations.reserve(imageList.size() * 600);
 
       for (auto img: imageList) {
@@ -724,7 +744,6 @@ namespace pathCam {
         }
       }
     }
-
 
 
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).
@@ -744,13 +763,14 @@ namespace pathCam {
     ++alignIterCount;
   }
 
-  void Composite::add_consumable_img(Image *img) {
-
-  }
-
   void Composite::prep_image_for_alignment(Image *img) {
+
     ftg->add_image(img);
 
+    Point2i coords = img->regInfo->absoluteCoords;
+    bool valid = false;
+
+    std::vector<Image*> alreadyMatched;
     if (img->regInfo && img->regInfo->winningVote.m) {
       Poco::FastMutex::ScopedLock lock(ftg->accessMutex);
       Poco::Mutex::ScopedLock lock2(img->regInfo->rAccessMutex);
@@ -759,36 +779,38 @@ namespace pathCam {
       ftg->process_match2(img->regInfo->winningVote.m);
 
       //we just pinned down some of my features to existing ft tracks, use those ft track locations to estimate my image coords
-      auto [coords,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
-
-      int candidateRequest;
-      Rect searchSpace;
-      if (valid) {
-        candidateRequest = 4;
-        searchSpace = Rect(coords, imageSize);
-      } else {
-        candidateRequest = 6;
-        Point2i p(imageSize.width, imageSize.height);
-
-        searchSpace = Rect(img->regInfo->absoluteCoords - 0.5 * p, img->regInfo->absoluteCoords + 1.5 * p);
-      }
-
-      //figure out who i should pair wise match against to pin down the rest of my features into existing ft tracks
-      auto [matchCandidates,featTracksCovered] = get_match_candidates(searchSpace, candidateRequest,
-                                                                      {img->regInfo->winningVote.m->image_1}, img);
-
-      if (!matchCandidates.empty()) {
-        auto matches = pairwise_match(img, matchCandidates); //pairwise match to those n images
-
-        for (auto &m: matches) {
-          ftg->process_match2(m);
-        }
-        // std::cout<<"index "<<img->index<<" "<<img->count_live_feats()<<std::endl;
-      }
-      // img->regInfo->absoluteCoords = coords;
+      std::tie(coords, valid) = ftg->estimate_image_coords_from_feature_tracks(img);
+      alreadyMatched.push_back(img->regInfo->winningVote.m->image_1);
     } else {
-      std::cout << "WARNING FROM Composite::prep_image_for_alignment IMAGE INDEX " << img->index << std::endl;
+      std::cout << "WARNING FROM Composite::prep_image_for_alignment IMAGE INDEX " << img->index <<
+          "HAD NO WINNING VOTE" << std::endl;
     }
+
+    int candidateRequest;
+    Rect searchSpace;
+    if (valid) {
+      candidateRequest = 4;
+      searchSpace = Rect(coords, imageSize);
+    } else {
+      candidateRequest = 6;
+      Point2i p(imageSize.width, imageSize.height);
+
+      searchSpace = Rect(img->regInfo->absoluteCoords - 0.5 * p, img->regInfo->absoluteCoords + 1.5 * p);
+    }
+
+    //figure out who i should pair wise match against to pin down the rest of my features into existing ft tracks
+    auto [matchCandidates,featTracksCovered] = get_match_candidates(searchSpace, candidateRequest,
+                                                                    alreadyMatched, img);
+
+    if (!matchCandidates.empty()) {
+      auto matches = pairwise_match(img, matchCandidates); //pairwise match to those n images
+
+      for (auto &m: matches) {
+        ftg->process_match2(m);
+      }
+      // std::cout<<"index "<<img->index<<" "<<img->count_live_feats()<<std::endl;
+    }
+    // img->regInfo->absoluteCoords = coords;
   }
 
   std::vector<std::shared_ptr<Match> >
@@ -1588,7 +1610,7 @@ namespace pathCam {
     std::vector<RegInfo *> new_info;
     while (!staging.empty()) {
       new_info.push_back(staging.front());
-      staging.pop();
+      staging.pop_front();
     }
     update_Bbox(new_info);
     add_images(new_info);

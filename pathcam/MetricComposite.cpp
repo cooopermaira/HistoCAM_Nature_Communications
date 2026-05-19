@@ -5,8 +5,6 @@
 #include "pathCam.h"
 
 namespace pathCam {
-
-
   MetricComposite::MetricComposite(StreamCam *parent, Size image_size, int _componentIndex) : Composite(
     parent, image_size, _componentIndex) {
     waitingFrames.resize(frameDelay, {nullptr, {}});
@@ -58,10 +56,11 @@ namespace pathCam {
     if (!staging.empty()) {
       auto ri = staging.front();
       auto img = ri->image;
+      memberFrames.push_back(img);
       assert(img->regInfo);
 
 
-      staging.pop();
+      staging.pop_front();
       ++frameCount;
       maxIndex = max(maxIndex, img->index);
 
@@ -126,13 +125,12 @@ namespace pathCam {
       }
       ++positionForNextWaitngFrame;
 
-      {
+
+      if (!immediateProcessingTiles.empty()) {
         Poco::FastMutex::ScopedLock lock(update_mutex);
-        memberFrames.push_back(img);
-        if (!immediateProcessingTiles.empty()) {
-          process_tiles(img, immediateProcessingTiles);
-        }
+        process_tiles(img, immediateProcessingTiles);
       }
+
 
       //if (imagePyramid->scale > 0) {
       float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
@@ -220,34 +218,35 @@ namespace pathCam {
       coords = c;
 
       if (valid) {
-        auto [matchCandidates,featTracksCovered] = get_match_candidates(Rect(coords,imageSize),4,{img->regInfo->winningVote.m->image_1}, img);
+        auto [matchCandidates,featTracksCovered] = get_match_candidates(Rect(coords, imageSize), 4,
+                                                                        {img->regInfo->winningVote.m->image_1}, img);
         if (!matchCandidates.empty()) {
-          launch_component_match_search(img,matchCandidates);
+          launch_component_match_search(img, matchCandidates);
           while (outstandingCMS_jobs > 0) {
             Poco::Thread::sleep(10);
           }
 
           ftg->process_match_queue();
         }
-      }else {
+      } else {
         int k = 0;
       }
 
       auto imageList = find_contributing_images();
       imageList.insert(root);
       imageList.insert(img);
-      std::vector imageListVec(imageList.begin(),imageList.end());
+      std::vector imageListVec(imageList.begin(), imageList.end());
 
-      auto ans = get_match_candidates(imagePyramid->bounds,1000,imageListVec);
-      imageListVec.insert(imageListVec.end(),ans.first.begin(),ans.first.end());
+      auto ans = get_match_candidates(imagePyramid->bounds, 1000, imageListVec);
+      imageListVec.insert(imageListVec.end(), ans.first.begin(), ans.first.end());
       imgSetSize = imageListVec.size();
       // auto imageListVec = memberFrames;
 
-      std::vector<Observation*> observations;
+      std::vector<Observation *> observations;
       observations.reserve(imageListVec.size() * 600);
 
-      for (auto &img : imageListVec) {
-        for (auto &obs : img->observations) {
+      for (auto &img: imageListVec) {
+        for (auto &obs: img->observations) {
           if (obs->feature->find()->active && obs->feature->find()->live) {
             observations.push_back(obs);
           }
@@ -256,7 +255,7 @@ namespace pathCam {
       obsSize = observations.size();
       ftg->launch_inprocess_sparse_CG_iterator(observations);
 
-      for (auto &obs : img->observations) {
+      for (auto &obs: img->observations) {
         if (obs && obs->image) {
           coords = obs->image->xy;
           break;
@@ -264,8 +263,10 @@ namespace pathCam {
       }
     }
 
-    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-    std::cout<<"index "<<img->index<<" observation size "<<obsSize<<" img set size "<< imgSetSize<<" time "<<t1<<std::endl;
+    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
+    std::cout << "index " << img->index << " observation size " << obsSize << " img set size " << imgSetSize << " time "
+        << t1 << std::endl;
     return coords;
   }
 
@@ -273,9 +274,9 @@ namespace pathCam {
     auto start11 = std::chrono::high_resolution_clock::now();
 
 
-    std::vector<Observation*> observations;
+    std::vector<Observation *> observations;
 
-    for (auto &img : memberFrames) {
+    for (auto &img: memberFrames) {
       int matchCount = 0;
       auto start = std::chrono::high_resolution_clock::now();
 
@@ -283,14 +284,14 @@ namespace pathCam {
 
       long covisTime = 0;
       if (img->regInfo && img->regInfo->winningVote.m) {
-
         ftg->process_match2(img->regInfo->winningVote.m);
         auto [coords,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
 
         if (valid) {
-          auto [matchCandidates,featTracksCovered] = get_match_candidates(Rect(coords,imageSize),4,{img->regInfo->winningVote.m->image_1}, img);
+          auto [matchCandidates,featTracksCovered] = get_match_candidates(
+            Rect(coords, imageSize), 4, {img->regInfo->winningVote.m->image_1}, img);
           if (!matchCandidates.empty()) {
-            launch_component_match_search(img,matchCandidates);
+            launch_component_match_search(img, matchCandidates);
             while (outstandingCMS_jobs > 0) {
               Poco::Thread::sleep(10);
             }
@@ -301,13 +302,14 @@ namespace pathCam {
               int k = 0;
             }
           }
-        }else {
+        } else {
           int k = 0;
         }
         start = std::chrono::high_resolution_clock::now();
 
-        covisTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-      }else if (img->index > 0) {
+        covisTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::high_resolution_clock::now() - start).count();
+      } else if (img->index > 0) {
         int k = 0;
       }
 
@@ -317,26 +319,29 @@ namespace pathCam {
       auto imageList = find_contributing_images();
 
 
-
       observations.reserve(observations.size() + img->observations.size());
-      for (auto &obs : img->observations) {
+      for (auto &obs: img->observations) {
         if (obs->feature->find()->active) {
           // if (img->regInfo->root || obs->feature->find()->imageFeatures.size() > 1) {
-            observations.push_back(obs);
+          observations.push_back(obs);
           // }
         }
       }
       auto obs2 = observations;
-      obs2.erase(std::remove_if(obs2.begin(),obs2.end(),[&](Observation* o){return o->feature->find()->imageFeatures.size() < 2;}),obs2.end());
+      obs2.erase(std::remove_if(obs2.begin(), obs2.end(), [&](Observation *o) {
+        return o->feature->find()->imageFeatures.size() < 2;
+      }), obs2.end());
 
 
       ftg->launch_inprocess_sparse_CG_iterator(obs2);
-      auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-      std::cout<<"index "<<img->index<<" matches " << matchCount <<" coVis time "<<covisTime<<" total observations "<<obs2.size()<<" iteration time "<<t1<<std::endl;
+      auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+          .count();
+      std::cout << "index " << img->index << " matches " << matchCount << " coVis time " << covisTime <<
+          " total observations " << obs2.size() << " iteration time " << t1 << std::endl;
       int k = 0;
     }
-    int maxx = 0,maxy = 0;
-    for (auto &img : memberFrames) {
+    int maxx = 0, maxy = 0;
+    for (auto &img: memberFrames) {
       auto baImg = img->observations[0]->image;
       if (abs(img->regInfo->absoluteCoords.x - baImg->xy.x) > maxx) {
         maxx = abs(img->regInfo->absoluteCoords.x - baImg->xy.x);
@@ -344,14 +349,14 @@ namespace pathCam {
       if (abs(img->regInfo->absoluteCoords.y - baImg->xy.y) > maxy) {
         maxy = abs(img->regInfo->absoluteCoords.y - baImg->xy.y);
       }
-      img->regInfo->absoluteCoords =baImg->xy;
-
+      img->regInfo->absoluteCoords = baImg->xy;
     }
-    auto t111 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start11).count();
-    std::cout<<"total iterative time "<<t111<<std::endl;
+    auto t111 = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start11).count();
+    std::cout << "total iterative time " << t111 << std::endl;
 
     int max = 0, min = 900000, average = 0;
-    for (auto img : memberFrames) {
+    for (auto img: memberFrames) {
       auto liveFts = img->count_live_feats();
       average += liveFts;
       if (max < liveFts) {
@@ -366,9 +371,9 @@ namespace pathCam {
     rebuild(memberFrames);
 
 
-    std::map<int,int> trackDepth;
-    int count = 0,invalid = 0;
-    for (auto ft : ftg->baFeatures) {
+    std::map<int, int> trackDepth;
+    int count = 0, invalid = 0;
+    for (auto ft: ftg->baFeatures) {
       if (ft->parent == ft && ft->live) {
         ++count;
         if (!ft->active) {
@@ -377,26 +382,25 @@ namespace pathCam {
         ++trackDepth[ft->imageFeatures.size()];
       }
     }
-    std::cout<<"total features and invalid "<<count<<" "<<invalid<<std::endl;
+    std::cout << "total features and invalid " << count << " " << invalid << std::endl;
 
-    std::cout<<"depth of tracks"<<std::endl;
-    for (auto &[depth,count] : trackDepth) {
-      std::cout<<depth<< " "<<count<<std::endl;
+    std::cout << "depth of tracks" << std::endl;
+    for (auto &[depth,count]: trackDepth) {
+      std::cout << depth << " " << count << std::endl;
     }
 
     auto startf = std::chrono::high_resolution_clock::now();
 
 
+    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf)
+        .count();
 
-
-
-    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
-
-    std::cout<<"total coverage search time "<<t11<<std::endl;
+    std::cout << "total coverage search time " << t11 << std::endl;
     int k = 0;
   }
 
   void MetricComposite::align_and_rebuild() {
+    auto startf = std::chrono::high_resolution_clock::now();
     // return;
     // std::vector<Observation*> observations;
     // observations.reserve(memberFrames.size() * 600);
@@ -409,13 +413,12 @@ namespace pathCam {
     //   }
     // }
     //
-    // auto startf = std::chrono::high_resolution_clock::now();
     // ftg->launch_inprocess_sparse_CG_iterator(observations,memberFrames.size());
     // auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
     // std::cout<<"runtime "<<t11<<std::endl;
 
-    int maxx = 0,maxy = 0;
-    for (auto &img : memberFrames) {
+    int maxx = 0, maxy = 0;
+    for (auto &img: memberFrames) {
       auto baImg = img->observations[0]->image;
       if (abs(img->regInfo->absoluteCoords.x - baImg->xy.x) > maxx) {
         maxx = abs(img->regInfo->absoluteCoords.x - baImg->xy.x);
@@ -426,14 +429,18 @@ namespace pathCam {
       img->regInfo->absoluteCoords = baImg->xy;
     }
 
-    std::unordered_set imageSet(memberFrames.begin(),memberFrames.end());
+    auto start = std::chrono::high_resolution_clock::now();
+    std::unordered_set imageSet(memberFrames.begin(), memberFrames.end());
     auto mosaicSet = reduce_members_through_competition(imageSet);
-    rebuild({mosaicSet.begin(),mosaicSet.end()});
-    // test_add_align_image();
+    auto reduceTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
 
-    std::map<int,int> trackDepth;
-    int count = 0,invalid = 0;
-    for (auto ft : ftg->baFeatures) {
+    start = std::chrono::high_resolution_clock::now();
+    rebuild({mosaicSet.begin(), mosaicSet.end()});
+    auto rebuildTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+
+    std::map<int, int> trackDepth;
+    int count = 0, invalid = 0;
+    for (auto ft: ftg->baFeatures) {
       if (ft->parent == ft && ft->live) {
         ++count;
         if (!ft->active) {
@@ -442,7 +449,11 @@ namespace pathCam {
         ++trackDepth[ft->imageFeatures.size()];
       }
     }
-    std::cout<<"total features and invalid "<<count<<" "<<invalid<<std::endl;
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+
+    // std::cout << "total features and invalid " << count << " " << invalid << std::endl;
+    std::cout << "total align time comp " << componentIndex << ": " << t3 <<" with "<<mosaicSet.size()<<" frames"<< std::endl;
+    int k = 0;
     return;
     // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment
     for (auto &loser: absorbedComponents) {
@@ -457,7 +468,7 @@ namespace pathCam {
     }
 
 
-    auto start = std::chrono::high_resolution_clock::now();
+    // auto start = std::chrono::high_resolution_clock::now();
 
     auto ig = ImageGraph();
 
@@ -646,26 +657,26 @@ namespace pathCam {
       }
     }
 
-    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start).count();
-
-    Poco::FastMutex::ScopedLock lock(parent->printToScreenMutex);
-    std::cout << std::endl << "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(
-          componentMagLabel) <<
-        std::endl;
-
-    if (!discardedIslands.empty()) {
-      std::cout << "failed to connect graph, discarded " << discardedIslands.size() << " islands, "
-          << std::accumulate(discardedIslands.begin(), discardedIslands.end(), size_t{0}) << " frames" << std::endl;
-    }
-
-    if (!graphConnectivityResult.promoted_nodes.empty()) {
-      std::cout << "promoted " << graphConnectivityResult.promoted_nodes.size() << " frames" << std::endl;
-    }
-
-    std::cout << memberImages.size() << " frames aligned in " << iters.first << " and " << iters.second << " iterations"
-        << std::endl;
-    std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
+    // auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
+    //     (std::chrono::high_resolution_clock::now() - start).count();
+    //
+    // Poco::FastMutex::ScopedLock lock(parent->printToScreenMutex);
+    // std::cout << std::endl << "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(
+    //       componentMagLabel) <<
+    //     std::endl;
+    //
+    // if (!discardedIslands.empty()) {
+    //   std::cout << "failed to connect graph, discarded " << discardedIslands.size() << " islands, "
+    //       << std::accumulate(discardedIslands.begin(), discardedIslands.end(), size_t{0}) << " frames" << std::endl;
+    // }
+    //
+    // if (!graphConnectivityResult.promoted_nodes.empty()) {
+    //   std::cout << "promoted " << graphConnectivityResult.promoted_nodes.size() << " frames" << std::endl;
+    // }
+    //
+    // std::cout << memberImages.size() << " frames aligned in " << iters.first << " and " << iters.second << " iterations"
+    //     << std::endl;
+    // std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
 
@@ -789,7 +800,7 @@ namespace pathCam {
 
     //put raw data into fourChannelPreallocated
     prepare_4CPA_cpu(img, tiles, forceFullImage);
-    img->free_memory_RAW();
+    img->free_memory_RAW(true);
 
     //calculate region of pyramid for data placement
     auto imageBox = cv::Rect_<float>(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->width,
@@ -974,7 +985,8 @@ namespace pathCam {
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
 
-      if (onlyFTG && !to->owner->addedToFTG){continue;} //skip images that haven't been added to the FTG for alignment
+      if (onlyFTG && !to->owner->addedToFTG) { continue; }
+      //skip images that haven't been added to the FTG for alignment
 
       members.insert(to->owner);
     }

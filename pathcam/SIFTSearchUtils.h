@@ -167,6 +167,7 @@ namespace pathCam {
     size_t size() const { return parent.size(); }
   };
 
+
   struct pMatch {
     unsigned long src_img_idx;
     unsigned long dst_img_idx;
@@ -342,7 +343,7 @@ namespace pathCam {
     std::vector<ImageFeaturePair> index_to_feature;
     std::unique_ptr<UnionFind> uf_ptr;
 
-    std::unordered_set<std::shared_ptr<Match> > matches;
+    std::unordered_set<std::shared_ptr<Match>,MatchPtrHash,MatchPtrEqual> matches;
 
     FeatureGrid featureGrid{256};
 

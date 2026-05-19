@@ -46,23 +46,19 @@ struct Observation;
     std::mutex cudaBufferMutex, blurMutex;
     std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
-    bool blurSet = false;
     bool hasBeenInMemory = false;
     bool labelObserved = false;
     bool addedToFTG = false;
-    bool stationary = true;
 
     bool subsequentMatchLaunched = false;
 
 
     std::unordered_set<cv::Point2i> ownedTiles;
-    std::vector<std::shared_ptr<Match>> matches;
+    std::vector<std::shared_ptr<Match>> combineMatches;
     std::vector<cv::KeyPoint> keypoints,keypointsImageSpace;
     std::vector<Observation*> observations;
     std::vector<Features> akazeFeatures;
     cv::Mat descriptors;
-
-    static cv::cuda::GpuMat hannWindow, blurMask;
 
 
     static std::vector<float> valid_scales_for_label(unsigned int label) {
@@ -238,7 +234,7 @@ struct Observation;
     char *raw_buffer_cuda;
 #endif
     cv::Mat reg_image;
-    cv::Mat blurDFT;
+
 
 
 

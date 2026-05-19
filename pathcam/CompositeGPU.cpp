@@ -220,7 +220,7 @@ namespace pathCam {
       memberFrames.push_back(img);
       assert(img->regInfo);
 
-      staging.pop();
+      staging.pop_front();
       ++frameCount;
 
       if (img->labelObserved) {

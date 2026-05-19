@@ -107,7 +107,7 @@ namespace pathCam {
       inference_thread.join();
     }
 
-    cleanup_and_reset();
+    // cleanup_and_reset();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::high_resolution_clock::now() - start).count();
@@ -667,7 +667,6 @@ namespace pathCam {
     {
       std::lock_guard lock(ri->image->blurMutex);
       ri->image->motionBlur = 10000000;
-      ri->image->blurSet = true;
     }
 
     ri->resolved = true;
