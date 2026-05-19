@@ -69,8 +69,8 @@ namespace pathCam {
       bool two = obs->feature->find()->lastIteration > 0;
       if (obs->feature->find()->live && obs->feature->find()->lastIteration > 0) {
         ++count;
-        xTotal += obs->feature->find()->x - obs->obs_x;
-        yTotal += obs->feature->find()->y - obs->obs_y;
+        xTotal += obs->feature->find()->xy.x - obs->obs_x;
+        yTotal += obs->feature->find()->xy.y - obs->obs_y;
       }
     }
 
@@ -82,9 +82,29 @@ namespace pathCam {
     return {{},false}; //uh oh, what happens if none of the features have ever been updated? we return false
   }
 
+
+
+  void FeatureTrackGenerator::consume(FeatureTrackGenerator *consumedFTG, Point2f translation) {
+    baFeatures.reserve( baFeatures.size() + consumedFTG->baFeatures.size());
+    baImages.reserve(baImages.size() + consumedFTG->baImages.size());
+
+    for (auto baImg : consumedFTG->baImages) {
+      baImg->xy += translation;
+      baImages.push_back(baImg);
+    }
+    for (auto baFt : consumedFTG->baFeatures) {
+      baFt->xy += translation;
+      baFeatures.push_back(baFt);
+    }
+
+  }
+
+
   void FeatureTrackGenerator::add_image(Image *img) {
+    if (img->addedToFTG){return;}
+
     img->observations.resize(img->keypoints.size(), nullptr);
-    auto baImg = new BAImage(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->regInfo->root,
+    auto baImg = new BAImage(img->regInfo->absoluteCoords, img->regInfo->root,
                              img->regInfo);
     baImages.push_back(baImg);
 
@@ -101,9 +121,7 @@ namespace pathCam {
 
       img->observations[i] = new Observation(baImg, feat, ftPixelCoords.x, ftPixelCoords.y);
 
-      auto ftWorldCoords = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
-      feat->x = ftWorldCoords.x;
-      feat->y = ftWorldCoords.y;
+      feat->xy = Point2f(img->regInfo->absoluteCoords) + ftPixelCoords;
       feat->imageFeatures.emplace(img, i);
 
       featureGrid.insert(feat);
@@ -312,14 +330,14 @@ namespace pathCam {
 
       ftXY.resize(2 * activeFeatures.size());
       for (int i = 0; i <activeFeatures.size(); ++i) {
-        ftXY[2 * i] = activeFeatures[i]->x;
-        ftXY[2 * i + 1] = activeFeatures[i]->y;
+        ftXY[2 * i] = activeFeatures[i]->xy.x;
+        ftXY[2 * i + 1] = activeFeatures[i]->xy.y;
       }
 
       imgXY.resize(activeImages.size() * 2);
       for (int i = 0; i < activeImages.size(); ++i) {
-        imgXY[2 * i] = activeImages[i]->x;
-        imgXY[2 * i + 1] = activeImages[i]->y;
+        imgXY[2 * i] = activeImages[i]->xy.x;
+        imgXY[2 * i + 1] = activeImages[i]->xy.y;
       }
     } //end scoped write lock
 
@@ -386,8 +404,8 @@ namespace pathCam {
       BAImage *img = o->image;
       BAFeature *feat = o->feature;
 
-      const float rx = feat->x - img->x - o->obs_x;
-      const float ry = feat->y - img->y - o->obs_y;
+      const float rx = feat->xy.x - img->xy.x - o->obs_x;
+      const float ry = feat->xy.y - img->xy.y - o->obs_y;
 
       solverState.feat_r_x[fi] -= rx;
       solverState.feat_r_y[fi] -= ry;
@@ -620,13 +638,13 @@ namespace pathCam {
 
       prev_rTz = new_rTz;
     }
-    std::cout<<"iters "<<c<<std::endl;
+    // std::cout<<"iters "<<c<<std::endl;
 
     Poco::RWLock::ScopedWriteLock lock(rwLock);
     for (int i = 0; i < activeFeatures.size(); ++i) {
       auto ft = activeFeatures[i];
-      ft->x = ftXY[2 * i];
-      ft->y = ftXY[2 * i + 1];
+      ft->xy.x = ftXY[2 * i];
+      ft->xy.y = ftXY[2 * i + 1];
       ft->systemIdx = -1;
       ft->lastIteration += c;
       featureGrid.update(ft);
@@ -634,8 +652,8 @@ namespace pathCam {
 
     for (int i = 0; i < activeImages.size(); ++i) {
       auto img = activeImages[i];
-      img->x = imgXY[2 * i];
-      img->y = imgXY[2 * i + 1];
+      img->xy.x = imgXY[2 * i];
+      img->xy.y = imgXY[2 * i + 1];
       img->systemIdx = -1;
     }
 

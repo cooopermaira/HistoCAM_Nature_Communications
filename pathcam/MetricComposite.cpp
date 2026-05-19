@@ -28,7 +28,7 @@ namespace pathCam {
    */
   void MetricComposite::update() {
     if (suspended) { return; }
-    Poco::RWLock::ScopedReadLock lock(compositeProcessHalt);
+    Poco::RWLock::ScopedWriteLock lock(compositeProcessHalt);
 
     if (!consumptionQ.empty()) {
       consume_queued_components();
@@ -58,16 +58,14 @@ namespace pathCam {
     if (!staging.empty()) {
       auto ri = staging.front();
       auto img = ri->image;
-      memberFrames.push_back(img);
       assert(img->regInfo);
-      ri->compPopped = true;
 
 
       staging.pop();
       ++frameCount;
       maxIndex = max(maxIndex, img->index);
 
-      // launch_XC_search(img);
+      launch_XC_search(img);
       // launch_component_match_search_with_XC(img);
       // prep_image_for_alignment(img);
       // if (!img->regInfo->root)
@@ -128,9 +126,12 @@ namespace pathCam {
       }
       ++positionForNextWaitngFrame;
 
-      if (!immediateProcessingTiles.empty()) {
+      {
         Poco::FastMutex::ScopedLock lock(update_mutex);
-        process_tiles(img, immediateProcessingTiles);
+        memberFrames.push_back(img);
+        if (!immediateProcessingTiles.empty()) {
+          process_tiles(img, immediateProcessingTiles);
+        }
       }
 
       //if (imagePyramid->scale > 0) {
@@ -257,7 +258,7 @@ namespace pathCam {
 
       for (auto &obs : img->observations) {
         if (obs && obs->image) {
-          coords = Point2i(obs->image->x,obs->image->y);
+          coords = obs->image->xy;
           break;
         }
       }
@@ -337,13 +338,13 @@ namespace pathCam {
     int maxx = 0,maxy = 0;
     for (auto &img : memberFrames) {
       auto baImg = img->observations[0]->image;
-      if (abs(img->regInfo->absoluteCoords.x - baImg->x) > maxx) {
-        maxx = abs(img->regInfo->absoluteCoords.x - baImg->x);
+      if (abs(img->regInfo->absoluteCoords.x - baImg->xy.x) > maxx) {
+        maxx = abs(img->regInfo->absoluteCoords.x - baImg->xy.x);
       }
-      if (abs(img->regInfo->absoluteCoords.y - baImg->y) > maxy) {
-        maxy = abs(img->regInfo->absoluteCoords.y - baImg->y);
+      if (abs(img->regInfo->absoluteCoords.y - baImg->xy.y) > maxy) {
+        maxy = abs(img->regInfo->absoluteCoords.y - baImg->xy.y);
       }
-      img->regInfo->absoluteCoords = Point2i(baImg->x,baImg->y);
+      img->regInfo->absoluteCoords =baImg->xy;
 
     }
     auto t111 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start11).count();
@@ -416,13 +417,13 @@ namespace pathCam {
     int maxx = 0,maxy = 0;
     for (auto &img : memberFrames) {
       auto baImg = img->observations[0]->image;
-      if (abs(img->regInfo->absoluteCoords.x - baImg->x) > maxx) {
-        maxx = abs(img->regInfo->absoluteCoords.x - baImg->x);
+      if (abs(img->regInfo->absoluteCoords.x - baImg->xy.x) > maxx) {
+        maxx = abs(img->regInfo->absoluteCoords.x - baImg->xy.x);
       }
-      if (abs(img->regInfo->absoluteCoords.y - baImg->y) > maxy) {
-        maxy = abs(img->regInfo->absoluteCoords.y - baImg->y);
+      if (abs(img->regInfo->absoluteCoords.y - baImg->xy.y) > maxy) {
+        maxy = abs(img->regInfo->absoluteCoords.y - baImg->xy.y);
       }
-      img->regInfo->absoluteCoords = Point2i(baImg->x,baImg->y);
+      img->regInfo->absoluteCoords = baImg->xy;
     }
 
     std::unordered_set imageSet(memberFrames.begin(),memberFrames.end());

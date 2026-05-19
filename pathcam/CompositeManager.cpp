@@ -143,22 +143,16 @@ namespace pathCam {
 
         threads.emplace_back([comp]() {
           auto t1 = std::chrono::high_resolution_clock::now();
-          // while (comp->outstandingCMS_jobs > 0 || comp->xcInProgress) {
-          //   Poco::Thread::sleep(50);
-          // }
+
           comp->alignmentShouldProceed = false;
+          comp->xcMatchShouldContinue = false;
 
           comp->realTimeAlignmentEvent.set();
-
           if (comp->realtimeAlignmentThread.joinable()) {
             comp->realtimeAlignmentThread.join();
           }
-          for (auto &subComp: comp->absorbedComponents) {
-            while (subComp->outstandingCMS_jobs > 0) {
-              Poco::Thread::sleep(50);
-            }
-          }
-          comp->alignmentHasBegun = true;
+
+          // comp->alignmentHasBegun = true;
           auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now() - t1).
               count();

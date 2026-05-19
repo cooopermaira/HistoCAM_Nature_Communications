@@ -58,6 +58,7 @@ namespace pathCam {
         consumed = theirComponent;
       }
 
+      consumed->alignmentShouldProceed = false;
       consumed->suspended = true;
       consumed->imagePyramid->suspended = true;
       consumed->xcMatchShouldContinue = false;

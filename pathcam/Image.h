@@ -50,6 +50,7 @@ struct Observation;
     bool hasBeenInMemory = false;
     bool labelObserved = false;
     bool addedToFTG = false;
+    bool stationary = true;
 
     bool subsequentMatchLaunched = false;
 

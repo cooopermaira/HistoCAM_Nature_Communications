@@ -67,10 +67,11 @@ namespace pathCam {
     Rect_<float> tiledImageBounds;
     Poco::FastMutex update_mutex;
 
+
     std::shared_ptr<Composite> joinedTo;
     std::unordered_set<int> relatedComponents;
 
-    std::atomic<bool> alignmentHasBegun = false;
+    // std::atomic<bool> alignmentHasBegun = false;
     std::atomic<bool> suspended = false;
     std::atomic<int> outstandingCMS_jobs = 0;
     std::vector<std::shared_ptr<Composite> > absorbedComponents;
@@ -146,6 +147,7 @@ namespace pathCam {
     Poco::Mutex realTimeAlignmentMutex;
     Poco::Event realTimeAlignmentEvent;
     std::thread realtimeAlignmentThread;
+    int alignIterCount = 0;
 
     std::vector<Image *> memberFrames;
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
@@ -187,9 +189,13 @@ namespace pathCam {
 
     void prep_image_for_alignment(Image *img);
 
+    void add_consumable_img(Image* img);
+
     std::vector<std::shared_ptr<Match>> pairwise_match(Image *img, const std::vector<Image *> &targets) const;
 
     virtual void align_and_rebuild() {};
+
+    virtual void rebuild(const std::vector<Image *> &members){};
 
     virtual Point2i test_add_image_realtime(Image *img){return img->regInfo->absoluteCoords;};
 
@@ -230,9 +236,7 @@ namespace pathCam {
 
     void establish_scale_at_root_cpu(Image *_rootImg);
 
-    // static void sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,
-    //                             const std::vector<uint8_t> &inlierMask, std::vector<
-    //                               KeyPoint> &keypoints1, std::vector<KeyPoint> &keypoints2);
+    Point2f get_space_to_space_translation(const ConsumableComponent &consumable) const;
 
     void set_scale(float _scale, bool _ffCorrectExistingTiles = false);
 

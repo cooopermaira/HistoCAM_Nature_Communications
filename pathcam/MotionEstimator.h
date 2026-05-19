@@ -55,7 +55,6 @@ public:
   // bool registered = false;
   bool queued = false;
   bool staged = false;
-  bool compPopped = false;
 
   int component_membership;
   Point2i absoluteCoords;

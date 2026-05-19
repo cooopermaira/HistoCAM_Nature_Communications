@@ -8,20 +8,23 @@
 #include "pathCam.h"
 
 namespace pathCam {
-  inline uint32_t make_stable_id(const long imageIdx, const int featureIdx){
+  inline uint32_t make_stable_id(const long imageIdx, const int featureIdx) {
     return (static_cast<uint32_t>(imageIdx) << 10) | static_cast<uint32_t>(featureIdx);
   }
-  inline uint32_t image_idx(uint32_t stableID){
+
+  inline uint32_t image_idx(uint32_t stableID) {
     return stableID >> 10;
   }
-  inline uint32_t feature_idx(uint32_t stableID){
+
+  inline uint32_t feature_idx(uint32_t stableID) {
     return stableID & ((1 << 10) - 1);
   }
+
   inline uint64_t make_edge_ID(uint32_t a, uint32_t b) {
     if (a > b) {
-      std::swap(a,b);
+      std::swap(a, b);
     }
-    return ((uint64_t)a << 32) | b;
+    return ((uint64_t) a << 32) | b;
   }
 
   struct MatchPtrHash {
@@ -96,8 +99,7 @@ namespace pathCam {
   };
 
   struct BAImage {
-    float x = 0;
-    float y = 0;
+    Point2f xy;
     bool fixed = false;
 
     RegInfo *regInfo = nullptr;
@@ -106,8 +108,7 @@ namespace pathCam {
   };
 
   struct BAFeature {
-    float x = 0;
-    float y = 0;
+    Point2f xy;
     bool active = true;
     bool live = false;
     int lastIteration = 0;
@@ -126,7 +127,6 @@ namespace pathCam {
         parent = parent->find();
       return parent;
     }
-
 
 
     static BAFeature *unite(BAFeature *a, BAFeature *b) {
@@ -197,7 +197,7 @@ namespace pathCam {
 
     // ---- insert ----
     void insert(BAFeature *f) {
-      auto [cx, cy] = getCell(f->x, f->y);
+      auto [cx, cy] = getCell(f->xy);
       auto &cell = grid[{cx, cy}];
 
       f->cellIdx.x = cx;
@@ -249,7 +249,7 @@ namespace pathCam {
 
     // ---- update position (after BA) ----
     void update(BAFeature *f) {
-      auto [newX, newY] = getCell(f->x, f->y);
+      auto [newX, newY] = getCell(f->xy);
 
       if (newX == f->cellIdx.x && newY == f->cellIdx.y)
         return;
@@ -298,17 +298,16 @@ namespace pathCam {
 
     std::unordered_map<CellCoord, std::vector<BAFeature *>, CellHash> grid;
 
-    inline std::pair<int, int> getCell(float x, float y) const {
+    inline std::pair<int, int> getCell(Point2f xy) const {
       return {
-        (int) std::floor(x * invCellSize),
-        (int) std::floor(y * invCellSize)
+        (int) std::floor(xy.x * invCellSize),
+        (int) std::floor(xy.y * invCellSize)
       };
     }
   };
 
   class FeatureTrackGenerator {
   public:
-
     FeatureTrackGenerator() {
       coVisEdgeSupport.reserve(30000000);
     }
@@ -343,7 +342,7 @@ namespace pathCam {
     std::vector<ImageFeaturePair> index_to_feature;
     std::unique_ptr<UnionFind> uf_ptr;
 
-    std::unordered_set<std::shared_ptr<Match>> matches;
+    std::unordered_set<std::shared_ptr<Match> > matches;
 
     FeatureGrid featureGrid{256};
 
@@ -351,7 +350,7 @@ namespace pathCam {
     std::vector<BAImage *> baImages;
     SolverState solverState;
 
-    std::unordered_map<uint64_t,uint16_t> coVisEdgeSupport;
+    std::unordered_map<uint64_t, uint16_t> coVisEdgeSupport;
 
     int invalidCount = 0;
 
@@ -385,12 +384,15 @@ namespace pathCam {
     void launch_inprocess_sparse_CG_iterator(const std::vector<Observation *> &observations, int maxIters = 0,
                                              float tol = 1e-4f);
 
+    void consume(FeatureTrackGenerator *consumedFTG, Point2f translation);
+
     std::vector<FeatureTrack> generateCurrentTracks(const std::vector<Image *> &images);
 
     Poco::FastMutex accessMutex;
+    inline static Poco::RWLock alignmentProcessHalt;
 
     // std::unordered_set<std::shared_ptr<Match>, MatchPtrHash, MatchPtrEqual> storedMatches;
-    std::queue<std::shared_ptr<Match>> queuedMatches;
+    std::queue<std::shared_ptr<Match> > queuedMatches;
     std::unordered_set<std::shared_ptr<Match> > storedMatches;
     std::unordered_map<int, std::unordered_set<std::shared_ptr<Match> > > interComponentMatches;
 

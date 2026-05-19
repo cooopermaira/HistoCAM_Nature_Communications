@@ -121,6 +121,10 @@ namespace pathCam {
         relativeCoords = Point2i(winningVote.m->t_x, winningVote.m->t_y);
         component_membership = wImg->regInfo->component_membership;
 
+        if (relativeCoords.x * relativeCoords.x + relativeCoords.y * relativeCoords.y > 100) {
+          image->stationary = false;
+        }
+
         long dt = index - wImg->index;
         if (dt > 0) {
           Point2f dist = Point2f(relativeCoords) / static_cast<float>(dt);
