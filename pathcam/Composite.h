@@ -19,8 +19,6 @@
 
 
 namespace pathCam {
-
-
   class FeatureTrackGenerator;
   class BundleAdjustmentIntegrator;
 
@@ -47,14 +45,13 @@ namespace pathCam {
     friend class CompositeManager;
     friend class RebuildRunnable;
 
-    struct ConsumableComponent
-    {
+    struct ConsumableComponent {
       std::shared_ptr<Composite> composite;
-      std::vector<std::shared_ptr<Match>> matches;
+      std::vector<std::shared_ptr<Match> > matches;
     };
 
   public:
-    Composite(StreamCam *parent, Size image_size, int _componentIndex) ;
+    Composite(StreamCam *parent, Size image_size, int _componentIndex);
 
     virtual ~Composite();
 
@@ -141,13 +138,13 @@ namespace pathCam {
     std::map<int, long> delaunayMembers;
     std::deque<RegInfo *> staging;
 
-    // std::vector<
-    std::vector<Image*> realTimeImageList;
-    std::queue<Image*> realTimeAlignmentQueue;
+    std::queue<ConsumableComponent> consumptionQ;
+    std::vector<Image *> realTimeImageList;
+    std::queue<Image *> realTimeAlignmentQueue;
     Poco::Mutex realTimeAlignmentMutex;
     Poco::Event realTimeAlignmentEvent;
     std::thread realtimeAlignmentThread;
-    int alignIterCount = 0;
+    int debugCount = 0;
 
     std::vector<Image *> memberFrames;
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
@@ -162,44 +159,28 @@ namespace pathCam {
     FeatureTrackGenerator *ftg = nullptr;
     BundleAdjustmentIntegrator *bai = nullptr;
 
-    //yikes, what a definition. its a queue of composites with a vector of the matches to process
-    std::queue< ConsumableComponent > consumptionQ;
 
     Size imageSize;
     std::vector<float> candidateScaleRatios;
 
-    std::shared_ptr<Composite> joinHead();
 
-    bool prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
 
-    bool prepare_4CPA_cpu(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
+    virtual void update();
 
-    bool prepare_4CPA(Image *img, Rect roi_ = Rect());
+    virtual int get_exit_rep_count() { return 0; }
 
-    bool prepare_4CPA_cpu(Image *img, Rect roi_ = Rect());
-
-    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n, const std::vector<Image *> &alreadyMatched, Image *self = nullptr) const;
-
-    void launch_component_match_search(Image *img_, std::vector<Image *> candidates_);
-
-    void realtime_alignment_thread_loop();
-
-    void realtime_align(std::vector<Image*> images);
-
-    void prep_image_for_alignment(Image *img) const;
-
-    std::vector<std::shared_ptr<Match>> pairwise_match(Image *img, const std::vector<Image *> &targets) const;
+    virtual void add_landmark_frame(Image *img) {};
 
     virtual void align_and_rebuild() {};
 
-    virtual void rebuild(const std::vector<Image *> &members){};
+    virtual void rebuild(const std::vector<Image *> &members) {};
 
-    virtual Point2i test_add_image_realtime(Image *img){return img->regInfo->absoluteCoords;};
+    virtual Point2i test_add_image_realtime(Image *img) { return img->regInfo->absoluteCoords; };
 
     virtual std::unordered_set<Image *> find_contributing_images(bool onlyFTG = false) const {
       if (onlyFTG) {
         std::unordered_set<Image *> ans;
-        for (auto &img : contributingFrames) {
+        for (auto &img: contributingFrames) {
           if (img->addedToFTG) {
             ans.insert(img);
           }
@@ -210,26 +191,42 @@ namespace pathCam {
       return contributingFrames;
     };
 
-    virtual int get_exit_rep_count() { return 0; }
+
+    bool prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
+
+    bool prepare_4CPA_cpu(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
+
+    bool prepare_4CPA(Image *img, Rect roi_ = Rect());
+
+    bool prepare_4CPA_cpu(Image *img, Rect roi_ = Rect());
+
+    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n,
+                                                              const std::vector<Image *> &alreadyMatched,
+                                                              Image *self = nullptr) const;
+
+    std::shared_ptr<Composite> joinHead();
+
+    void launch_component_match_search(Image *img_, std::vector<Image *> candidates_);
+
+    void realtime_alignment_thread_loop();
+
+    void realtime_align(std::vector<Image *> images);
+
+    void prep_image_for_alignment(Image *img) const;
+
+    std::vector<std::shared_ptr<Match> > pairwise_match(Image *img, const std::vector<Image *> &targets) const;
 
     std::vector<std::pair<Image *, Image *> > calculate_member_overlaps(std::vector<Image *> images) const;
-
 
     void sort_overlaps_by_likelihood(std::vector<std::pair<pathCam::Image *, cv::Rect> > &_overlaps,
                                      const float &_targetScale);
 
-    virtual void add_landmark_frame(Image *img) {
-    };
-
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);
 
-
     void stage(RegInfo *_ri) { staging.push_back(_ri); }
 
-    // bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
-    //
-    // void establish_scale_at_root(Image *_rootImg);
+    void queue_for_consumption(const ConsumableComponent &component) { consumptionQ.push(component); }
 
     void establish_scale_at_root_cpu(Image *_rootImg);
 
@@ -237,11 +234,9 @@ namespace pathCam {
 
     void set_scale(float _scale, bool _ffCorrectExistingTiles = false);
 
-    void queue_for_consumption(const ConsumableComponent &component){consumptionQ.push(component);}
-
     void consume_queued_components();
 
-    void launch_XC_search(Image* img);
+    void launch_XC_search(Image *img);
 
     void ff_correct_existing_tiles();
 
@@ -262,8 +257,6 @@ namespace pathCam {
     void update_Bbox(std::vector<RegInfo *> new_info);
 
     void update_Bbox_no_composite(std::vector<RegInfo *> new_info);
-
-    virtual void update();
 
     Mat get_composite();
 

@@ -25,7 +25,7 @@ namespace pathCam {
    * over and over again by a series of consecutive frames and substantially lowers computational cost
    */
   void MetricComposite::update() {
-    if (suspended) { return; }
+
     Poco::RWLock::ScopedWriteLock lock(compositeProcessHalt);
 
     if (!consumptionQ.empty()) {

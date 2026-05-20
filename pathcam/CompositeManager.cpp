@@ -85,7 +85,10 @@ namespace pathCam {
           auto start = std::chrono::high_resolution_clock::now();
 
           for (auto &comp: parent->composites) {
-            comp->update();
+            if (comp->suspended){continue;}
+            while (!comp->staging.empty()) {
+              comp->update();
+            }
           }
 
           auto stop = std::chrono::high_resolution_clock::now();

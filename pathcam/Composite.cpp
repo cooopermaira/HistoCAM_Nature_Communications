@@ -571,6 +571,12 @@ namespace pathCam {
     while (!consumptionQ.empty()) {
       auto consumable = std::move(consumptionQ.front());
       consumptionQ.pop();
+
+      while (!consumable.composite->consumptionQ.empty()) {
+        consumptionQ.push(consumable.composite->consumptionQ.front());
+        consumable.composite->consumptionQ.pop();
+      }
+
       for (auto m : consumable.matches) {
         m->image_1->combineMatches.push_back(m);
         m->image_2->combineMatches.push_back(m);
@@ -708,7 +714,6 @@ namespace pathCam {
 
     // update coordinates on all regInfo objects before returning.
 
-    ++alignIterCount;
   }
 
   void Composite::prep_image_for_alignment(Image *img) const {
