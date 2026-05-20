@@ -136,11 +136,6 @@ namespace pathCam {
       auto tAlign = std::chrono::high_resolution_clock::now();
 
       for (auto &comp: parent->composites) {
-        if (comp->suspended) {
-          comp->imagePyramid->suspended = true;
-          continue;
-        }
-
         threads.emplace_back([comp]() {
           auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -157,6 +152,12 @@ namespace pathCam {
                 std::chrono::high_resolution_clock::now() - t1).
               count();
           std::cout << "component " << comp->componentIndex << " wait time " << t2 << std::endl;
+
+          if (comp->suspended) {
+            comp->imagePyramid->suspended = true;
+            return;
+          }
+
           comp->align_and_rebuild();
         });
       }

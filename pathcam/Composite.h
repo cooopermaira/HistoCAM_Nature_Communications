@@ -187,7 +187,7 @@ namespace pathCam {
 
     void realtime_align(std::vector<Image*> images);
 
-    void prep_image_for_alignment(Image *img);
+    void prep_image_for_alignment(Image *img) const;
 
     std::vector<std::shared_ptr<Match>> pairwise_match(Image *img, const std::vector<Image *> &targets) const;
 

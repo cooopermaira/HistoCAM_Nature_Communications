@@ -42,7 +42,7 @@ namespace pathCam {
     if (!matches.empty()) {
       //figure out which component consumes the other
 
-      Poco::RWLock::ScopedWriteLock lock(Composite::compositeProcessHalt);
+      Poco::RWLock::ScopedWriteLock compositeHalt(Composite::compositeProcessHalt);
       if (theirComponent->suspended){return;}// component was already consumed
 
       auto theirImages = theirComponent->find_contributing_images();
@@ -58,31 +58,15 @@ namespace pathCam {
         consumed = theirComponent;
       }
 
+      std::cout<<"COMPONENT "<<consumed->componentIndex<<" WILL BE CONSUMED BY COMPONENT "<<survivor->componentIndex<<std::endl;
+
+      Poco::RWLock::ScopedWriteLock ftgHalt(FeatureTrackGenerator::alignmentProcessHalt);
       consumed->alignmentShouldProceed = false;
       consumed->suspended = true;
       consumed->imagePyramid->suspended = true;
       consumed->xcMatchShouldContinue = false;
 
       survivor->queue_for_consumption({consumed,matches});
-
-
-      //halt registration process, update all component membership and coordinates for consumed component.
-      Poco::RWLock::ScopedWriteLock haltRegistration(RegInfo::registrationProcessHalt);
-
-
-      //thru averaging, calculate single translation for all images in consumed component into their new component
-
-      //halt FTG (possibly thru compositeProcessHalt since its managed by a composite object thread
-      //shift all objects in consumed FTG (features and images) into surviving FTG space
-      //must now combine FTGs. for each match, find candidate matches and pursue them. then
-      // 1) shift all consumed FTG objects into surviving FTG space
-      // 2) add all consumed FTG objects to surviving FTG
-      // 3) process all matches thru surviving FTG
-
-
-
-
-      //halt composite process
 
     }
 
@@ -112,8 +96,6 @@ namespace pathCam {
       if (candidate == nullptr || candidate->index == image->index) {continue;}
       if (!candidate->is_good()) {continue;}
       if (image->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && image->label != candidate->label){continue;}
-
-      ++image->matchCount;
 
       // auto meP1 = image->regInfo->absoluteCoords - Point2i(200,200);
       // auto meP2 = image->regInfo->absoluteCoords + Point2i(image->width+200,image->height+200);

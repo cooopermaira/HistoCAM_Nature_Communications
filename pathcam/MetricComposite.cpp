@@ -101,8 +101,7 @@ namespace pathCam {
 
 
       //grab affected tiles with their category of coverage
-      auto affectedPyramidTilesWithStatus = calculate_affected_tiles_with_status(
-        Point2f(ri->absoluteCoords));
+      auto affectedPyramidTilesWithStatus = calculate_affected_tiles_with_status(ri->absoluteCoords);
 
 
       //calculate: for which of the affected tiles is this frame an improvement?
@@ -131,16 +130,16 @@ namespace pathCam {
         process_tiles(img, immediateProcessingTiles);
       }
 
+      if (img->showFrameBoundaryOnUpdate){
+        float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
+        float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
+        float w = parent->image_width * imagePyramid->scale;
+        float h = parent->image_height * imagePyramid->scale;
+        bool showAsCircle = (componentMagLabel == Image::_2X);
 
-      //if (imagePyramid->scale > 0) {
-      float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
-      float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
-      float w = parent->image_width * imagePyramid->scale;
-      float h = parent->image_height * imagePyramid->scale;
-      bool showAsCircle = (componentMagLabel == Image::_2X);
-
-      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
-                                Image::get_label(componentMagLabel), get_scale());
+        parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
+                                  Image::get_label(componentMagLabel), get_scale());
+      }
       //}
     } else {
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
@@ -427,16 +426,19 @@ namespace pathCam {
         maxy = abs(img->regInfo->absoluteCoords.y - baImg->xy.y);
       }
       img->regInfo->absoluteCoords = baImg->xy;
+      img->regInfo->wasAligned = true;
     }
 
     auto start = std::chrono::high_resolution_clock::now();
     std::unordered_set imageSet(memberFrames.begin(), memberFrames.end());
     auto mosaicSet = reduce_members_through_competition(imageSet);
-    auto reduceTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    auto reduceTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start).count();
 
     start = std::chrono::high_resolution_clock::now();
     rebuild({mosaicSet.begin(), mosaicSet.end()});
-    auto rebuildTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+    auto rebuildTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start).count();
 
     std::map<int, int> trackDepth;
     int count = 0, invalid = 0;
@@ -449,12 +451,16 @@ namespace pathCam {
         ++trackDepth[ft->imageFeatures.size()];
       }
     }
-    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).
+        count();
 
     // std::cout << "total features and invalid " << count << " " << invalid << std::endl;
-    std::cout << "total align time comp " << componentIndex << ": " << t3 <<" with "<<mosaicSet.size()<<" frames"<< std::endl;
+    std::cout << "total align time comp " << componentIndex << ": " << t3 << " with " << mosaicSet.size() << " frames"
+        << std::endl;
     int k = 0;
     return;
+
+
     // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment
     for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
@@ -724,7 +730,6 @@ namespace pathCam {
           assert(check_tile_img(img->regInfo->absoluteCoords,tileIdx,parent->tileSize,imageSize));
         }
       }
-      img->subsequentMatchLaunched = true;
       process_tiles(img, tileIndexes, false);
 
 
@@ -946,16 +951,13 @@ namespace pathCam {
     }
 
     float myMotionBlur, theirMotionBlur, myFocusBlur, theirFocusBlur;
-    {
-      std::lock_guard lock(_img->blurMutex);
-      myMotionBlur = _img->motionBlur;
-      myFocusBlur = _img->focusBlur;
-    }
-    {
-      std::lock_guard lock(_to->owner->blurMutex);
-      theirMotionBlur = _to->owner->motionBlur;
-      theirFocusBlur = _to->owner->focusBlur;
-    }
+
+    myMotionBlur = _img->motionBlur;
+    myFocusBlur = _img->focusBlur;
+
+    theirMotionBlur = _to->owner->motionBlur;
+    theirFocusBlur = _to->owner->focusBlur;
+
     //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
     //pretty close to the center of the frame
     if (std::abs(theirMotionBlur - myMotionBlur) < /*0.01f*/50) {

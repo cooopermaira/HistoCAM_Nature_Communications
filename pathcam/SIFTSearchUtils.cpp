@@ -173,7 +173,7 @@ namespace pathCam {
         auto tInd = match_->good_matches[i].trainIdx;
 
         //path compression happens here, so baFeat1 and baFeat2 are their own parents
-        auto baFeat1 = img1->observations[qInd]->feature->find();
+        auto baFeat1 = img1->observations[qInd]->feature->find(); //segfault right here
         auto baFeat2 = img2->observations[tInd]->feature->find();
 
         if (baFeat1 != baFeat2) {

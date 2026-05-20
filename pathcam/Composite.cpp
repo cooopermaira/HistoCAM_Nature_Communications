@@ -570,6 +570,7 @@ namespace pathCam {
         m->image_2->combineMatches.push_back(m);
       }
 
+      std::cout<<"COMPONENT "<<componentIndex<<" NOW CONSUMING "<<consumable.composite->componentIndex<<std::endl;
 
       auto translation = get_space_to_space_translation(consumable);
 
@@ -591,8 +592,13 @@ namespace pathCam {
 
       for (auto img : consumable.composite->memberFrames) {
         staging.push_back(img->regInfo);
+        for (auto obs : img->observations) {
+          delete obs;
+        }
         img->observations.clear();
         img->addedToFTG = false;
+        img->showFrameBoundaryOnUpdate = false;
+        img->ownedTiles.clear();
       }
 
       staging.insert(
@@ -663,6 +669,7 @@ namespace pathCam {
       // -----------------------------------------
 
       if (!alignmentShouldProceed) {
+        if (suspended){return;}
         Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
 
         if (realTimeAlignmentQueue.empty()) {
@@ -677,40 +684,20 @@ namespace pathCam {
 
   void Composite::realtime_align(std::vector<Image *> images) {
     Poco::RWLock::ScopedReadLock processLock(FeatureTrackGenerator::alignmentProcessHalt);
+    if (suspended){return;}
+
+    realTimeImageList.reserve(realTimeImageList.size() + images.size());
+
     auto startf = std::chrono::high_resolution_clock::now();
     std::vector<Observation *> observations;
 
-    std::vector<Image*> pushGridLater;
 
     for (auto img: images) {
-      if (img->addedToFTG){pushGridLater.push_back(img);}
       prep_image_for_alignment(img);
+      realTimeImageList.push_back(img);
     }
-    if (!pushGridLater.empty()) {
-      std::unordered_set<BAFeature*> ftsToAdd;
-      for (auto img : pushGridLater) {
-        for (auto obs : img->observations) {
-          if (obs->feature) {
-            auto f = obs->feature->find();
-            if (f->active) {
-              ftsToAdd.insert(f);
-            }
-          }
-        }
-      }
-      for (auto f : ftsToAdd) {
-        ftg->featureGrid.insert(f);
-      }
-      for (auto img : pushGridLater) {
-        for (auto m : img->combineMatches) {
-          ftg->process_match2(m);
-        }
-      }
-    }
-    realTimeImageList.insert(realTimeImageList.end(), images.begin(), images.end());
 
-    //if (alignIterCount % 20 == 0) {
-    if (true) {
+
       //do a full align
 
       observations.reserve(realTimeImageList.size() * 600);
@@ -727,23 +714,7 @@ namespace pathCam {
           }
         }
       }
-    } else {
-      update_mutex.lock();
-      auto imageList = find_contributing_images(true);
-      update_mutex.unlock();
 
-      imageList.insert(images.begin(), images.end());
-      observations.reserve(imageList.size() * 600);
-
-      for (auto img: imageList) {
-        for (Observation *obs: img->observations) {
-          auto *f = obs->feature->find();
-          if (f->active && f->live) {
-            observations.push_back(obs);
-          }
-        }
-      }
-    }
 
 
     auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).
@@ -754,8 +725,8 @@ namespace pathCam {
 
     auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).
         count();
-    std::cout << "preproc time " << t3 << " solve time " << t4 <<
-        " queue size " << images.size() << std::endl;
+    // std::cout << "preproc time " << t3 << " solve time " << t4 <<
+    //     " queue size " << images.size() << std::endl;
 
 
     // update coordinates on all regInfo objects before returning.
@@ -763,7 +734,7 @@ namespace pathCam {
     ++alignIterCount;
   }
 
-  void Composite::prep_image_for_alignment(Image *img) {
+  void Composite::prep_image_for_alignment(Image *img) const {
 
     ftg->add_image(img);
 
@@ -781,10 +752,11 @@ namespace pathCam {
       //we just pinned down some of my features to existing ft tracks, use those ft track locations to estimate my image coords
       std::tie(coords, valid) = ftg->estimate_image_coords_from_feature_tracks(img);
       alreadyMatched.push_back(img->regInfo->winningVote.m->image_1);
-    } else {
-      std::cout << "WARNING FROM Composite::prep_image_for_alignment IMAGE INDEX " << img->index <<
-          "HAD NO WINNING VOTE" << std::endl;
     }
+    // else  {
+    //   std::cout << "WARNING FROM Composite::prep_image_for_alignment IMAGE INDEX " << img->index <<
+    //       " HAD NO WINNING VOTE" << std::endl;
+    // }
 
     int candidateRequest;
     Rect searchSpace;
@@ -895,7 +867,7 @@ namespace pathCam {
     // Build dense candidate structures
     // ------------------------------------------------------------------------
 
-    const int imageCount = (int) memberFrames.size();
+    const int imageCount = (int) realTimeImageList.size();
 
     std::vector<Candidate> candidates(imageCount);
 
@@ -905,7 +877,7 @@ namespace pathCam {
 
     long maxGlobalIndex = 0;
 
-    for (Image *img: memberFrames) {
+    for (Image *img: realTimeImageList) {
       if (img) {
         maxGlobalIndex = std::max(maxGlobalIndex, img->index);
       }
@@ -914,7 +886,7 @@ namespace pathCam {
     std::vector<int> globalToLocal(maxGlobalIndex + 1, -1);
 
     for (int localIdx = 0; localIdx < imageCount; ++localIdx) {
-      Image *img = memberFrames[localIdx];
+      Image *img = realTimeImageList[localIdx];
 
       if (img) {
         globalToLocal[img->index] = localIdx;
@@ -1029,7 +1001,7 @@ namespace pathCam {
       // --------------------------------------------------------------------
 
       for (int localIdx = 0; localIdx < imageCount; ++localIdx) {
-        Image *img = memberFrames[localIdx];
+        Image *img = realTimeImageList[localIdx];
 
         if (!img)
           continue;
@@ -1076,13 +1048,13 @@ namespace pathCam {
 
 
   void Composite::launch_component_match_search(Image *img, std::vector<Image *> candidates_) {
-    if (!img->subsequentMatchLaunched) {
+    // if (!img->subsequentMatchLaunched) {
       // img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
-      img->subsequentMatchLaunched = true;
+      // img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
       const auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), candidates_);
       parent->jqSecondary->add_runnable(cms);
-    }
+    // }
   }
 
 

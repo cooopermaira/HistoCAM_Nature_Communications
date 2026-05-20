@@ -313,6 +313,15 @@ namespace pathCam {
       coVisEdgeSupport.reserve(30000000);
     }
 
+    ~FeatureTrackGenerator() {
+      for (auto img : baImages) {
+        delete img;
+      }
+      for (auto ft : baFeatures) {
+        delete ft;
+      }
+    }
+
     struct ImageFeaturePair {
       long image_id;
       int feature_id;

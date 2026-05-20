@@ -22,7 +22,6 @@ struct Observation;
     int loadCount = 0;
 
     // v DEBUG v
-    int matchCount = 0;
     // long profileTime = 0;
     // ^ DEBUG ^
 
@@ -43,14 +42,15 @@ struct Observation;
     cv::Point2i absoluteCoords;
 
     Poco::FastMutex buffer_mutex,matchesMutex;
-    std::mutex cudaBufferMutex, blurMutex;
+    std::mutex cudaBufferMutex;
     std::condition_variable cudaBufferConVar, blurConVar;
     bool cudaBufferReady;
     bool hasBeenInMemory = false;
     bool labelObserved = false;
     bool addedToFTG = false;
+    bool showFrameBoundaryOnUpdate = true;
 
-    bool subsequentMatchLaunched = false;
+    // bool subsequentMatchLaunched = false;
 
 
     std::unordered_set<cv::Point2i> ownedTiles;

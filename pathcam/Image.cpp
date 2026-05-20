@@ -103,6 +103,9 @@ namespace pathCam {
 
   Image::~Image() {
     free_memory_RAW(true);
+    for (auto obs : observations) {
+      delete obs;
+    }
     // if (regInfo) {
     //   delete regInfo;
     // }
