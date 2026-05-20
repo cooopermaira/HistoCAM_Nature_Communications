@@ -64,7 +64,7 @@ public:
 
     voiceHandlerThread = std::thread(&AnnotateComponent::voice_annotation_handler,this);
 
-    // silly_test();
+    silly_test();
   }
 
   void voice_annotation_handler();
@@ -192,6 +192,10 @@ public:
   }
 
   void removeSelected();
+
+  void saveConceptSpans(const std::string &filepath, const std::vector<ConceptSpan> &spans);
+  std::vector<ConceptSpan> loadConceptSpans(const std::string &filepath);
+
 
   std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > activeAnnotations;
   std::vector<std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > > allSlideAnnotations;
