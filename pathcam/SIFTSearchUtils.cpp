@@ -101,24 +101,6 @@ namespace pathCam {
 
 
   void FeatureTrackGenerator::add_image(Image *img) {
-    if (img->addedToFTG) {
-
-      bool imgAdded = false;
-      baFeatures.reserve(baFeatures.size() + img->observations.size());
-
-      for (auto obs : img->observations) {
-        if (obs) {
-          if (obs->image && !imgAdded) {
-            baImages.push_back(obs->image);
-            imgAdded = true;
-          }
-          if (obs->feature) {
-            baFeatures.push_back(obs->feature);
-          }
-        }
-      }
-
-    }else {
 
       img->observations.resize(img->keypoints.size(), nullptr);
       auto baImg = new BAImage(img->regInfo->absoluteCoords, img->regInfo->root,
@@ -133,7 +115,7 @@ namespace pathCam {
       for (int i = 0; i < img->observations.size(); ++i) {
         const auto ftPixelCoords = img->keypoints[i].pt / regScale;
 
-        auto feat = new BAFeature;
+        auto feat = new BAFeature; //how is this leaked?
         baFeatures.push_back(feat);
 
         img->observations[i] = new Observation(baImg, feat, ftPixelCoords.x, ftPixelCoords.y);
@@ -145,7 +127,7 @@ namespace pathCam {
       }
 
       img->addedToFTG = true;
-    }
+
   }
 
   int FeatureTrackGenerator::process_match_queue() {

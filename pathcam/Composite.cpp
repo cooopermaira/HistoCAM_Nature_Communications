@@ -513,6 +513,12 @@ namespace pathCam {
     delete ftg;
   }
 
+  std::shared_ptr<Composite> Composite::joinHead() {
+    if (joinedTo->componentIndex != componentIndex) {
+      joinedTo = joinedTo->joinHead();
+    }
+    return joinedTo;
+  }
 
   void Composite::launch_XC_search(Image *img) {
     // Poco::RWLock::ScopedReadLock(parent->component_mutex); //already locked in composite manager, this is composite thread
@@ -602,40 +608,11 @@ namespace pathCam {
       }
 
       staging.insert(
-          staging.begin(),
+          staging.end(),
           std::make_move_iterator(consumable.composite->staging.begin()),
           std::make_move_iterator(consumable.composite->staging.end())
       );
       consumable.composite->staging.clear();
-
-      return;
-      {
-        //translate all the FTG objects into my space
-        Poco::RWLock::ScopedWriteLock ftgProcLock(FeatureTrackGenerator::alignmentProcessHalt);
-
-        for (auto img: consumable.composite->memberFrames) {
-          realTimeAlignmentQueue.push(img);
-        }
-        realTimeAlignmentEvent.set();
-      }
-
-
-
-      memberFrames.insert(memberFrames.end(), consumable.composite->memberFrames.begin(),
-                          consumable.composite->memberFrames.end());
-      auto mosaicFrames = find_contributing_images();
-      auto theirMosaicFrames = consumable.composite->find_contributing_images();
-      mosaicFrames.insert(theirMosaicFrames.begin(), theirMosaicFrames.end());
-
-      rebuild({mosaicFrames.begin(), mosaicFrames.end()});
-      return;
-      //halt FTG
-
-      //translate everything in their FTG into my space
-
-      //process all things in their FTG as find match candidate and if any, add match.
-
-      //process all matches
     }
   }
 
@@ -736,6 +713,9 @@ namespace pathCam {
 
   void Composite::prep_image_for_alignment(Image *img) const {
 
+    if (img->addedToFTG) {
+      int k = 0;
+    }
     ftg->add_image(img);
 
     Point2i coords = img->regInfo->absoluteCoords;

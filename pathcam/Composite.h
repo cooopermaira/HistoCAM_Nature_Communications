@@ -165,7 +165,10 @@ namespace pathCam {
     //yikes, what a definition. its a queue of composites with a vector of the matches to process
     std::queue< ConsumableComponent > consumptionQ;
 
-    // SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
+    Size imageSize;
+    std::vector<float> candidateScaleRatios;
+
+    std::shared_ptr<Composite> joinHead();
 
     bool prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
 
@@ -174,10 +177,6 @@ namespace pathCam {
     bool prepare_4CPA(Image *img, Rect roi_ = Rect());
 
     bool prepare_4CPA_cpu(Image *img, Rect roi_ = Rect());
-
-    Size imageSize;
-
-    std::vector<float> candidateScaleRatios;
 
     std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n, const std::vector<Image *> &alreadyMatched, Image *self = nullptr) const;
 

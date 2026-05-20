@@ -43,7 +43,6 @@ namespace pathCam {
       //figure out which component consumes the other
 
       Poco::RWLock::ScopedWriteLock compositeHalt(Composite::compositeProcessHalt);
-      if (theirComponent->suspended){return;}// component was already consumed
 
       auto theirImages = theirComponent->find_contributing_images();
       auto myImages = component->find_contributing_images();
@@ -57,6 +56,8 @@ namespace pathCam {
         survivor = component;
         consumed = theirComponent;
       }
+      if (consumed->joinHead()->componentIndex != consumed->componentIndex){return;}// component was already consumed
+
 
       std::cout<<"COMPONENT "<<consumed->componentIndex<<" WILL BE CONSUMED BY COMPONENT "<<survivor->componentIndex<<std::endl;
 
@@ -65,6 +66,8 @@ namespace pathCam {
       consumed->suspended = true;
       consumed->imagePyramid->suspended = true;
       consumed->xcMatchShouldContinue = false;
+
+      consumed->joinedTo = survivor;
 
       survivor->queue_for_consumption({consumed,matches});
 

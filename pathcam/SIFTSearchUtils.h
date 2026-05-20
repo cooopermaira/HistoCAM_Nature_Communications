@@ -123,8 +123,9 @@ namespace pathCam {
 
 
     BAFeature *find() {
-      if (parent != this)
+      if (parent != this) {
         parent = parent->find();
+      }
       return parent;
     }
 
