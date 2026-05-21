@@ -223,60 +223,38 @@ void MainComponent::resized() {
     dirSelectButton.setVisible(dirBrowser->isVisible());
   }
 
-  // Position slideListButton as floating overlay below the centerButton
-  // controlsOverlay is at (panelWidth + 20, 20) with centerButton at top 60px
-  if (slideListButton) {
-    // int xPos = panelWidth + 20; // Same x as controlsOverlay
-    // int yPos = 50 + 20 + 60; // toolbar(50) + overlay_offset(20) + centerButton_height(60)
-    // slideListButton->setBounds(xPos, yPos, 60, 60);
-    if (capture->controlsOverlay) {
-      ImageViewOverlay *overlay = nullptr;
-      if (capture->isVisible()) {
-        overlay = capture->controlsOverlay.get();
-      } else if (annotate->isVisible()) {
-        overlay = annotate->rightComponent->controlsOverlay.get();
-      }
-
-      if (overlay) {
-        // 1) Get center button bounds in overlay-local coords
-        auto rLocal = overlay->getCenterButtonBoundsLocal();
-        if (!rLocal.isEmpty()) {
-          // 2) Convert overlay-local rect -> MainComponent-local rect
-          // (convert top-left point, keep same size)
-          auto pInMain = overlay->localPointToGlobal(rLocal.getPosition());
-          pInMain = this->getLocalPoint(nullptr, pInMain); // global -> MainComponent local
-
-          juce::Rectangle<int> rInMain(pInMain.x, pInMain.y, rLocal.getWidth(), rLocal.getHeight());
-
-          // 3) Place slideListButton directly below center button, same size
-          const int gap = 8; // whatever spacing you want
-          auto slideRect = rInMain.translated(0, rInMain.getHeight() + gap);
-
-          slideListButton->setBounds(slideRect);
-
-          // visibility logic unchanged
-          bool shouldShowButton = (sCam != nullptr) &&
-                                  !capture->recording &&
-                                  !capture->simulating &&
-                                  (sCam->get_num_slides() > 0);
-          slideListButton->setVisible(shouldShowButton);
-        }
-      }
-    }
-
-
-    // Update slideListButton visibility based on state
-    bool shouldShowButton = (sCam != nullptr) &&
-                            !capture->recording &&
-                            !capture->simulating &&
-                            (sCam->get_num_slides() > 0);
-    slideListButton->setVisible(shouldShowButton);
-  }
+  repositionSlideListButton();
 
   // Update labelList visibility - hide if recording/simulating
   if (labelList && (capture->recording || capture->simulating)) {
     labelList->setVisible(false);
   }
+}
+
+void MainComponent::repositionSlideListButton() {
+  if (!slideListButton) return;
+
+  ImageViewOverlay *overlay = nullptr;
+  if (capture && capture->isVisible() && capture->controlsOverlay)
+    overlay = capture->controlsOverlay.get();
+  else if (annotate && annotate->isVisible() && annotate->rightComponent->controlsOverlay)
+    overlay = annotate->rightComponent->controlsOverlay.get();
+
+  if (overlay) {
+    auto rLocal = overlay->getCenterButtonBoundsLocal();
+    if (!rLocal.isEmpty()) {
+      auto pInMain = overlay->localPointToGlobal(rLocal.getPosition());
+      pInMain = getLocalPoint(nullptr, pInMain);
+      juce::Rectangle<int> rInMain(pInMain.x, pInMain.y, rLocal.getWidth(), rLocal.getHeight());
+      slideListButton->setBounds(rInMain.translated(0, rInMain.getHeight() + 8));
+    }
+  }
+
+  bool shouldShow = (sCam != nullptr) &&
+                    capture && !capture->recording &&
+                    !capture->simulating &&
+                    (sCam->get_num_slides() > 0);
+  slideListButton->setVisible(shouldShow);
 }
 
 void MainComponent::buttonClicked(juce::Button *button) {

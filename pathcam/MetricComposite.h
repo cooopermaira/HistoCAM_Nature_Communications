@@ -43,7 +43,11 @@ namespace pathCam {
 
         void align_and_rebuild() override;
 
-        void rebuild(const std::vector<Image *> &members);
+        Point2i test_add_image_realtime(Image *img) override;
+
+        void test_add_align_image();
+
+        void rebuild(const std::vector<Image *> &members) override;
 
         bool image_improves_tile(const std::shared_ptr<TileObj>& _to, Image *_img) const;
 
@@ -53,16 +57,13 @@ namespace pathCam {
 
         int get_exit_rep_count() override {return frameDelay;}
 
-        [[nodiscard]] std::unordered_set<Image *> find_contributing_images() const override;
+        [[nodiscard]] std::unordered_set<Image *> find_contributing_images(bool onlyFTG = false) const override;
 
         std::vector<std::pair<Image*,std::vector<Point2i>>> waitingFrames;
 
         std::unordered_set<Image *> reduce_members_through_competition(std::unordered_set<Image *> _members) const;
 
         void launch_component_match_search_with_XC(Image* img_);
-
-
-        // SiftData compSiftData;
 
 
         inline static int frameDelay = 10;

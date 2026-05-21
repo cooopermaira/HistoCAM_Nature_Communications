@@ -33,7 +33,7 @@ class RegInfo{
 public:
   inline static int featureQuorum = 100;
   inline static int minimumVote = 50;
-  inline static Poco::RWLock registrationProcessMutex;
+  inline static Poco::RWLock registrationProcessHalt;
   inline static std::atomic<bool> flag = false;
 
   struct vote {
@@ -55,7 +55,6 @@ public:
   // bool registered = false;
   bool queued = false;
   bool staged = false;
-  bool compPopped = false;
 
   int component_membership;
   Point2i absoluteCoords;

@@ -5,7 +5,7 @@
 //  Created by cooper maira on 12/23/23.
 //
 // This class listens for registered frames, sorts them by component membership, then passes them to the component object for compositing.
-//do not change this class unless you REALLY now what youre doing. this class ultimately handles the order of frames being added even if theyre
+//do not change this class unless you REALLY know what youre doing. this class ultimately handles the order of frames being added even if theyre
 //being added by adding a new component. its complicated and fragile.
 
 #include "pathCam.h"
@@ -61,37 +61,40 @@ namespace pathCam {
           Poco::Thread::sleep(100);
         }
       } else {
-        auto indexes = parent->get_Q_front(false);
+        auto regInfos = parent->get_Q_front(false);
         if (isNewComp) {
-          if (indexes.front()->index > std::get<0>(newComp)) {
+          if (regInfos.front()->index > std::get<0>(newComp)) {
             parent->add_new_component(std::get<0>(newComp), std::get<1>(newComp), std::get<2>(newComp));
             parent->newComponentQ.pop();
           }
         }
-        indexes = parent->get_Q_front(true);
-        std::sort(indexes.begin(), indexes.end());
+        regInfos = parent->get_Q_front(true);
+        std::sort(regInfos.begin(), regInfos.end());
 
-        while (parent->composites.size() <= indexes.back()->component_membership) {
-          //Because of the multithreading, this place in the code can be reached before a new component object has been instantiated and added to the vector. If this happens, wait.
-          Poco::Thread::sleep(100);
-        }
+        // while (parent->composites.size() <= indexes.back()->component_membership) {
+        //   //Because of the multithreading, this place in the code can be reached before a new component object has been instantiated and added to the vector. If this happens, wait.
+        //   Poco::Thread::sleep(100);
+        // }
 
-        if (!indexes.empty()) {
-          Image *lastViewedFrame = nullptr;
-          for (auto index: indexes) {
-            stage(index);
-            lastViewedFrame = index->image;
+        if (!regInfos.empty()) {
+          Poco::RWLock::ScopedReadLock lock(parent->component_mutex);
+          for (auto ri: regInfos) {
+            stage(ri);
           }
 
           auto start = std::chrono::high_resolution_clock::now();
+
           for (auto &comp: parent->composites) {
-            comp->update();
+            if (comp->suspended){continue;}
+            while (!comp->staging.empty()) {
+              comp->update();
+            }
           }
+
           auto stop = std::chrono::high_resolution_clock::now();
           duration += std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count();
 
           parent->notify_observers();
-          parent->lastViewedFrame = lastViewedFrame;
         }
       }
 
@@ -136,26 +139,28 @@ namespace pathCam {
       auto tAlign = std::chrono::high_resolution_clock::now();
 
       for (auto &comp: parent->composites) {
-        if (comp->suspended) {
-          comp->imagePyramid->suspended = true;
-          continue;
-        }
-
         threads.emplace_back([comp]() {
           auto t1 = std::chrono::high_resolution_clock::now();
-          while (comp->outstandingCMS_jobs > 0 || comp->xcInProgress) {
-            Poco::Thread::sleep(50);
+
+          comp->alignmentShouldProceed = false;
+          comp->xcMatchShouldContinue = false;
+
+          comp->realTimeAlignmentEvent.set();
+          if (comp->realtimeAlignmentThread.joinable()) {
+            comp->realtimeAlignmentThread.join();
           }
-          for (auto &subComp: comp->absorbedComponents) {
-            while (subComp->outstandingCMS_jobs > 0) {
-              Poco::Thread::sleep(50);
-            }
-          }
-          comp->alignmentHasBegun = true;
+
+          // comp->alignmentHasBegun = true;
           auto t2 = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::high_resolution_clock::now() - t1).
               count();
           std::cout << "component " << comp->componentIndex << " wait time " << t2 << std::endl;
+
+          if (comp->suspended) {
+            comp->imagePyramid->suspended = true;
+            return;
+          }
+
           comp->align_and_rebuild();
         });
       }
@@ -287,6 +292,7 @@ namespace pathCam {
   }
 
   void CompositeManager::stage(RegInfo *_regInfo) const {
+    //reminder - this function is on the composite thread. no need to lock mutexes against composite activity
     _regInfo->accessMutex.lock();
     assert(_regInfo->inCompositeQ);
     _regInfo->inCompositeQ = false;
@@ -299,13 +305,13 @@ namespace pathCam {
   }
 
   void CompositeManager::debug_print_component_status() const {
-    for (auto &comp : parent->composites) {
+    for (auto &comp: parent->composites) {
       if (comp->suspended) {
-        std::cout << "component "<<comp->componentIndex <<" SUSPENDED"<<std::endl;
-      }else {
-        std::cout << "component "<<comp->componentIndex <<" ACTIVE"<<std::endl;
+        std::cout << "component " << comp->componentIndex << " SUSPENDED" << std::endl;
+      } else {
+        std::cout << "component " << comp->componentIndex << " ACTIVE" << std::endl;
       }
     }
-    std::cout<<std::endl;
+    std::cout << std::endl;
   }
 }

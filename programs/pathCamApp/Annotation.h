@@ -178,26 +178,6 @@ public:
 
   void paint(juce::Graphics& g, fPoint offset, bool selected, fPoint scale=fPoint(1.0,1.0), float alpha=0.5f) override {
     PolygonAnnotation::paint(g, offset, selected, scale, alpha);
-    juce::Path temp = path;
-
-    temp.applyTransform(juce::AffineTransform::translation(-offset.getX(), -offset.getY()));
-    temp.applyTransform(juce::AffineTransform::scale(scale.getX(), scale.getY()));
-
-    juce::Path::Iterator it(temp);
-
-    if(selected){
-      g.setColour(juce::Colours::greenyellow);
-
-      while (it.next())
-      {
-        if (it.elementType == juce::Path::Iterator::lineTo ||
-            it.elementType == juce::Path::Iterator::startNewSubPath)
-        {
-          g.fillEllipse(it.x1 - 10, it.y1 - 10, 2 * 10, 2 * 10);
-        }
-      }
-    }
-
   }
 
   void move(fPoint new_position) {
@@ -386,7 +366,7 @@ public:
     startFrameIdx = annospan.startFrameIdx;
     endFrameIdx = annospan.endFrameIdx;
   };
-  VoicePointPoly(ConceptSpan _conceptSpan) : PointClickPoly(_conceptSpan.concept_text), conceptSpan(_conceptSpan) {
+  VoicePointPoly(ConceptSpan _conceptSpan) : PointClickPoly(_conceptSpan.concept_text + " - " + _conceptSpan.assertion), conceptSpan(_conceptSpan) {
     spanStartI = conceptSpan.spanStartI;
     spanEndI = conceptSpan.spanEndI;
     startMS = conceptSpan.startMS;

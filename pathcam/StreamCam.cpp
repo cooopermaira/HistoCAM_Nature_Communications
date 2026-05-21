@@ -664,11 +664,8 @@ namespace pathCam {
       component->set_offset(Point2f(0, 0));
     }
 
-    {
-      std::lock_guard lock(ri->image->blurMutex);
-      ri->image->motionBlur = 10000000;
-      ri->image->blurSet = true;
-    }
+    ri->image->motionBlur = 10000000;
+
 
     ri->resolved = true;
     push_compositeQ(ri);

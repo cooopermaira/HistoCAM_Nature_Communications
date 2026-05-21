@@ -13,6 +13,7 @@
 // #include <numeric>
 #include "pathCam.h"
 #include "MRTiledImage.h"
+#include "StreamCam.h"
 // #include "AccessSAM.h"
 // #include "StreamCam.h"
 
@@ -20,6 +21,7 @@
 namespace pathCam {
   class FeatureTrackGenerator;
   class BundleAdjustmentIntegrator;
+
   // class MRTiledImage;
   template<typename T>
   struct PointCompare {
@@ -39,11 +41,18 @@ namespace pathCam {
   };
 
 
-  class Composite {
+  class Composite : public std::enable_shared_from_this<Composite> {
     friend class CompositeManager;
     friend class RebuildRunnable;
 
+    struct ConsumableComponent {
+      std::shared_ptr<Composite> composite;
+      std::vector<std::shared_ptr<Match> > matches;
+    };
+
   public:
+    Composite(StreamCam *parent, Size image_size, int _componentIndex);
+
     virtual ~Composite();
 
     StreamCam *parent;
@@ -55,17 +64,18 @@ namespace pathCam {
     Rect_<float> tiledImageBounds;
     Poco::FastMutex update_mutex;
 
+
     std::shared_ptr<Composite> joinedTo;
     std::unordered_set<int> relatedComponents;
 
-    std::atomic<bool> alignmentHasBegun = false;
+    // std::atomic<bool> alignmentHasBegun = false;
     std::atomic<bool> suspended = false;
     std::atomic<int> outstandingCMS_jobs = 0;
-    std::vector<std::shared_ptr<Composite>> absorbedComponents;
+    std::vector<std::shared_ptr<Composite> > absorbedComponents;
 
     bool flatfieldKnown = false;
     bool xcMatchInitiated = false;
-    bool xcMatchShouldContinue = true;
+    std::atomic<bool> xcMatchShouldContinue = true;
     std::vector<Image *> landmarkFrames;
     Image *xcRegLandmark = nullptr;
     Point2f xcPwDist;
@@ -111,9 +121,9 @@ namespace pathCam {
 #endif
     Mat circleMask;
 
-    char* threeChnBuf;
-    char* fourChnBuf;
-    char* rectMaskBuf;
+    char *threeChnBuf;
+    char *fourChnBuf;
+    char *rectMaskBuf;
 
     Mat rectMask;
     Mat threeChannelPreallocated;
@@ -126,20 +136,61 @@ namespace pathCam {
     std::vector<RegInfo *> contributingRegInfos;
     std::set<Image *> contributingImages;
     std::map<int, long> delaunayMembers;
-    std::queue<RegInfo *> staging;
+    std::deque<RegInfo *> staging;
 
-    std::vector<Image*> memberFrames;
+    std::queue<ConsumableComponent> consumptionQ;
+    std::vector<Image *> realTimeImageList;
+    std::queue<Image *> realTimeAlignmentQueue;
+    Poco::Mutex realTimeAlignmentMutex;
+    Poco::Event realTimeAlignmentEvent;
+    std::thread realtimeAlignmentThread;
+    int debugCount = 0;
+
+    std::vector<Image *> memberFrames;
     std::unordered_set<Image *> contributingFrames, newContributingFrames;
     int frameCount = 0;
 
+    std::atomic<bool> alignmentShouldProceed = true;
     std::atomic<bool> xcInProgress = false;
     inline static std::mutex EstRoot_mutex;
+    inline static Poco::RWLock compositeProcessHalt;
+
+    long qTime = 0;
+    FeatureTrackGenerator *ftg = nullptr;
+    BundleAdjustmentIntegrator *bai = nullptr;
 
 
-    FeatureTrackGenerator* ftg;
-    BundleAdjustmentIntegrator* bai;
+    Size imageSize;
+    std::vector<float> candidateScaleRatios;
 
-    // SiftData GPU_extract_SIFT(cuda::GpuMat &_img, int _numPts);
+
+
+    virtual void update();
+
+    virtual int get_exit_rep_count() { return 0; }
+
+    virtual void add_landmark_frame(Image *img) {};
+
+    virtual void align_and_rebuild() {};
+
+    virtual void rebuild(const std::vector<Image *> &members) {};
+
+    virtual Point2i test_add_image_realtime(Image *img) { return img->regInfo->absoluteCoords; };
+
+    virtual std::unordered_set<Image *> find_contributing_images(bool onlyFTG = false) const {
+      if (onlyFTG) {
+        std::unordered_set<Image *> ans;
+        for (auto &img: contributingFrames) {
+          if (img->addedToFTG) {
+            ans.insert(img);
+          }
+        }
+        return ans;
+      }
+
+      return contributingFrames;
+    };
+
 
     bool prepare_4CPA(Image *img, const std::vector<Point2i> &affectedTiles, bool forceFullImage = false);
 
@@ -147,48 +198,45 @@ namespace pathCam {
 
     bool prepare_4CPA(Image *img, Rect roi_ = Rect());
 
-    bool prepare_4CPA_cpu(Image *img,Rect roi_ = Rect());
+    bool prepare_4CPA_cpu(Image *img, Rect roi_ = Rect());
 
-    Size imageSize;
+    std::pair<std::vector<Image *>, int> get_match_candidates(const Rect &rect, int n,
+                                                              const std::vector<Image *> &alreadyMatched,
+                                                              Image *self = nullptr) const;
 
-    std::vector<float> candidateScaleRatios;
+    std::shared_ptr<Composite> joinHead();
 
-    Composite(StreamCam *parent, Size image_size, int _componentIndex);
+    void launch_component_match_search(Image *img_, std::vector<Image *> candidates_);
 
-    void launch_component_match_search(Image* img_, std::vector<Image*> candidates_);
+    void realtime_alignment_thread_loop();
 
-    virtual int get_exit_rep_count(){ return 0;}
+    void realtime_align(std::vector<Image *> images);
 
-    virtual void align_and_rebuild() {};
+    void prep_image_for_alignment(Image *img) const;
 
-    virtual std::unordered_set<Image *> find_contributing_images() const {
-      return contributingFrames;
-    };
+    std::vector<std::shared_ptr<Match> > pairwise_match(Image *img, const std::vector<Image *> &targets) const;
 
     std::vector<std::pair<Image *, Image *> > calculate_member_overlaps(std::vector<Image *> images) const;
 
-
-    void sort_overlaps_by_likelihood(std::vector<std::pair<pathCam::Image *, cv::Rect> > &_overlaps, const float &_targetScale);
-
-    virtual void add_landmark_frame(Image* img){};
+    void sort_overlaps_by_likelihood(std::vector<std::pair<pathCam::Image *, cv::Rect> > &_overlaps,
+                                     const float &_targetScale);
 
     void calculate_effected_tiles_round(std::vector<Point2i> maskAsPolygon, std::vector<Point2i> &result,
                                         Point2f absCoord);
 
+    void stage(RegInfo *_ri) { staging.push_back(_ri); }
 
-    void stage(RegInfo *_ri) { staging.push(_ri); }
-
-    bool establish_scale_between_pairs(Image *_rootImg, Image *_target, bool _fullImageFtExtract);
-
-    void establish_scale_at_root(Image *_rootImg);
+    void queue_for_consumption(const ConsumableComponent &component) { consumptionQ.push(component); }
 
     void establish_scale_at_root_cpu(Image *_rootImg);
 
-    // static void sift_to_cvMatch(const SiftData &siftData, Image *image1, Image *image2, int inlierCount,
-    //                             const std::vector<uint8_t> &inlierMask, std::vector<
-    //                               KeyPoint> &keypoints1, std::vector<KeyPoint> &keypoints2);
+    Point2f get_space_to_space_translation(const ConsumableComponent &consumable) const;
 
     void set_scale(float _scale, bool _ffCorrectExistingTiles = false);
+
+    void consume_queued_components();
+
+    void launch_XC_search(Image *img);
 
     void ff_correct_existing_tiles();
 
@@ -210,8 +258,6 @@ namespace pathCam {
 
     void update_Bbox_no_composite(std::vector<RegInfo *> new_info);
 
-    virtual void update();
-
     Mat get_composite();
 
     Mat score_image_2X(int, int, int);
@@ -220,8 +266,6 @@ namespace pathCam {
                                bool _withEffectedTiles = true, bool _outline = false,
                                std::vector<Point2i> effectedTiles = {});
   };
-
-
 }
 
 #endif /* Composite_h */

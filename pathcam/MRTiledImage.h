@@ -19,6 +19,23 @@ struct NavigationPath {
   long startTime, endTime;
   long startFrame, endFrame;
   std::vector<Point2i> frameCenters;
+  double distancePerFrame;
+
+  [[nodiscard]] double calc_dist_per_frame(int start_ = -1,int end_ = -1) const {
+    if (start_ < 0){start_ = 0;}
+    if (end_ < 0){end_ = frameCenters.size() - 1;}
+    start_ = max(1,start_);
+    end_ = min(end_,(int)frameCenters.size() - 1);
+    if (end_ - start_ > 0) {
+      double dist = 0;
+      for (int ii = start_; ii <= end_; ++ii) {
+        auto p = frameCenters[ii] - frameCenters[ii - 1];
+        dist += sqrt(p.x * p.x + p.y * p.y);
+      }
+      return dist / (end_ - start_);
+    }
+    return 0;
+  }
 };
 
 struct Point2iLess {

@@ -172,6 +172,19 @@ void resolveEvidenceSpans(const std::string &originalText,
   }
 }
 
+static std::vector<std::string> load_andrew_transcriptions() {
+  std::ifstream file("/home/cm/Documents/data/Andrew_data_march/transcriptions.txt");
+  std::vector<std::string> out;
+  std::string line;
+  while (std::getline(file, line)) {
+    // skip index lines (pure digits) and blank lines
+    if (line.empty() || line.find_first_not_of("0123456789") == std::string::npos)
+      continue;
+    out.push_back(line);
+  }
+  return out;
+}
+
 std::vector<std::string> AnnotateComponent::get_preconfig_anno() {
   if (parent && parent->sCam) {
     return parent->sCam->get_preconfig_anno_labels();
@@ -229,8 +242,26 @@ void AnnotateComponent::removeSelected() {
 }
 
 
+void AnnotateComponent::resized() {
+  auto area = getLocalBounds();
+  juce::Component *components[] = {leftComponent.get(), resizerBar.get(), rightComponent.get()};
+
+  layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+
+  auto leftBounds = leftComponent->getBounds();
+  int navHeight = leftBounds.getHeight() / 4;
+  leftComponent->setBounds(leftBounds.withTrimmedBottom(navHeight));
+  navPathList->setBounds(leftBounds.removeFromBottom(navHeight));
+
+  rightComponent->resized();
+
+  parent->repositionSlideListButton();
+}
+
 void AnnotateComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
   ephemeralNavPath.reset();
+  getListComp()->setDistancePerFrame(std::nullopt);
+  getListComp()->setPathSectionDist(std::nullopt);
   rightComponent->setImage(image);
   if (image) {
     update_active_annotations(image->index);
@@ -511,7 +542,7 @@ static std::string buildConceptExtractionRequestBody_JSON(const juce::String &te
       "For each concept, output:\n"
       "- evidence_text: the EXACT contiguous substring from the transcript\n"
       "- concept_text: a concise interpretation (1 to 10 words, NOT a final label)\n"
-      "- concept_type: one of ['inflammation','invasion','margin','gleason_grade','extraprostatic_extension','tumor','architecture','other']\n"
+      "- concept_type: one of ['inflammation','invasion_pattern','margin_status','gleason_grade','extension_pattern','tumor_presence','architectural_pattern','other']\n"
       "- assertion: one of ['present','absent','uncertain','revised']\n"
       "- attributes: object (may be empty)\n"
       "\n"
@@ -696,254 +727,6 @@ static std::string buildConceptExtractionRequestBody_JSON(const juce::String &te
 }
 
 
-static std::string buildResponsesRequestBody_JSON2(const juce::String &text,
-                                                   const std::vector<std::string> &preconfigAnnos) {
-  juce::String systemMsg =
-      "You convert pathology slide-review transcripts into a sequence of short annotation labels.\n"
-      "Input: a single string 'text'.\n"
-      "\n"
-      "Your task:\n"
-      "Extract 1..N distinct POSITIVE pathology findings mentioned in the transcript, in the SAME ORDER they appear.\n"
-      "\n"
-      "For each finding, output:\n"
-      "- label: a 1-5 word canonical pathology phrase.\n"
-      "- evidence_text: the exact contiguous substring from the transcript that supports this label.\n"
-      "- scope: either 'local' or 'global'.\n"
-      "\n"
-      "Scope definitions: \n"
-      "- local = the finding is tied to a specific slide region, focal area, ROI, side, location, core, nodule, or microscopic subregion being discussed. \n"
-      "- global = the finding is stated as an overall specimen-level / case-level / final interpretive conclusion, grading summary, or report-level assessment. \n"
-      "\n"
-      "Rules:\n"
-      "1) Output ONLY JSON matching the provided schema.\n"
-      "2) Do NOT merge non-contiguous mentions: if topic A then B then A again, output three annotations.\n"
-      "3) label must be a concise semantic reduction of the finding.\n"
-      "   Example: transcript contains 'Gleason pattern 3 plus 4' -> label 'Gleason 3+4'.\n"
-      "4) evidence_text MUST be copied verbatim from the transcript as a single contiguous substring.\n"
-      "   Do not paraphrase it. Do not summarize it.\n"
-      "5) evidence_text must include all words necessary to justify the label, including qualifiers, numbers, and context words.\n"
-      "6) Revision/uncertainty merge rule (MUST follow):\n"
-      "   Only merge multiple mentions into ONE annotation when the transcript explicitly presents them as alternative interpretations\n"
-      "   or a correction/revision of the SAME finding, using uncertainty/revision markers such as:\n"
-      "   \"maybe\", \"probably\", \"or\", \"versus\", \"favors\", \"could be\", \"cannot exclude\", \"actually\", \"no\", \"never mind\", \"on second thought\".\n"
-      "   In that case, output exactly ONE annotation labeled with the FINAL favored interpretation (the last decisive claim in that discussion),\n"
-      "   and evidence_text MUST be one contiguous verbatim substring spanning from the first mention through the final conclusion/revision.\n"
-      "\n"
-      "6a) Distinct-assertion split rule (MUST follow):\n"
-      "    If the transcript asserts TWO different interpretations/values as separate findings WITHOUT the uncertainty/revision markers above\n"
-      "    (often joined by \"and\", \"also\", \"as well as\", or stated in separate clauses/sentences), then output TWO annotations (one per finding).\n"
-      "    Gleason-specific example: \"more Gleason 3 plus 4, and Gleason pattern 4 plus 3\" -> output both \"Gleason 3+4\" and \"Gleason 4+3\".\n"
-      "\n"
-      "6b) Forbidden adjacent-alternatives pattern (guardrail):\n"
-      "    Do NOT output two adjacent annotations for the same finding when one is clearly an alternative/correction of the other per rule 6\n"
-      "    (e.g. \"Gleason 3+3\" then \"Gleason 3+4\" with \"maybe/probably\"). If you would, merge them into ONE labeled with the final favored interpretation,\n"
-      "    and evidence_text spanning both. Do NOT label with an earlier, less confident alternative if a later, more confident alternative is present.\n"
-      "\n"
-      "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive surgical margin', 'negative surgical margin', 'Gleason 3+4').\n"
-      "8) NEGATIVE FINDINGS - SKIP ENTIRELY (MOST IMPORTANT RULE):\n"
-      "   If a finding is negative, absent, or not identified - including any phrasing such as\n"
-      "   'negative for', 'no evidence of', 'not identified', 'absent', 'none', 'not seen', 'free of', 'clear of' -\n"
-      "   DO NOT output an annotation for it. Omit it completely. This applies even if the finding is named.\n"
-      "   Example: 'negative for perineural invasion' -> output NOTHING for this finding.\n"
-      "   Example: 'margins are clear' -> output NOTHING.\n"
-      "   Only output annotations for findings that are PRESENT and POSITIVE.\n"
-      "\n"
-      "9) Scope MUST be 'local' when the evidence_text is tied to a particular area such as side, apex, base,\n"
-      "   nodule, focus, core, or microscopic subregion, OR when it is a Gleason score tied to a specific region or core.\n"
-      "\n"
-      "10) Scope MUST be 'global' when the evidence_text states an overall specimen-level or case-level conclusion,\n"
-      "    such as overall adenocarcinoma involvement, overall margin status, or a generalized summary statement.\n"
-      "    IMPORTANT - Gleason global pattern: when the transcript states a Gleason grade together with a percentage\n"
-      "    of prostate gland involvement (e.g. 'Gleason 4 plus 3 constituting 60 percent of the prostate gland',\n"
-      "    'Gleason 3+4 involving 40% of the gland'), this IS a specimen-level summary - scope MUST be 'global'.\n"
-      "    Label it as the Gleason grade (e.g. 'Gleason 4+3') and include the full phrase with percentage in evidence_text.\n"
-      "\n"
-      "11) If uncertain between 'local' and 'global', prefer 'local' unless the wording clearly indicates a final overall conclusion.\n"
-      "\n"
-      "12) Before outputting JSON, perform two self-checks:\n"
-      "    a) Confirm no annotation corresponds to a negative or absent finding. Remove any that do.\n"
-      "    b) Check for adjacent alternative/correction duplicates (rule 6) and merge as required.\n"
-      "13) Label-evidence fidelity (MUST follow):\n"
-      "    The label MUST be derivable from the evidence_text alone. Do NOT assign a label based on\n"
-      "    context elsewhere in the transcript if that concept does not appear in the evidence_text.\n";
-  if (!preconfigAnnos.empty()) {
-    systemMsg +=
-        "14) If any annotation can be adequately described using one of the following exact labels,\n"
-        "   you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
-
-    for (const auto &anno: preconfigAnnos) {
-      systemMsg += "   - " + juce::String(anno) + "\n";
-    }
-  }
-
-  // Helper to build {"type": "..."} objects for schema leaf nodes
-  auto makeTypeObj = [](const juce::String &t) -> juce::var {
-    juce::DynamicObject::Ptr o(new juce::DynamicObject());
-    o->setProperty("type", t);
-    return {o.get()};
-  };
-
-  // --- Build item schema: {label, evidence_text}
-  juce::DynamicObject::Ptr annProps(new juce::DynamicObject());
-  annProps->setProperty("label", makeTypeObj("string"));
-  annProps->setProperty("evidence_text", makeTypeObj("string"));
-
-  juce::DynamicObject::Ptr scopeObj(new juce::DynamicObject());
-  scopeObj->setProperty("type", "string");
-  juce::Array<juce::var> scopeEnum;
-  scopeEnum.add("local");
-  scopeEnum.add("global");
-  scopeObj->setProperty("enum", scopeEnum);
-
-  annProps->setProperty("scope", juce::var(scopeObj.get()));
-
-  juce::Array<juce::var> annRequiredArr;
-  annRequiredArr.add("label");
-  annRequiredArr.add("evidence_text");
-  annRequiredArr.add("scope");
-  juce::var annRequiredVar = annRequiredArr;
-
-  juce::DynamicObject::Ptr annItem(new juce::DynamicObject());
-  annItem->setProperty("type", "object");
-  annItem->setProperty("properties", juce::var(annProps.get()));
-  annItem->setProperty("required", annRequiredVar);
-  annItem->setProperty("additionalProperties", false);
-
-
-  juce::DynamicObject::Ptr annotationsProp(new juce::DynamicObject());
-  annotationsProp->setProperty("type", "array");
-  annotationsProp->setProperty("items", juce::var(annItem.get()));
-
-  // --- Root schema: { annotations: [...] }
-  juce::DynamicObject::Ptr rootProps(new juce::DynamicObject());
-  rootProps->setProperty("annotations", juce::var(annotationsProp.get()));
-
-  juce::Array<juce::var> rootRequiredArr;
-  rootRequiredArr.add("annotations");
-  juce::var rootRequiredVar = rootRequiredArr;
-
-  juce::DynamicObject::Ptr schemaObj(new juce::DynamicObject());
-  schemaObj->setProperty("type", "object");
-  schemaObj->setProperty("properties", juce::var(rootProps.get()));
-  schemaObj->setProperty("required", rootRequiredVar);
-  schemaObj->setProperty("additionalProperties", false);
-
-  // --- Responses: text.format
-  juce::DynamicObject::Ptr formatObj(new juce::DynamicObject());
-  formatObj->setProperty("type", "json_schema");
-  formatObj->setProperty("name", "annotation_extraction");
-  formatObj->setProperty("strict", true);
-  formatObj->setProperty("schema", juce::var(schemaObj.get()));
-
-  juce::DynamicObject::Ptr textObj(new juce::DynamicObject());
-  textObj->setProperty("format", juce::var(formatObj.get()));
-
-  // --- Root request body
-  juce::DynamicObject::Ptr root(new juce::DynamicObject());
-  root->setProperty("model", "gpt-4o-mini");
-  root->setProperty("instructions", systemMsg);
-  root->setProperty("input", text);
-  root->setProperty("temperature", 0);
-  root->setProperty("text", juce::var(textObj.get()));
-
-  return juce::JSON::toString(juce::var(root.get()), true).toStdString();
-}
-
-static std::string buildResponsesRequestBody_JSON(const juce::String &text,
-                                                  const std::vector<std::string> &preconfigAnnos) {
-  juce::String systemMsg =
-      "You convert pathology slide-review transcripts into a sequence of short annotation labels.\n"
-      "Input: a single string 'text'.\n"
-      "Define the transcript word list as: split 'text' on single spaces. Indices refer to this list (0-based).\n"
-      "Rules:\n"
-      "1) Output ONLY JSON matching the provided schema.\n"
-      "2) Produce 1..N annotations in the SAME ORDER the ideas appear in the transcript.\n"
-      "3) Each annotation corresponds to a contiguous span of the word list: span_start_word..span_end_word (inclusive).\n"
-      "4) Do NOT merge non-contiguous mentions: if topic A then B then A again, output three annotations.\n"
-      "5) label must be 1-5 words.\n"
-      "6) label is a semantic reduction / canonical phrase for the span. It DOES NOT need to be an exact substring.\n"
-      "   Example: span contains 'Gleason pattern 3+4' -> label 'Gleason 3+4'.\n"
-      "7) Prefer canonical pathology wording (e.g., 'perineural invasion', 'positive margin', 'Gleason 3+4').\n"
-      "8) Choose spans that fully cover the evidence words for the idea (include necessary modifiers like \"3+4\").\n"
-      "9) span_start_word through span_end_word MUST include all words that justify the label, including qualifiers, numbers, and context words (e.g. \"pattern\", \"plus\"). Do not select a span shorter than the evidence phrase.\n"
-      "10) If multiple alternative interpretations of the SAME finding appear in close proximity (e.g. \"maybe\", \"probably\", \"versus\", \"favors\"), and a later statement clearly resolves or favors one, output ONE annotation covering the entire discussion, labeled with the final favored interpretation.\n"
-      "11) Before outputting JSON, verify for each label that the words indexed by span_start_word through span_end_word include all thoughts and discussion attributable to that label. If not, expand the span.";
-
-  if (!preconfigAnnos.empty()) {
-    systemMsg +=
-        "12) If any annotation can be adequately described using one of the following exact labels,\n"
-        "    you MUST use that exact label verbatim (case-sensitive) instead of inventing a new phrasing:\n";
-
-    for (const auto &anno: preconfigAnnos) {
-      systemMsg += "    - " + juce::String(anno) + "\n";
-    }
-  }
-
-  // Helper to build {"type": "..."} objects for schema leaf nodes
-  auto makeTypeObj = [](const juce::String &t) -> juce::var {
-    juce::DynamicObject::Ptr o(new juce::DynamicObject());
-    o->setProperty("type", t);
-    return {o.get()};
-  };
-
-  // --- Build item schema: {label, span_start_word, span_end_word}
-  juce::DynamicObject::Ptr annProps(new juce::DynamicObject());
-  annProps->setProperty("label", makeTypeObj("string"));
-  annProps->setProperty("span_start_word", makeTypeObj("integer"));
-  annProps->setProperty("span_end_word", makeTypeObj("integer"));
-
-  // required: ["label","span_start_word","span_end_word"]  (build array safely)
-  juce::Array<juce::var> annRequiredArr;
-  annRequiredArr.add("label");
-  annRequiredArr.add("span_start_word");
-  annRequiredArr.add("span_end_word");
-  juce::var annRequiredVar = annRequiredArr;
-
-  juce::DynamicObject::Ptr annItem(new juce::DynamicObject());
-  annItem->setProperty("type", "object");
-  annItem->setProperty("properties", juce::var(annProps.get()));
-  annItem->setProperty("required", annRequiredVar);
-  annItem->setProperty("additionalProperties", false);
-
-  juce::DynamicObject::Ptr annotationsProp(new juce::DynamicObject());
-  annotationsProp->setProperty("type", "array");
-  annotationsProp->setProperty("items", juce::var(annItem.get()));
-
-  // --- Root schema: { annotations: [...] }
-  juce::DynamicObject::Ptr rootProps(new juce::DynamicObject());
-  rootProps->setProperty("annotations", juce::var(annotationsProp.get()));
-
-  juce::Array<juce::var> rootRequiredArr;
-  rootRequiredArr.add("annotations");
-  juce::var rootRequiredVar = rootRequiredArr;
-
-  juce::DynamicObject::Ptr schemaObj(new juce::DynamicObject());
-  schemaObj->setProperty("type", "object");
-  schemaObj->setProperty("properties", juce::var(rootProps.get()));
-  schemaObj->setProperty("required", rootRequiredVar);
-  schemaObj->setProperty("additionalProperties", false);
-
-  // --- Responses: text.format
-  juce::DynamicObject::Ptr formatObj(new juce::DynamicObject());
-  formatObj->setProperty("type", "json_schema");
-  formatObj->setProperty("name", "annotation_extraction");
-  formatObj->setProperty("strict", true);
-  formatObj->setProperty("schema", juce::var(schemaObj.get()));
-
-  juce::DynamicObject::Ptr textObj(new juce::DynamicObject());
-  textObj->setProperty("format", juce::var(formatObj.get()));
-
-  // --- Root request body
-  juce::DynamicObject::Ptr root(new juce::DynamicObject());
-  root->setProperty("model", "gpt-5-mini");
-  root->setProperty("instructions", systemMsg);
-  root->setProperty("input", text);
-  // root->setProperty("temperature", 0);
-  root->setProperty("text", juce::var(textObj.get()));
-
-  return juce::JSON::toString(juce::var(root.get()), true).toStdString();
-}
-
 static std::string LlamaResponses_POST(const std::string &requestBodyJson, int timeoutMs = 120000) {
 
   juce::URL url("http://127.0.0.1:8081/v1/chat/completions");
@@ -988,121 +771,6 @@ static std::string openAIResponses_POST(const std::string &apiKey,
   }
 
   return in->readEntireStreamAsString().toStdString();
-}
-
-static std::vector<AnnotationSpan> parseAnnotationsFromResponses(const std::string &responsesJson) {
-  std::vector<AnnotationSpan> out;
-
-  auto top = juce::JSON::parse(responsesJson);
-  if (!top.isObject()) { return out; }
-
-  auto *topObj = top.getDynamicObject();
-  if (!topObj) { return out; }
-
-  auto outputVar = topObj->getProperty("output");
-  auto *outArr = outputVar.getArray();
-  if (!outArr) { return out; }
-
-  // 1) Find first message
-  juce::var messageContentVar;
-
-  for (const auto &item: *outArr) {
-    auto *msgObj = item.getDynamicObject();
-    if (!msgObj) continue;
-
-    if (msgObj->getProperty("type").toString() == "message") {
-      messageContentVar = msgObj->getProperty("content");
-      break;
-    }
-  }
-
-  auto *msgContentArr = messageContentVar.getArray();
-  if (!msgContentArr) { return out; }
-
-  juce::String payloadText;
-
-  // ------------------------------------------------------------
-  // Helper lambda: parse annotations array into AnnotationSpan
-  // ------------------------------------------------------------
-  auto parseAnnotationArray = [&](juce::Array<juce::var> *annArr) {
-    if (!annArr) return;
-
-    out.reserve((size_t) annArr->size());
-
-    for (const auto &av: *annArr) {
-      auto *aobj = av.getDynamicObject();
-      if (!aobj) continue;
-
-      AnnotationSpan a;
-      a.label = aobj->getProperty("label").toString().toStdString();
-      a.scope = aobj->getProperty("scope").toString().toStdString();
-
-
-      // ---- NEW FLEXIBLE HANDLING ----
-
-      auto spanStartVar = aobj->getProperty("span_start_word");
-      auto spanEndVar = aobj->getProperty("span_end_word");
-      auto evidenceVar = aobj->getProperty("evidence_text");
-
-      const bool hasSpan =
-          !spanStartVar.isVoid() && !spanEndVar.isVoid();
-
-      const bool hasEvidence =
-          !evidenceVar.isVoid() &&
-          evidenceVar.toString().isNotEmpty();
-
-      if (hasSpan) {
-        a.spanStartI = (int) spanStartVar;
-        a.spanEndI = (int) spanEndVar;
-      } else if (hasEvidence) {
-        a.evidenceText = evidenceVar.toString().toStdString();
-      }
-
-      if (!a.label.empty()) {
-        out.push_back(std::move(a));
-      }
-    }
-  };
-
-  // 2) Extract either output_text or output_json
-  for (const auto &c: *msgContentArr) {
-    auto *cobj = c.getDynamicObject();
-    if (!cobj) continue;
-
-    const auto ctype = cobj->getProperty("type").toString();
-
-    if (ctype == "output_text") {
-      payloadText = cobj->getProperty("text").toString();
-      break;
-    } else if (ctype == "output_json") {
-      auto jsonVar = cobj->getProperty("content");
-      auto *jsonObj = jsonVar.getDynamicObject();
-      if (!jsonObj) return out;
-
-      auto annVar = jsonObj->getProperty("annotations");
-      auto *annArr = annVar.getArray();
-      parseAnnotationArray(annArr);
-      return out;
-    }
-  }
-
-  if (payloadText.isEmpty()) {
-    return out;
-  }
-
-  // 3) Parse JSON string inside output_text
-  auto inner = juce::JSON::parse(payloadText);
-  if (!inner.isObject()) return out;
-
-  auto *innerObj = inner.getDynamicObject();
-  if (!innerObj) return out;
-
-  auto annVar = innerObj->getProperty("annotations");
-  auto *annArr = annVar.getArray();
-
-  parseAnnotationArray(annArr);
-
-  return out;
 }
 
 
@@ -1334,6 +1002,7 @@ static std::vector<ConceptSpan> parseConceptsFromLlamaResponses(const std::strin
 std::vector<ConceptSpan> reduceToConcepts_LLM(const std::string &text) {
 
   std::string body = buildConceptExtractionRequestBody_JSON_Llama(text);
+  // std::string body = buildConceptSpanExtractionRequestBody_JSON_Llama(text);
   const std::string resp = LlamaResponses_POST(body);
 
   if (resp.empty()) {
@@ -1349,9 +1018,9 @@ std::vector<ConceptSpan> reduceToAnnotations_LLM(const std::string &text,
   std::string apiKey(
     "REDACTED_OPENAI_API_KEY");
 
-  bool extractConceptFirst = false;
+  bool useLocalLLM = false;
 
-  if (extractConceptFirst) {
+  if (useLocalLLM) {
     auto resp = reduceToConcepts_LLM(text);
     resolveEvidenceSpans(text, resp);
     return resp;
@@ -1369,6 +1038,102 @@ std::vector<ConceptSpan> reduceToAnnotations_LLM(const std::string &text,
     // resolveEvidenceSpans(text, pResp);
     // return pResp;
   }
+}
+
+
+void AnnotateComponent::saveConceptSpans(const std::string &filepath,
+                                          const std::vector<ConceptSpan> &spans) {
+  juce::Array<juce::var> arr;
+  arr.ensureStorageAllocated((int) spans.size());
+
+  for (const auto &s : spans) {
+    juce::DynamicObject::Ptr obj(new juce::DynamicObject());
+    obj->setProperty("evidence_text",  juce::String(s.evidence_text));
+    obj->setProperty("concept_text",   juce::String(s.concept_text));
+    obj->setProperty("concept_type",   juce::String(s.concept_type));
+    obj->setProperty("assertion",      juce::String(s.assertion));
+    obj->setProperty("slide_level",    s.slideLevel);
+    obj->setProperty("span_start_i",   s.spanStartI);
+    obj->setProperty("span_end_i",     s.spanEndI);
+    obj->setProperty("start_ms",       (juce::int64) s.startMS);
+    obj->setProperty("end_ms",         (juce::int64) s.endMS);
+    obj->setProperty("start_frame_idx",(juce::int64) s.startFrameIdx);
+    obj->setProperty("end_frame_idx",  (juce::int64) s.endFrameIdx);
+
+    juce::DynamicObject::Ptr attr(new juce::DynamicObject());
+    attr->setProperty("gleason_primary",    s.attributes.gleason_primary.has_value()
+                                            ? juce::var(*s.attributes.gleason_primary)
+                                            : juce::var());
+    attr->setProperty("gleason_secondary",  s.attributes.gleason_secondary.has_value()
+                                            ? juce::var(*s.attributes.gleason_secondary)
+                                            : juce::var());
+    attr->setProperty("percent_involvement", s.attributes.percent_involvement.has_value()
+                                            ? juce::var(*s.attributes.percent_involvement)
+                                            : juce::var());
+    obj->setProperty("attributes", juce::var(attr.get()));
+
+    arr.add(juce::var(obj.get()));
+  }
+
+  juce::DynamicObject::Ptr root(new juce::DynamicObject());
+  root->setProperty("concept_spans", juce::var(arr));
+
+  juce::File f(filepath);
+  f.replaceWithText(juce::JSON::toString(juce::var(root.get()), false));
+}
+
+std::vector<ConceptSpan> AnnotateComponent::loadConceptSpans(const std::string &filepath) {
+  std::vector<ConceptSpan> out;
+
+  juce::File f(filepath);
+  if (!f.existsAsFile())
+    return out;
+
+  auto top = juce::JSON::parse(f.loadFileAsString());
+  if (!top.isObject())
+    return out;
+
+  auto *topObj = top.getDynamicObject();
+  if (!topObj)
+    return out;
+
+  auto *arr = topObj->getProperty("concept_spans").getArray();
+  if (!arr)
+    return out;
+
+  out.reserve((size_t) arr->size());
+
+  for (const auto &v : *arr) {
+    auto *o = v.getDynamicObject();
+    if (!o) continue;
+
+    ConceptSpan s;
+    s.evidence_text  = o->getProperty("evidence_text").toString().toStdString();
+    s.concept_text   = o->getProperty("concept_text").toString().toStdString();
+    s.concept_type   = o->getProperty("concept_type").toString().toStdString();
+    s.assertion      = o->getProperty("assertion").toString().toStdString();
+    s.slideLevel     = (bool) o->getProperty("slide_level");
+    s.spanStartI     = (int)  o->getProperty("span_start_i");
+    s.spanEndI       = (int)  o->getProperty("span_end_i");
+    s.startMS        = (long)(juce::int64) o->getProperty("start_ms");
+    s.endMS          = (long)(juce::int64) o->getProperty("end_ms");
+    s.startFrameIdx  = (long)(juce::int64) o->getProperty("start_frame_idx");
+    s.endFrameIdx    = (long)(juce::int64) o->getProperty("end_frame_idx");
+
+    auto *attr = o->getProperty("attributes").getDynamicObject();
+    if (attr) {
+      auto gp = attr->getProperty("gleason_primary");
+      auto gs = attr->getProperty("gleason_secondary");
+      auto pi = attr->getProperty("percent_involvement");
+      if (!gp.isVoid()) s.attributes.gleason_primary    = (int)    gp;
+      if (!gs.isVoid()) s.attributes.gleason_secondary  = (int)    gs;
+      if (!pi.isVoid()) s.attributes.percent_involvement = (double) pi;
+    }
+
+    out.push_back(std::move(s));
+  }
+
+  return out;
 }
 
 
@@ -1477,115 +1242,19 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-
-  // auto [fullText,wordVec] = send_transcribe_call(juce::File("/home/cm/Documents/data/Andrew_data_march/cap1/dictation.wav"));
-  // auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
-  //
-  // for (auto &annospan: annoSpanVec) {
-  //   std::cout << annospan.concept_type;
-  //
-  //   if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
-  //     std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
-  //     for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
-  //       std::cout << wordVec[i].word;
-  //       if (i < annospan.spanEndI) {
-  //         std::cout << " ";
-  //       }
-  //     }
-  //     std::cout << "\"" << std::endl;
-  //   }
-  //
-  //   if (!annospan.evidence_text.empty()) {
-  //     std::cout << ", \"" << annospan.evidence_text << "\"" << std::endl;
-  //   }
-  // }
-
-  // std::ofstream outFile("/home/cm/Documents/data/Andrew_data_march/transcriptions.txt");
-  for (int i = 0; i < 15; ++i) {
+  for (int i = 5; i < 15; ++i) {
     juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/dictation.wav");
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
-    std::cout << std::endl << std::endl << i << std::endl;
+    auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
 
-    size_t width = 120;
-    size_t pos = 0;
-
-    // outFile<<i<<std::endl;
-    // while (pos < fullText.size()) {
-    //   size_t end = pos + width;
-    //
-    //   // If we're at the end, just print the rest
-    //   if (end >= fullText.size()) {
-    //     outFile << fullText.substr(pos) << "\n";
-    //     break;
-    //   }
-    //
-    //   // Find last space before the cutoff
-    //   size_t spacePos = fullText.rfind(' ', end);
-    //
-    //   // If no space found or it's behind current pos (very long word)
-    //   if (spacePos == std::string::npos || spacePos < pos) {
-    //     // fallback: hard break (rare case: huge token)
-    //     spacePos = end;
-    //   }
-    //
-    //   outFile << fullText.substr(pos, spacePos - pos) << "\n";
-    //
-    //   // Move past the space
-    //   pos = spacePos + 1;
-    // }
-    // outFile<<std::endl;
-
-    for (size_t ii = 0; ii < fullText.size(); ii += width) {
-      std::cout << fullText.substr(ii, width) << "\n";
+    for (auto &conceptSpan : annoSpanVec) {
+      conceptSpan.startMS = wordVec[conceptSpan.spanStartI].startMS;
+      conceptSpan.endMS = wordVec[conceptSpan.spanEndI].endMS;
     }
-    for (auto &word : wordVec) {
-      std::cout<<word.word<<" "<<word.startMS << " "<<word.endMS<<std::endl;
-    }
+    std::string savepath = "/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/conceptSpan";
 
-
-    auto start = std::chrono::high_resolution_clock::now();
-
-    // auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
-
-    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-        count();
-    //
-    // for (auto & c : annoSpanVec) {
-    //   if (!c.evidence_text.empty()) {
-    //     c.endMS = wordVec[c.spanEndI].endMS;
-    //     c.startMS = wordVec[c.spanStartI].startMS;
-    //   }
-    //
-    // }
-    int k = 0;
-    // for (auto &annospan: annoSpanVec) {
-    //   std::cout << annospan.label;
-    //
-    //   if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
-    //     std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
-    //     for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
-    //       std::cout << wordVec[i].word;
-    //       if (i < annospan.spanEndI) {
-    //         std::cout << " ";
-    //       }
-    //     }
-    //     std::cout << "\"" << std::endl;
-    //   }
-    //
-    // }
+    saveConceptSpans(savepath,annoSpanVec);
   }
 
-  // outFile.close();
 
-  juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap1/dictation.wav");
-
-  auto start = std::chrono::high_resolution_clock::now();
-  // auto [fullText,wordVec] = send_transcribe_call(dictPath);
-  //
-  // auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-  //     count();
-  // std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
-  // auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
-
-  int k = 0;
 }

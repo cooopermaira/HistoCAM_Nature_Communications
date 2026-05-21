@@ -25,7 +25,12 @@ namespace pathCam {
    * over and over again by a series of consecutive frames and substantially lowers computational cost
    */
   void MetricComposite::update() {
-    if (suspended) { return; }
+
+    Poco::RWLock::ScopedWriteLock lock(compositeProcessHalt);
+
+    if (!consumptionQ.empty()) {
+      consume_queued_components();
+    }
 
     //place component in MR image
     if (imagePyramid->scale == 0 && !xcMatchInitiated) {
@@ -34,7 +39,7 @@ namespace pathCam {
       xcMatchInitiated = true;
 
       // std::thread t([this, img = staging.front()->image]() {
-      std::lock_guard lock(EstRoot_mutex);
+      std::scoped_lock lock2(EstRoot_mutex);
       // std::cout << "component " << componentIndex << " establishing scale" << std::endl;
       auto start = std::chrono::high_resolution_clock::now();
       establish_scale_at_root_cpu(staging.front()->image);
@@ -46,7 +51,6 @@ namespace pathCam {
       // t.detach();
     }
 
-    Poco::FastMutex::ScopedLock lock(update_mutex);
 
     // PROCESS NEW FRAMES BEGIN
     if (!staging.empty()) {
@@ -54,14 +58,21 @@ namespace pathCam {
       auto img = ri->image;
       memberFrames.push_back(img);
       assert(img->regInfo);
-      ri->compPopped = true;
 
 
-      staging.pop();
+      staging.pop_front();
       ++frameCount;
       maxIndex = max(maxIndex, img->index);
 
-      launch_component_match_search_with_XC(img);
+      launch_XC_search(img);
+      // launch_component_match_search_with_XC(img);
+      // prep_image_for_alignment(img);
+      // if (!img->regInfo->root)
+      {
+        Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
+        realTimeAlignmentQueue.push(img);
+        realTimeAlignmentEvent.set();
+      }
 
       // vote on what objective lens this component is
       if (img->labelObserved) {
@@ -77,7 +88,6 @@ namespace pathCam {
         if (winner != componentMagLabel) {
           componentMagLabel = winner;
 
-          Poco::FastMutex::ScopedLock lock(update_mutex);
           get_flatfield();
           imagePyramid->set_mag_label(componentMagLabel);
           parent->MRImageSet->sort_by_scale();
@@ -91,8 +101,7 @@ namespace pathCam {
 
 
       //grab affected tiles with their category of coverage
-      auto affectedPyramidTilesWithStatus = calculate_affected_tiles_with_status(
-        Point2f(ri->absoluteCoords));
+      auto affectedPyramidTilesWithStatus = calculate_affected_tiles_with_status(ri->absoluteCoords);
 
 
       //calculate: for which of the affected tiles is this frame an improvement?
@@ -115,19 +124,22 @@ namespace pathCam {
       }
       ++positionForNextWaitngFrame;
 
+
       if (!immediateProcessingTiles.empty()) {
+        Poco::FastMutex::ScopedLock lock(update_mutex);
         process_tiles(img, immediateProcessingTiles);
       }
 
-      //if (imagePyramid->scale > 0) {
-      float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
-      float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
-      float w = parent->image_width * imagePyramid->scale;
-      float h = parent->image_height * imagePyramid->scale;
-      bool showAsCircle = (componentMagLabel == Image::_2X);
+      if (img->showFrameBoundaryOnUpdate){
+        float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
+        float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
+        float w = parent->image_width * imagePyramid->scale;
+        float h = parent->image_height * imagePyramid->scale;
+        bool showAsCircle = (componentMagLabel == Image::_2X);
 
-      parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
-                                Image::get_label(componentMagLabel), get_scale());
+        parent->update_last_frame(Rect_<float>(x, y, w, h), showAsCircle, componentIndex,
+                                  Image::get_label(componentMagLabel), get_scale());
+      }
       //}
     } else {
       waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
@@ -149,7 +161,7 @@ namespace pathCam {
       tiles.erase(
         std::remove_if(tiles.begin(),
                        tiles.end(),
-                       [&](Point2i &tileIdx) {
+                       [&](const Point2i &tileIdx) {
                          auto tileObj = imagePyramid->get_base_tile(tileIdx);
                          if (tileObj->owner == img) {
                            //im marked as the owner, so i keep it
@@ -181,6 +193,7 @@ namespace pathCam {
     if (positionForNextWaitngFrame > frameDelay && !tiles.empty()) {
       needsAlignment = true;
 
+      Poco::FastMutex::ScopedLock lock(update_mutex);
       process_tiles(img, tiles);
 
       tiles.clear();
@@ -190,8 +203,264 @@ namespace pathCam {
     // PROCESS OLD FRAMES END
   }
 
+  Point2i MetricComposite::test_add_image_realtime(Image *img) {
+    auto start = std::chrono::high_resolution_clock::now();
+    int obsSize = 0, imgSetSize = 0;
+    Point2i coords;
+
+    ftg->add_image(img);
+    if (img->regInfo && img->regInfo->winningVote.m) {
+      coords = img->regInfo->absoluteCoords;
+
+      ftg->process_match2(img->regInfo->winningVote.m);
+      auto [c,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
+      coords = c;
+
+      if (valid) {
+        auto [matchCandidates,featTracksCovered] = get_match_candidates(Rect(coords, imageSize), 4,
+                                                                        {img->regInfo->winningVote.m->image_1}, img);
+        if (!matchCandidates.empty()) {
+          launch_component_match_search(img, matchCandidates);
+          while (outstandingCMS_jobs > 0) {
+            Poco::Thread::sleep(10);
+          }
+
+          ftg->process_match_queue();
+        }
+      } else {
+        int k = 0;
+      }
+
+      auto imageList = find_contributing_images();
+      imageList.insert(root);
+      imageList.insert(img);
+      std::vector imageListVec(imageList.begin(), imageList.end());
+
+      auto ans = get_match_candidates(imagePyramid->bounds, 1000, imageListVec);
+      imageListVec.insert(imageListVec.end(), ans.first.begin(), ans.first.end());
+      imgSetSize = imageListVec.size();
+      // auto imageListVec = memberFrames;
+
+      std::vector<Observation *> observations;
+      observations.reserve(imageListVec.size() * 600);
+
+      for (auto &img: imageListVec) {
+        for (auto &obs: img->observations) {
+          if (obs->feature->find()->active && obs->feature->find()->live) {
+            observations.push_back(obs);
+          }
+        }
+      }
+      obsSize = observations.size();
+      ftg->launch_inprocess_sparse_CG_iterator(observations);
+
+      for (auto &obs: img->observations) {
+        if (obs && obs->image) {
+          coords = obs->image->xy;
+          break;
+        }
+      }
+    }
+
+    auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
+        count();
+    std::cout << "index " << img->index << " observation size " << obsSize << " img set size " << imgSetSize << " time "
+        << t1 << std::endl;
+    return coords;
+  }
+
+  void MetricComposite::test_add_align_image() {
+    auto start11 = std::chrono::high_resolution_clock::now();
+
+
+    std::vector<Observation *> observations;
+
+    for (auto &img: memberFrames) {
+      int matchCount = 0;
+      auto start = std::chrono::high_resolution_clock::now();
+
+      ftg->add_image(img);
+
+      long covisTime = 0;
+      if (img->regInfo && img->regInfo->winningVote.m) {
+        ftg->process_match2(img->regInfo->winningVote.m);
+        auto [coords,valid] = ftg->estimate_image_coords_from_feature_tracks(img);
+
+        if (valid) {
+          auto [matchCandidates,featTracksCovered] = get_match_candidates(
+            Rect(coords, imageSize), 4, {img->regInfo->winningVote.m->image_1}, img);
+          if (!matchCandidates.empty()) {
+            launch_component_match_search(img, matchCandidates);
+            while (outstandingCMS_jobs > 0) {
+              Poco::Thread::sleep(10);
+            }
+
+            matchCount = ftg->process_match_queue();
+
+            if (matchCount == 0) {
+              int k = 0;
+            }
+          }
+        } else {
+          int k = 0;
+        }
+        start = std::chrono::high_resolution_clock::now();
+
+        covisTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::high_resolution_clock::now() - start).count();
+      } else if (img->index > 0) {
+        int k = 0;
+      }
+
+
+      // build subgraph
+      start = std::chrono::high_resolution_clock::now();
+      auto imageList = find_contributing_images();
+
+
+      observations.reserve(observations.size() + img->observations.size());
+      for (auto &obs: img->observations) {
+        if (obs->feature->find()->active) {
+          // if (img->regInfo->root || obs->feature->find()->imageFeatures.size() > 1) {
+          observations.push_back(obs);
+          // }
+        }
+      }
+      auto obs2 = observations;
+      obs2.erase(std::remove_if(obs2.begin(), obs2.end(), [&](Observation *o) {
+        return o->feature->find()->imageFeatures.size() < 2;
+      }), obs2.end());
+
+
+      ftg->launch_inprocess_sparse_CG_iterator(obs2);
+      auto t1 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start)
+          .count();
+      std::cout << "index " << img->index << " matches " << matchCount << " coVis time " << covisTime <<
+          " total observations " << obs2.size() << " iteration time " << t1 << std::endl;
+      int k = 0;
+    }
+    int maxx = 0, maxy = 0;
+    for (auto &img: memberFrames) {
+      auto baImg = img->observations[0]->image;
+      if (abs(img->regInfo->absoluteCoords.x - baImg->xy.x) > maxx) {
+        maxx = abs(img->regInfo->absoluteCoords.x - baImg->xy.x);
+      }
+      if (abs(img->regInfo->absoluteCoords.y - baImg->xy.y) > maxy) {
+        maxy = abs(img->regInfo->absoluteCoords.y - baImg->xy.y);
+      }
+      img->regInfo->absoluteCoords = baImg->xy;
+    }
+    auto t111 = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start11).count();
+    std::cout << "total iterative time " << t111 << std::endl;
+
+    int max = 0, min = 900000, average = 0;
+    for (auto img: memberFrames) {
+      auto liveFts = img->count_live_feats();
+      average += liveFts;
+      if (max < liveFts) {
+        max = liveFts;
+      }
+      if (min > liveFts) {
+        min = liveFts;
+      }
+    }
+    average /= memberFrames.size();
+
+    rebuild(memberFrames);
+
+
+    std::map<int, int> trackDepth;
+    int count = 0, invalid = 0;
+    for (auto ft: ftg->baFeatures) {
+      if (ft->parent == ft && ft->live) {
+        ++count;
+        if (!ft->active) {
+          ++invalid;
+        }
+        ++trackDepth[ft->imageFeatures.size()];
+      }
+    }
+    std::cout << "total features and invalid " << count << " " << invalid << std::endl;
+
+    std::cout << "depth of tracks" << std::endl;
+    for (auto &[depth,count]: trackDepth) {
+      std::cout << depth << " " << count << std::endl;
+    }
+
+    auto startf = std::chrono::high_resolution_clock::now();
+
+
+    auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf)
+        .count();
+
+    std::cout << "total coverage search time " << t11 << std::endl;
+    int k = 0;
+  }
 
   void MetricComposite::align_and_rebuild() {
+    auto startf = std::chrono::high_resolution_clock::now();
+    // return;
+    // std::vector<Observation*> observations;
+    // observations.reserve(memberFrames.size() * 600);
+    //
+    // for (auto &img : memberFrames) {
+    //   for (auto &obs : img->observations) {
+    //     if (obs->feature->find()->active && obs->feature->find()->live) {
+    //       observations.push_back(obs);
+    //     }
+    //   }
+    // }
+    //
+    // ftg->launch_inprocess_sparse_CG_iterator(observations,memberFrames.size());
+    // auto t11 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).count();
+    // std::cout<<"runtime "<<t11<<std::endl;
+
+    int maxx = 0, maxy = 0;
+    for (auto &img: memberFrames) {
+      auto baImg = img->observations[0]->image;
+      if (abs(img->regInfo->absoluteCoords.x - baImg->xy.x) > maxx) {
+        maxx = abs(img->regInfo->absoluteCoords.x - baImg->xy.x);
+      }
+      if (abs(img->regInfo->absoluteCoords.y - baImg->xy.y) > maxy) {
+        maxy = abs(img->regInfo->absoluteCoords.y - baImg->xy.y);
+      }
+      img->regInfo->absoluteCoords = baImg->xy;
+      img->regInfo->wasAligned = true;
+    }
+
+    auto start = std::chrono::high_resolution_clock::now();
+    std::unordered_set imageSet(memberFrames.begin(), memberFrames.end());
+    auto mosaicSet = reduce_members_through_competition(imageSet);
+    auto reduceTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start).count();
+
+    start = std::chrono::high_resolution_clock::now();
+    rebuild({mosaicSet.begin(), mosaicSet.end()});
+    auto rebuildTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::high_resolution_clock::now() - start).count();
+
+    std::map<int, int> trackDepth;
+    int count = 0, invalid = 0;
+    for (auto ft: ftg->baFeatures) {
+      if (ft->parent == ft && ft->live) {
+        ++count;
+        if (!ft->active) {
+          ++invalid;
+        }
+        ++trackDepth[ft->imageFeatures.size()];
+      }
+    }
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).
+        count();
+
+    // std::cout << "total features and invalid " << count << " " << invalid << std::endl;
+    std::cout << "total align time comp " << componentIndex << ": " << t3 << " with " << mosaicSet.size() << " frames"
+        << std::endl;
+    int k = 0;
+    return;
+
+
     // combining components - should only be relevant if CompositeManager::combine_components() ran prior to alignment
     for (auto &loser: absorbedComponents) {
       ftg->storedMatches.insert(loser->ftg->storedMatches.begin(), loser->ftg->storedMatches.end());
@@ -205,7 +474,7 @@ namespace pathCam {
     }
 
 
-    auto start = std::chrono::high_resolution_clock::now();
+    // auto start = std::chrono::high_resolution_clock::now();
 
     auto ig = ImageGraph();
 
@@ -325,25 +594,20 @@ namespace pathCam {
     //This is done to attempt to close long cycles where two overlapping frames don't have a match, but we might be able
     //to promote a frame that's between them and thereby close the loop. This is not absolutely necessary but improves performance
     auto memberOverlaps = calculate_member_overlaps(std::vector(members.begin(), members.end()));
-    auto start1 = std::chrono::high_resolution_clock::now();
     ImageGraph::PromoteMembersForOverlapConnectivityShortestHop(members, memberOverlaps,
                                                                 std::vector(
                                                                   ftg->storedMatches.begin(),
                                                                   ftg->storedMatches.end()));
-    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start1).count();
 
 
+    auto start1 = std::chrono::high_resolution_clock::now();
     for (auto m: matches) {
       if (members.find(m->image_1) != members.end() && members.find(m->image_2) != members.end()) {
-        for (int i = 0; i < m->good_matches.size(); ++i) {
-          if (m->inliers[i]) {
-            ftg->process_match(m->image_1->index, m->image_2->index, m->good_matches[i]);
-          }
-        }
+        ftg->process_match(m);
       }
     }
-
+    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>
+        (std::chrono::high_resolution_clock::now() - start1).count();
 
     for (auto &img: members) {
       img->keypointsImageSpace.resize(img->keypoints.size());
@@ -359,6 +623,7 @@ namespace pathCam {
     //**************** GENERATE TRACKS ****************
     auto tracks = ftg->generateCurrentTracks(memberImages);
     //**************** GENERATE TRACKS ****************
+
 
     //**************** RUN SPARSE CONJUGATE GRADIENT ****************
     auto iters = BundleAdjustmentIntegrator::run_coopers_planar_ba_edge_list(
@@ -398,25 +663,26 @@ namespace pathCam {
       }
     }
 
-    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
-        (std::chrono::high_resolution_clock::now() - start).count();
-
-    Poco::FastMutex::ScopedLock lock(parent->printToScreenMutex);
-    std::cout << std::endl<< "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(componentMagLabel) <<
-        std::endl;
-
-    if (!discardedIslands.empty()) {
-      std::cout << "failed to connect graph, discarded " << discardedIslands.size() << " islands, "
-          << std::accumulate(discardedIslands.begin(), discardedIslands.end(), size_t{0}) << " frames" << std::endl;
-    }
-
-    if (!graphConnectivityResult.promoted_nodes.empty()) {
-      std::cout << "promoted " << graphConnectivityResult.promoted_nodes.size() << " frames" << std::endl;
-    }
-
-    std::cout << memberImages.size() << " frames aligned in " << iters.first << " and " << iters.second << " iterations"
-        << std::endl;
-    std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
+    // auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>
+    //     (std::chrono::high_resolution_clock::now() - start).count();
+    //
+    // Poco::FastMutex::ScopedLock lock(parent->printToScreenMutex);
+    // std::cout << std::endl << "ALIGNMENT OF COMPONENT " << componentIndex << " MAGLABEL " << Image::get_label(
+    //       componentMagLabel) <<
+    //     std::endl;
+    //
+    // if (!discardedIslands.empty()) {
+    //   std::cout << "failed to connect graph, discarded " << discardedIslands.size() << " islands, "
+    //       << std::accumulate(discardedIslands.begin(), discardedIslands.end(), size_t{0}) << " frames" << std::endl;
+    // }
+    //
+    // if (!graphConnectivityResult.promoted_nodes.empty()) {
+    //   std::cout << "promoted " << graphConnectivityResult.promoted_nodes.size() << " frames" << std::endl;
+    // }
+    //
+    // std::cout << memberImages.size() << " frames aligned in " << iters.first << " and " << iters.second << " iterations"
+    //     << std::endl;
+    // std::cout << "total align time comp " << componentIndex << ": " << t3 << std::endl;
   }
 
 
@@ -464,7 +730,6 @@ namespace pathCam {
           assert(check_tile_img(img->regInfo->absoluteCoords,tileIdx,parent->tileSize,imageSize));
         }
       }
-      img->subsequentMatchLaunched = true;
       process_tiles(img, tileIndexes, false);
 
 
@@ -540,7 +805,7 @@ namespace pathCam {
 
     //put raw data into fourChannelPreallocated
     prepare_4CPA_cpu(img, tiles, forceFullImage);
-    img->free_memory_RAW();
+    img->free_memory_RAW(true);
 
     //calculate region of pyramid for data placement
     auto imageBox = cv::Rect_<float>(img->regInfo->absoluteCoords.x, img->regInfo->absoluteCoords.y, img->width,
@@ -686,16 +951,13 @@ namespace pathCam {
     }
 
     float myMotionBlur, theirMotionBlur, myFocusBlur, theirFocusBlur;
-    {
-      std::lock_guard lock(_img->blurMutex);
-      myMotionBlur = _img->motionBlur;
-      myFocusBlur = _img->focusBlur;
-    }
-    {
-      std::lock_guard lock(_to->owner->blurMutex);
-      theirMotionBlur = _to->owner->motionBlur;
-      theirFocusBlur = _to->owner->focusBlur;
-    }
+
+    myMotionBlur = _img->motionBlur;
+    myFocusBlur = _img->focusBlur;
+
+    theirMotionBlur = _to->owner->motionBlur;
+    theirFocusBlur = _to->owner->focusBlur;
+
     //frames have about the same blur, prioritize closeness to center of frame instead unless the tile is already
     //pretty close to the center of the frame
     if (std::abs(theirMotionBlur - myMotionBlur) < /*0.01f*/50) {
@@ -719,19 +981,23 @@ namespace pathCam {
   }
 
 
-  std::unordered_set<Image *> MetricComposite::find_contributing_images() const {
+  std::unordered_set<Image *> MetricComposite::find_contributing_images(bool onlyFTG) const {
     std::unordered_set<Image *> members;
 
     for (auto &tileIdx: imagePyramid->liveTiles) {
       auto to = imagePyramid->get_base_tile(tileIdx);
+
+      if (onlyFTG && !to->owner->addedToFTG) { continue; }
+      //skip images that haven't been added to the FTG for alignment
+
       members.insert(to->owner);
     }
 
-    for (auto &[img,tileIdx]: waitingFrames) {
-      if (img) {
-        members.insert(img);
-      }
-    }
+    // for (auto &[img,tileIdx]: waitingFrames) {
+    //   if (img) {
+    //     members.insert(img);
+    //   }
+    // }
 
     return members;
   }
@@ -757,14 +1023,14 @@ namespace pathCam {
 
   void MetricComposite::add_landmark_frame(Image *img) {
     landmarkFrames.push_back(img);
-    if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
-      img->subsequentMatchLaunched = true;
-      ++outstandingCMS_jobs;
-      auto members = find_contributing_images();
-      auto cms = new ComponentMatchSearch(parent, img, this, {members.begin(), members.end()});
-      parent->jqSecondary->add_runnable(cms);
-    }
+    // if (!img->subsequentMatchLaunched) {
+    //   img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
+    //   img->subsequentMatchLaunched = true;
+    //   ++outstandingCMS_jobs;
+    //   auto members = find_contributing_images();
+    //   auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), {members.begin(), members.end()});
+    //   parent->jqSecondary->add_runnable(cms);
+    // }
   }
 
   void MetricComposite::launch_component_match_search_with_XC(Image *img_) {
@@ -781,7 +1047,8 @@ namespace pathCam {
         members.insert(component->root);
       }
     }
-
+    int k = 0;
+    members.clear();
     launch_component_match_search(img_, {members.begin(), members.end()});
   }
 }

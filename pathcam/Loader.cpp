@@ -55,12 +55,12 @@ namespace pathCam {
     if (!image->is_mostly_black()) {
       // image->check_blur_async(); //this is computationally very expensive even for small windows
       // image->motionBlur = 0.5;
-
-      auto start = std::chrono::high_resolution_clock::now();
-      // make_akaze(image,{0.25,0.1});
-
-      image->profileTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::high_resolution_clock::now() - start).count();
+      //
+      // auto start = std::chrono::high_resolution_clock::now();
+      // // make_akaze(image,{0.25,0.1});
+      //
+      // image->profileTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+      //   std::chrono::high_resolution_clock::now() - start).count();
 
       image->create_reg_image(parent->scale_factor, parent->crop_factor, parent->debayer, parent->interpolation,
                               parent->real);
@@ -104,6 +104,7 @@ namespace pathCam {
       image->release_reg_image();
 
       build_reg_info(image);
+
       auto matchjob = new MatchRunnable(parent, image_index);
       ++parent->matchableCount;
       parent->JobQ->add_runnable(matchjob);

@@ -994,6 +994,7 @@ void MRTiledImageSet::generate_nav_paths() {
       currentNavPath.endTime = frameTimeStamps[i - 1];
       currentNavPath.endFrame = i - 1;
       currentNavPath.frameCenters = frame_centers_from_frame_interval(currentNavPath.startFrame,currentNavPath.endFrame);
+      currentNavPath.distancePerFrame = currentNavPath.calc_dist_per_frame();
       navPaths.push_back(currentNavPath);
 
       currentNavPath = NavigationPath{};
@@ -1007,5 +1008,6 @@ void MRTiledImageSet::generate_nav_paths() {
   currentNavPath.endTime = frameTimeStamps.back();
   currentNavPath.endFrame = frameComponentMembership.size() - 1;
   currentNavPath.frameCenters = frame_centers_from_frame_interval(currentNavPath.startFrame,currentNavPath.endFrame);
+  currentNavPath.distancePerFrame = currentNavPath.calc_dist_per_frame();
   navPaths.push_back(currentNavPath);
 }

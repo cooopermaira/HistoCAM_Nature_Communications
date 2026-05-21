@@ -11,8 +11,6 @@
 #include <memory>
 
 namespace pathCam {
-
-
   double Composite::get_scale() const {
     return imagePyramid->scale;
   }
@@ -78,7 +76,7 @@ namespace pathCam {
   }
 
   void Composite::correct_offset() const {
-    if (xcRegLandmark && xcRegLandmark->regInfo && xcRegLandmark->regInfo->wasAligned) {
+    if (xcRegLandmark && xcRegLandmark->regInfo/* && xcRegLandmark->regInfo->wasAligned*/) {
       auto queryAbC = xcPwDist + Point2f(xcRegLandmark->regInfo->absoluteCoords);
       auto resultantPoint = parent->get_AbC_relative_from_relative(xcRegLandmark->regInfo->component_membership,
                                                                    queryAbC, 0);
@@ -90,7 +88,7 @@ namespace pathCam {
 
   void Composite::set_scale(float _scale, bool _ffCorrectExistingTiles) {
     imagePyramid->set_scale(_scale);
-    update_mutex.lock();
+    Poco::FastMutex::ScopedLock lock(update_mutex);
     deduce_label();
 
     if (componentMagLabel > 0) {
@@ -106,7 +104,6 @@ namespace pathCam {
     }
     imagePyramid->set_mag_label(componentMagLabel);
     parent->MRImageSet->sort_by_scale();
-    update_mutex.unlock();
   }
 
 
@@ -206,10 +203,10 @@ namespace pathCam {
   void Composite::establish_scale_at_root_cpu(Image *_rootImg) {
     _rootImg->load_raw_from_disk(true);
     if (_rootImg->akazeFeatures.empty()) {
-      make_akaze(_rootImg,{0.25,0.1});
+      make_akaze(_rootImg, {0.25, 0.1});
     }
 
-    Poco::RWLock::ScopedReadLock lock(parent->component_mutex);
+    // Poco::RWLock::ScopedReadLock lock(parent->component_mutex); //already locked in composite manager
 
     //find most recent resolved frame
     if (auto [mostRcntRslv,objChange] = parent->get_most_recent_resolved_frame(_rootImg, false);
@@ -254,12 +251,11 @@ namespace pathCam {
           std::cout << "registration attempt " << count++ << " frame " << target->index << std::endl;
 
           if (target->akazeFeatures.empty()) {
-            make_akaze(target,{0.25,0.1});
+            make_akaze(target, {0.25, 0.1});
           }
 
           //target and root are swapped in this function call because we know the scales for target but not for root
           if (auto res = findHomographyAKAZE_allScalePairs(target->akazeFeatures, _rootImg->akazeFeatures); res.valid) {
-
             //detect scale difference between likelyLabel and img.label
             auto targetScales = Image::valid_scales_for_label(target->get_label());
             auto scaleDiff = targetScales[likelyLabel - 1];
@@ -294,7 +290,7 @@ namespace pathCam {
                 xcPwDist = pairwiseDistance;
                 xcRegLandmark = target;
                 std::cout << "component " << componentIndex
-                          << " is same-scale; remaining independent for CMS joining" << std::endl;
+                    << " is same-scale; remaining independent for CMS joining" << std::endl;
                 _rootImg->free_memory_RAW();
                 return;
               }
@@ -315,7 +311,7 @@ namespace pathCam {
         xcPwDist = projectedAbC - Point2f(mostRcntRslv->regInfo->absoluteCoords);
         xcRegLandmark = mostRcntRslv;
         std::cout << "component " << componentIndex
-                  << " positioned via velocity projection; remaining independent" << std::endl;
+            << " positioned via velocity projection; remaining independent" << std::endl;
 
         _rootImg->free_memory_RAW();
       } else {
@@ -325,7 +321,7 @@ namespace pathCam {
         // Mat targetRaw(imageSize,CV_8UC1, mostRcntRslv->get_Raw());
         // Mat rootRaw(imageSize,CV_8UC1, _rootImg->get_Raw());
         if (mostRcntRslv->akazeFeatures.empty()) {
-          make_akaze(mostRcntRslv,{0.25,0.1});
+          make_akaze(mostRcntRslv, {0.25, 0.1});
         }
 
         if (auto res = findHomographyAKAZE_allScalePairs(_rootImg->akazeFeatures, mostRcntRslv->akazeFeatures); res.
@@ -508,25 +504,544 @@ namespace pathCam {
   }
 
   Composite::~Composite() {
-
 #ifdef PATHCAM_OPENCV_CUDA
     cudaFree(threeChnBuf);
     cudaFree(fourChnBuf);
     cudaFree(rectMaskBuf);
 #endif
+
     delete ftg;
   }
 
+  std::shared_ptr<Composite> Composite::joinHead() {
+    if (joinedTo->componentIndex != componentIndex) {
+      joinedTo = joinedTo->joinHead();
+    }
+    return joinedTo;
+  }
 
-  void Composite::launch_component_match_search(Image *img, std::vector<Image*> candidates_) {
-    if (!img->subsequentMatchLaunched) {
-      img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
-      img->subsequentMatchLaunched = true;
-      ++outstandingCMS_jobs;
-      const auto cms = new ComponentMatchSearch(parent, img, this,candidates_);
-      parent->jqSecondary->add_runnable(cms);
+  void Composite::launch_XC_search(Image *img) {
+    // Poco::RWLock::ScopedReadLock(parent->component_mutex); //already locked in composite manager, this is composite thread
+    for (auto &comp: parent->composites) {
+      if (comp->componentIndex == componentIndex) { continue; }
+      if (comp->suspended) { continue; }
+
+      if (comp->componentMagLabel == componentMagLabel) {
+        auto candidates = comp->find_contributing_images();
+        //ok to call without mutex as long as its from composite thread
+        auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), {candidates.begin(), candidates.end()});
+        parent->jqSecondary->add_runnable(cms);
+      }
     }
   }
+
+  Point2f Composite::get_space_to_space_translation(const ConsumableComponent &consumable) const {
+    const bool use2 =
+        consumable.matches[0]->image_1->regInfo->component_membership
+        != componentIndex;
+
+    // figure out translation into my space
+    Point2f translation;
+    const float count = consumable.matches.size();
+
+    for (auto &m: consumable.matches) {
+      Image *target = use2 ? m->image_1 : m->image_2;
+      Image *other = use2 ? m->image_2 : m->image_1;
+
+      auto [delta, ok] = m->t_to(target);
+
+      if (!ok) {
+        throw std::runtime_error("IMAGE NOT IN MATCH");
+      }
+
+      translation +=
+          delta +
+          Point2f(other->regInfo->absoluteCoords) -
+          Point2f(target->regInfo->absoluteCoords);
+    }
+
+    translation /= count;
+
+    return translation;
+  }
+
+  void Composite::consume_queued_components() {
+    //COMPOSITE PROCESS SHOULD BE HALTED VIA compositeProcessHalt WRITE LOCK BEFORE CALLING THIS FUNCTION
+
+    while (!consumptionQ.empty()) {
+      auto consumable = std::move(consumptionQ.front());
+      consumptionQ.pop();
+
+      while (!consumable.composite->consumptionQ.empty()) {
+        consumptionQ.push(consumable.composite->consumptionQ.front());
+        consumable.composite->consumptionQ.pop();
+      }
+
+      for (auto m : consumable.matches) {
+        m->image_1->combineMatches.push_back(m);
+        m->image_2->combineMatches.push_back(m);
+      }
+
+      std::cout<<"COMPONENT "<<componentIndex<<" NOW CONSUMING "<<consumable.composite->componentIndex<<std::endl;
+
+      auto translation = get_space_to_space_translation(consumable);
+
+      {
+        //translate all the reginfo into my space and fix their component index
+        Poco::RWLock::ScopedWriteLock riLock(RegInfo::registrationProcessHalt);
+
+        for (auto &img: parent->images) {
+          if (!img || !img->regInfo) { continue; }
+          auto *ri = img->regInfo;
+          if (ri->component_membership != consumable.composite->componentIndex) {
+            continue;
+          }
+          ri->absoluteCoords += Point2i(translation);
+          ri->component_membership = componentIndex;
+          ri->root = false;
+        }
+      }
+
+      for (auto img : consumable.composite->memberFrames) {
+        staging.push_back(img->regInfo);
+        for (auto obs : img->observations) {
+          delete obs;
+        }
+        img->observations.clear();
+        img->addedToFTG = false;
+        img->showFrameBoundaryOnUpdate = false;
+        img->ownedTiles.clear();
+      }
+
+      staging.insert(
+          staging.end(),
+          std::make_move_iterator(consumable.composite->staging.begin()),
+          std::make_move_iterator(consumable.composite->staging.end())
+      );
+      consumable.composite->staging.clear();
+    }
+  }
+
+  void Composite::realtime_alignment_thread_loop() {
+    std::vector<Image *> batch;
+    batch.reserve(256);
+
+    while (true) {
+      realTimeAlignmentEvent.wait();
+
+      batch.clear();
+
+      {
+        Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
+
+        while (!realTimeAlignmentQueue.empty()) {
+          batch.push_back(realTimeAlignmentQueue.front());
+          realTimeAlignmentQueue.pop();
+        }
+
+        // queue empty now
+        realTimeAlignmentEvent.reset();
+      }
+
+      if (!batch.empty()) {
+        realtime_align(batch);
+      }
+
+      // -----------------------------------------
+      // only exit AFTER draining remaining work
+      // -----------------------------------------
+
+      if (!alignmentShouldProceed) {
+        if (suspended){return;}
+        Poco::Mutex::ScopedLock lock(realTimeAlignmentMutex);
+
+        if (realTimeAlignmentQueue.empty()) {
+          break;
+        } else {
+          // more work arrived while aligning
+          realTimeAlignmentEvent.set();
+        }
+      }
+    }
+  }
+
+  void Composite::realtime_align(std::vector<Image *> images) {
+    Poco::RWLock::ScopedReadLock processLock(FeatureTrackGenerator::alignmentProcessHalt);
+    if (suspended){return;}
+
+    realTimeImageList.reserve(realTimeImageList.size() + images.size());
+
+    auto startf = std::chrono::high_resolution_clock::now();
+    std::vector<Observation *> observations;
+
+
+    for (auto img: images) {
+      prep_image_for_alignment(img);
+      realTimeImageList.push_back(img);
+    }
+
+
+      //do a full align
+
+      observations.reserve(realTimeImageList.size() * 600);
+
+      Poco::FastMutex::ScopedLock lock(update_mutex);
+
+      for (auto img: realTimeImageList) {
+        // if (img->stationary && img->ownedTiles.empty()){continue;} //no movement, not in mosaic
+
+        for (Observation *obs: img->observations) {
+          auto *f = obs->feature->find();
+          if (f->active && f->live) {
+            observations.push_back(obs);
+          }
+        }
+      }
+
+
+
+    auto t3 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).
+        count();
+    startf = std::chrono::high_resolution_clock::now();
+
+    ftg->launch_inprocess_sparse_CG_iterator(observations);
+
+    auto t4 = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - startf).
+        count();
+    // std::cout << "preproc time " << t3 << " solve time " << t4 <<
+    //     " queue size " << images.size() << std::endl;
+
+
+    // update coordinates on all regInfo objects before returning.
+
+  }
+
+  void Composite::prep_image_for_alignment(Image *img) const {
+
+    if (img->addedToFTG) {
+      int k = 0;
+    }
+    ftg->add_image(img);
+
+    Point2i coords = img->regInfo->absoluteCoords;
+    bool valid = false;
+
+    std::vector<Image*> alreadyMatched;
+    if (img->regInfo && img->regInfo->winningVote.m) {
+      Poco::FastMutex::ScopedLock lock(ftg->accessMutex);
+      Poco::Mutex::ScopedLock lock2(img->regInfo->rAccessMutex);
+
+      //we have one match for this image, use that match to figure out which existing feature tracks this image's features actually are.
+      ftg->process_match2(img->regInfo->winningVote.m);
+
+      //we just pinned down some of my features to existing ft tracks, use those ft track locations to estimate my image coords
+      std::tie(coords, valid) = ftg->estimate_image_coords_from_feature_tracks(img);
+      alreadyMatched.push_back(img->regInfo->winningVote.m->image_1);
+    }
+    // else  {
+    //   std::cout << "WARNING FROM Composite::prep_image_for_alignment IMAGE INDEX " << img->index <<
+    //       " HAD NO WINNING VOTE" << std::endl;
+    // }
+
+    int candidateRequest;
+    Rect searchSpace;
+    if (valid) {
+      candidateRequest = 4;
+      searchSpace = Rect(coords, imageSize);
+    } else {
+      candidateRequest = 6;
+      Point2i p(imageSize.width, imageSize.height);
+
+      searchSpace = Rect(img->regInfo->absoluteCoords - 0.5 * p, img->regInfo->absoluteCoords + 1.5 * p);
+    }
+
+    //figure out who i should pair wise match against to pin down the rest of my features into existing ft tracks
+    auto [matchCandidates,featTracksCovered] = get_match_candidates(searchSpace, candidateRequest,
+                                                                    alreadyMatched, img);
+
+    if (!matchCandidates.empty()) {
+      auto matches = pairwise_match(img, matchCandidates); //pairwise match to those n images
+
+      for (auto &m: matches) {
+        ftg->process_match2(m);
+      }
+      // std::cout<<"index "<<img->index<<" "<<img->count_live_feats()<<std::endl;
+    }
+    // img->regInfo->absoluteCoords = coords;
+  }
+
+  std::vector<std::shared_ptr<Match> >
+  Composite::pairwise_match(Image *img, const std::vector<Image *> &targets) const {
+    if (targets.empty()) {
+      return {};
+    }
+    auto &matcher = getThreadLocalMatcher(parent->matcher_type);
+    std::vector<std::shared_ptr<Match> > matches;
+
+    for (auto &candidate: targets) {
+      if (candidate == nullptr || candidate->index == img->index) { continue; }
+      if (!candidate->is_good()) { continue; }
+      if (img->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && img->label != candidate->label) {
+        continue;
+      }
+
+      auto m = std::make_shared<Match>(candidate, img);
+      matcher.match(m);
+
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
+        m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
+        matches.push_back(m);
+      }
+    }
+    return matches;
+  }
+
+
+  std::pair<std::vector<Image *>, int>
+  Composite::get_match_candidates(const Rect &rect,
+                                  const int n,
+                                  const std::vector<Image *> &alreadyMatched,
+                                  Image *self) const {
+    struct Candidate {
+      int gain = 0;
+      bool valid = false;
+      bool selected = false;
+
+      // feature indices this image covers
+      std::vector<uint16_t> features;
+    };
+
+    // ------------------------------------------------------------------------
+    // Gather valid features directly during query
+    // ------------------------------------------------------------------------
+
+    std::vector<BAFeature *> features;
+    features.reserve(512);
+
+    const int radSq = parent->scope_radius * parent->scope_radius;
+    const Point2i center = rect.tl() + Point2i(rect.size()) / 2;
+
+    ftg->featureGrid.query(
+      rect.x,
+      rect.y,
+      rect.x + rect.width,
+      rect.y + rect.height,
+      [&](BAFeature *f) {
+        if (componentMagLabel == Image::_2X) {
+          f = f->find();
+
+          const int dx = center.x - (int) f->xy.x;
+          const int dy = center.y - (int) f->xy.y;
+
+          if (dx * dx + dy * dy > radSq)
+            return;
+        } else {
+          if (!rect.contains(f->xy))
+            return;
+        }
+
+        features.push_back(f);
+      });
+
+    const int F = (int) features.size();
+
+    if (F == 0)
+      return {{}, 0};
+
+    // ------------------------------------------------------------------------
+    // Build dense candidate structures
+    // ------------------------------------------------------------------------
+
+    const int imageCount = (int) realTimeImageList.size();
+
+    std::vector<Candidate> candidates(imageCount);
+
+    // ------------------------------------------------------------------------
+    // Build dense global->local image remap
+    // ------------------------------------------------------------------------
+
+    long maxGlobalIndex = 0;
+
+    for (Image *img: realTimeImageList) {
+      if (img) {
+        maxGlobalIndex = std::max(maxGlobalIndex, img->index);
+      }
+    }
+
+    std::vector<int> globalToLocal(maxGlobalIndex + 1, -1);
+
+    for (int localIdx = 0; localIdx < imageCount; ++localIdx) {
+      Image *img = realTimeImageList[localIdx];
+
+      if (img) {
+        globalToLocal[img->index] = localIdx;
+      }
+    }
+
+    // feature -> observing images
+    std::vector<std::vector<Image *> > featureToImages(F);
+
+    // ------------------------------------------------------------------------
+    // Build graph
+    // ------------------------------------------------------------------------
+
+    for (uint16_t featIdx = 0; featIdx < F; ++featIdx) {
+      BAFeature *f = features[featIdx];
+
+      for (const auto &[img, obsIdx]: f->imageFeatures) {
+        if (!img)
+          continue;
+
+        if (img == self)
+          continue;
+
+        if (img->index < 0 || img->index >= (int) globalToLocal.size())
+          continue;
+
+        const int localIdx = globalToLocal[img->index];
+
+        if (localIdx < 0)
+          continue;
+
+        Candidate &cand = candidates[localIdx];
+
+        cand.valid = true;
+        cand.features.push_back(featIdx);
+        cand.gain++;
+
+        featureToImages[featIdx].push_back(img);
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Covered feature tracking
+    // ------------------------------------------------------------------------
+
+    std::vector<uint8_t> covered(F, 0);
+
+    int totalCovered = 0;
+
+    auto cover_feature = [&](uint16_t featIdx) {
+      if (covered[featIdx])
+        return;
+
+      covered[featIdx] = 1;
+      totalCovered++;
+
+      // decrement gain for all images observing this feature
+      for (Image *img: featureToImages[featIdx]) {
+        if (img->index < 0 || img->index >= (int) globalToLocal.size())
+          continue;
+
+        const int localIdx = globalToLocal[img->index];
+
+        if (localIdx >= 0) {
+          candidates[localIdx].gain--;
+        }
+      }
+    };
+
+    // ------------------------------------------------------------------------
+    // Apply already matched images
+    // ------------------------------------------------------------------------
+
+    for (Image *img: alreadyMatched) {
+      if (!img)
+        continue;
+
+      if (img->index < 0 || img->index >= (int) globalToLocal.size())
+        continue;
+
+      const int localIdx = globalToLocal[img->index];
+
+      if (localIdx < 0)
+        continue;
+
+      Candidate &cand = candidates[localIdx];
+
+      if (!cand.valid)
+        continue;
+
+      cand.selected = true;
+
+      for (uint16_t featIdx: cand.features) {
+        cover_feature(featIdx);
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Greedy selection
+    // ------------------------------------------------------------------------
+
+    std::vector<Image *> selected;
+    selected.reserve(n);
+
+    for (int iter = 0; iter < n; ++iter) {
+      Image *bestImg = nullptr;
+      int bestIdx = -1;
+      int bestGain = 0;
+
+      // --------------------------------------------------------------------
+      // Find best candidate
+      // --------------------------------------------------------------------
+
+      for (int localIdx = 0; localIdx < imageCount; ++localIdx) {
+        Image *img = realTimeImageList[localIdx];
+
+        if (!img)
+          continue;
+
+        Candidate &cand = candidates[localIdx];
+
+        if (!cand.valid)
+          continue;
+
+        if (cand.selected)
+          continue;
+
+        if (cand.gain > bestGain) {
+          bestGain = cand.gain;
+          bestImg = img;
+          bestIdx = localIdx;
+        }
+      }
+
+      if (!bestImg || bestGain <= 0) {
+        break;
+      }
+
+      // --------------------------------------------------------------------
+      // Select image
+      // --------------------------------------------------------------------
+
+      Candidate &bestCand = candidates[bestIdx];
+
+      bestCand.selected = true;
+      selected.push_back(bestImg);
+
+      // --------------------------------------------------------------------
+      // Cover newly covered features
+      // --------------------------------------------------------------------
+
+      for (uint16_t featIdx: bestCand.features) {
+        cover_feature(featIdx);
+      }
+    }
+
+    return {selected, totalCovered};
+  }
+
+
+  void Composite::launch_component_match_search(Image *img, std::vector<Image *> candidates_) {
+    // if (!img->subsequentMatchLaunched) {
+      // img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
+      // img->subsequentMatchLaunched = true;
+      ++outstandingCMS_jobs;
+      const auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), candidates_);
+      parent->jqSecondary->add_runnable(cms);
+    // }
+  }
+
 
   bool Composite::prepare_4CPA_cpu(Image *img, const std::vector<Point2i> &affectedTiles, const bool forceFullImage) {
     if (affectedTiles.size() < 100 && !forceFullImage) {
@@ -820,7 +1335,7 @@ namespace pathCam {
   Composite::Composite(StreamCam *parent, Size image_size, int _componentIndex) : parent(parent),
     componentIndex(_componentIndex), imageSize(image_size),
     root_offset(0.0, 0.0),
-    max_offset(0.0, 0.0), ftg(new FeatureTrackGenerator) {
+    max_offset(0.0, 0.0), ftg(new FeatureTrackGenerator), realTimeAlignmentEvent(false) {
     //flat_field = parent->flat_field2X;
 
     imagePyramid = std::make_shared<MRTiledImage>(parent);
@@ -839,7 +1354,6 @@ namespace pathCam {
     rectMaskGPU = cuda::GpuMat(imageSize,CV_8UC1, rectMaskBuf);
 
 
-
     cudaMallocManaged(&threeChnBuf, 3 * imageSize.area());
     threeChannelPreallocated = Mat(imageSize,CV_8UC3, threeChnBuf);
     threeChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC3, threeChnBuf);
@@ -848,9 +1362,9 @@ namespace pathCam {
     fourChannelPreallocated = Mat(imageSize,CV_8UC4, fourChnBuf);
     fourChannelPrealGPU = cuda::GpuMat(imageSize,CV_8UC4, fourChnBuf);
 #else
-    threeChannelPreallocated = Mat(imageSize,CV_8UC3);
-    fourChannelPreallocated = Mat(imageSize,CV_8UC4);
-    rectMask = Mat(image_size, CV_8UC1,Scalar(255));
+    threeChannelPreallocated = Mat(imageSize, CV_8UC3);
+    fourChannelPreallocated = Mat(imageSize, CV_8UC4);
+    rectMask = Mat(image_size, CV_8UC1, Scalar(255));
 #endif
     if (parent->circleMask.empty()) {
       circleMask = Mat::zeros(image_size, CV_8U);
@@ -858,6 +1372,8 @@ namespace pathCam {
              Scalar(255),
              -1);
     }
+
+    realtimeAlignmentThread = std::thread(&Composite::realtime_alignment_thread_loop, this);
   }
 
 
@@ -1051,7 +1567,7 @@ namespace pathCam {
     std::vector<RegInfo *> new_info;
     while (!staging.empty()) {
       new_info.push_back(staging.front());
-      staging.pop();
+      staging.pop_front();
     }
     update_Bbox(new_info);
     add_images(new_info);

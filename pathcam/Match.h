@@ -66,6 +66,16 @@ public:
     }
     return nullptr;
   }
+
+  std::pair<Point2f,bool> t_to(Image* img) {
+    if (img == image_1) {
+      return {Point2f(t_x,t_y),true};
+    }
+    if (img == image_2) {
+      return {Point2f(-t_x,-t_y),true};
+    }
+    return {{},false};
+  }
   
 };
 

@@ -336,6 +336,7 @@ namespace pathCam {
     return buf;
   }
 
+
   inline float sobel_focus_green_even_odd(const cv::Mat& bayer)
   {
     CV_Assert(!bayer.empty());
@@ -370,6 +371,8 @@ namespace pathCam {
     // Return mean energy
     return cv::mean(mag2)[0];
   }
+
+
 
   template<typename T>
   class OrderedSet {

@@ -92,20 +92,7 @@ public:
 
   void refreshImage() { rightComponent->refreshImage(); }
 
-  void resized() override {
-    auto area = getLocalBounds();
-    juce::Component *components[] = {leftComponent.get(), resizerBar.get(), rightComponent.get()};
-
-    layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
-
-    // Split the left column: leftComponent gets top 3/4, navPathList gets bottom 1/4.
-    auto leftBounds = leftComponent->getBounds();
-    int navHeight = leftBounds.getHeight() / 4;
-    leftComponent->setBounds(leftBounds.withTrimmedBottom(navHeight));
-    navPathList->setBounds(leftBounds.removeFromBottom(navHeight));
-
-    rightComponent->resized();
-  }
+  void resized() override;
 
   void setVisible(bool shouldBeVisible) override {
     Component::setVisible(shouldBeVisible);
@@ -155,12 +142,31 @@ public:
     updateEphemeralNavPath();
   }
 
+  void updatePathSection() {
+    if (const NavigationPath *navPath = getSelectedNavPath()) {
+      const int n = (int) navPath->frameCenters.size();
+      const int intervalFrames = (int) pathSectionFrames;
+      if (intervalFrames > 0 && intervalFrames < n && n > 1) {
+        int startI = (int) (pathSection * (float) (n - intervalFrames));
+        startI = juce::jlimit(0, n - intervalFrames, startI);
+        double dist = navPath->calc_dist_per_frame(startI, startI + intervalFrames);
+        getListComp()->setPathSectionDist(dist);
+      } else {
+        getListComp()->setPathSectionDist(std::nullopt);
+      }
+    } else {
+      getListComp()->setPathSectionDist(std::nullopt);
+    }
+    rightComponent->repaint();
+  }
+
   void updateEphemeralNavPath() {
     ephemeralNavPath.reset();
 
     auto *vpp = dynamic_cast<VoicePointPoly *>(selected.get());
     if (!vpp || vpp->startFrameIdx < 0 || !rightComponent->MRImageSet) {
-      rightComponent->repaint();
+      getListComp()->setDistancePerFrame(std::nullopt);
+      updatePathSection();
       return;
     }
 
@@ -175,13 +181,21 @@ public:
       path.frameCenters.reserve(centers.size());
       for (const auto &c : centers)
         path.frameCenters.emplace_back((float) c.x, (float) c.y);
+      path.distancePerFrame = path.calc_dist_per_frame();
+      getListComp()->setDistancePerFrame(path.distancePerFrame, path.frameCenters.size());
       ephemeralNavPath = std::move(path);
+    } else {
+      getListComp()->setDistancePerFrame(std::nullopt);
     }
 
-    rightComponent->repaint();
+    updatePathSection();
   }
 
   void removeSelected();
+
+  void saveConceptSpans(const std::string &filepath, const std::vector<ConceptSpan> &spans);
+  std::vector<ConceptSpan> loadConceptSpans(const std::string &filepath);
+
 
   std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > activeAnnotations;
   std::vector<std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > > allSlideAnnotations;
@@ -201,6 +215,8 @@ public:
 
   float annotationVisibility = 0.5f;
   float pathHistory = 0.0f;
+  float pathSection = 0.0f;
+  float pathSectionFrames = 0.0f;
   std::optional<NavigationPath> ephemeralNavPath;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AnnotateComponent)

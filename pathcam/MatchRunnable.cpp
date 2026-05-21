@@ -11,34 +11,94 @@
 namespace pathCam {
 
   void ComponentMatchSearch::run() {
-    auto matcher = DescriptorMatcher(parent->matcher_type);
+    if (candidates.empty()){return;}
+
+    auto& matcher = getThreadLocalMatcher(parent->matcher_type);
     std::vector<std::shared_ptr<Match> > matches;
 
-    // image->siftMutex.lock();
-    // image->extract_sift(parent->siftPoints, 4, 0, 0.4f, 0.1f,
-    //                     getThreadConvertSpace(parent->siftWindow, parent->siftWindow),
-    //                     true,EnsureSiftScratch(parent->siftWindow, parent->siftWindow,4,false));
-    // image->siftMutex.unlock();
-    image->free_memory_RAW(); //incremented in MetricComposite::process_tiles(...)
+    auto theirCompIndex = candidates[0]->regInfo->component_membership; //no need to lock any mutex because this image is decidedly sorted and has been composited
+    auto theirComponent = parent->get_composite(theirCompIndex);
+
+
+    for (auto candidate : candidates) {
+      if (!theirComponent->xcMatchShouldContinue || !component->xcMatchShouldContinue){return;}
+      if (candidate == nullptr || candidate->index == image->index) {continue;}
+      if (!candidate->is_good()) {continue;}
+      if (image->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && image->label != candidate->label){continue;}
+
+      auto m = std::make_shared<Match>(candidate, image);
+      matcher.match(m);
+
+
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
+        m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
+        matches.push_back(m);
+        if (matches.size() > 3) {
+          break;
+        }
+      }
+    }
+
+    if (!matches.empty()) {
+      //figure out which component consumes the other
+
+      Poco::RWLock::ScopedWriteLock compositeHalt(Composite::compositeProcessHalt);
+
+      auto theirImages = theirComponent->find_contributing_images();
+      auto myImages = component->find_contributing_images();
+
+      std::shared_ptr<Composite> survivor, consumed;
+
+      if (theirImages.size() > myImages.size()) {
+        survivor = theirComponent;
+        consumed = component;
+      }else {
+        survivor = component;
+        consumed = theirComponent;
+      }
+      if (consumed->joinHead()->componentIndex != consumed->componentIndex){return;}// component was already consumed
+
+
+      std::cout<<"COMPONENT "<<consumed->componentIndex<<" WILL BE CONSUMED BY COMPONENT "<<survivor->componentIndex<<std::endl;
+
+      Poco::RWLock::ScopedWriteLock ftgHalt(FeatureTrackGenerator::alignmentProcessHalt);
+      consumed->alignmentShouldProceed = false;
+      consumed->suspended = true;
+      consumed->imagePyramid->suspended = true;
+      consumed->xcMatchShouldContinue = false;
+
+      consumed->joinedTo = survivor;
+
+      survivor->queue_for_consumption({consumed,matches});
+
+    }
+
+  }
+
+
+
+  void ComponentMatchSearch::run2() {
+    auto& matcher = getThreadLocalMatcher(parent->matcher_type);
+    std::vector<std::shared_ptr<Match> > matches;
 
     bool empty = false;
     if (candidates.empty() && image_index > 0) {
       empty = true;
-      std::vector<long> indexes(image_index);
+      std::vector<long> indexes;
+      indexes.reserve(image_index);
       for (long int prev_idx = image_index - 1; prev_idx >= 0; prev_idx--) {
         indexes.push_back(prev_idx);
       }
+      candidates = parent->get_image_ref(indexes);
     }
 
     auto start = std::chrono::high_resolution_clock::now();
     int count = 0;
     for (auto candidate : candidates) {
 
-      if (candidate == nullptr) {continue;}
+      if (candidate == nullptr || candidate->index == image->index) {continue;}
       if (!candidate->is_good()) {continue;}
       if (image->label != Image::_NOLABEL && candidate->label != Image::_NOLABEL && image->label != candidate->label){continue;}
-
-      ++image->matchCount;
 
       // auto meP1 = image->regInfo->absoluteCoords - Point2i(200,200);
       // auto meP2 = image->regInfo->absoluteCoords + Point2i(image->width+200,image->height+200);
@@ -55,7 +115,7 @@ namespace pathCam {
       matcher.match(m);
 
 
-      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 30)) {
+      if (1 == MotionEstimator::findHomography(m, parent->estimator_type, 10)) {
         m->numMatches = std::accumulate(m->inliers.begin(), m->inliers.end(), 0);
         //forward match to feature track generator (ftg)
 
@@ -72,6 +132,10 @@ namespace pathCam {
 
       ++count;
     }
+
+    // if (candidates.size() > 200) {
+    //   int k = 0;
+    // }
     parent->cmsCount += count;
     auto v = std::chrono::duration_cast<std::chrono::milliseconds>(
   std::chrono::high_resolution_clock::now() - start).count();
@@ -91,6 +155,7 @@ namespace pathCam {
         //store INTRA component matches
         else {
           component->ftg->store_match(match);
+          component->ftg->queue_match(match);
         }
       }
       if (image->regInfo->winningVote.m) {
@@ -140,9 +205,9 @@ namespace pathCam {
 
 
     --component->outstandingCMS_jobs;
-    if (component->alignmentHasBegun) {
-      throw std::runtime_error("CMS jobs still running after CompositeManager thought they were done");
-    }
+    // if (component->alignmentHasBegun) {
+    //   throw std::runtime_error("CMS jobs still running after CompositeManager thought they were done");
+    // }
   }
 
   void MatchRunnable::build_reg_info(Image *img) const {

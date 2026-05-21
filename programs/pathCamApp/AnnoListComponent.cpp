@@ -6,7 +6,17 @@
 //
 
 #include "JuceHeader.h"
+std::string to_string_sig(double x, int n) {
+  std::ostringstream oss;
+  oss << std::setprecision(n) << x;
+  return oss.str();
+}
 
+std::string to_string_fixed(double x, int n) {
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(n) << x;
+  return oss.str();
+}
 
 void AnnoListBoxModel::removeSelected() {
   parent->removeSelected();
@@ -83,6 +93,16 @@ void AnnoListComponent::initAlphaSliders() {
     parent->pathHistory = (float) pathHistorySlider.getValue();
     parent->updateEphemeralNavPath();
   };
+  pathSectionSlider.onValueChange = [this]() {
+    parent->pathSection = (float) pathSectionSlider.getValue();
+    parent->updatePathSection();
+  };
+  auto updateSectionFrames = [this]() {
+    parent->pathSectionFrames = pathSectionFramesEditor.getText().getFloatValue();
+    parent->updatePathSection();
+  };
+  pathSectionFramesEditor.onReturnKey = updateSectionFrames;
+  pathSectionFramesEditor.onFocusLost = updateSectionFrames;
 }
 
 void AnnoListComponent::newSelection() {
@@ -133,8 +153,8 @@ void NavPathListComponent::paintListBoxItem(int row, juce::Graphics &g,
   }
 
   const auto &path = paths[row];
-  juce::String label = juce::String(pathCam::Image::get_label(path.magLabel))
-                       + "  |  " + juce::String((int) path.frameCenters.size()) + " frames";
+  std::string label = pathCam::Image::get_label(path.magLabel) + "  |  " + std::to_string((int) path.frameCenters.size())
+  + " frames"+ "  |  " + to_string_fixed(path.distancePerFrame, 2) +" px/frame";
 
   g.setColour(juce::Colours::white);
   g.setFont(11.0f);
