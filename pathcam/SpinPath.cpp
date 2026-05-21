@@ -388,7 +388,7 @@ namespace pathCam {
       pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Red);
       pCam->BalanceRatio.SetValue(1.7);
       pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Blue);
-      pCam->BalanceRatio.SetValue(2.0);
+      pCam->BalanceRatio.SetValue(2.35);
     } catch (Spinnaker::Exception &e) {
       camlogger.error(Poco::format("Error Spinning up camera: %s", e.what()));
       result = -1;
