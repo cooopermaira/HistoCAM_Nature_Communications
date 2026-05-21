@@ -76,7 +76,7 @@ namespace pathCam {
   }
 
   void Composite::correct_offset() const {
-    if (xcRegLandmark && xcRegLandmark->regInfo && xcRegLandmark->regInfo->wasAligned) {
+    if (xcRegLandmark && xcRegLandmark->regInfo/* && xcRegLandmark->regInfo->wasAligned*/) {
       auto queryAbC = xcPwDist + Point2f(xcRegLandmark->regInfo->absoluteCoords);
       auto resultantPoint = parent->get_AbC_relative_from_relative(xcRegLandmark->regInfo->component_membership,
                                                                    queryAbC, 0);

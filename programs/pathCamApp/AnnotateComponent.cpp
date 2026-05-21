@@ -172,6 +172,19 @@ void resolveEvidenceSpans(const std::string &originalText,
   }
 }
 
+static std::vector<std::string> load_andrew_transcriptions() {
+  std::ifstream file("/home/cm/Documents/data/Andrew_data_march/transcriptions.txt");
+  std::vector<std::string> out;
+  std::string line;
+  while (std::getline(file, line)) {
+    // skip index lines (pure digits) and blank lines
+    if (line.empty() || line.find_first_not_of("0123456789") == std::string::npos)
+      continue;
+    out.push_back(line);
+  }
+  return out;
+}
+
 std::vector<std::string> AnnotateComponent::get_preconfig_anno() {
   if (parent && parent->sCam) {
     return parent->sCam->get_preconfig_anno_labels();
@@ -529,7 +542,7 @@ static std::string buildConceptExtractionRequestBody_JSON(const juce::String &te
       "For each concept, output:\n"
       "- evidence_text: the EXACT contiguous substring from the transcript\n"
       "- concept_text: a concise interpretation (1 to 10 words, NOT a final label)\n"
-      "- concept_type: one of ['inflammation','invasion','margin','gleason_grade','extraprostatic_extension','tumor','architecture','other']\n"
+      "- concept_type: one of ['inflammation','invasion_pattern','margin_status','gleason_grade','extension_pattern','tumor_presence','architectural_pattern','other']\n"
       "- assertion: one of ['present','absent','uncertain','revised']\n"
       "- attributes: object (may be empty)\n"
       "\n"
@@ -989,6 +1002,7 @@ static std::vector<ConceptSpan> parseConceptsFromLlamaResponses(const std::strin
 std::vector<ConceptSpan> reduceToConcepts_LLM(const std::string &text) {
 
   std::string body = buildConceptExtractionRequestBody_JSON_Llama(text);
+  // std::string body = buildConceptSpanExtractionRequestBody_JSON_Llama(text);
   const std::string resp = LlamaResponses_POST(body);
 
   if (resp.empty()) {
@@ -1228,77 +1242,19 @@ void AnnotateComponent::voice_annotation_handler() {
 }
 
 void AnnotateComponent::silly_test() {
-
-
-
-  // std::ofstream outFile("/home/cm/Documents/data/Andrew_data_march/transcriptions.txt");
-  for (int i = 0; i < 15; ++i) {
+  for (int i = 5; i < 15; ++i) {
     juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/dictation.wav");
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
-    std::cout << std::endl << std::endl << i << std::endl;
-
-    size_t width = 120;
-    size_t pos = 0;
-
-
-
-    for (size_t ii = 0; ii < fullText.size(); ii += width) {
-      std::cout << fullText.substr(ii, width) << "\n";
-    }
-    for (auto &word : wordVec) {
-      std::cout<<word.word<<" "<<word.startMS << " "<<word.endMS<<std::endl;
-    }
-
-
-    auto start = std::chrono::high_resolution_clock::now();
-
     auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
+
     for (auto &conceptSpan : annoSpanVec) {
       conceptSpan.startMS = wordVec[conceptSpan.spanStartI].startMS;
       conceptSpan.endMS = wordVec[conceptSpan.spanEndI].endMS;
     }
-    // std::string conceptSpanSavePath = "/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/conceptSpan";
-    // saveConceptSpans(conceptSpanSavePath,annoSpanVec);
+    std::string savepath = "/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/conceptSpan";
 
-    auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-        count();
-    //
-    // for (auto & c : annoSpanVec) {
-    //   if (!c.evidence_text.empty()) {
-    //     c.endMS = wordVec[c.spanEndI].endMS;
-    //     c.startMS = wordVec[c.spanStartI].startMS;
-    //   }
-    //
-    // }
-    int k = 0;
-    // for (auto &annospan: annoSpanVec) {
-    //   std::cout << annospan.label;
-    //
-    //   if (annospan.spanStartI >= 0 && annospan.spanEndI >= annospan.spanStartI) {
-    //     std::cout << ", " << annospan.spanStartI << ", " << annospan.spanEndI << ", \"";
-    //     for (int i = annospan.spanStartI; i <= annospan.spanEndI; ++i) {
-    //       std::cout << wordVec[i].word;
-    //       if (i < annospan.spanEndI) {
-    //         std::cout << " ";
-    //       }
-    //     }
-    //     std::cout << "\"" << std::endl;
-    //   }
-    //
-    // }
+    saveConceptSpans(savepath,annoSpanVec);
   }
 
-  // outFile.close();
 
-  juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap1/dictation.wav");
-
-  auto start = std::chrono::high_resolution_clock::now();
-  // auto [fullText,wordVec] = send_transcribe_call(dictPath);
-  //
-  // auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
-  //     count();
-  // std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
-  // auto annoSpanVec = reduceToAnnotations_LLM(fullText, get_preconfig_anno());
-
-  int k = 0;
 }
