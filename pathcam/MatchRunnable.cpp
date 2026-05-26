@@ -16,10 +16,6 @@ namespace pathCam {
     auto& matcher = getThreadLocalMatcher(parent->matcher_type);
     std::vector<std::shared_ptr<Match> > matches;
 
-    auto theirCompIndex = candidates[0]->regInfo->component_membership; //no need to lock any mutex because this image is decidedly sorted and has been composited
-    auto theirComponent = parent->get_composite(theirCompIndex);
-
-
     for (auto candidate : candidates) {
       if (!theirComponent->xcMatchShouldContinue || !component->xcMatchShouldContinue){return;}
       if (candidate == nullptr || candidate->index == image->index) {continue;}

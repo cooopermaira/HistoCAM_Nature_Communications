@@ -86,9 +86,7 @@ namespace pathCam {
 
           for (auto &comp: parent->composites) {
             if (comp->suspended){continue;}
-            while (!comp->staging.empty()) {
-              comp->update();
-            }
+            comp->update();
           }
 
           auto stop = std::chrono::high_resolution_clock::now();
@@ -131,8 +129,8 @@ namespace pathCam {
     parent->notify_observers();
     threads.clear();
 
-    debug_print_component_status();
-    combine_components();
+    // debug_print_component_status();
+    // combine_components();
     debug_print_component_status();
 
     if (align) {
@@ -304,11 +302,13 @@ namespace pathCam {
 
   void CompositeManager::debug_print_component_status() const {
     for (auto &comp: parent->composites) {
+      std::string status;
       if (comp->suspended) {
-        std::cout << "component " << comp->componentIndex << " SUSPENDED" << std::endl;
+        status = "SUSPENDED";
       } else {
-        std::cout << "component " << comp->componentIndex << " ACTIVE" << std::endl;
+        status = "ACTIVE";
       }
+      std::cout<<Image::get_label(comp->componentMagLabel)<<" component "<<comp->componentIndex<<" "<<status<<std::endl;
     }
     std::cout << std::endl;
   }

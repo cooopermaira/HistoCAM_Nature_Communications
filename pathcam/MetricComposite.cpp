@@ -25,12 +25,12 @@ namespace pathCam {
    * over and over again by a series of consecutive frames and substantially lowers computational cost
    */
   void MetricComposite::update() {
-
-    Poco::RWLock::ScopedWriteLock lock(compositeProcessHalt);
-
     if (!consumptionQ.empty()) {
+      Poco::RWLock::ScopedWriteLock lock(compositeProcessHalt);
       consume_queued_components();
     }
+
+    Poco::RWLock::ScopedReadLock lock(compositeProcessHalt);
 
     //place component in MR image
     if (imagePyramid->scale == 0 && !xcMatchInitiated) {
@@ -51,9 +51,14 @@ namespace pathCam {
       // t.detach();
     }
 
+    if (staging.empty()) {
+      waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
+      ++positionForNextWaitngFrame;
+      process_one_waiting_frame();
+    }
 
-    // PROCESS NEW FRAMES BEGIN
-    if (!staging.empty()) {
+    while (!staging.empty()) {
+      // PROCESS NEW FRAMES BEGIN
       auto ri = staging.front();
       auto img = ri->image;
       memberFrames.push_back(img);
@@ -130,7 +135,7 @@ namespace pathCam {
         process_tiles(img, immediateProcessingTiles);
       }
 
-      if (img->showFrameBoundaryOnUpdate){
+      if (img->showFrameBoundaryOnUpdate) {
         float x = (imagePyramid->offset.x + img->regInfo->absoluteCoords.x) * imagePyramid->scale;
         float y = (imagePyramid->offset.y + img->regInfo->absoluteCoords.y) * imagePyramid->scale;
         float w = parent->image_width * imagePyramid->scale;
@@ -141,20 +146,25 @@ namespace pathCam {
                                   Image::get_label(componentMagLabel), get_scale());
       }
       //}
-    } else {
-      waitingFrames[positionForNextWaitngFrame % frameDelay] = {nullptr, {}};
-      ++positionForNextWaitngFrame;
+
+      // PROCESS NEW FRAMES END
+
+
+      //PROCESS OLD FRAMES BEGIN
+      process_one_waiting_frame();
+      // PROCESS OLD FRAMES END
     }
-    // PROCESS NEW FRAMES END
+  }
 
-
-    //PROCESS OLD FRAMES BEGIN
+  void MetricComposite::process_one_waiting_frame() {
     /*
         here we process delayed frames, allowing the least blurry frames to win out before processing.
         this is an erase-remove_if implementation with a lambda function that updates the tileObj
         if img should be owner, otherwise it removes the tile from the img's list as another img can fill that tile with
         better data
     */
+
+
     for (auto &[img,tiles]: waitingFrames) {
       if (!img) { continue; }
 
@@ -200,7 +210,6 @@ namespace pathCam {
       img->free_memory_RAW();
       img = nullptr;
     }
-    // PROCESS OLD FRAMES END
   }
 
   Point2i MetricComposite::test_add_image_realtime(Image *img) {

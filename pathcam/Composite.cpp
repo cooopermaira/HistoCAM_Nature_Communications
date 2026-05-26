@@ -527,9 +527,10 @@ namespace pathCam {
       if (comp->suspended) { continue; }
 
       if (comp->componentMagLabel == componentMagLabel) {
-        auto candidates = comp->find_contributing_images();
         //ok to call without mutex as long as its from composite thread
-        auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), {candidates.begin(), candidates.end()});
+        auto candidates = comp->find_contributing_images();
+
+        const auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), comp,{candidates.begin(), candidates.end()});
         parent->jqSecondary->add_runnable(cms);
       }
     }
@@ -1037,8 +1038,8 @@ namespace pathCam {
       // img->load_raw_from_disk(false); //freed in ComponentMatchSearch::run()
       // img->subsequentMatchLaunched = true;
       ++outstandingCMS_jobs;
-      const auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), candidates_);
-      parent->jqSecondary->add_runnable(cms);
+      // const auto cms = new ComponentMatchSearch(parent, img, shared_from_this(), candidates_);
+      // parent->jqSecondary->add_runnable(cms);
     // }
   }
 

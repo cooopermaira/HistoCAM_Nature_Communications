@@ -76,203 +76,372 @@ namespace {
         ++count;
     return count;
   }
+
+  void combine_partial_gleason_annotations(std::vector<ConceptSpan>& concepts) {
+
+  auto is_gleason = [](const ConceptSpan& c) {
+    return c.concept_type == "gleason_grade";
+  };
+
+  auto is_tumor_percent = [](const ConceptSpan& c) {
+    return c.concept_type == "tumor_presence" &&
+           c.attributes.percent_involvement.has_value();
+  };
+
+  auto compatible = [&](const ConceptSpan& a,
+                        const ConceptSpan& b) {
+
+    // only merge positive assertions for now
+    if (a.assertion != "present" ||
+        b.assertion != "present") {
+      return false;
+    }
+
+    bool allowed_pair =
+      (is_gleason(a) && is_gleason(b)) ||
+      (is_gleason(a) && is_tumor_percent(b)) ||
+      (is_tumor_percent(a) && is_gleason(b));
+
+    if (!allowed_pair) {
+      return false;
+    }
+
+    const auto& aa = a.attributes;
+    const auto& bb = b.attributes;
+
+    auto attr_compatible = [](const auto& x,
+                              const auto& y) {
+
+      // conflicting populated attributes
+      if (x.has_value() &&
+          y.has_value() &&
+          x.value() != y.value()) {
+        return false;
+      }
+
+      return true;
+    };
+
+    return
+      attr_compatible(aa.gleason_primary,
+                      bb.gleason_primary) &&
+
+      attr_compatible(aa.gleason_secondary,
+                      bb.gleason_secondary) &&
+
+      attr_compatible(aa.percent_involvement,
+                      bb.percent_involvement);
+  };
+
+  auto merge_into = [](ConceptSpan& dst,
+                       const ConceptSpan& src) {
+
+    auto merge_attr = [](auto& dstAttr,
+                         const auto& srcAttr) {
+
+      if (!dstAttr.has_value() &&
+           srcAttr.has_value()) {
+        dstAttr = srcAttr;
+      }
+    };
+
+    merge_attr(dst.attributes.gleason_primary,
+               src.attributes.gleason_primary);
+
+    merge_attr(dst.attributes.gleason_secondary,
+               src.attributes.gleason_secondary);
+
+    merge_attr(dst.attributes.percent_involvement,
+               src.attributes.percent_involvement);
+
+    // preserve gleason concept type if either side is gleason
+    if (src.concept_type == "gleason_grade") {
+      dst.concept_type = "gleason_grade";
+    }
+
+    // combine evidence text
+    if (!src.evidence_text.empty()) {
+      if (!dst.evidence_text.empty())
+        dst.evidence_text += " | ";
+
+      dst.evidence_text += src.evidence_text;
+    }
+
+    // combine concept text
+    if (!src.concept_text.empty()) {
+      if (!dst.concept_text.empty())
+        dst.concept_text += " | ";
+
+      dst.concept_text += src.concept_text;
+    }
+
+    // expand textual span
+    if (src.spanStartI != -1) {
+      if (dst.spanStartI == -1)
+        dst.spanStartI = src.spanStartI;
+      else
+        dst.spanStartI =
+          std::min(dst.spanStartI,
+                   src.spanStartI);
+    }
+
+    if (src.spanEndI != -1) {
+      if (dst.spanEndI == -1)
+        dst.spanEndI = src.spanEndI;
+      else
+        dst.spanEndI =
+          std::max(dst.spanEndI,
+                   src.spanEndI);
+    }
+
+    // expand timestamps
+    if (src.startMS != -1) {
+      if (dst.startMS == -1)
+        dst.startMS = src.startMS;
+      else
+        dst.startMS =
+          std::min(dst.startMS,
+                   src.startMS);
+    }
+
+    if (src.endMS != -1) {
+      if (dst.endMS == -1)
+        dst.endMS = src.endMS;
+      else
+        dst.endMS =
+          std::max(dst.endMS,
+                   src.endMS);
+    }
+
+    // expand frame range
+    if (src.startFrameIdx != -1) {
+      if (dst.startFrameIdx == -1)
+        dst.startFrameIdx =
+          src.startFrameIdx;
+      else
+        dst.startFrameIdx =
+          std::min(dst.startFrameIdx,
+                   src.startFrameIdx);
+    }
+
+    if (src.endFrameIdx != -1) {
+      if (dst.endFrameIdx == -1)
+        dst.endFrameIdx =
+          src.endFrameIdx;
+      else
+        dst.endFrameIdx =
+          std::max(dst.endFrameIdx,
+                   src.endFrameIdx);
+    }
+
+    dst.slideLevel =
+      dst.slideLevel || src.slideLevel;
+  };
+
+  std::vector<bool> removed(concepts.size(),
+                            false);
+
+  for (size_t i = 0;
+       i < concepts.size();
+       ++i) {
+
+    if (removed[i])
+      continue;
+
+    for (size_t j = i + 1;
+         j < concepts.size();
+         ++j) {
+
+      if (removed[j])
+        continue;
+
+      if (!compatible(concepts[i],
+                      concepts[j])) {
+        continue;
+      }
+
+      const auto& a =
+        concepts[i].attributes;
+
+      const auto& b =
+        concepts[j].attributes;
+
+      bool complementary = false;
+
+      auto contributes_missing =
+        [](const auto& x,
+           const auto& y) {
+
+          return !x.has_value() &&
+                  y.has_value();
+        };
+
+      complementary |=
+        contributes_missing(
+          a.gleason_primary,
+          b.gleason_primary);
+
+      complementary |=
+        contributes_missing(
+          a.gleason_secondary,
+          b.gleason_secondary);
+
+      complementary |=
+        contributes_missing(
+          a.percent_involvement,
+          b.percent_involvement);
+
+      complementary |=
+        contributes_missing(
+          b.gleason_primary,
+          a.gleason_primary);
+
+      complementary |=
+        contributes_missing(
+          b.gleason_secondary,
+          a.gleason_secondary);
+
+      complementary |=
+        contributes_missing(
+          b.percent_involvement,
+          a.percent_involvement);
+
+      if (!complementary) {
+        continue;
+      }
+
+      merge_into(concepts[i],
+                 concepts[j]);
+
+      removed[j] = true;
+    }
+  }
+
+  std::vector<ConceptSpan> merged;
+  merged.reserve(concepts.size());
+
+  for (size_t i = 0;
+       i < concepts.size();
+       ++i) {
+
+    if (!removed[i]) {
+      merged.push_back(
+        std::move(concepts[i]));
+    }
+  }
+
+  concepts = std::move(merged);
 }
 
-void resolveEvidenceSpans(const std::string &originalText,
-                          std::vector<ConceptSpan> &annotations) {
-  if (originalText.empty())
-    return;
 
-  size_t searchStartByte = 0;
+  void resolveEvidenceSpans(const std::string &originalText,
+                            std::vector<ConceptSpan> &annotations) {
+    if (originalText.empty())
+      return;
 
-  // Pre-split transcript tokens once (for token matching)
-  const auto transcriptTokens = splitWords(originalText);
-  const auto normalizedTranscript = normalize(originalText);
+    size_t searchStartByte = 0;
 
-  for (auto &ann: annotations) {
-    if (ann.evidence_text.empty())
-      continue;
+    // Pre-split transcript tokens once (for token matching)
+    const auto transcriptTokens = splitWords(originalText);
+    const auto normalizedTranscript = normalize(originalText);
 
-    // ---------------------------------------------
-    // 1) Exact substring match
-    // ---------------------------------------------
-    size_t pos = originalText.find(ann.evidence_text, searchStartByte);
+    for (auto &ann: annotations) {
+      if (ann.evidence_text.empty())
+        continue;
 
-    if (pos != std::string::npos) {
-      int startWord = byteOffsetToWordIndex(originalText, pos);
-      int endWord = byteOffsetToWordIndex(originalText,
-                                          pos + ann.evidence_text.size() - 1);
+      // ---------------------------------------------
+      // 1) Exact substring match
+      // ---------------------------------------------
+      size_t pos = originalText.find(ann.evidence_text, searchStartByte);
 
-      ann.spanStartI = startWord;
-      ann.spanEndI = endWord;
+      if (pos != std::string::npos) {
+        int startWord = byteOffsetToWordIndex(originalText, pos);
+        int endWord = byteOffsetToWordIndex(originalText,
+                                            pos + ann.evidence_text.size() - 1);
 
-      searchStartByte = pos + ann.evidence_text.size();
-      continue;
-    }
+        ann.spanStartI = startWord;
+        ann.spanEndI = endWord;
 
-    // ---------------------------------------------
-    // 2) Normalized exact match
-    // ---------------------------------------------
-    const std::string normalizedEvidence = normalize(ann.evidence_text);
+        searchStartByte = pos + ann.evidence_text.size();
+        continue;
+      }
 
-    size_t normPos = normalizedTranscript.find(
-      normalizedEvidence,
-      normalize(originalText.substr(0, searchStartByte)).size()
-    );
+      // ---------------------------------------------
+      // 2) Normalized exact match
+      // ---------------------------------------------
+      const std::string normalizedEvidence = normalize(ann.evidence_text);
 
-    if (normPos != std::string::npos) {
-      // Need to map normalized position back to original
-      // Simplest deterministic approach:
-      // perform token-based match instead (more reliable mapping)
-    }
+      size_t normPos = normalizedTranscript.find(
+        normalizedEvidence,
+        normalize(originalText.substr(0, searchStartByte)).size()
+      );
 
-    // ---------------------------------------------
-    // 3) Token sequence match (contiguous)
-    // ---------------------------------------------
-    const auto evidenceTokens = splitWords(ann.evidence_text);
+      if (normPos != std::string::npos) {
+        // Need to map normalized position back to original
+        // Simplest deterministic approach:
+        // perform token-based match instead (more reliable mapping)
+      }
 
-    if (!evidenceTokens.empty()) {
-      const size_t tSize = transcriptTokens.size();
-      const size_t eSize = evidenceTokens.size();
+      // ---------------------------------------------
+      // 3) Token sequence match (contiguous)
+      // ---------------------------------------------
+      const auto evidenceTokens = splitWords(ann.evidence_text);
 
-      for (size_t i = 0; i + eSize <= tSize; ++i) {
-        bool match = true;
+      if (!evidenceTokens.empty()) {
+        const size_t tSize = transcriptTokens.size();
+        const size_t eSize = evidenceTokens.size();
 
-        for (size_t j = 0; j < eSize; ++j) {
-          if (toLower(transcriptTokens[i + j]) !=
-              toLower(evidenceTokens[j])) {
-            match = false;
+        for (size_t i = 0; i + eSize <= tSize; ++i) {
+          bool match = true;
+
+          for (size_t j = 0; j < eSize; ++j) {
+            if (toLower(transcriptTokens[i + j]) !=
+                toLower(evidenceTokens[j])) {
+              match = false;
+              break;
+                }
+          }
+
+          if (match) {
+            ann.spanStartI = static_cast<int>(i);
+            ann.spanEndI = static_cast<int>(i + eSize - 1);
+
+            // advance search start
+            // convert word index to byte offset
+            size_t bytePos = 0;
+            int wordCount = 0;
+
+            while (bytePos < originalText.size() &&
+                   wordCount < ann.spanEndI + 1) {
+              if (originalText[bytePos] == ' ')
+                ++wordCount;
+              ++bytePos;
+                   }
+
+            searchStartByte = bytePos;
             break;
           }
         }
-
-        if (match) {
-          ann.spanStartI = static_cast<int>(i);
-          ann.spanEndI = static_cast<int>(i + eSize - 1);
-
-          // advance search start
-          // convert word index to byte offset
-          size_t bytePos = 0;
-          int wordCount = 0;
-
-          while (bytePos < originalText.size() &&
-                 wordCount < ann.spanEndI + 1) {
-            if (originalText[bytePos] == ' ')
-              ++wordCount;
-            ++bytePos;
-          }
-
-          searchStartByte = bytePos;
-          break;
-        }
       }
-    }
 
-    // If all methods fail, annotation remains with -1 indices
-  }
-}
-
-static std::vector<std::string> load_andrew_transcriptions() {
-  std::ifstream file("/home/cm/Documents/data/Andrew_data_march/transcriptions.txt");
-  std::vector<std::string> out;
-  std::string line;
-  while (std::getline(file, line)) {
-    // skip index lines (pure digits) and blank lines
-    if (line.empty() || line.find_first_not_of("0123456789") == std::string::npos)
-      continue;
-    out.push_back(line);
-  }
-  return out;
-}
-
-std::vector<std::string> AnnotateComponent::get_preconfig_anno() {
-  if (parent && parent->sCam) {
-    return parent->sCam->get_preconfig_anno_labels();
-  }
-  return {
-    "Gleason 3+3", "Gleason 3+4", "Gleason 4+3", "Gleason 4+4", "Gleason 4+5", "Gleason 5+4",
-    "positive surgical margin", "seminal vesicle invasion", "perineural invasion", "extraprostatic extension"
-  };
-}
-
-void AnnotateComponent::removeSelected() {
-  if (!selected)
-    return;
-
-  // Remove annotation object from the annotations list
-  auto itAnno = std::find(activeAnnotations->begin(), activeAnnotations->end(), selected);
-  if (itAnno == activeAnnotations->end())
-    return;
-
-  if (selected->getType() == Annotation::_SEG) {
-    // Safe cast (never dereference a failed dynamic_cast)
-    auto seg = std::dynamic_pointer_cast<SegmentAnnotation>(selected);
-    if (seg) {
-      const int targetSegID = seg->ID;
-
-      auto *mr0 = rightComponent->MRImageSet->MRImages[0].get();
-      for (auto &tileIdx: mr0->liveTiles) {
-        auto tileObj = mr0->get_base_tile(tileIdx);
-
-        auto &masks = tileObj->SAMMasks; // std::map<int, std::pair<cv::cuda::GpuMat, void*>>
-
-        auto itMask = masks.find(targetSegID);
-        if (itMask != masks.end()) {
-          // Release GPU memory
-          itMask->second.first.release();
-
-          // Delete frontend cached object, then null it
-          if (itMask->second.second) {
-            delete static_cast<juce::Image *>(itMask->second.second);
-            itMask->second.second = nullptr;
-          }
-
-          // Remove the entry from the map
-          masks.erase(itMask);
-        }
-      }
+      // If all methods fail, annotation remains with -1 indices
     }
   }
 
-  activeAnnotations->erase(itAnno);
-  selected.reset();
-
-  leftComponent->updatelist();
-  repaint();
-}
-
-
-void AnnotateComponent::resized() {
-  auto area = getLocalBounds();
-  juce::Component *components[] = {leftComponent.get(), resizerBar.get(), rightComponent.get()};
-
-  layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
-
-  auto leftBounds = leftComponent->getBounds();
-  int navHeight = leftBounds.getHeight() / 4;
-  leftComponent->setBounds(leftBounds.withTrimmedBottom(navHeight));
-  navPathList->setBounds(leftBounds.removeFromBottom(navHeight));
-
-  rightComponent->resized();
-
-  parent->repositionSlideListButton();
-}
-
-void AnnotateComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
-  ephemeralNavPath.reset();
-  getListComp()->setDistancePerFrame(std::nullopt);
-  getListComp()->setPathSectionDist(std::nullopt);
-  rightComponent->setImage(image);
-  if (image) {
-    update_active_annotations(image->index);
-    if (image->navPaths.empty()) {
-      image->generate_nav_paths();
+  std::vector<std::string> load_andrew_transcriptions() {
+    std::ifstream file("/home/cm/Documents/data/Andrew_data_march/transcriptions.txt");
+    std::vector<std::string> out;
+    std::string line;
+    while (std::getline(file, line)) {
+      // skip index lines (pure digits) and blank lines
+      if (line.empty() || line.find_first_not_of("0123456789") == std::string::npos)
+        continue;
+      out.push_back(line);
     }
-    getNavPathList()->setPaths(image->navPaths);
+    return out;
   }
-}
 
-std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File audioFile) {
+  std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File audioFile) {
   // Send audio file to local transcription server
   juce::URL transcriptionUrl("http://127.0.0.1:8088/v1/audio/transcriptions");
 
@@ -368,6 +537,97 @@ std::pair<std::string, std::vector<tsWord> > send_transcribe_call(juce::File aud
   }
   return {};
 }
+}
+std::vector<std::string> AnnotateComponent::get_preconfig_anno() const {
+  if (parent && parent->sCam) {
+    return parent->sCam->get_preconfig_anno_labels();
+  }
+  return {
+    "Gleason 3+3", "Gleason 3+4", "Gleason 4+3", "Gleason 4+4", "Gleason 4+5", "Gleason 5+4",
+    "positive surgical margin", "seminal vesicle invasion", "perineural invasion", "extraprostatic extension"
+  };
+}
+
+
+
+void AnnotateComponent::removeSelected() {
+  if (!selected)
+    return;
+
+  // Remove annotation object from the annotations list
+  auto itAnno = std::find(activeAnnotations->begin(), activeAnnotations->end(), selected);
+  if (itAnno == activeAnnotations->end())
+    return;
+
+  if (selected->getType() == Annotation::_SEG) {
+    // Safe cast (never dereference a failed dynamic_cast)
+    auto seg = std::dynamic_pointer_cast<SegmentAnnotation>(selected);
+    if (seg) {
+      const int targetSegID = seg->ID;
+
+      auto *mr0 = rightComponent->MRImageSet->MRImages[0].get();
+      for (auto &tileIdx: mr0->liveTiles) {
+        auto tileObj = mr0->get_base_tile(tileIdx);
+
+        auto &masks = tileObj->SAMMasks; // std::map<int, std::pair<cv::cuda::GpuMat, void*>>
+
+        auto itMask = masks.find(targetSegID);
+        if (itMask != masks.end()) {
+          // Release GPU memory
+          itMask->second.first.release();
+
+          // Delete frontend cached object, then null it
+          if (itMask->second.second) {
+            delete static_cast<juce::Image *>(itMask->second.second);
+            itMask->second.second = nullptr;
+          }
+
+          // Remove the entry from the map
+          masks.erase(itMask);
+        }
+      }
+    }
+  }
+
+  activeAnnotations->erase(itAnno);
+  selected.reset();
+
+  leftComponent->updatelist();
+  repaint();
+}
+
+
+void AnnotateComponent::resized() {
+  auto area = getLocalBounds();
+  juce::Component *components[] = {leftComponent.get(), resizerBar.get(), rightComponent.get()};
+
+  layout.layOutComponents(components, 3, area.getX(), area.getY(), area.getWidth(), area.getHeight(), false, true);
+
+  auto leftBounds = leftComponent->getBounds();
+  int navHeight = leftBounds.getHeight() / 4;
+  leftComponent->setBounds(leftBounds.withTrimmedBottom(navHeight));
+  navPathList->setBounds(leftBounds.removeFromBottom(navHeight));
+
+  rightComponent->resized();
+
+  parent->repositionSlideListButton();
+}
+
+void AnnotateComponent::setImage(std::shared_ptr<MRTiledImageSet> image) {
+  ephemeralNavPath.reset();
+  getListComp()->setDistancePerFrame(std::nullopt);
+  getListComp()->setPathSectionDist(std::nullopt);
+  rightComponent->setImage(image);
+  if (image) {
+    update_active_annotations(image->index);
+    if (image->navPaths.empty()) {
+      image->generate_nav_paths();
+    }
+    getNavPathList()->setPaths(image->navPaths);
+  }
+}
+
+
 
 
 static std::string buildConceptExtractionRequestBody_JSON_Llama(const juce::String &text) {
@@ -1162,6 +1422,8 @@ void AnnotateComponent::voice_annotation_handler() {
     auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).
         count();
 
+    combine_partial_gleason_annotations(annoSpanVec);
+
     std::cout << "full text: \"" << fullText << "\" processed in " << dur << std::endl;
     for (auto &annospan: annoSpanVec) {
       std::cout << annospan.concept_type;
@@ -1231,6 +1493,10 @@ void AnnotateComponent::voice_annotation_handler() {
       thisSlidesAnnotations->push_back(polyAnno);
     }
 
+    auto dictDir = dictPath.getParentDirectory();
+    auto conceptSpanPath = dictDir.getChildFile("conceptSpan");
+    saveConceptSpans(conceptSpanPath.getFullPathName().toStdString(),annoSpanVec);
+
     // Update the list box if this is the current slide
     if (thisSlidesAnnotations == activeAnnotations) {
       leftComponent->requestListRefresh();
@@ -1241,11 +1507,43 @@ void AnnotateComponent::voice_annotation_handler() {
   newVoiceAnnotation.wait();
 }
 
+void AnnotateComponent::build_poly_span_annotations_from_save(const std::string &filepath, const std::shared_ptr<MRTiledImageSet>& mrImgSet) {
+  juce::File csPath(filepath);
+  assert(csPath.existsAsFile());
+
+  auto annoSpanVec = loadConceptSpans(filepath);
+
+  //this lock doesnt really need to be done because this vector is only accessed from one thread during load
+  Poco::FastMutex::ScopedLock lock(allSlideAnnotationMutex);
+
+  allSlideAnnotations[mrImgSet->index]->reserve(annoSpanVec.size());
+  for (auto &cs : annoSpanVec) {
+
+    auto polyAnnoVertices = mrImgSet->poly_annotations_from_frame_interval(cs.startFrameIdx,cs.endFrameIdx);
+    auto polyAnno = std::make_shared<VoicePointPoly>(cs);
+
+    // Add each vertex from polyAnnoVertices
+    for (const auto &vertex: polyAnnoVertices) {
+      polyAnno->direct_add(fPoint(vertex.x, vertex.y));
+    }
+
+    if (cs.concept_type == "gleason_grade" || cs.assertion == "absent") {
+      polyAnno->global = true;
+    }
+
+    allSlideAnnotations[mrImgSet->index]->push_back(polyAnno);
+  }
+  int k = 0;
+
+}
+
 void AnnotateComponent::silly_test() {
   for (int i = 5; i < 15; ++i) {
     juce::File dictPath("/home/cm/Documents/data/Andrew_data_march/cap" + std::to_string(i) + "/dictation.wav");
     auto [fullText,wordVec] = send_transcribe_call(dictPath);
     auto annoSpanVec = reduceToAnnotations_LLM(fullText,get_preconfig_anno());
+
+    combine_partial_gleason_annotations(annoSpanVec);
 
     for (auto &conceptSpan : annoSpanVec) {
       conceptSpan.startMS = wordVec[conceptSpan.spanStartI].startMS;

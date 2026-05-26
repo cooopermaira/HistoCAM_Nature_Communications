@@ -304,6 +304,39 @@ void MainComponent::findSlideDirectories() {
       slideDirs.push_back(subdir);
   }
 
+  std::sort(slideDirs.begin(),
+          slideDirs.end(),
+          [](const juce::File& a,
+             const juce::File& b) {
+
+  auto parse_num =
+    [](const juce::File& f)
+    -> std::optional<int>
+  {
+    auto name = f.getFileName();
+
+    if (!name.containsOnly("0123456789"))
+      return std::nullopt;
+
+    return name.getIntValue();
+  };
+
+  auto na = parse_num(a);
+  auto nb = parse_num(b);
+
+  if (na && nb)
+    return *na < *nb;
+
+  if (na)
+    return true;
+
+  if (nb)
+    return false;
+
+  return a.getFullPathName() <
+         b.getFullPathName();
+});
+
   load_case(slideDirs);
 }
 
@@ -314,16 +347,21 @@ void MainComponent::load_case(std::vector<juce::File> slideDirs) {
   for (auto& ptr : annotate->allSlideAnnotations) {
     ptr = std::make_shared<std::vector<std::shared_ptr<Annotation>>>();
   }
+
   {
     Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
+    sCam->previousSlides.reserve(slideDirs.size());
+
     for (auto &p :slideDirs) {
       auto slide = std::make_shared<MRTiledImageSet>();
+
       slide->index = sCam->previousSlides.size();
       slide->cwd = p.getFullPathName().toStdString();
-      slide->read_slide_header();
-      sCam->previousSlides.push_back(slide);
-      load_annotations(p,slide->index);
 
+      slide->load_slide();
+      sCam->previousSlides.push_back(slide);
+
+      load_annotations(slide);
 
       ++sCam->numSlides;
     }
@@ -346,10 +384,19 @@ void MainComponent::load_case(std::vector<juce::File> slideDirs) {
   resized();
 }
 
-void MainComponent::load_annotations(juce::File dir, int index) {
+void MainComponent::load_annotations(const std::shared_ptr<MRTiledImageSet>& mrImgSet) const {
+  //first check if conceptSpan file exists. if it exists, use
+  juce::File dir(mrImgSet->cwd.toString());
+
+  auto csPath = dir.getChildFile("conceptSpan");
+  if (csPath.existsAsFile()) {
+    annotate->build_poly_span_annotations_from_save(csPath.getFullPathName().toStdString(),mrImgSet);
+    return;
+  }
+
   auto dPath = dir.getChildFile("dictation.wav");
   if (dPath.existsAsFile()) {
-    annotate->voiceAnnoOutstanding.push({index,dPath});
+    annotate->voiceAnnoOutstanding.emplace(mrImgSet->index,dPath);
     annotate->newVoiceAnnotation.set();
   }
 }

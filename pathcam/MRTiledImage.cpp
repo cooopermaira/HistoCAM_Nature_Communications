@@ -499,7 +499,7 @@ void MRTiledImageSet::write_slide_header() {
   }
 }
 
-void MRTiledImageSet::read_slide_header() {
+void MRTiledImageSet::load_slide() {
   Poco::Path dir(cwd);
   dir.makeDirectory(); // ensures trailing slash semantics
   dir.append("slide.pcHdr");

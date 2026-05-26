@@ -222,7 +222,7 @@ public:
 
   void write_slide_header();
 
-  void read_slide_header();
+  void load_slide();
 
   void save_to_disk(const std::string& path) {
     for (auto &mrImg : MRImages) {
