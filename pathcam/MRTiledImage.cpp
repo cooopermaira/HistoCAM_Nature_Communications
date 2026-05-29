@@ -441,7 +441,7 @@ void MRTiledImageSet::write_slide_header() {
       write_all(fd, &y, sizeof(int32_t));
     }
     for (const auto &fl: frameComponentMembership) {
-      auto fl8 = static_cast<uint8_t>(fl);
+      auto fl8 = static_cast<int8_t>(fl);
       write_all(fd, &fl8, sizeof(fl8));
     }
 
@@ -561,7 +561,7 @@ void MRTiledImageSet::load_slide() {
 
     frameComponentMembership.reserve(numFrames);
     for (uint16_t i = 0; i < numFrames; ++i) {
-      uint8_t fl;
+      int8_t fl;
       read_all(fd, &fl, sizeof(fl));
       frameComponentMembership.push_back(fl);
     }
@@ -724,6 +724,7 @@ std::vector<Point2i> MRTiledImageSet::frame_centers_from_frame_interval(long sta
     Point2i center(MRTiledImageSet::frameWidth / 2, MRTiledImageSet::frameHeight / 2);
 
     for (long i = startFrameIdx; i <= endFrameIdx; ++i) {
+      if (frameComponentMembership[i] < 0){continue;}
       auto mrImg = get_mrImg_by_comp_idx(frameComponentMembership[i]);
       auto coords = mrImg->scale * (Point2i(mrImg->offset) + AbCs[i] + center);
       frameCenters.push_back(coords);
@@ -743,6 +744,7 @@ std::vector<Point2i> MRTiledImageSet::poly_annotations_from_frame_interval(long 
     frameBoundaries.reserve(endFrameIdx - startFrameIdx + 1);
 
     for (long i = startFrameIdx; i <= endFrameIdx; ++i) {
+      if (frameComponentMembership[i] < 0){continue;}
       auto mrImg = get_mrImg_by_comp_idx(frameComponentMembership[i]);
       auto label = mrImg->magLabel;
       auto coords = mrImg->scale * (mrImg->offset + Point2f(AbCs[i]));
@@ -983,12 +985,20 @@ void MRTiledImageSet::generate_nav_paths() {
   navPaths.clear();
 
   NavigationPath currentNavPath;
-  currentNavPath.magLabel = get_mrImg_by_comp_idx(frameComponentMembership[0])->magLabel; //assumes the first frame was valid. there will undoubtedly be a case where that isnt true eventually;
-  currentNavPath.startTime = frameTimeStamps[0];
-  currentNavPath.startFrame = 0L;
-  currentNavPath.componentIndex = frameComponentMembership[0];
+  int ii = -1;
+  std::shared_ptr<MRTiledImage> mrImg = nullptr;
+  while (!mrImg) {
+    ++ii;
+    mrImg = get_mrImg_by_comp_idx(frameComponentMembership[ii]);
+  }
+  currentNavPath.magLabel = mrImg->magLabel; //assumes the first frame was valid. there will undoubtedly be a case where that isnt true eventually;
+  currentNavPath.startTime = frameTimeStamps[ii];
+  currentNavPath.startFrame = ii;
+  currentNavPath.componentIndex = frameComponentMembership[ii];
 
-  for (int i = 1; i < frameComponentMembership.size(); ++i) {
+  for (int i = 1 + ii; i < frameComponentMembership.size(); ++i) {
+    if (frameComponentMembership[i] < 0){continue;}
+
     auto mrImg = get_mrImg_by_comp_idx(frameComponentMembership[i]);
     if (mrImg->magLabel != currentNavPath.magLabel) {
       currentNavPath.endTime = frameTimeStamps[i - 1];

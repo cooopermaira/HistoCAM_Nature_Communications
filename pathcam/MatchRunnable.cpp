@@ -40,12 +40,11 @@ namespace pathCam {
 
       Poco::RWLock::ScopedWriteLock compositeHalt(Composite::compositeProcessHalt);
 
-      auto theirImages = theirComponent->find_contributing_images();
       auto myImages = component->find_contributing_images();
 
       std::shared_ptr<Composite> survivor, consumed;
 
-      if (theirImages.size() > myImages.size()) {
+      if (candidates.size() > myImages.size()) {
         survivor = theirComponent;
         consumed = component;
       }else {

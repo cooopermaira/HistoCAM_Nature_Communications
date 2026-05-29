@@ -1,0 +1,215 @@
+{
+  "template_name": "Radical Prostatectomy CAP Report",
+  "template_version": "1.0",
+  "organ_system": "Prostate",
+  "specimen_type": "Radical prostatectomy",
+
+  "global_prompt_rules": {
+    "use_only_provided_annotations": true,
+    "require_evidence": true,
+    "allow_inference": true,
+    "preliminary_draft_only": true,
+    "mention_when_inferred": true
+  },
+
+  "questions": [
+
+    {
+      "id": "histologic_type",
+
+      "section": "Tumor",
+
+      "title": "Histologic Type",
+
+      "note": "Note B",
+
+      "question_text":
+      "Determine the histologic tumor type(s) present in this radical prostatectomy case.",
+
+      "answer_format": "multi_select",
+
+      "select_all_that_apply": true,
+
+      "required": true,
+
+      "resolution_strategy": "llm_inference",
+
+      "inference_policy": "allow_default_subtype_inference",
+
+      "confidence_required": false,
+
+      "allow_multiple_answers": true,
+
+      "allowed_answers": [
+
+        {
+          "group": "Glandular",
+          "value": "Acinar adenocarcinoma, conventional (usual)"
+        },
+
+        {
+          "group": "Glandular",
+          "value": "Acinar adenocarcinoma, signet-ring-like cell"
+        },
+
+        {
+          "group": "Glandular",
+          "value": "Acinar adenocarcinoma, pleomorphic giant cell"
+        },
+
+        {
+          "group": "Glandular",
+          "value": "Acinar adenocarcinoma, sarcomatoid"
+        },
+
+        {
+          "group": "Glandular",
+          "value": "Acinar adenocarcinoma, prostatic intraepithelial neoplasia-like"
+        },
+
+        {
+          "group": "Glandular",
+          "value": "Intraductal carcinoma"
+        },
+
+        {
+          "group": "Glandular",
+          "value": "Ductal adenocarcinoma"
+        },
+
+        {
+          "group": "Squamous",
+          "value": "Adenosquamous carcinoma"
+        },
+
+        {
+          "group": "Squamous",
+          "value": "Squamous cell carcinoma"
+        },
+
+        {
+          "group": "Squamous",
+          "value": "Basal cell (adenoid cystic) carcinoma"
+        },
+
+        {
+          "group": "Neuroendocrine",
+          "value": "Adenocarcinoma with neuroendocrine differentiation"
+        },
+
+        {
+          "group": "Neuroendocrine",
+          "value": "Well-differentiated neuroendocrine tumor"
+        },
+
+        {
+          "group": "Neuroendocrine",
+          "value": "Small cell neuroendocrine carcinoma"
+        },
+
+        {
+          "group": "Neuroendocrine",
+          "value": "Large cell neuroendocrine carcinoma"
+        },
+
+        {
+          "group": "Other",
+          "value": "Other histologic type not listed",
+          "allows_free_text": true
+        },
+
+        {
+          "group": "Other",
+          "value": "Carcinoma, type cannot be determined",
+          "allows_free_text": true
+        }
+      ],
+
+      "retrieval": {
+
+        "concept_types": [
+          "tumor",
+          "histologic_type",
+          "intraductal_carcinoma",
+          "cribriform",
+          "neuroendocrine",
+          "squamous",
+          "ductal_features"
+        ],
+
+        "keywords": [
+          "adenocarcinoma",
+          "ductal",
+          "intraductal",
+          "small cell",
+          "neuroendocrine",
+          "squamous",
+          "sarcomatoid",
+          "signet ring",
+          "cribriform",
+          "PIN-like"
+        ],
+
+        "include_neighboring_annotations": true,
+
+        "max_annotations": 25
+      },
+
+      "llm_prompt": {
+
+        "task":
+        "Determine which histologic tumor type(s) are supported by the pathology annotations.",
+
+        "instructions": [
+
+          "Use only the provided annotations.",
+
+          "Do not infer rare histologic variants unless explicitly supported.",
+
+          "The phrase 'prostatic adenocarcinoma' alone usually supports 'Acinar adenocarcinoma, conventional (usual)'.",
+
+          "Do not confuse high-grade prostatic intraepithelial neoplasia (HGPIN) with PIN-like adenocarcinoma.",
+
+          "Negative findings should not be selected as present histologic types.",
+
+          "Return only answer choices from the allowed answer list unless using an 'Other' category."
+        ],
+
+        "require_evidence_indices": true,
+
+        "require_reasoning": false,
+
+        "require_confidence": true
+      },
+
+      "output_schema": {
+
+        "type": "object",
+
+        "properties": {
+
+          "selected_answers": {
+            "type": "array"
+          },
+
+          "free_text_answer": {
+            "type": "string"
+          },
+
+          "evidence_annotation_indices": {
+            "type": "array"
+          },
+
+          "confidence": {
+            "type": "number"
+          },
+
+          "inference_used": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+
+  ]
+}

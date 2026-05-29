@@ -382,6 +382,7 @@ void MainComponent::load_case(std::vector<juce::File> slideDirs) {
     labelList->refresh();
 
   resized();
+  capture->captureOverlay->resized();
 }
 
 void MainComponent::load_annotations(const std::shared_ptr<MRTiledImageSet>& mrImgSet) const {
