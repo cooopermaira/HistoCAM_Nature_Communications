@@ -28,12 +28,15 @@ MainComponent::MainComponent(Poco::Util::LayeredConfiguration::Ptr config) : con
 
   //capture->bcam->set_MainComponent_reference(this);
   annotate = new AnnotateComponent(view, iconNames, iconsFromZipFile, this);
+  reportGenerator = new ReportGenerator(this);
+  report = new ReportViewComponent(reportGenerator);
 
   // addAndMakeVisible(imageview);
   addAndMakeVisible(toolbar);
 
   addChildComponent(capture);
   addChildComponent(annotate);
+  addChildComponent(report);
 
   capture->setup_listbox();
 
@@ -73,6 +76,8 @@ MainComponent::~MainComponent() {
   // delete imageview;
   delete capture;
   delete annotate;
+  delete report;
+  delete reportGenerator;
 }
 
 //==============================================================================
@@ -215,6 +220,7 @@ void MainComponent::resized() {
   // imageview->setBounds(b);
   capture->setBounds(b);
   annotate->setBounds(b);
+  report->setBounds(b);
   if (dirBrowser) {
     dirBrowser->setBounds(b);
     // Place the select button at the bottom-right, aligned with the path bar
@@ -419,6 +425,7 @@ void MainComponent::GuiEventHandler(std::string event) {
       const ScopedLock lock(mutex);
       capture->setVisible(false);
       annotate->setVisible(false);
+      report->setVisible(false);
       if (dirBrowser) dirBrowser->setVisible(true);
     }
     resized();
@@ -430,6 +437,7 @@ void MainComponent::GuiEventHandler(std::string event) {
       capture->setVisible(true);
       capture->fixAspectRatio();
       annotate->setVisible(false);
+      report->setVisible(false);
       if (dirBrowser) dirBrowser->setVisible(false);
     }
     resized();
@@ -439,9 +447,20 @@ void MainComponent::GuiEventHandler(std::string event) {
     {
       const ScopedLock lock(mutex);
       annotate->setVisible(true);
-
       annotate->fixAspectRatio();
       capture->setVisible(false);
+      report->setVisible(false);
+      if (dirBrowser) dirBrowser->setVisible(false);
+    }
+    resized();
+  }
+
+  if (event == "report") {
+    {
+      const ScopedLock lock(mutex);
+      report->setVisible(true);
+      capture->setVisible(false);
+      annotate->setVisible(false);
       if (dirBrowser) dirBrowser->setVisible(false);
     }
     resized();

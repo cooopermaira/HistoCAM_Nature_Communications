@@ -209,7 +209,77 @@
           }
         }
       }
+    },
+
+    {
+      "id": "intraductal_carcinoma",
+
+      "section": "Tumor",
+
+      "title": "Intraductal Carcinoma (IDC)",
+
+      "note": "Note D",
+
+      "question_text":
+      "Determine whether intraductal carcinoma of the prostate (IDC) is present.",
+
+      "answer_format": "single_select",
+
+      "required": true,
+
+      "resolution_strategy": "deterministic_annotation_rule",
+
+      "allowed_answers": [
+        "Not identified",
+        "Present"
+      ],
+
+      "rule": {
+        "type": "exists_annotation",
+        "concept_types": [
+          "intraductal_carcinoma"
+        ],
+        "assertion": "present",
+        "if_true": "Present",
+        "if_false": "Not identified",
+        "max_annotations": -1,
+        "citation_policy": "cite_all_matching_slides"
+      }
+    },
+    {
+      "id": "cribriform_glands",
+
+      "section": "Tumor",
+
+      "title": "Cribriform Glands",
+
+      "question_text":
+      "Determine whether cribriform glands are present based only on the provided annotations.",
+
+      "answer_format": "single_select",
+
+      "required": true,
+
+      "resolution_strategy": "deterministic_annotation_rule",
+
+      "allowed_answers": [
+        "Not identified",
+        "Present"
+      ],
+
+      "rule": {
+        "type": "exists_annotation",
+        "concept_types": [
+          "cribriform"
+        ],
+        "assertion": "present",
+        "if_true": "Present",
+        "if_false": "Not identified",
+        "max_annotations": -1,
+        "citation_policy": "cite_all_matching_slides"
+      }
     }
+
 
   ]
 }

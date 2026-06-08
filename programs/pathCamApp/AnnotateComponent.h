@@ -64,7 +64,7 @@ public:
 
     voiceHandlerThread = std::thread(&AnnotateComponent::voice_annotation_handler,this);
 
-    silly_test();
+    // silly_test();
   }
 
   void voice_annotation_handler();

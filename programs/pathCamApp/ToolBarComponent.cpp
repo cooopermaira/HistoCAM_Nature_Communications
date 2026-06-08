@@ -88,6 +88,9 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
     case PCamToolbarItemFactory::annotate:
       parent->GuiEventHandler("annotate");
       break;
+    case PCamToolbarItemFactory::report:
+      parent->GuiEventHandler("report");
+      break;
     case PCamToolbarItemFactory::pathCamIcon:
       std::cout << "pathCamIcon\n" << "\n";
       break;
