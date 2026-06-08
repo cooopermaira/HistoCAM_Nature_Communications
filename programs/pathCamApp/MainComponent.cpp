@@ -256,7 +256,10 @@ void MainComponent::repositionSlideListButton() {
     }
   }
 
-  bool shouldShow = (sCam != nullptr) &&
+  bool imageViewVisible = (capture && capture->isVisible()) ||
+                          (annotate && annotate->isVisible());
+  bool shouldShow = imageViewVisible &&
+                    (sCam != nullptr) &&
                     capture && !capture->recording &&
                     !capture->simulating &&
                     (sCam->get_num_slides() > 0);

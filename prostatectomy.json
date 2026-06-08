@@ -237,7 +237,7 @@
       "rule": {
         "type": "exists_annotation",
         "concept_types": [
-          "intraductal_carcinoma"
+          "intraductal carcinoma"
         ],
         "assertion": "present",
         "if_true": "Present",
@@ -277,6 +277,66 @@
         "if_false": "Not identified",
         "max_annotations": -1,
         "citation_policy": "cite_all_matching_slides"
+      }
+    },
+
+    {
+      "id": "extraprostatic_extension",
+
+      "section": "Tumor",
+
+      "title": "Extraprostatic Extension (EPE)",
+
+      "note": "Note F",
+
+      "question_text":
+      "Determine whether extraprostatic extension is present.",
+
+      "answer_format": "single_select",
+
+      "required": true,
+
+      "resolution_strategy": "deterministic_annotation_rule",
+
+      "allowed_answers": [
+        "Not identified",
+        "Present, focal",
+        "Present, nonfocal",
+        "Cannot be determined"
+      ],
+
+      "rule": {
+        "type": "classification_by_annotation_text",
+
+        "concept_types": [
+          "extraprostatic"
+        ],
+
+        "assertion": "present",
+        "if_false": "Not identified",
+
+        "max_annotations": -1,
+
+        "citation_policy": "cite_all_matching_slides",
+
+        "answer_mapping": [
+
+          {
+            "evidence_text_contains": [
+              "nonfocal"
+            ],
+            "answer": "Present, nonfocal"
+          },
+
+          {
+            "evidence_text_contains": [
+              "focal"
+            ],
+            "answer": "Present, focal"
+          }
+        ],
+        "fallback_if_present": "Present, nonfocal",
+        "conflict_resolution": "Present, nonfocal"
       }
     }
 

@@ -171,7 +171,9 @@ namespace pathCam {
 
     if (_name.empty()) {
       if (currentSlideLabel.empty()) {
-        currentSlideLabel = std::to_string(currentSlideIndex);
+        int num    = currentSlideIndex / 26 + 1;
+        char letter = 'A' + (currentSlideIndex % 26);
+        currentSlideLabel = std::to_string(num) + letter;
       } else {
         currentSlideLabel = "";
       }
