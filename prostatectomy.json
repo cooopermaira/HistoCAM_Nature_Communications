@@ -136,13 +136,29 @@
         "type": "object",
         "properties": {
           "selected_answers": {
-            "type": "array"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string"
+                },
+                "evidence_annotation_indices": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "required": [
+                "answer",
+                "evidence_annotation_indices"
+              ],
+              "additionalProperties": false
+            }
           },
           "free_text_answer": {
             "type": "string"
-          },
-          "evidence_annotation_indices": {
-            "type": "array"
           },
           "confidence": {
             "type": "number"
@@ -150,7 +166,13 @@
           "inference_used": {
             "type": "boolean"
           }
-        }
+        },
+        "required": [
+          "selected_answers",
+          "confidence",
+          "inference_used"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -246,20 +268,12 @@
     },
     {
       "id": "extraprostatic_extension_location",
-
       "section": "Tumor",
-
       "title": "Location of Extraprostatic Extension",
-
-      "question_text":
-      "Determine the anatomic location(s) of extraprostatic extension by mapping the slides positive for extraprostatic extension to the gross report block descriptions.",
-
+      "question_text": "Determine the anatomic location(s) of extraprostatic extension by mapping the slides positive for extraprostatic extension to the gross report block descriptions.",
       "answer_format": "multi_select",
-
       "select_all_that_apply": true,
-
       "required": false,
-
       "applicability": {
         "depends_on_question": "extraprostatic_extension",
         "value": [
@@ -267,16 +281,13 @@
           "Present, nonfocal"
         ]
       },
-
       "resolution_strategy": "llm_inference",
-
       "context_requirements": {
         "include_annotations": false,
         "include_gross_report": true,
         "include_parent_question_citation_slides": true,
         "parent_question_id": "extraprostatic_extension"
       },
-
       "allowed_answers": [
         "Right apical",
         "Right bladder neck",
@@ -293,16 +304,12 @@
         "Other",
         "Cannot be determined"
       ],
-
       "retrieval": {
         "use_annotation_retrieval": false,
         "max_annotations": 0
       },
-
       "llm_prompt": {
-        "task":
-        "Determine the CAP location(s) of extraprostatic extension by using only the slides that were positive for extraprostatic extension and the gross report block map.",
-
+        "task": "Determine the CAP location(s) of extraprostatic extension by using only the slides that were positive for extraprostatic extension and the gross report block map.",
         "instructions": [
           "Do not use annotation text to determine location.",
           "Use only the list of slides positive for extraprostatic extension and the gross report.",
@@ -313,31 +320,48 @@
           "If the gross report maps a slide only to anterior or posterior without enough detail for apical/lateral/posterolateral, choose the closest CAP answer that is directly supported and do not over-infer.",
           "Do not select locations for slides that were not positive for extraprostatic extension.",
           "Select 'Cannot be determined' if the positive slide identifiers cannot be mapped to the gross report.",
-          "Do not select 'Other' unless the gross report clearly supports a location not represented by the standard CAP choices."
+          "Do not select 'Other' unless the gross report clearly supports a location not represented by the standard CAP choices.",
+          "Every selected answer must have at least one supporting slide identifier."
         ],
-
         "require_evidence_indices": false,
         "require_slide_evidence": true,
         "require_reasoning": false,
         "require_confidence": true
       },
-
       "output_schema": {
         "type": "object",
-
         "properties": {
           "selected_answers": {
-            "type": "array"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "answer": {
+                  "type": "string"
+                },
+                "evidence_slide_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "answer",
+                "evidence_slide_ids"
+              ],
+              "additionalProperties": false
+            }
           },
-
-          "evidence_slide_ids": {
-            "type": "array"
-          },
-
           "confidence": {
             "type": "number"
           }
-        }
+        },
+        "required": [
+          "selected_answers",
+          "confidence"
+        ],
+        "additionalProperties": false
       }
     }
   ]
