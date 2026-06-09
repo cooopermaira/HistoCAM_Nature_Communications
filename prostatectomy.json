@@ -3,7 +3,6 @@
   "template_version": "1.0",
   "organ_system": "Prostate",
   "specimen_type": "Radical prostatectomy",
-
   "global_prompt_rules": {
     "use_only_provided_annotations": true,
     "require_evidence": true,
@@ -11,122 +10,89 @@
     "preliminary_draft_only": true,
     "mention_when_inferred": true
   },
-
   "questions": [
-
     {
       "id": "histologic_type",
-
       "section": "Tumor",
-
       "title": "Histologic Type",
-
       "note": "Note B",
-
-      "question_text":
-      "Determine the histologic tumor type(s) present in this radical prostatectomy case.",
-
+      "question_text": "Determine the histologic tumor type(s) present in this radical prostatectomy case.",
       "answer_format": "multi_select",
-
       "select_all_that_apply": true,
-
       "required": true,
-
       "resolution_strategy": "llm_inference",
-
       "inference_policy": "allow_default_subtype_inference",
-
       "confidence_required": false,
-
       "allow_multiple_answers": true,
-
       "allowed_answers": [
-
         {
           "group": "Glandular",
           "value": "Acinar adenocarcinoma, conventional (usual)"
         },
-
         {
           "group": "Glandular",
           "value": "Acinar adenocarcinoma, signet-ring-like cell"
         },
-
         {
           "group": "Glandular",
           "value": "Acinar adenocarcinoma, pleomorphic giant cell"
         },
-
         {
           "group": "Glandular",
           "value": "Acinar adenocarcinoma, sarcomatoid"
         },
-
         {
           "group": "Glandular",
           "value": "Acinar adenocarcinoma, prostatic intraepithelial neoplasia-like"
         },
-
         {
           "group": "Glandular",
           "value": "Intraductal carcinoma"
         },
-
         {
           "group": "Glandular",
           "value": "Ductal adenocarcinoma"
         },
-
         {
           "group": "Squamous",
           "value": "Adenosquamous carcinoma"
         },
-
         {
           "group": "Squamous",
           "value": "Squamous cell carcinoma"
         },
-
         {
           "group": "Squamous",
           "value": "Basal cell (adenoid cystic) carcinoma"
         },
-
         {
           "group": "Neuroendocrine",
           "value": "Adenocarcinoma with neuroendocrine differentiation"
         },
-
         {
           "group": "Neuroendocrine",
           "value": "Well-differentiated neuroendocrine tumor"
         },
-
         {
           "group": "Neuroendocrine",
           "value": "Small cell neuroendocrine carcinoma"
         },
-
         {
           "group": "Neuroendocrine",
           "value": "Large cell neuroendocrine carcinoma"
         },
-
         {
           "group": "Other",
           "value": "Other histologic type not listed",
           "allows_free_text": true
         },
-
         {
           "group": "Other",
           "value": "Carcinoma, type cannot be determined",
           "allows_free_text": true
         }
       ],
-
       "retrieval": {
-
         "concept_types": [
           "tumor",
           "histologic_type",
@@ -136,104 +102,70 @@
           "squamous",
           "ductal_features"
         ],
-
         "keywords": [
           "adenocarcinoma",
           "ductal",
-          "intraductal",
+          "ductal",
           "small cell",
+          "large cell",
           "neuroendocrine",
           "squamous",
           "sarcomatoid",
           "signet ring",
-          "cribriform",
+          "pleomorphic giant cell",
           "PIN-like"
         ],
-
         "include_neighboring_annotations": true,
-
         "max_annotations": 25
       },
-
       "llm_prompt": {
-
-        "task":
-        "Determine which histologic tumor type(s) are supported by the pathology annotations.",
-
+        "task": "Determine which histologic tumor type(s) are supported by the pathology annotations.",
         "instructions": [
-
           "Use only the provided annotations.",
-
           "Do not infer rare histologic variants unless explicitly supported.",
-
           "The phrase 'prostatic adenocarcinoma' alone usually supports 'Acinar adenocarcinoma, conventional (usual)'.",
-
           "Do not confuse high-grade prostatic intraepithelial neoplasia (HGPIN) with PIN-like adenocarcinoma.",
-
           "Negative findings should not be selected as present histologic types.",
-
           "Return only answer choices from the allowed answer list unless using an 'Other' category."
         ],
-
         "require_evidence_indices": true,
-
         "require_reasoning": false,
-
         "require_confidence": true
       },
-
       "output_schema": {
-
         "type": "object",
-
         "properties": {
-
           "selected_answers": {
             "type": "array"
           },
-
           "free_text_answer": {
             "type": "string"
           },
-
           "evidence_annotation_indices": {
             "type": "array"
           },
-
           "confidence": {
             "type": "number"
           },
-
           "inference_used": {
             "type": "boolean"
           }
         }
       }
     },
-
     {
       "id": "intraductal_carcinoma",
-
       "section": "Tumor",
-
       "title": "Intraductal Carcinoma (IDC)",
-
       "note": "Note D",
-
-      "question_text":
-      "Determine whether intraductal carcinoma of the prostate (IDC) is present.",
-
+      "question_text": "Determine whether intraductal carcinoma of the prostate (IDC) is present.",
       "answer_format": "single_select",
-
       "required": true,
-
       "resolution_strategy": "deterministic_annotation_rule",
-
       "allowed_answers": [
         "Not identified",
         "Present"
       ],
-
       "rule": {
         "type": "exists_annotation",
         "concept_types": [
@@ -248,25 +180,16 @@
     },
     {
       "id": "cribriform_glands",
-
       "section": "Tumor",
-
       "title": "Cribriform Glands",
-
-      "question_text":
-      "Determine whether cribriform glands are present based only on the provided annotations.",
-
+      "question_text": "Determine whether cribriform glands are present based only on the provided annotations.",
       "answer_format": "single_select",
-
       "required": true,
-
       "resolution_strategy": "deterministic_annotation_rule",
-
       "allowed_answers": [
         "Not identified",
         "Present"
       ],
-
       "rule": {
         "type": "exists_annotation",
         "concept_types": [
@@ -279,55 +202,37 @@
         "citation_policy": "cite_all_matching_slides"
       }
     },
-
     {
       "id": "extraprostatic_extension",
-
       "section": "Tumor",
-
       "title": "Extraprostatic Extension (EPE)",
-
       "note": "Note F",
-
-      "question_text":
-      "Determine whether extraprostatic extension is present.",
-
+      "question_text": "Determine whether extraprostatic extension is present.",
       "answer_format": "single_select",
-
       "required": true,
-
       "resolution_strategy": "deterministic_annotation_rule",
-
       "allowed_answers": [
         "Not identified",
         "Present, focal",
         "Present, nonfocal",
         "Cannot be determined"
       ],
-
       "rule": {
         "type": "classification_by_annotation_text",
-
         "concept_types": [
           "extraprostatic"
         ],
-
         "assertion": "present",
         "if_false": "Not identified",
-
         "max_annotations": -1,
-
         "citation_policy": "cite_all_matching_slides",
-
         "answer_mapping": [
-
           {
             "evidence_text_contains": [
               "nonfocal"
             ],
             "answer": "Present, nonfocal"
           },
-
           {
             "evidence_text_contains": [
               "focal"
@@ -338,8 +243,102 @@
         "fallback_if_present": "Present, nonfocal",
         "conflict_resolution": "Present, nonfocal"
       }
+    },
+    {
+      "id": "extraprostatic_extension_location",
+
+      "section": "Tumor",
+
+      "title": "Location of Extraprostatic Extension",
+
+      "question_text":
+      "Determine the anatomic location(s) of extraprostatic extension by mapping the slides positive for extraprostatic extension to the gross report block descriptions.",
+
+      "answer_format": "multi_select",
+
+      "select_all_that_apply": true,
+
+      "required": false,
+
+      "applicability": {
+        "depends_on_question": "extraprostatic_extension",
+        "value": [
+          "Present, focal",
+          "Present, nonfocal"
+        ]
+      },
+
+      "resolution_strategy": "llm_inference",
+
+      "context_requirements": {
+        "include_annotations": false,
+        "include_gross_report": true,
+        "include_parent_question_citation_slides": true,
+        "parent_question_id": "extraprostatic_extension"
+      },
+
+      "allowed_answers": [
+        "Right apical",
+        "Right bladder neck",
+        "Right anterior",
+        "Right lateral",
+        "Right posterolateral (neurovascular bundle)",
+        "Right posterior",
+        "Left apical",
+        "Left bladder neck",
+        "Left anterior",
+        "Left lateral",
+        "Left posterolateral (neurovascular bundle)",
+        "Left posterior",
+        "Other",
+        "Cannot be determined"
+      ],
+
+      "retrieval": {
+        "use_annotation_retrieval": false,
+        "max_annotations": 0
+      },
+
+      "llm_prompt": {
+        "task":
+        "Determine the CAP location(s) of extraprostatic extension by using only the slides that were positive for extraprostatic extension and the gross report block map.",
+
+        "instructions": [
+          "Do not use annotation text to determine location.",
+          "Use only the list of slides positive for extraprostatic extension and the gross report.",
+          "The positive slide list comes from the answer citations for the parent question: extraprostatic_extension.",
+          "Map each positive slide/block identifier to its corresponding anatomic location in the gross report.",
+          "Select all CAP locations supported by the positive slide/block identifiers.",
+          "If a positive slide maps to a range such as right posterior apex to base, select the corresponding side and region supported by that block description.",
+          "If the gross report maps a slide only to anterior or posterior without enough detail for apical/lateral/posterolateral, choose the closest CAP answer that is directly supported and do not over-infer.",
+          "Do not select locations for slides that were not positive for extraprostatic extension.",
+          "Select 'Cannot be determined' if the positive slide identifiers cannot be mapped to the gross report.",
+          "Do not select 'Other' unless the gross report clearly supports a location not represented by the standard CAP choices."
+        ],
+
+        "require_evidence_indices": false,
+        "require_slide_evidence": true,
+        "require_reasoning": false,
+        "require_confidence": true
+      },
+
+      "output_schema": {
+        "type": "object",
+
+        "properties": {
+          "selected_answers": {
+            "type": "array"
+          },
+
+          "evidence_slide_ids": {
+            "type": "array"
+          },
+
+          "confidence": {
+            "type": "number"
+          }
+        }
+      }
     }
-
-
   ]
 }

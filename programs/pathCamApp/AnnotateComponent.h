@@ -199,6 +199,8 @@ public:
 
   void build_poly_span_annotations_from_save(const std::string &filepath, const std::shared_ptr<MRTiledImageSet>& mrImgSet);
 
+  void debug_fix_extraprostatic_assertion(std::vector<ConceptSpan>& spans, const std::string& filepath);
+
 
   std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > activeAnnotations;
   std::vector<std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > > allSlideAnnotations;

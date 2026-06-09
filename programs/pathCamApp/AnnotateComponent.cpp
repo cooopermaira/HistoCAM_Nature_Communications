@@ -9,10 +9,6 @@
 
 namespace {
 
-  std::string apiKey(
-    "REDACTED_OPENAI_API_KEY");
-
-
   std::string toLower(const std::string &s) {
     std::string out = s;
     std::transform(out.begin(), out.end(), out.begin(),
@@ -1124,31 +1120,6 @@ static std::string LlamaResponses_POST(const std::string &requestBodyJson, int t
   return in->readEntireStreamAsString().toStdString();
 }
 
-static std::string openAIResponses_POST(const std::string &apiKey,
-                                        const std::string &requestBodyJson,
-                                        int timeoutMs = 120000) {
-  juce::URL url("https://api.openai.com/v1/responses");
-
-  juce::String headers;
-  headers << "Authorization: Bearer " << apiKey << "\r\n";
-  headers << "Content-Type: application/json\r\n";
-
-  auto in = url.withPOSTData(requestBodyJson)
-      .createInputStream(
-        juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inPostData)
-        .withExtraHeaders(headers)
-        .withConnectionTimeoutMs(timeoutMs)
-        .withNumRedirectsToFollow(0)
-      );
-
-  if (in == nullptr) {
-    return {};
-  }
-
-  return in->readEntireStreamAsString().toStdString();
-}
-
-
 static std::vector<ConceptSpan> parseConceptsFromResponses(const std::string &responsesJson) {
   std::vector<ConceptSpan> out;
 
@@ -1397,7 +1368,7 @@ std::vector<ConceptSpan> reduceToAnnotations_LLM(const std::string &text,
     return resp;
   } else {
     std::string body = buildConceptExtractionRequestBody_JSON(text);
-    const std::string resp = openAIResponses_POST(apiKey, body);
+    const std::string resp = openAIResponses_POST(openAIApiKey, body);
 
     if (resp.empty()) {
       return {};
@@ -1627,6 +1598,21 @@ void AnnotateComponent::voice_annotation_handler() {
   }
 
   newVoiceAnnotation.wait();
+}
+
+void AnnotateComponent::debug_fix_extraprostatic_assertion(std::vector<ConceptSpan>& spans,
+                                                           const std::string& filepath) {
+  bool modified = false;
+  for (auto& span : spans) {
+    std::string lower = span.evidence_text;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    if (lower.find("extraprostatic") != std::string::npos) {
+      span.assertion = "present";
+      modified = true;
+    }
+  }
+  if (modified)
+    saveConceptSpans(filepath, spans);
 }
 
 void AnnotateComponent::build_poly_span_annotations_from_save(const std::string &filepath,
