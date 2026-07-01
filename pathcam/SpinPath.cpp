@@ -367,12 +367,14 @@ namespace pathCam {
       //Set exposure mode to "Timed"
       pCam->ExposureMode.SetValue(Spinnaker::ExposureModeEnums::ExposureMode_Timed);
       //Set absolute value of shutter exposure time to 1500 microseconds
-      pCam->ExposureTime.SetValue(1300);
-      //pCam->ExposureTime.SetValue(1504);
+      //pCam->ExposureTime.SetValue(1300);
+      pCam->ExposureTime.SetValue(38000); //polarized
 
       //Turn auto gain off
       pCam->GainAuto.SetValue(Spinnaker::GainAutoEnums::GainAuto_Off);
-      pCam->Gain.SetValue(0);
+      //pCam->Gain.SetValue(0);
+      pCam->Gain.SetValue(30); //polarized
+
       cout << pCam->Gain.GetValue() << endl;
 
       // set gamma value to 0
@@ -386,9 +388,11 @@ namespace pathCam {
       pCam->BalanceWhiteAuto.SetValue(Spinnaker::BalanceWhiteAutoEnums::BalanceWhiteAuto_Off);
       //Select red channel balance ratio and set to 1.5
       pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Red);
-      pCam->BalanceRatio.SetValue(1.7);
+      //pCam->BalanceRatio.SetValue(1.7);
+      pCam->BalanceRatio.SetValue(1); //polarized
       pCam->BalanceRatioSelector.SetValue(Spinnaker::BalanceRatioSelectorEnums::BalanceRatioSelector_Blue);
-      pCam->BalanceRatio.SetValue(2.35);
+      //pCam->BalanceRatio.SetValue(2.35);
+      pCam->BalanceRatio.SetValue(1); //polarized
     } catch (Spinnaker::Exception &e) {
       camlogger.error(Poco::format("Error Spinning up camera: %s", e.what()));
       result = -1;
