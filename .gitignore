@@ -52,3 +52,23 @@ Thumbs.db
 *.mov
 *.wmv
 
+
+# Local dependency/source folders
+BAM/
+CudaSift/
+SFML/
+StreamDeck-CPPSDK/
+TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/
+cuda-bundle-adjustment/
+libtorch/
+onnxruntime-linux-aarch64-1.23.2/
+
+# Local dependency/source folders
+BAM/
+CudaSift/
+SFML/
+StreamDeck-CPPSDK/
+TensorRT-10.14.1.48.Linux.aarch64-gnu.cuda-13.0/
+cuda-bundle-adjustment/
+libtorch/
+onnxruntime-linux-aarch64-1.23.2/
