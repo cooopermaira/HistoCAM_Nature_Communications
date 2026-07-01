@@ -171,7 +171,9 @@ namespace pathCam {
 
     if (_name.empty()) {
       if (currentSlideLabel.empty()) {
-        currentSlideLabel = std::to_string(currentSlideIndex);
+        int num    = currentSlideIndex / 26 + 1;
+        char letter = 'A' + (currentSlideIndex % 26);
+        currentSlideLabel = std::to_string(num) + letter;
       } else {
         currentSlideLabel = "";
       }
@@ -385,7 +387,6 @@ namespace pathCam {
     auto img = get_image_ref(_image_idx);
     img->free_memory_RAW();
     img->free_memory_cuda();
-
   }
 
   Point2f StreamCam::get_AbC_relative_from_relative(unsigned int _srcCompIdx, Point2f _srcAbC,
@@ -969,7 +970,6 @@ namespace pathCam {
   }
 
   void StreamCam::cleanup_and_reset() {
-
     for (auto comp: composites) {
       comp->correct_offset();
     }
@@ -978,7 +978,7 @@ namespace pathCam {
       if (comp->frameCount < 5) {
         comp->suspended = true;
         comp->imagePyramid->suspended = true;
-        for (auto &frame : comp->memberFrames) {
+        for (auto &frame: comp->memberFrames) {
           frame->label = Image::_LOWFEAT;
         }
       }
@@ -1013,16 +1013,16 @@ namespace pathCam {
 
           if (img->index > 0) {
             auto d = AbCs[img->index] - AbCs[img->index - 1];
-            if (frameComponentMembership[img->index] == frameComponentMembership[img->index - 1] && d.dot(d) > 1000000) {
+            if (frameComponentMembership[img->index] == frameComponentMembership[img->index - 1] && d.dot(d) >
+                1000000) {
               int k = 0;
             }
           }
         } else {
           if (img->label == Image::_UNDEREXP || img->label == Image::_LOWFEAT) {
-            if (img->index > 0) {
-              AbCs[img->index] = AbCs[img->index - 1];
-              frameComponentMembership[img->index] = frameComponentMembership[img->index - 1];
-            } //else it just stays (0,0) because that's what it inits to.
+            AbCs[img->index] = AbCs[img->index - 1];
+            // frameComponentMembership[img->index] = frameComponentMembership[img->index - 1];
+            frameComponentMembership[img->index] = -1;
           } else {
             std::cout << img->index << " " << Image::get_label(img->label) << "no reginfo but non black label" <<
                 std::endl;

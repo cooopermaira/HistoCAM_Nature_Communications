@@ -342,10 +342,10 @@ namespace pathCam {
   public:
     StreamCam *parent;
     Image *image;
-    std::shared_ptr<Composite> component;
+    std::shared_ptr<Composite> component, theirComponent;
     std::vector<Image*> candidates;
 
-    ComponentMatchSearch(StreamCam *_parent, Image *_image,std::shared_ptr<Composite> _component, std::vector<Image*> candidates_) : parent(_parent),component(_component),
+    ComponentMatchSearch(StreamCam *_parent, Image *_image,std::shared_ptr<Composite> _component, std::shared_ptr<Composite> _theirComponent ,std::vector<Image*> candidates_) : parent(_parent),theirComponent(_theirComponent),component(_component),
                                                               image(_image), candidates(candidates_),
                                                               RunnableIntermediate(_image->index, 0) {
       int k = 0;

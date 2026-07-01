@@ -36,7 +36,7 @@ public:
   void silly_test();
 
 
-  std::vector<std::string> get_preconfig_anno();
+  std::vector<std::string> get_preconfig_anno() const;
 
   AnnotateComponent(std::shared_ptr<fRectangle> view,
                     StringArray &iconNames,
@@ -194,7 +194,12 @@ public:
   void removeSelected();
 
   void saveConceptSpans(const std::string &filepath, const std::vector<ConceptSpan> &spans);
-  std::vector<ConceptSpan> loadConceptSpans(const std::string &filepath);
+
+  static std::vector<ConceptSpan> loadConceptSpans(const std::string &filepath);
+
+  void build_poly_span_annotations_from_save(const std::string &filepath, const std::shared_ptr<MRTiledImageSet>& mrImgSet);
+
+  void debug_fix_extraprostatic_assertion(std::vector<ConceptSpan>& spans, const std::string& filepath);
 
 
   std::shared_ptr<std::vector<std::shared_ptr<Annotation> > > activeAnnotations;

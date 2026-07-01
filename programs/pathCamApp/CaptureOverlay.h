@@ -12,6 +12,71 @@
 
 class CaptureComponent;
 class AnnotateComponent;
+class StreamCamLabelList;
+
+// One row in the slide-selector list. Shows the label as plain text normally;
+// switches to an inline TextEditor when the row is clicked a second time while
+// already selected. Committing (Return key or click-away) writes back to
+// MRTiledImageSet::labelName and flushes to disk.
+class SlideRowComponent : public juce::Component,
+                          public juce::TextEditor::Listener
+{
+public:
+  explicit SlideRowComponent(StreamCamLabelList* owner) : owner(owner)
+  {
+    textEditor.setMultiLine(false);
+    textEditor.setReturnKeyStartsNewLine(false);
+    textEditor.setScrollbarsShown(false);
+    textEditor.setCaretVisible(true);
+    textEditor.addListener(this);
+    addChildComponent(textEditor);
+  }
+
+  void update(int rowNum, const juce::String& label, bool selected, bool editing)
+  {
+    rowNumber    = rowNum;
+    currentLabel = label;
+    isSelected   = selected;
+    isEditing    = editing;
+
+    if (isEditing) {
+      textEditor.setText(currentLabel, false);
+      textEditor.setVisible(true);
+      textEditor.grabKeyboardFocus();
+      textEditor.selectAll();
+    } else {
+      textEditor.setVisible(false);
+    }
+    repaint();
+  }
+
+  void resized() override { textEditor.setBounds(getLocalBounds().reduced(4, 2)); }
+
+  void paint(juce::Graphics& g) override
+  {
+    g.fillAll(isSelected ? juce::Colours::lightblue.withAlpha(0.4f)
+                         : juce::Colours::transparentBlack);
+    if (!isEditing) {
+      g.setColour(juce::Colours::white);
+      g.setFont((float)getHeight() * 0.55f);
+      g.drawText(currentLabel, 8, 0, getWidth() - 16, getHeight(),
+                 juce::Justification::centredLeft);
+    }
+  }
+
+  // Defined after StreamCamLabelList below.
+  void mouseDown(const juce::MouseEvent& e) override;
+  void textEditorFocusLost(juce::TextEditor& ed) override;
+  void textEditorReturnKeyPressed(juce::TextEditor& ed) override;
+
+private:
+  StreamCamLabelList* owner;
+  juce::TextEditor   textEditor;
+  juce::String       currentLabel;
+  int  rowNumber = -1;
+  bool isSelected = false;
+  bool isEditing  = false;
+};
 
 class StreamCamLabelList : public juce::Component,
                            private juce::ListBoxModel,
@@ -69,37 +134,77 @@ public:
     return (int)filteredIndices.size();
   }
 
-  void paintListBoxItem(int rowNumber, juce::Graphics& g,
-                        int width, int height, bool rowIsSelected) override
+  // Painting is handled entirely by SlideRowComponent.
+  void paintListBoxItem(int, juce::Graphics&, int, int, bool) override {}
+
+  // listBoxItemClicked is superseded by SlideRowComponent::mouseDown → rowMouseDown.
+  void listBoxItemClicked(int, const juce::MouseEvent&) override {}
+
+  Component* refreshComponentForRow(int rowNumber, bool /*isRowSelected*/,
+                                    Component* existingComponentToUpdate) override
   {
-    if (rowIsSelected)
-      g.fillAll(juce::Colours::lightblue.withAlpha(0.25f));
+    auto* comp = dynamic_cast<SlideRowComponent*>(existingComponentToUpdate);
+    if (!comp) {
+      delete existingComponentToUpdate;
+      comp = new SlideRowComponent(this);
+    }
 
     if (rowNumber < 0 || rowNumber >= (int)filteredIndices.size())
-      return;
+      return comp;
 
-    int actualSlideIndex = filteredIndices[rowNumber];
-    if (actualSlideIndex < 0 || actualSlideIndex >= sCam->get_num_slides())
-      return;
+    int actualIndex = filteredIndices[rowNumber];
+    juce::String label;
+    if (actualIndex >= 0 && actualIndex < sCam->get_num_slides())
+      label = sCam->get_slide_label(actualIndex);
 
-    g.setColour(juce::Colours::white);
-    g.setFont((float)height * 0.55f);
-
-    auto text = sCam->get_slide_label(actualSlideIndex);
-    g.drawText(text, 8, 0, width - 16, height, juce::Justification::centredLeft);
+    comp->update(rowNumber, label,
+                 rowNumber == selectedRow,
+                 rowNumber == editingRow);
+    return comp;
   }
 
-  void listBoxItemClicked(int row, const juce::MouseEvent&) override
+  // Called by SlideRowComponent::mouseDown.
+  void rowMouseDown(int row, const juce::MouseEvent&)
   {
-    if (row < 0 || row >= (int)filteredIndices.size())
-      return;
+    if (row < 0 || row >= (int)filteredIndices.size()) return;
+    int actualIndex = filteredIndices[row];
+    if (actualIndex < 0 || actualIndex >= sCam->get_num_slides()) return;
 
-    int actualSlideIndex = filteredIndices[row];
-    if (actualSlideIndex < 0 || actualSlideIndex >= sCam->get_num_slides())
-      return;
+    if (row == selectedRow) {
+      // Second click on the already-selected row — enter editing.
+      editingRow = row;
+    } else {
+      // First click — select the row and load the slide.
+      editingRow  = -1;
+      selectedRow = row;
+      if (onClick)
+        onClick(actualIndex, sCam->get_slide_label(actualIndex), matchedByAnnotation[row]);
+    }
 
-    if (onClick)
-      onClick(actualSlideIndex, sCam->get_slide_label(actualSlideIndex), matchedByAnnotation[row]);
+    listBox.updateContent();
+    listBox.repaint();
+  }
+
+  // Called by SlideRowComponent on Return key or focus loss.
+  void commitEdit(int row, const juce::String& newLabel)
+  {
+    if (row < 0 || row >= (int)filteredIndices.size()) return;
+    int actualIndex = filteredIndices[row];
+
+    std::shared_ptr<MRTiledImageSet> slide;
+    {
+      Poco::FastMutex::ScopedLock lock(sCam->previousSlidesMutex);
+      if (actualIndex >= 0 && actualIndex < (int)sCam->previousSlides.size())
+        slide = sCam->previousSlides[actualIndex];
+    }
+
+    if (slide && newLabel.toStdString() != slide->labelName) {
+      slide->labelName = newLabel.toStdString();
+      slide->write_slide_header();
+    }
+
+    if (editingRow == row) editingRow = -1;
+    filterSlides(searchBox.getText());
   }
 
   void updateFilteredIndices(const juce::String& searchText)
@@ -184,7 +289,26 @@ private:
   juce::TextEditor searchBox;
   std::vector<int> filteredIndices;
   std::vector<bool> matchedByAnnotation;
+  int selectedRow = -1;
+  int editingRow  = -1;
 };
+
+// SlideRowComponent methods that call back into StreamCamLabelList — defined
+// here so the full StreamCamLabelList definition is in scope.
+inline void SlideRowComponent::mouseDown(const juce::MouseEvent& e)
+{
+  owner->rowMouseDown(rowNumber, e);
+}
+
+inline void SlideRowComponent::textEditorFocusLost(juce::TextEditor& ed)
+{
+  owner->commitEdit(rowNumber, ed.getText());
+}
+
+inline void SlideRowComponent::textEditorReturnKeyPressed(juce::TextEditor& ed)
+{
+  owner->commitEdit(rowNumber, ed.getText());
+}
 
 class CaptureOverlay final : public Component,
                              public Button::Listener {

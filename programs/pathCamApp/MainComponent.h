@@ -38,6 +38,8 @@ public:
   std::shared_ptr<MRTiledImage> imagePyramid;
   CaptureComponent *capture;
   AnnotateComponent *annotate;
+  ReportViewComponent *report;
+  ReportGenerator *reportGenerator;
 
   std::unique_ptr<StreamCamLabelList> labelList;
   std::unique_ptr<SvgButton> slideListButton;
@@ -97,7 +99,7 @@ private:
   void findSlideDirectories();
   void load_case(std::vector<juce::File> slideDirs);
 
-  void load_annotations(juce::File dir, int index);
+  void load_annotations(const std::shared_ptr<MRTiledImageSet>& mrImgSet) const;
 
   ToolbarComponent *toolbar;
 

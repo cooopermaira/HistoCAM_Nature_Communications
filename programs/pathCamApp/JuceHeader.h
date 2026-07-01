@@ -64,6 +64,9 @@ cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
 #include "AnnoViewComponent.h"
 #include "AnnotateComponent.h"
 
+#include "OpenAIClient.h"
+#include "ReportGenerator.h"
+#include "ReportViewComponent.h"
 
 #include "MainComponent.h"
 

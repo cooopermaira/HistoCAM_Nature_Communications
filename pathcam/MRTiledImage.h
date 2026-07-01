@@ -212,7 +212,7 @@ public:
     int k = 0;
   }
 
-  bool empty() { return MRImages.empty(); }
+  bool empty() const { return MRImages.empty(); }
 
   cv::Rect_<float> get_component_bounds(int _component_index) const { return get_mrImg_by_comp_idx(_component_index)->bounds; }
 
@@ -222,7 +222,7 @@ public:
 
   void write_slide_header();
 
-  void read_slide_header();
+  void load_slide();
 
   void save_to_disk(const std::string& path) {
     for (auto &mrImg : MRImages) {

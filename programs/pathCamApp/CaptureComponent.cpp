@@ -269,17 +269,17 @@ void CaptureComponent::stop() {
   if (recording) { stopRecording(); }
   if (simulating) { stopSimulating(); }
 
-  if (parent->audioDictationOn) {
-    // if (true){
+  // if (parent->audioDictationOn) {
+    if (true){
     Poco::FastMutex::ScopedLock lock(parent->annotate->voiceAnnoMutex);
-    parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index, juce::File(finalAudio.toString())));
+    // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index, juce::File(finalAudio.toString())));
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/low_feat_10x/dictation.wav")));
     // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
-      // auto p = Poco::Path(sCam->inputFileOverride).parent().pushDirectory("dictation.wav").toString();
-      // auto d = MRImageSet->cwd.makeDirectory();
-      // d.setFileName("dictation.wav");
-      // Poco::File(p).copyTo(d.toString());
-      // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(p)));
+      auto p = Poco::Path(sCam->inputFileOverride).parent().pushDirectory("dictation.wav").toString();
+      auto d = MRImageSet->cwd.makeDirectory();
+      d.setFileName("dictation.wav");
+      Poco::File(p).copyTo(d.toString());
+      parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(p)));
     parent->annotate->newVoiceAnnotation.set();
   }
   save_slide_set();

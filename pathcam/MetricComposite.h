@@ -33,6 +33,8 @@ namespace pathCam {
 
         void update() override;
 
+        void process_one_waiting_frame();
+
         std::vector<std::pair<Point2i,int>> calculate_affected_tiles_with_status(Point2f AbC) const;
 
         std::vector<std::pair<Image *, Image *>> calculate_member_neighbors();
