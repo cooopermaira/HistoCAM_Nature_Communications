@@ -32,16 +32,6 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
       public:
         SettingsPanel(MainComponent* mainComp) : mainComponent(mainComp)
         {
-          audioDictationToggle.setButtonText("Audio Dictation");
-          audioDictationToggle.setToggleState(mainComp->audioDictationOn, juce::dontSendNotification);
-          audioDictationToggle.onClick = [this]() {
-            mainComponent->audioDictationOn = audioDictationToggle.getToggleState();
-            if (mainComponent->audioDictationOn && !mainComponent->capture->wavRecorder.initialised) {
-              mainComponent->capture->wavRecorder.init();
-            }
-          };
-          addAndMakeVisible(audioDictationToggle);
-
           keepFramesToggle.setButtonText("Keep Frames");
           keepFramesToggle.setToggleState(mainComp->keepFrames, juce::dontSendNotification);
           keepFramesToggle.onClick = [this]() {
@@ -56,18 +46,16 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
           };
           addAndMakeVisible(keepFramesToggle);
 
-          setSize(200, 90);
+          setSize(200, 50);
         }
 
         void resized() override
         {
           auto b = getLocalBounds().reduced(10);
-          audioDictationToggle.setBounds(b.removeFromTop(30));
           keepFramesToggle.setBounds(b.removeFromTop(30));
         }
 
       private:
-        juce::ToggleButton audioDictationToggle;
         juce::ToggleButton keepFramesToggle;
         MainComponent* mainComponent;
       };
@@ -87,9 +75,6 @@ void ToolbarComponent::buttonClicked(juce::Button* button)
       break;
     case PCamToolbarItemFactory::annotate:
       parent->GuiEventHandler("annotate");
-      break;
-    case PCamToolbarItemFactory::report:
-      parent->GuiEventHandler("report");
       break;
     case PCamToolbarItemFactory::pathCamIcon:
       std::cout << "pathCamIcon\n" << "\n";

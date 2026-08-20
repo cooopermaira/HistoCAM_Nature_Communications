@@ -50,7 +50,6 @@ cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
 
 #include "EditorWindow.h"
 #include "AIOverlay.h"
-#include "ReportOverlay.h"
 #include "ImageViewOverlay.h"
 #include "ImageViewComponent.h"
 
@@ -63,10 +62,6 @@ cv::Rect_< T > RectJtoC (juce::Rectangle < T > r) {
 #include "AnnotateOverlay.h"
 #include "AnnoViewComponent.h"
 #include "AnnotateComponent.h"
-
-#include "OpenAIClient.h"
-#include "ReportGenerator.h"
-#include "ReportViewComponent.h"
 
 #include "MainComponent.h"
 

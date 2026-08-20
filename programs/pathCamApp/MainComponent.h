@@ -38,13 +38,10 @@ public:
   std::shared_ptr<MRTiledImage> imagePyramid;
   CaptureComponent *capture;
   AnnotateComponent *annotate;
-  ReportViewComponent *report;
-  ReportGenerator *reportGenerator;
 
   std::unique_ptr<StreamCamLabelList> labelList;
   std::unique_ptr<SvgButton> slideListButton;
 
-  bool audioDictationOn = false;
   bool keepFrames = true;
 
   void setup_listbox();

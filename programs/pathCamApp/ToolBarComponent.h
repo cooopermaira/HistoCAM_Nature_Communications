@@ -66,7 +66,6 @@ private:
       capture         = 7,
       annotate        = 8,
       pathCamIcon     = 9,
-      report          = 10,
     };
     
     void getAllToolbarItemIds (Array<int>& ids) override
@@ -79,7 +78,6 @@ private:
       ids.add (settings);
       ids.add (capture);
       ids.add (annotate);
-      ids.add (report);
       ids.add (pathCamIcon);
       ids.add (separatorBarId);
       ids.add (spacerId);
@@ -108,8 +106,6 @@ private:
       ids.add (spacerId);
       ids.add (annotate);
       ids.add (spacerId);
-      ids.add (report);
-      ids.add (spacerId);
       ids.add (separatorBarId);
       ids.add (flexibleSpacerId);
       ids.add (settings);
@@ -129,7 +125,6 @@ private:
         case settings:        return createButtonFromZipFileSVG (itemId, "settings",    "settings.svg");
         case capture:         return createButtonFromZipFileSVG (itemId, "capture",     "capture.svg");
         case annotate:        return createButtonFromZipFileSVG (itemId, "annotate",   "annotate.svg");
-        case report:          return createButtonFromHudZipFileSVG (itemId, "report",  "edit.svg");
         case pathCamIcon:     return createButtonFromZipFileSVG (itemId, "pathCamIcon",   "pathCamIcon.svg");
         default:              break;
       }
@@ -170,30 +165,6 @@ private:
       auto* image = iconsFromZipFile[iconNames.indexOf (filename)];
       return new ToolbarButton (itemId, text, image->createCopy(), {});
     }
-
-    ToolbarButton* createButtonFromHudZipFileSVG (const int itemId, const juce::String& text, const juce::String& filename)
-    {
-      if (hudIconsFromZipFile.size() == 0)
-      {
-        std::stringstream ss;
-        ss << PROJECT_SOURCE_DIR << "/resources/hud_icons.zip";
-        ZipFile icons (File(ss.str().c_str()));
-        for (int i = 0; i < icons.getNumEntries(); ++i)
-        {
-          std::unique_ptr<InputStream> svgFileStream (icons.createStreamForEntry (i));
-          if (svgFileStream.get() != nullptr)
-          {
-            hudIconNames.add (icons.getEntry (i)->filename);
-            hudIconsFromZipFile.add (Drawable::createFromImageDataStream (*svgFileStream));
-          }
-        }
-      }
-      auto* image = hudIconsFromZipFile[hudIconNames.indexOf (filename)];
-      return new ToolbarButton (itemId, text, image->createCopy(), {});
-    }
-
-    StringArray hudIconNames;
-    OwnedArray<Drawable> hudIconsFromZipFile;
 
   };
   

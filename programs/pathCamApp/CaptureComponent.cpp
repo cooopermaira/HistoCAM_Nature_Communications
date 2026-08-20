@@ -7,15 +7,6 @@
 
 #include "JuceHeader.h"
 
-#include <filesystem>
-
-
-inline std::filesystem::path makeTempWavInCwd(const std::string &prefix = "recording") {
-  namespace fs = std::filesystem;
-  fs::path p = fs::current_path() / (prefix + ".wav");
-  return p;
-}
-
 
 class sCamPocoRunnable : public Poco::Runnable {
 public:
@@ -68,13 +59,6 @@ CaptureComponent::CaptureComponent(std::shared_ptr<fRectangle> view,
 
   uncacheThread = std::thread(&ImageViewComponent::uncacher, this);
   cacheThread = std::thread(&ImageViewComponent::cacher, this);
-
-  auto start = std::chrono::high_resolution_clock::now();
-  if (parent->audioDictationOn) {
-    wavRecorder.init();
-  }
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-    std::chrono::high_resolution_clock::now() - start).count();
 
 #ifdef WITH_SPINNAKER
   if (!spinpath) {
@@ -196,12 +180,6 @@ void CaptureComponent::startRecording() {
 
   compositeThread.start(new bcamPocoRunnable(this));
   parent->startCompositingUIUpdates();
-  if (parent->audioDictationOn) {
-    if (!wavRecorder.initialised) {
-      wavRecorder.init(1);
-    }
-    wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
-  }
 
   captureOverlay->resized();
   aiOverlay->resized();
@@ -241,47 +219,17 @@ void CaptureComponent::startSimulating() {
   compositeThread.start(new sCamPocoRunnable(this));
   parent->startCompositingUIUpdates();
 
-  if (parent->audioDictationOn) {
-    if (!wavRecorder.initialised) {
-      wavRecorder.init(1);
-    }
-    wavRecorder.startRecording(juce::File(makeTempWavInCwd("dictation").string()));
-  }
-
   captureOverlay->resized();
   aiOverlay->resized();
-  //reportOverlay->resized();
   resized();
   repaint();
 }
 
 
 void CaptureComponent::stop() {
-  Poco::Path finalAudio;
-  if (wavRecorder.isRecording()) {
-    wavRecorder.stop();
-    finalAudio = MRImageSet->cwd;
-    finalAudio.makeDirectory();
-    finalAudio.setFileName("dictation");
-    finalAudio.setExtension("wav");
-    wavRecorder.writeFile.moveFileTo(juce::File(finalAudio.toString()));
-  }
   if (recording) { stopRecording(); }
   if (simulating) { stopSimulating(); }
 
-  // if (parent->audioDictationOn) {
-    if (true){
-    Poco::FastMutex::ScopedLock lock(parent->annotate->voiceAnnoMutex);
-    // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index, juce::File(finalAudio.toString())));
-    // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/low_feat_10x/dictation.wav")));
-    // parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File("/home/cm/Documents/data/blur_test/config/0/dictation.wav")));
-      auto p = Poco::Path(sCam->inputFileOverride).parent().pushDirectory("dictation.wav").toString();
-      auto d = MRImageSet->cwd.makeDirectory();
-      d.setFileName("dictation.wav");
-      Poco::File(p).copyTo(d.toString());
-      parent->annotate->voiceAnnoOutstanding.push(std::pair(MRImageSet->index,juce::File(p)));
-    parent->annotate->newVoiceAnnotation.set();
-  }
   save_slide_set();
   ready = true;
   std::cout<<"*************** READY ***************"<<std::endl;
